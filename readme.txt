@@ -31,8 +31,9 @@ POSSE-first: every syndication destination configured on your site is enabled by
 
 * WordPress 6.5 or newer.
 * PHP 8.2 or newer.
+* The [IndieAuth plugin](https://wordpress.org/plugins/indieauth/) by Matthias Pfefferle and David Shanske (required dependency — Micropub itself requires this).
 * The [Micropub plugin](https://wordpress.org/plugins/micropub/) by David Shanske (required dependency).
-* Recommended: the [IndieAuth plugin](https://wordpress.org/plugins/indieauth/), [Syndication Links](https://wordpress.org/plugins/syndication-links/), and [Post Kinds](https://wordpress.org/plugins/indieweb-post-kinds/) for full functionality.
+* Recommended: [Syndication Links](https://wordpress.org/plugins/syndication-links/) and [Post Kinds](https://wordpress.org/plugins/indieweb-post-kinds/) for full functionality.
 
 == Companion Plugins ==
 
@@ -47,11 +48,14 @@ Outpost works standalone with just Micropub, and lights up additional features w
 
 == Installation ==
 
-1. Install and activate the Micropub plugin from the WordPress.org plugin directory.
-2. Install Outpost from the WordPress.org plugin directory and activate.
-3. Visit Settings → Outpost to configure syndication destinations and (optionally) the route slug.
-4. Open `/post` on your phone. Tap "Add to Home Screen" in your browser to install the PWA.
-5. From the settings page, drag the bookmarklet for each post kind to your bookmark bar.
+1. Install and activate the IndieAuth plugin from the WordPress.org plugin directory.
+2. Install and activate the Micropub plugin from the WordPress.org plugin directory.
+3. Install Outpost from the WordPress.org plugin directory and activate.
+4. Visit Settings → Outpost to configure syndication destinations and (optionally) the route slug.
+5. Open `/post` on your phone. Tap "Add to Home Screen" in your browser to install the PWA.
+6. From the settings page, drag the bookmarklet for each post kind to your bookmark bar.
+
+If you skip step 1 the Micropub plugin will refuse to register its endpoints; Outpost surfaces this as a "[Install IndieAuth]" admin notice.
 
 == Frequently Asked Questions ==
 

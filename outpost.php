@@ -35,6 +35,7 @@ define( 'OUTPOST_MIN_PHP', '8.2' );
 
 // Companion plugin file paths (for is_plugin_active checks).
 define( 'OUTPOST_MICROPUB_PLUGIN_FILE', 'micropub/micropub.php' );
+define( 'OUTPOST_INDIEAUTH_PLUGIN_FILE', 'indieauth/indieauth.php' );
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.
@@ -49,25 +50,34 @@ function outpost_meets_requirements(): bool {
 }
 
 /**
- * Detect the current state of the required Micropub companion plugin.
+ * Detect the registration state of any companion plugin by its main file path.
  *
- * Returns one of three values describing what the user needs to do next.
+ * Returns one of three values:
+ * - 'active'   — `is_plugin_active()` reports true
+ * - 'inactive' — file is on disk under wp-content/plugins but not activated
+ * - 'absent'   — file is not on disk
+ *
+ * Note: 'active' here is WordPress's registration state, not "fully functional."
+ * Some plugins (notably Micropub) self-disable when their own dependencies are
+ * missing; that case looks 'active' to WP but is functionally inactive. The
+ * caller is responsible for chaining dependency checks in upstream-first order.
  *
  * @since 0.1.0
  *
+ * @param string $plugin_file Plugin main file path relative to wp-content/plugins/.
  * @return string One of 'active', 'inactive', or 'absent'.
  */
-function outpost_micropub_status(): string {
+function outpost_companion_plugin_status( string $plugin_file ): string {
 	if ( ! function_exists( 'is_plugin_active' ) ) {
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 	}
 
-	if ( is_plugin_active( OUTPOST_MICROPUB_PLUGIN_FILE ) ) {
+	if ( is_plugin_active( $plugin_file ) ) {
 		return 'active';
 	}
 
 	$installed = get_plugins();
-	if ( isset( $installed[ OUTPOST_MICROPUB_PLUGIN_FILE ] ) ) {
+	if ( isset( $installed[ $plugin_file ] ) ) {
 		return 'inactive';
 	}
 
@@ -75,24 +85,115 @@ function outpost_micropub_status(): string {
 }
 
 /**
+ * Detect the state of the IndieAuth companion plugin.
+ *
+ * IndieAuth is a hard dependency of the Micropub plugin (David Shanske), so
+ * Outpost surfaces IndieAuth status as the most-upstream notice — without
+ * IndieAuth, Micropub itself refuses to register its endpoints.
+ *
+ * @since 0.1.0
+ *
+ * @return string One of 'active', 'inactive', or 'absent'.
+ */
+function outpost_indieauth_status(): string {
+	return outpost_companion_plugin_status( OUTPOST_INDIEAUTH_PLUGIN_FILE );
+}
+
+/**
+ * Detect the state of the Micropub companion plugin.
+ *
+ * @since 0.1.0
+ *
+ * @return string One of 'active', 'inactive', or 'absent'.
+ */
+function outpost_micropub_status(): string {
+	return outpost_companion_plugin_status( OUTPOST_MICROPUB_PLUGIN_FILE );
+}
+
+/**
  * Whether the plugin's full feature surface (PWA composer, REST endpoints) is available.
+ *
+ * Both IndieAuth and Micropub must be active. The Micropub plugin hard-requires
+ * IndieAuth at its own preflight, so a Micropub-active-but-IndieAuth-missing
+ * environment is functionally broken from Outpost's perspective.
  *
  * Used by the route handler and REST controller in later sessions to decide whether
  * to render the composer or a friendly install-prompt page (PWA) / 503 response (REST).
  *
  * @since 0.1.0
  *
- * @return bool True only when Micropub is active.
+ * @return bool True only when both IndieAuth and Micropub are active.
  */
 function outpost_is_ready(): bool {
-	return outpost_meets_requirements() && 'active' === outpost_micropub_status();
+	return outpost_meets_requirements()
+		&& 'active' === outpost_indieauth_status()
+		&& 'active' === outpost_micropub_status();
 }
 
 /**
- * Render the Micropub status admin notice on every admin screen.
+ * Render a single dependency notice with an action button.
  *
- * Hybrid gate: plugin loads regardless, but warns when Micropub is missing
- * or installed-but-deactivated. Admins with insufficient capabilities see nothing.
+ * @since 0.1.0
+ *
+ * @param string $plugin_label Human-readable plugin name (untranslated; brand name).
+ * @param string $plugin_file  Plugin main file path relative to wp-content/plugins/.
+ * @param string $wporg_slug   WordPress.org plugin slug for the install link.
+ * @param string $status       'inactive' or 'absent' (caller filters out 'active').
+ */
+function outpost_render_dependency_notice( string $plugin_label, string $plugin_file, string $wporg_slug, string $status ): void {
+	if ( 'inactive' === $status ) {
+		$action_url   = wp_nonce_url(
+			self_admin_url( 'plugins.php?action=activate&plugin=' . $plugin_file ),
+			'activate-plugin_' . $plugin_file
+		);
+		$action_label = sprintf(
+			/* translators: %s: plugin name. */
+			__( 'Activate %s', 'outpost' ),
+			$plugin_label
+		);
+		$message      = sprintf(
+			/* translators: %s: plugin name. */
+			__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost' ),
+			$plugin_label
+		);
+	} else {
+		$action_url   = wp_nonce_url(
+			self_admin_url( 'update.php?action=install-plugin&plugin=' . $wporg_slug ),
+			'install-plugin_' . $wporg_slug
+		);
+		$action_label = sprintf(
+			/* translators: %s: plugin name. */
+			__( 'Install %s', 'outpost' ),
+			$plugin_label
+		);
+		$message      = sprintf(
+			/* translators: %s: plugin name. */
+			__( 'Outpost requires the %s plugin. Install it from WordPress.org to continue.', 'outpost' ),
+			$plugin_label
+		);
+	}
+
+	printf(
+		'<div class="notice notice-warning"><p>%1$s &nbsp; <a class="button button-primary" href="%2$s">%3$s</a></p></div>',
+		esc_html( $message ),
+		esc_url( $action_url ),
+		esc_html( $action_label )
+	);
+}
+
+/**
+ * Render the dependency-status admin notice on every admin screen.
+ *
+ * Hybrid gate: plugin loads regardless, but warns when a required dependency
+ * is missing or inactive. Notices surface in upstream-first order:
+ *
+ *   1. Host requirements (WP and PHP versions)
+ *   2. IndieAuth (required by Micropub's own preflight)
+ *   3. Micropub (required by Outpost's PWA and REST surfaces)
+ *
+ * The chain short-circuits — once a notice is shown, downstream checks
+ * are skipped because they can't be satisfied without the upstream one.
+ * Admins without `install_plugins` capability see nothing.
  *
  * @since 0.1.0
  */
@@ -116,33 +217,17 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
-	$status = outpost_micropub_status();
-	if ( 'active' === $status ) {
+	$indieauth = outpost_indieauth_status();
+	if ( 'active' !== $indieauth ) {
+		outpost_render_dependency_notice( 'IndieAuth', OUTPOST_INDIEAUTH_PLUGIN_FILE, 'indieauth', $indieauth );
 		return;
 	}
 
-	if ( 'inactive' === $status ) {
-		$action_url   = wp_nonce_url(
-			self_admin_url( 'plugins.php?action=activate&plugin=' . OUTPOST_MICROPUB_PLUGIN_FILE ),
-			'activate-plugin_' . OUTPOST_MICROPUB_PLUGIN_FILE
-		);
-		$action_label = __( 'Activate Micropub', 'outpost' );
-		$message      = __( 'Outpost needs the Micropub plugin to be activated before the composer can run.', 'outpost' );
-	} else {
-		$action_url   = wp_nonce_url(
-			self_admin_url( 'update.php?action=install-plugin&plugin=micropub' ),
-			'install-plugin_micropub'
-		);
-		$action_label = __( 'Install Micropub', 'outpost' );
-		$message      = __( 'Outpost requires the Micropub plugin by David Shanske. Install it from WordPress.org to activate the composer.', 'outpost' );
+	$micropub = outpost_micropub_status();
+	if ( 'active' !== $micropub ) {
+		outpost_render_dependency_notice( 'Micropub', OUTPOST_MICROPUB_PLUGIN_FILE, 'micropub', $micropub );
+		return;
 	}
-
-	printf(
-		'<div class="notice notice-warning"><p>%1$s &nbsp; <a class="button button-primary" href="%2$s">%3$s</a></p></div>',
-		esc_html( $message ),
-		esc_url( $action_url ),
-		esc_html( $action_label )
-	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
 

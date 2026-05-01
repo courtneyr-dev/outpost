@@ -62,8 +62,8 @@ Detection runs at runtime (not install-time) so the UI updates as users activate
 
 | Companion | Outpost behavior |
 |-----------|------------------|
-| `micropub/micropub.php` (David Shanske) | **Required.** Hybrid gate: plugin loads, admin notice when absent, PWA route renders friendly install page, REST routes return 503. |
-| `indieauth/indieauth.php` | Use as auth provider. Falls back to WordPress application passwords if missing. |
+| `indieauth/indieauth.php` (Pfefferle, Shanske) | **Required.** The Micropub plugin hard-requires IndieAuth at its own preflight, so Outpost surfaces IndieAuth status as the most-upstream notice. Detected by `outpost_indieauth_status()`. |
+| `micropub/micropub.php` (David Shanske) | **Required.** Hybrid gate: plugin loads, admin notice when IndieAuth-or-Micropub is absent or inactive, PWA route renders friendly install page, REST routes return 503. Detected by `outpost_micropub_status()`. |
 | Post Kinds for IndieWeb | Surface Listen/Watch/Read/Checkin/Play tabs. Surface Follow sub-mode. |
 | Post Formats for Block Themes | Format selector in More pull-out. Auto-detect from content. |
 | Link Extension for XFN | Relationship picker on reply targets. |
