@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Plugin-core hygiene — wordpress-plugin-core audit)
+- `uninstall.php` — runs once when an admin clicks "Delete" on the plugin (after deactivation). Clears `outpost_rewrite_version` (the only persistent option Outpost stored at v0.1.6, added by A2's flush guard). Forward-looking comments mark where future cleanup belongs as B2 / Phase F / Phase H surfaces add their own persistent state, including a multisite iteration pattern.
+- `phpcs.xml.dist` and `phpstan.neon.dist` extended to include `uninstall.php` in lint + analyze scope.
+
 ### Added (Security hardening — wordpress-security follow-up audit)
 - `pwa/src/lib/url-validation.ts` — `is_safe_http_url(value)` rejects malformed URLs and any scheme other than `http://` / `https://`. Closes two attack vectors:
   - **User-input `me` URL** (typed into LoginScreen) is now validated in `auth-flow.ts:begin_login` before reaching `fetch()`. Pasting `javascript:alert(1)` produces a clear inline error rather than failing opaquely.

@@ -5,6 +5,7 @@ parameters:
     level: 6
     paths:
         - outpost.php
+        - uninstall.php
         - includes/
     excludePaths:
         - vendor/

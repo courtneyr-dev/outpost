@@ -7,6 +7,7 @@
 	     class-{slug}.php convention. Add tests/ back when there's a clean
 	     way to scope WPCS rules per-directory. -->
 	<file>./outpost.php</file>
+	<file>./uninstall.php</file>
 	<file>./includes</file>
 
 	<exclude-pattern>*/vendor/*</exclude-pattern>
