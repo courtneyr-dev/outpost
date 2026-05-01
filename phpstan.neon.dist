@@ -8,7 +8,10 @@ parameters:
         - includes/
     excludePaths:
         - vendor/
-        - node_modules/
+        # node_modules/ exists locally and in the test-js CI job, but not in
+        # the lint-php CI job where PHPStan runs. (?) marks it optional so
+        # PHPStan tolerates absence.
+        - node_modules/ (?)
         - build/
         - pwa/
         - tests/
