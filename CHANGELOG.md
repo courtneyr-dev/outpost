@@ -7,6 +7,14 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (between-session tooling)
+- `.github/workflows/ci.yml` — CI gate for every push to `main` and every PR. Three jobs: `lint-php` (PHPCS + PHPStan), `test-php` matrix across PHP 8.2 / 8.3 / 8.4 (PHPUnit unit suite), `test-js` (TypeScript strict typecheck + Vitest + production-build smoke). Composer + npm caches keyed on lockfile hashes; concurrency group cancels in-flight runs on the same branch when a new commit lands; `permissions: contents: read` only.
+- `docs/security/PHP-SURFACE-CHECKLIST.md` extended with three cross-cutting patterns from the wordpress-security audit: object-injection avoidance (`json_decode` over `unserialize`), path-traversal validation (`realpath()` + base-directory check), inline JS / `data-*` attribute escaping context.
+- README badges (CI status, latest release, license) and v0.1.4 status line.
+
+### Changed (between-session tooling)
+- `phpstan.neon.dist`: `node_modules/` exclude path marked optional (`(?)`) so PHPStan tolerates absence in the lint-php CI job (which only runs `composer install`, not `npm install`).
+
 ## [0.1.4] — 2026-05-01
 
 This release consolidates Sessions A1 + A2 (foundation → routes/shell), B0a + B0b (build pipeline → IndieAuth login), and B1 (Micropub client → note posting). The plugin is functional end-to-end on staging: open `/post/`, sign in with IndieAuth, post a note via Micropub, see the new post URL. v0.1.0 was the scaffold; v0.1.4 is the first version that actually posts.
