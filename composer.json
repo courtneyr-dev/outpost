@@ -1,0 +1,67 @@
+{
+  "name": "courtneyr-dev/outpost",
+  "description": "Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Notes, replies, likes, photos, and life-tracking entries from your phone with one-tap syndication.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+    {
+      "name": "Courtney Robertson",
+      "homepage": "https://courtneyr.dev"
+    }
+  ],
+  "require": {
+    "php": ">=8.2"
+  },
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
+    "phpstan/phpstan": "^2.0",
+    "phpunit/phpunit": "^10.5",
+    "szepeviktor/phpstan-wordpress": "^2.0",
+    "wp-coding-standards/wpcs": "^3.1",
+    "yoast/phpunit-polyfills": "^4.0"
+  },
+  "autoload": {
+    "classmap": [
+      "includes/"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Outpost\\Tests\\": "tests/phpunit/"
+    }
+  },
+  "scripts": {
+    "lint": "phpcs",
+    "lint:fix": "phpcbf",
+    "analyze": "phpstan analyse --memory-limit=2G",
+    "analyze:baseline": "phpstan analyse --generate-baseline",
+    "test": "phpunit",
+    "test:unit": "phpunit --testsuite=unit",
+    "test:integration": "phpunit --testsuite=integration",
+    "test:coverage": "phpunit --coverage-html coverage/php",
+    "audit": "composer audit",
+    "security": "@audit",
+    "i18n:make-pot": "wp i18n make-pot . languages/outpost.pot --domain=outpost",
+    "check": [
+      "@lint",
+      "@analyze",
+      "@test"
+    ],
+    "check:security": [
+      "@lint",
+      "@audit"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "sort-packages": true,
+    "platform": {
+      "php": "8.2"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

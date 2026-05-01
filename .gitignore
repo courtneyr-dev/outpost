@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts (generated, not tracked)
+build/
+dist/
+pwa/dist/
+.vite/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.buildpath
+
+# Testing
+coverage/
+.phpunit.result.cache
+.phpunit.cache
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Deployment artifacts
+*.zip
+test-dist/
+dist-test/
+wordpress-org-upload/
+WORDPRESS-ORG-UPLOAD-README.md
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment / secrets — never commit these
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Site-specific values that must not leak into the public repo
+staging-url.txt
+production-url.txt
+.outpost-site-config.json
+
+# Temporary files
+tmp/
+temp/
+*.xml
+!phpunit.xml.dist
+blueprint-local.json
+PLAYGROUND-URL.txt
+
+# Package manager locks — tracked for reproducible builds
+# (uncomment to exclude)
+# package-lock.json
+# composer.lock
+
+# WordPress core (defensive — Outpost is a sibling repo, not a WP install,
+# but this prevents accidental commits if dragged into one)
+wp-content/
+wp-admin/
+wp-includes/
+
+# Note: .wordpress-org/ is tracked in git for version control
+# but excluded from plugin ZIP via .distignore
