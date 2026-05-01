@@ -60,10 +60,12 @@ One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the iOS bot
 
 Detection runs at runtime (not install-time) so the UI updates as users activate plugins. Adapter classes live at `includes/companions/`. Composer code never imports companion-specific code directly.
 
+The dependency chain is **upstream-first**: `[indieauth/indieauth.php, micropub/micropub.php]`. Notice rendering and REST 503 reasons short-circuit on the first unsatisfied entry — installing a downstream dependency before the upstream one is met produces a broken state (Micropub plugin's own preflight fails without IndieAuth).
+
 | Companion | Outpost behavior |
 |-----------|------------------|
-| `indieauth/indieauth.php` (Pfefferle, Shanske) | **Required.** The Micropub plugin hard-requires IndieAuth at its own preflight, so Outpost surfaces IndieAuth status as the most-upstream notice. Detected by `outpost_indieauth_status()`. |
-| `micropub/micropub.php` (David Shanske) | **Required.** Hybrid gate: plugin loads, admin notice when IndieAuth-or-Micropub is absent or inactive, PWA route renders friendly install page, REST routes return 503. Detected by `outpost_micropub_status()`. |
+| `indieauth/indieauth.php` (Pfefferle, Shanske) | **Required (plugin install).** The Micropub plugin hard-requires IndieAuth at its own preflight, so Outpost surfaces IndieAuth status as the most-upstream notice. App passwords are *not* an alternative to installing the IndieAuth plugin — they remain a runtime fallback only when the IndieAuth endpoint is unreachable for an already-installed IndieAuth plugin. Detected by `outpost_indieauth_status()`. |
+| `micropub/micropub.php` (David Shanske) | **Required (plugin install).** Hybrid gate: plugin loads, admin notice when any chain entry is absent or inactive, PWA route renders friendly install page, REST routes return 503 with the chain entry name as the reason. Detected by `outpost_micropub_status()`. |
 | Post Kinds for IndieWeb | Surface Listen/Watch/Read/Checkin/Play tabs. Surface Follow sub-mode. |
 | Post Formats for Block Themes | Format selector in More pull-out. Auto-detect from content. |
 | Link Extension for XFN | Relationship picker on reply targets. |
@@ -145,6 +147,14 @@ Outpost evolves from prior IndieWeb work for WordPress. Credit these in `readme.
 ## Forbidden Vocabulary
 
 In commits, code comments, copy, admin labels, and docs: avoid *delve, leverage, synergy, robust, seamless, ecosystem (non-tech sense), stakeholder, bandwidth (non-tech sense), pivot, agentic AI, AI agents*. Use plain language: "uses" not "leverages," "thorough" not "robust," "smooth" not "seamless," "people involved" not "stakeholders."
+
+## Session A1 — Design Constraints
+
+These constraints are inherited from Session A0's staging discovery. Honor them when implementing the companion detector:
+
+1. **`outpost_companion_plugin_status()` becomes `Outpost_Companion_Detector::status()`** — a static method on the detector class. Named wrappers per companion call through it: `Outpost_Companion_Detector::is_indieauth_active()`, `::is_micropub_active()`, `::is_post_kinds_active()`, `::is_post_formats_active()`, `::is_xfn_active()`, `::is_syndication_links_active()`, `::is_yoast_active()`, `::is_activitypub_active()`. Procedural functions in `outpost.php` (`outpost_indieauth_status()`, `outpost_micropub_status()`) become thin shims that delegate to the static method, so the bootstrap file stays bootstrap-only.
+2. **Add `Outpost_Companion_Detector::dependency_chain()` and `::first_unsatisfied()`** as the single source of truth for the IndieAuth → Micropub ordering. `dependency_chain()` returns `['indieauth/indieauth.php', 'micropub/micropub.php']`. `first_unsatisfied()` returns the first chain entry not in `'active'` state, or `null`. Future sessions (REST 503 reasons in B2, PWA install-prompt page in A2, first-run wizard in H1) iterate this single source instead of hard-coding the order.
+3. **IndieAuth is hard-required at the plugin-install level**, not just at the runtime auth level. The original prompt's Section 3 said "fall back to WordPress application passwords for the PWA" if IndieAuth was missing — staging test on 2026-05-01 showed the Micropub plugin itself hard-requires IndieAuth, so the fallback path is moot. CLAUDE.md is now the source of truth on this. Application passwords remain a fallback only for the Micropub bearer token at runtime if the user's already-installed IndieAuth endpoint is unreachable, not as an alternative to installing the IndieAuth plugin itself. **Update Session B0's plan when you get there** — the IndieAuth flow is required, not optional.
 
 ## Build Order (40 sessions)
 
