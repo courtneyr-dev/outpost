@@ -234,6 +234,20 @@ Closed 2026-05-01. The constraints below are now production code; the rationale 
 11. **CSS in the bundle for B0b; A3 will move tokens to server-rendered.** `pwa/src/styles/structure.css` ships in the Vite build. Per A3 design constraint #1, `styles/outpost-tokens.css` will be server-rendered and the structural CSS may relocate. Structure is plugin territory; color/font/radius/shadow tokens become theme-overridable via `var(--outpost-*, neutral-fallback)`.
 12. **`OUTPOST_VERSION` bumped to `0.1.2`.** A2 Locked Decision #16: any deployable behaviour change moves the version, even when it's not a rewrite-table change. B0b ships the JS bundle enqueue + the login UI + the manifest reader — all observable changes.
 
+## Session B1 — Locked Decisions (shipped)
+
+Closed 2026-05-01. The constraints below are now production code; the rationale stays here so future sessions don't re-litigate. B1 lands the Micropub client + a minimal note-posting form, replacing B0b's `ComposerPlaceholder`.
+
+1. **Per-post discovery, not persistent in token meta.** `discover_micropub_endpoint(me)` runs each fresh post; `NoteForm` caches the result in component state for the session. IDB schema unchanged — keeping it stable matters more than saving one HTTP request per post. B1c+ may persist `micropub_endpoint` in `StoredToken.meta` if discovery latency becomes a measurable UX issue.
+2. **Form-encoded body, not JSON.** `h=entry&content=<text>`. Simplest valid Micropub request; every server accepts it. JSON Micropub (richer microformat shapes for replies/photos/articles) lands when Phase C's modes need it.
+3. **201 Created and 202 Accepted both treated as success** per the Micropub spec. UI shows the same "Posted to: <url>" message for both — the async-vs-sync distinction isn't user-facing.
+4. **`MicropubError` codes:** `discovery_failed`, `no_endpoint`, `post_failed`, `no_location`. Mirrors the `AuthFlowError` pattern from B0b. UI prefixes message with the code (`<code>: <message>`) so screenshot triage from staging is fast.
+5. **`MicropubEnvironment { fetch }` is minimal.** No `crypto`/`random`/`indexedDB`. The Micropub client doesn't need them; fewer test stub surfaces is cheaper to maintain. Compare `IndieAuthEnvironment` (fetch + crypto + random) and `TokenStoreEnvironment` (indexedDB + crypto) — each env exposes only what its client actually consumes.
+6. **`micropub.ts` reuses parse helpers from `indieauth.ts`** rather than re-implementing DOM/Link-header parsing. `parse_link_header` and `parse_html_endpoints` are exported from indieauth specifically so micropub can import them. Discovery shape is identical between the two specs.
+7. **`composer-placeholder.tsx` deleted in this commit, not just unimported.** Replaced by `note-form.tsx`. Recoverable from `0cc82c9` if a future need re-emerges. Reducing surface area is the right call when "is there still a use for this?" is "no, never again."
+8. **Hard Contract verified for B1 CSS.** `.outpost-textarea` paint fallbacks: `background: var(--outpost-input-bg, transparent)`, `color: var(--outpost-input-fg, inherit)`, `border: 1px solid var(--outpost-border, currentColor)`. **Not `revert`** — `revert` for form inputs would force UA defaults that ignore the theme (opposite of what we want for inputs). The B0b button hotfix used `revert` correctly because BOTH `background` and `color` collapsed to the same value; for textareas the two properties have different fallbacks (`transparent` vs `inherit`) so they don't collapse. The `revert` rule is for elements where same-property collapse is the failure mode, not for all paint fallbacks.
+9. **`OUTPOST_VERSION` bumped to `0.1.4`** per A2 Locked Decision #16 (any deployable behaviour change moves the version). B1 ships a JS bundle change — observable behaviour on `/post/`.
+
 ## Build Order (40 sessions)
 
 Phase A: Foundation (slug, scaffold, companion detector, routes).

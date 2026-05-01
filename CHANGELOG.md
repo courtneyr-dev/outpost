@@ -7,6 +7,20 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session B1 — Micropub client + note-posting form)
+- `pwa/src/lib/micropub.ts` — `discover_micropub_endpoint(me)` reuses `parse_link_header` and `parse_html_endpoints` from `indieauth.ts`; `post_note({content, accessToken, micropubEndpoint})` POSTs `h=entry&content=...` form-encoded with the bearer token, parses the Location header for the new post URL. Handles 201 Created and 202 Accepted as success. `MicropubError` discriminates failure paths (`discovery_failed`, `no_endpoint`, `post_failed`, `no_location`).
+- `pwa/src/components/note-form.tsx` — minimal note-posting Preact form. Replaces `ComposerPlaceholder` from B0b. Discovers micropub endpoint on first post (cached in component state for the session), shows discovering / posting / posted / error states with `aria-live` regions, surfaces the new post URL as a clickable link.
+- `pwa/src/lib/micropub.test.ts` — 13 vitest tests covering Link-header / HTML-link-rel / first-wins discovery, network errors, 404s, 201 + 202 success cases, 4xx with body, missing Location header, lowercase Location header (HTTP/2 convention), fetch rejection, and `MicropubError` instanceof.
+- `pwa/src/styles/structure.css` — added `.outpost-textarea` (multi-line input geometry, same fallback pattern as `.outpost-input`) and `.outpost-form-actions` (button row layout). All paint goes through `var(--outpost-*, theme-fallback)` per the Hard Contract.
+
+### Changed (Session B1)
+- `outpost.php`: `OUTPOST_VERSION` bumped to `0.1.4` per A2 Locked Decision #16 (any deployable behaviour change moves the version).
+- `package.json`: bumped to `0.1.4` to match.
+- `pwa/src/index.tsx`: `App` mounts `NoteForm` instead of `ComposerPlaceholder` for the authenticated composer route.
+
+### Removed (Session B1)
+- `pwa/src/components/composer-placeholder.tsx` — replaced by `note-form.tsx`. Git history preserves the original (commit `0cc82c9` introduced it; this commit removes it).
+
 ### Added (Session B0b — login screen + auth-callback + PHP manifest reader)
 - `includes/class-pwa-assets.php` — `final`, static-only `Outpost_PWA_Assets`. Reads `build/pwa/.vite/manifest.json` (cached per request), resolves `entry_url()` and `entry_css_urls()` to plugin-URL + hashed asset paths. Fails gracefully (null / empty array) when manifest missing or invalid. `override_paths_for_tests()` substitutes a temp filesystem path + fake URL prefix for unit tests.
 - `pwa/src/lib/auth-flow.ts` — `begin_login(me, client_id, redirect_uri, scope?)` and `handle_callback(query, client_id, redirect_uri)`. State persists in sessionStorage. `AuthFlowError` with discriminating `code` (`state_mismatch`, `missing_state`, `exchange_failed`, `no_code`). Always clears sessionStorage in `finally` so partial flow doesn't poison retries.

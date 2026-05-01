@@ -5,7 +5,7 @@
  * current URL + token state:
  *
  *   - /post/auth/callback → AuthCallback (handles the IndieAuth code exchange)
- *   - /post/* with a stored token → ComposerPlaceholder (B0b confirmation UI)
+ *   - /post/* with a stored token → NoteForm (B1: minimal Micropub round-trip)
  *   - /post/* without a stored token → LoginScreen
  *   - /post/share-target → fallback message (Phase E lands this)
  *
@@ -19,7 +19,7 @@ import { useEffect, useState } from 'preact/hooks';
 import './styles/structure.css';
 import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
-import { ComposerPlaceholder } from './components/composer-placeholder';
+import { NoteForm } from './components/note-form';
 import { read_token, type StoredToken, type TokenStoreEnvironment } from './lib/token-store';
 
 type OutpostRoute = 'composer' | 'share-target' | 'auth-callback' | 'unknown';
@@ -114,7 +114,7 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	}
 
 	if (tokenState.status === 'present') {
-		return <ComposerPlaceholder token={tokenState.token} tokenStore={tokenStore} />;
+		return <NoteForm token={tokenState.token} tokenStore={tokenStore} />;
 	}
 
 	return <LoginScreen clientId={clientId} redirectUri={redirectUri} />;

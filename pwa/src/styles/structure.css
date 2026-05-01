@@ -122,3 +122,25 @@
 	font-size: 0.95rem;
 	color: var(--outpost-text-muted, inherit);
 }
+
+.outpost-textarea {
+	min-height: 7.5rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	font: inherit;
+	background: var(--outpost-input-bg, transparent);
+	color: var(--outpost-input-fg, inherit);
+	resize: vertical;
+}
+
+.outpost-textarea:focus {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-form-actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
