@@ -54,6 +54,23 @@ Neither file ships yet. Browsers tolerate this (the manifest stays valid, instal
 
 **Verification:** Stage 4 of any future smoke test inspects the manifest and confirms the icon URLs return 200 OK with the expected dimensions. Android Chrome install (when available) shows the brand icon, not a fallback.
 
+## A3-4 — Token defaults must verify at WCAG 4.5:1 contrast
+
+**Observed:** v0.1.8 wordpress-accessibility audit. Outpost's CSS uses `var(--outpost-*, theme-fallback)` for all paint, which means contrast at runtime depends on the theme's tokens (or the cascade fallback). Outpost can't claim WCAG 1.4.3 Contrast (Minimum, Level AA) compliance until A3 ships measurable defaults.
+
+**Gap:** No `styles/outpost-tokens.css` exists yet. A3 design constraint #1 (server-rendered tokens) is the right venue but it doesn't currently include a contrast requirement.
+
+**Ship:** when authoring `styles/outpost-tokens.css`:
+
+- [ ] `--outpost-primary-bg` and `--outpost-primary-fg` must meet 4.5:1 against each other.
+- [ ] `--outpost-input-bg` and `--outpost-input-fg` must meet 4.5:1.
+- [ ] `--outpost-error-bg` and `--outpost-error-fg` must meet 4.5:1 (errors are critical text per WCAG severity).
+- [ ] `--outpost-focus` must have 3:1 contrast against the surface where the focus ring will render (typically the page background).
+
+**Verification:** after building the token defaults, paste the values into a contrast checker (https://webaim.org/resources/contrastchecker/) for each pair. Document the resulting ratios in `THEME-INTEGRATION.md` (Phase J) so theme integrators know the *floor*; their overrides must meet or exceed the same ratios.
+
+**Theme contract:** the Hard Contract guarantees that themes can override Outpost's tokens. The corollary is that themes MUST themselves meet 4.5:1 in their override values. Outpost can't enforce this at runtime, but documenting the contract in `THEME-INTEGRATION.md` makes it explicit.
+
 ## Cross-cutting
 
-The three items above plus the existing CLAUDE.md A3 design constraints (server-rendered tokens, forced `safe-area-inset-bottom` only paint default, SW fetch handler stays out of A3) form the full A3 scope. CHANGELOG.md will reference both this file and the CLAUDE.md section when A3 closes.
+The four items above plus the existing CLAUDE.md A3 design constraints (server-rendered tokens, forced `safe-area-inset-bottom` only paint default, SW fetch handler stays out of A3) form the full A3 scope. CHANGELOG.md will reference both this file and the CLAUDE.md section when A3 closes.

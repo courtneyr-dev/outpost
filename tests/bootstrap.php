@@ -79,6 +79,11 @@ if ( ! function_exists( '_doing_it_wrong' ) ) {
 		// no-op; tests that care assert via WP_Mock::userFunction explicitly.
 	}
 }
+if ( ! function_exists( 'get_locale' ) ) {
+	function get_locale(): string {
+		return 'en_US';
+	}
+}
 
 // Load the bootstrap. This pulls in the constant block, the detector class,
 // the companion-base class, and every procedural helper outpost.php defines.

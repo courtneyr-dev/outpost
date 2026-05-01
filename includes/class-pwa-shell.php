@@ -62,7 +62,7 @@ final class Outpost_PWA_Shell {
 		// tags below are intentional inline outputs.
 		// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet, WordPress.WP.EnqueuedResources.NonEnqueuedScript
 		?><!doctype html>
-<html lang="en">
+<html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -171,7 +171,7 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		?>
 		<!doctype html>
-<html lang="en">
+<html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -202,7 +202,7 @@ final class Outpost_PWA_Shell {
 		);
 		?>
 		<!doctype html>
-<html lang="en">
+<html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

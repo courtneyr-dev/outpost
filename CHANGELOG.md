@@ -7,6 +7,14 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Accessibility — wordpress-accessibility audit)
+- `docs/accessibility/A11Y-CHECKLIST.md` — WCAG 2.1/2.2 Level AA per-surface audit. Status at v0.1.8 documents what's already correct (semantic landmarks, single `<h1>` per surface, `<label for>` ↔ `<input id>` association, `aria-labelledby` on cards, `aria-live="polite"` on AuthCallback transient states, `role="alert"` on error blocks, real `<button>`/`<a>`/`<input>` elements, 44px touch targets, focus rings). Forward-looking gates for A3 contrast verification, Phase C composer-mode focus management (WAI-ARIA tabs pattern), Phase D reduced-motion + offline announcements, Phase G axe-core CI job, Phase J real-device screen reader testing matrix.
+- `docs/A3-REQUIREMENTS.md` extended with **A3-4** — token defaults must verify at WCAG 4.5:1 contrast. Documents the theme contract corollary (themes that override Outpost tokens must themselves meet 4.5:1).
+
+### Changed (Accessibility)
+- `<html lang>` in `render_shell()`, `render_install_prompt()`, and `render_host_unmet_prompt()` now reflects the WordPress site locale via `get_locale()` (with `_` → `-` substitution for BCP 47 format). Previously hardcoded `"en"` regardless of site language. Closes WCAG 3.1.1 Language of Page.
+- `tests/bootstrap.php` adds a `get_locale()` stub returning `'en_US'` for unit tests (the SUT now references the function at file-load time via the shell render paths).
+
 ### Added (Plugin-core hygiene — wordpress-plugin-core audit)
 - `uninstall.php` — runs once when an admin clicks "Delete" on the plugin (after deactivation). Clears `outpost_rewrite_version` (the only persistent option Outpost stored at v0.1.6, added by A2's flush guard). Forward-looking comments mark where future cleanup belongs as B2 / Phase F / Phase H surfaces add their own persistent state, including a multisite iteration pattern.
 - `phpcs.xml.dist` and `phpstan.neon.dist` extended to include `uninstall.php` in lint + analyze scope.
