@@ -135,6 +135,23 @@ These apply everywhere PHP runs:
 - WordPress's `error_log` for failures that need investigation
 - `_doing_it_wrong()` for developer-facing API misuse
 
+**Avoid object injection:**
+- Never `unserialize()` user-influenced data. `unserialize()` invokes `__wakeup()` / `__destruct()` on whatever class shapes the input claims, which an attacker can use to trigger PHP object instantiation chains (POP gadgets).
+- Use `wp_json_decode()` / `json_decode()` for user-influenced structured data.
+- Outpost has zero `unserialize` / `maybe_unserialize` calls at v0.1.4 (audited 2026-05-01). When B2+ adds REST endpoints or settings storage, keep it that way.
+
+**Path traversal in file operations:**
+- Any file path that incorporates user-influenced data must be validated against an allowlisted base directory.
+- Pattern: build the candidate path → `realpath()` to resolve `..` and symlinks → check `str_starts_with( $real, $allowed_base )`.
+- Outpost's only file read at v0.1.4 (`Outpost_PWA_Assets::manifest_path()`) uses a deterministic constant path (`OUTPOST_PLUGIN_DIR . 'build/pwa/.vite/manifest.json'`); no traversal vector.
+- Phase E's photo upload pipeline + any future settings that store filesystem paths get the `realpath()` check.
+
+**Inline JS and `data-*` attribute contexts:**
+- Inline `<script>` blocks that interpolate PHP variables: `esc_js()` for string content; `wp_json_encode()` for objects (and `esc_attr( wp_json_encode( $config ) )` if embedding the JSON in a `data-*` attribute rather than a script tag).
+- `data-*` attributes: `esc_attr()` is sufficient for the HTML-attribute context. Use `wp_json_encode()` first if the value is structured.
+- Outpost's only inline `<script>` (SW registration in `Outpost_PWA_Shell::render_shell()`) is static — no PHP interpolation, no escaping required. `data-outpost-blocker` uses `esc_attr()`.
+- Prefer `wp_localize_script()` over inline `<script>` when interpolating user data; it handles JSON encoding + escaping in one step.
+
 ---
 
 ## Validation commands
