@@ -1,10 +1,14 @@
 # Outpost
 
+[![CI](https://github.com/courtneyr-dev/outpost/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/courtneyr-dev/outpost/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/courtneyr-dev/outpost)](https://github.com/courtneyr-dev/outpost/releases/latest)
+[![License](https://img.shields.io/badge/license-GPLv2%2B-blue.svg)](LICENSE)
+
 > *Post from your outpost. Reach your people everywhere.*
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built for WordPress 6.5+ / 7.0 development branch.
 
-**Status:** Pre-release. Session A0 scaffold deployed; PWA shell, composer modes, and companion adapters land in subsequent sessions.
+**Status:** Pre-release, [v0.1.4](https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.4) — first functional end-to-end version. Sign in via IndieAuth, post a note via Micropub, see the new post URL. Composer modes (Reply, Photo, Article, Listen group) land in Phase C.
 
 ## What this is
 
