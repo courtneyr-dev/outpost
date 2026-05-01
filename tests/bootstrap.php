@@ -21,6 +21,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/stubs/wordpress/' );
 }
 
+// Suppress the post-render `exit` in Outpost_PWA_Shell::halt() so unit tests
+// can capture render output via ob_start without aborting PHPUnit.
+if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
+	define( 'OUTPOST_TESTING_PWA_SHELL', true );
+}
+
 // Stubs for the WordPress functions outpost.php calls at file-load time. These
 // run before outpost.php is `require`d, so the bootstrap doesn't error on
 // missing-function. Their bodies are intentionally no-ops — anything a test

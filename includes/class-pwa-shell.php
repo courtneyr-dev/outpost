@@ -75,6 +75,7 @@ final class Outpost_PWA_Shell {
 </body>
 </html>
 		<?php
+		self::halt();
 	}
 
 	/**
@@ -159,6 +160,7 @@ final class Outpost_PWA_Shell {
 </body>
 </html>
 		<?php
+		self::halt();
 	}
 
 	/**
@@ -187,6 +189,7 @@ final class Outpost_PWA_Shell {
 </body>
 </html>
 		<?php
+		self::halt();
 	}
 
 	/**
@@ -223,6 +226,7 @@ final class Outpost_PWA_Shell {
 
 		self::send_json_header();
 		echo wp_json_encode( $manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+		self::halt();
 	}
 
 	/**
@@ -248,6 +252,7 @@ self.addEventListener('activate', (event) => {
 // Scope is /post/ only — registered explicitly in the shell so this SW
 // never tries to control the parent WordPress site.
 		<?php
+		self::halt();
 	}
 
 	/**
@@ -271,5 +276,23 @@ self.addEventListener('activate', (event) => {
 		if ( ! headers_sent() ) {
 			header( 'Content-Type: application/javascript; charset=utf-8' );
 		}
+	}
+
+	/**
+	 * Halt PHP execution after a response has been sent.
+	 *
+	 * Without this, WordPress continues past `template_redirect` and renders
+	 * the theme template, concatenating it onto our shell/manifest/sw output.
+	 *
+	 * The unit-test bootstrap defines `OUTPOST_TESTING_PWA_SHELL` so test runs
+	 * skip the `exit` and the assertions on captured output still work.
+	 *
+	 * @codeCoverageIgnore
+	 */
+	private static function halt(): void {
+		if ( defined( 'OUTPOST_TESTING_PWA_SHELL' ) && OUTPOST_TESTING_PWA_SHELL ) {
+			return;
+		}
+		exit;
 	}
 }

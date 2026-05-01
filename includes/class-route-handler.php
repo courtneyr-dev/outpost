@@ -44,7 +44,10 @@ final class Outpost_Route_Handler {
 	public static function init(): void {
 		add_action( 'init', array( __CLASS__, 'register_rewrite_rules' ) );
 		add_filter( 'query_vars', array( __CLASS__, 'register_query_var' ) );
-		add_action( 'template_redirect', array( __CLASS__, 'dispatch' ) );
+		// Priority 1 so dispatch fires before redirect_canonical (priority 10),
+		// otherwise WP would 302 our manifest/sw URLs into trailing-slash variants
+		// before the route handler sees them.
+		add_action( 'template_redirect', array( __CLASS__, 'dispatch' ), 1 );
 	}
 
 	/**
