@@ -7,6 +7,25 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session B0b — login screen + auth-callback + PHP manifest reader)
+- `includes/class-pwa-assets.php` — `final`, static-only `Outpost_PWA_Assets`. Reads `build/pwa/.vite/manifest.json` (cached per request), resolves `entry_url()` and `entry_css_urls()` to plugin-URL + hashed asset paths. Fails gracefully (null / empty array) when manifest missing or invalid. `override_paths_for_tests()` substitutes a temp filesystem path + fake URL prefix for unit tests.
+- `pwa/src/lib/auth-flow.ts` — `begin_login(me, client_id, redirect_uri, scope?)` and `handle_callback(query, client_id, redirect_uri)`. State persists in sessionStorage. `AuthFlowError` with discriminating `code` (`state_mismatch`, `missing_state`, `exchange_failed`, `no_code`). Always clears sessionStorage in `finally` so partial flow doesn't poison retries.
+- `pwa/src/components/login-screen.tsx` — single-form Preact component with the `me` URL field defaulting to `location.origin + '/'`. Surfaces discovery errors inline.
+- `pwa/src/components/auth-callback.tsx` — handles the IndieAuth callback on mount, redirects on success via `location.replace` (so the back button doesn't replay the consumed code), renders a "Start over" affordance on error.
+- `pwa/src/components/composer-placeholder.tsx` — logged-in state for B0b, shows `me` + scope and a "Sign out" button. Phase C replaces with the actual composer modes.
+- `pwa/src/styles/structure.css` — minimal structural CSS for B0b's three surfaces. Every paintable property goes through `var(--outpost-*, neutral-fallback)` per the Hard Contract. A3 will relocate tokens to a server-rendered file.
+- `pwa/src/index.tsx` — `App` component with mount logic that branches on `detect_route` and token state. `mount(root, props)` exported for testability; auto-mount runs on import only when `#outpost-root` exists.
+- `tests/unit/PWAAssetsTest.php` — 7 PHP unit tests covering missing/unreadable/invalid/valid manifest states plus the per-request cache assertion.
+- `pwa/src/lib/auth-flow.test.ts` — 7 vitest tests covering happy-path exchange, all four error codes, and 4xx token-endpoint responses.
+- 7 new tests bring vitest total to 45 → 52; PHP unit total to 51 → 58.
+
+### Changed (Session B0b)
+- `outpost.php`: `OUTPOST_VERSION` bumped to `0.1.2`. New `require_once` for `class-pwa-assets.php`.
+- `includes/class-pwa-shell.php` `render_shell()`: emits `<script type="module">` for the entry plus `<link rel="stylesheet">` for any associated CSS chunks, both via `Outpost_PWA_Assets`. Skips both tags entirely when the manifest is missing.
+- `.gitignore`: `build/` ignore changed to `build/*` (ignore contents) plus `!build/pwa/` exception so the bundle ships via the staging rsync. `.vite/` anchored to project root with a leading slash so the production manifest at `build/pwa/.vite/manifest.json` is tracked while the dev-server cache stays ignored.
+- `docs/STAGING-DEPLOY.md`: added "The `npm run build` deploy ritual" section documenting the build-then-commit-then-bump sequence and the symptom of forgetting (empty `<main>` on staging).
+- `build/pwa/` is now tracked in git. Initial bundle: 25 KB JS (9.28 KB gzipped) + 1.81 KB CSS (0.55 KB gzipped) + manifest.
+
 ### Added (Session B0a — PWA build pipeline + IndieAuth client + token store)
 - `vite.config.ts`, `tsconfig.json`, `vitest.config.ts` — build + typecheck + test configuration. Vite runs in manifest mode (`build.manifest: true`) so `build/pwa/.vite/manifest.json` maps source paths to hashed output filenames; B0b reads the manifest from PHP. TypeScript at strict ceiling: `strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + noImplicitOverride + noImplicitReturns`. Vitest runs in happy-dom for DOM-touching tests.
 - `pwa/src/index.tsx` — entry stub with `detect_route(pathname)` that maps `/post/`, `/post/share-target/*`, and `/post/auth/callback/*` to discriminated route values. Reads `location.pathname` because the PHP shell hard-codes `data-outpost-route="composer"` for all three paths.

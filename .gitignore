@@ -2,11 +2,24 @@
 node_modules/
 vendor/
 
-# Build artifacts (generated, not tracked)
-build/
+# Build artifacts (generated)
+# `build/pwa/` IS tracked: the gd-wordpress-deployer rsync reflects the
+# working tree, so the production-shaped staging tests need the bundle on
+# disk. Mirrors the courtneyr-child theme pattern of committing built CSS.
+# `npm run build` is part of the deploy ritual — see docs/STAGING-DEPLOY.md.
+#
+# Pattern: ignore the contents of build/ (build/*) rather than the
+# directory itself (build/), so the !build/pwa/ exception can re-include
+# the PWA bundle. Excluding a directory entry blocks all re-inclusion of
+# its children — gitignore won't recurse into an ignored directory.
+build/*
+!build/pwa/
 dist/
 pwa/dist/
-.vite/
+# Anchor .vite/ to the project root so Vite's dev server cache stays
+# ignored, but the production manifest at build/pwa/.vite/manifest.json
+# (which the PHP shell reads to look up cache-busted asset URLs) is tracked.
+/.vite/
 
 # OS files
 .DS_Store

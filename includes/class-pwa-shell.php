@@ -53,6 +53,8 @@ final class Outpost_PWA_Shell {
 	 */
 	public static function render_shell(): void {
 		self::send_html_header();
+		$entry_url = Outpost_PWA_Assets::entry_url();
+		$css_urls  = Outpost_PWA_Assets::entry_css_urls();
 		?><!doctype html>
 <html lang="en">
 <head>
@@ -64,9 +66,15 @@ final class Outpost_PWA_Shell {
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="default">
+		<?php foreach ( $css_urls as $css_url ) : ?>
+	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
+		<?php endforeach; ?>
 </head>
 <body class="outpost-composer-shell">
 	<main id="outpost-root" data-outpost-route="composer"></main>
+		<?php if ( null !== $entry_url ) : ?>
+	<script type="module" src="<?php echo esc_url( $entry_url ); ?>"></script>
+		<?php endif; ?>
 	<script>
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/post/sw', { scope: '/post/' });

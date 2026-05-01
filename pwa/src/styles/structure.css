@@ -1,0 +1,115 @@
+/*
+ * Outpost structural CSS.
+ *
+ * Per the Hard Contract, the plugin owns layout (this file) and the theme
+ * owns paint (every color, font, radius, shadow). Every paintable property
+ * goes through `var(--outpost-*, neutral-fallback)` so a theme that defines
+ * the token wins, and a theme that doesn't gets the inherited cascade.
+ *
+ * One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the
+ * iOS bottom toolbar when the composer modes land. None of B0b's surfaces
+ * use it yet — kept here as a pattern reminder for Phase C.
+ *
+ * A3 will move this file to `styles/outpost-tokens.css` and have PHP enqueue
+ * it server-rendered (per A3 design constraint #1). For B0b it ships in the
+ * Vite bundle.
+ */
+
+.outpost-app {
+	min-height: 100vh;
+	min-height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	font-family: var(--outpost-font-body, inherit);
+	background: var(--outpost-surface-bg, transparent);
+	color: var(--outpost-surface-fg, inherit);
+}
+
+.outpost-card {
+	max-width: 32rem;
+	margin: 0 auto;
+	padding: 1.5rem 1.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.outpost-card__title {
+	margin: 0;
+	font-size: 1.5rem;
+	line-height: 1.2;
+	font-family: var(--outpost-font-heading, inherit);
+}
+
+.outpost-card__lede {
+	margin: 0;
+	color: var(--outpost-text-muted, inherit);
+	opacity: 0.85;
+}
+
+.outpost-form-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.outpost-label {
+	font-weight: 600;
+	font-size: 0.9rem;
+}
+
+.outpost-input {
+	min-height: 2.75rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	font: inherit;
+	background: var(--outpost-input-bg, transparent);
+	color: var(--outpost-input-fg, inherit);
+}
+
+.outpost-input:focus {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-button {
+	min-height: 2.75rem;
+	padding: 0.5rem 1rem;
+	border: 1px solid transparent;
+	border-radius: var(--outpost-radius, 0.375rem);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+	background: var(--outpost-primary-bg, currentColor);
+	color: var(--outpost-primary-fg, inherit);
+}
+
+.outpost-button:focus {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-button[disabled] {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+.outpost-button--secondary {
+	background: transparent;
+	color: inherit;
+	border-color: var(--outpost-border, currentColor);
+}
+
+.outpost-error {
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--outpost-error-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	background: var(--outpost-error-bg, transparent);
+	color: var(--outpost-error-fg, inherit);
+}
+
+.outpost-status {
+	font-size: 0.95rem;
+	color: var(--outpost-text-muted, inherit);
+}

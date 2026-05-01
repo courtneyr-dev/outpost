@@ -50,11 +50,40 @@ git push origin main
 
 Pin to specific SHAs, never to `main`-as-a-floating-ref. The deploy Action validates JSON and PHP-lints before rsyncing; failed validation blocks the deploy.
 
+## The `npm run build` deploy ritual (B0b onwards)
+
+From B0b onwards Outpost ships a Vite-built JavaScript bundle. The bundle lives at `build/pwa/` and **must be committed before the submodule bump** so the rsync picks it up. Sequence:
+
+```bash
+# In the outpost repo
+cd ~/projects/outpost
+npm run build                          # rebuilds build/pwa/ with cache-busted filenames
+git add build/pwa/                     # tracked despite the .gitignore wildcard exception
+git commit -m "Rebuild PWA bundle for <session>"
+git push origin main
+
+# Then bump the submodule as usual
+cd ~/projects/staging-courtneyr-dev/plugins/outpost
+git pull origin main
+cd ../..
+git add plugins/outpost
+git commit -m "Bump outpost to <short-sha>"
+git push origin main
+```
+
+Why we commit the build:
+
+- The `gd-wordpress-deployer` Action rsyncs the working tree of the submodule. There's no Node.js step on the server.
+- Mirrors the `courtneyr-child` theme's pattern of committing built CSS for the same reason.
+- The `.vite/manifest.json` file inside `build/pwa/` is what the PHP shell reads to enqueue the cache-busted entry script — without it committed, `Outpost_PWA_Shell::render_shell()` falls back to "no script tag" and the PWA bundle silently fails to load.
+
+If you forget the build before bumping: the deploy goes through, but `/post/` renders the shell HTML without the JS bundle. Symptom on the staging site: an empty `<main id="outpost-root">` and no console activity. The fix is to rebuild, commit, and re-bump the submodule.
+
 ## What ships
 
 The `gd-wordpress-deployer` Action rsyncs the **contents** of `staging-courtneyr-dev/plugins/outpost/` to the server. That means everything in the working tree — including `vendor/` and `build/` — gets deployed. Implications:
 
-- **`build/` must be committed at the time of deploy** for production-shaped staging tests, since the rsync reflects the working tree. Local development uses `npm run dev` (Vite serves at `localhost:5173`); staging needs the production build.
+- **`build/pwa/` must be committed at the time of deploy** for production-shaped staging tests, since the rsync reflects the working tree. The `.gitignore` keeps `build/` ignored generally but allows `build/pwa/` through with a `!build/pwa/` exception. Local development uses `npm run dev` (Vite serves at `localhost:5173`); staging needs `npm run build` output committed. See "The `npm run build` deploy ritual" below.
 - **`vendor/` must be committed** if the plugin uses Composer runtime dependencies. For Outpost, runtime dependencies are intentionally zero through Phase B; we'll revisit when needed.
 - **Dev artefacts must be `.distignore`d** to stay out of the deployed tree. (Not yet authored — added in Phase I.)
 
