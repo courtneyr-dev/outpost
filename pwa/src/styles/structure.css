@@ -76,13 +76,22 @@
 .outpost-button {
 	min-height: 2.75rem;
 	padding: 0.5rem 1rem;
-	border: 1px solid transparent;
+	border: 1px solid var(--outpost-primary-border, transparent);
 	border-radius: var(--outpost-radius, 0.375rem);
 	font: inherit;
 	font-weight: 600;
 	cursor: pointer;
-	background: var(--outpost-primary-bg, currentColor);
-	color: var(--outpost-primary-fg, inherit);
+	/*
+	 * `revert` (rather than currentColor/inherit) is what the Hard Contract
+	 * asks for: when no --outpost-* token is set, fall back to whatever the
+	 * theme's `button { ... }` rules say, or the user-agent default if the
+	 * theme is silent. currentColor/inherit collapse foreground and
+	 * background to the same value on most themes — the button renders as
+	 * an unreadable black rectangle. revert never converges; it lets the
+	 * cascade resolve from the layer below ours.
+	 */
+	background: var(--outpost-primary-bg, revert);
+	color: var(--outpost-primary-fg, revert);
 }
 
 .outpost-button:focus {
