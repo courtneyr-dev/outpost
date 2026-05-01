@@ -68,10 +68,20 @@ final class Outpost_PWA_Shell {
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<title>Outpost</title>
 	<link rel="manifest" href="/post/manifest.json">
+		<?php if ( null !== $entry_url ) : ?>
+	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
+		<?php endif; ?>
 	<meta name="theme-color" content="">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="default">
+	<style>
+		/* Critical layout — reserves space before the bundled CSS loads,
+			prevents CLS when JS mounts the .outpost-app class onto #outpost-root.
+			Layout primitives only (no paint) per the Hard Contract. */
+		body { margin: 0; min-height: 100dvh; min-height: 100vh; }
+		#outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }
+	</style>
 		<?php foreach ( $css_urls as $css_url ) : ?>
 	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 		<?php endforeach; ?>
