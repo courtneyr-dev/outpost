@@ -69,7 +69,7 @@ final class Outpost_PWA_Shell {
 	<main id="outpost-root" data-outpost-route="composer"></main>
 	<script>
 		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/post/sw.js', { scope: '/post/' });
+			navigator.serviceWorker.register('/post/sw', { scope: '/post/' });
 		}
 	</script>
 </body>

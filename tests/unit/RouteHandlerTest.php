@@ -41,7 +41,8 @@ final class RouteHandlerTest extends TestCase {
 		$this->assertSame(
 			array(
 				'^post/manifest\.json$'        => 'manifest',
-				'^post/sw\.js$'                => 'sw',
+				// SW intentionally has no `.js` extension — see Outpost_Route_Handler::rules() comment.
+				'^post/sw/?$'                  => 'sw',
 				'^post/share-target/?$'        => 'share-target',
 				'^post/auth/callback/?$'       => 'auth-callback',
 				'^post/?$'                     => 'composer',

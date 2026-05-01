@@ -60,7 +60,13 @@ final class Outpost_Route_Handler {
 	public static function rules(): array {
 		return array(
 			'^post/manifest\.json$'  => 'manifest',
-			'^post/sw\.js$'          => 'sw',
+			// SW path has no .js extension on purpose — most managed-WP hosts
+			// (GoDaddy, WP Engine, Kinsta) configure nginx to short-circuit
+			// `.js` requests with a static-file lookup before WordPress runs,
+			// which 404s our SW. Stripping the extension keeps the request in
+			// WP's hands. The browser doesn't care about the script URL's
+			// extension as long as the response is JavaScript.
+			'^post/sw/?$'            => 'sw',
 			'^post/share-target/?$'  => 'share-target',
 			'^post/auth/callback/?$' => 'auth-callback',
 			'^post/?$'               => 'composer',
