@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-05-01
+
+This release consolidates Sessions A1 + A2 (foundation → routes/shell), B0a + B0b (build pipeline → IndieAuth login), and B1 (Micropub client → note posting). The plugin is functional end-to-end on staging: open `/post/`, sign in with IndieAuth, post a note via Micropub, see the new post URL. v0.1.0 was the scaffold; v0.1.4 is the first version that actually posts.
+
+### Tooling (between-session work)
+- `docs/SMOKE-TESTS.md` — durable test plan covering B0b + B1 sign-off across the device matrix (Android Chrome, iPhone Safari, iOS Chrome) with platform-specific DevTools setup and stage-by-stage verification including the AES-GCM IV-freshness check.
+- `docs/A3-REQUIREMENTS.md` — three follow-ups discovered during the B0b smoke test: apple-touch-icon link, status-bar-style tuning, icon-192.png + icon-512.png assets.
+- `phpcs.xml.dist` — WordPress-Extra ruleset pinned to PHP 8.2+ and WP 6.5+, locks the i18n text_domain to `"outpost"`. Excludes `WordPress.Files.FileName.InvalidClassFileName` (Outpost convention is `includes/class-{thing}.php` without the redundant slug prefix).
+- `phpstan.neon.dist` + `phpstan-bootstrap.php` — Level 6 static analysis with `szepeviktor/phpstan-wordpress`. Bootstrap mirrors outpost.php's constant block so analysis sees `OUTPOST_*` when scanning files in isolation. `treatPhpDocTypesAsCertain: false` keeps the runtime PHP-version check from being marked redundant.
+- Defensive `esc_html()` on `_doing_it_wrong()` messages in `outpost.php` and `class-pwa-shell.php`. The messages reach Query Monitor's panel which renders HTML.
+- Suppressions with rationale: `class-pwa-assets.php` `file_get_contents` (local build artefact, not HTTP), `class-pwa-shell.php` enqueue rules (the shell IS the entire HTML document; `wp_head`/`wp_footer` aren't called).
+
 ### Added (Session B1 — Micropub client + note-posting form)
 - `pwa/src/lib/micropub.ts` — `discover_micropub_endpoint(me)` reuses `parse_link_header` and `parse_html_endpoints` from `indieauth.ts`; `post_note({content, accessToken, micropubEndpoint})` POSTs `h=entry&content=...` form-encoded with the bearer token, parses the Location header for the new post URL. Handles 201 Created and 202 Accepted as success. `MicropubError` discriminates failure paths (`discovery_failed`, `no_endpoint`, `post_failed`, `no_location`).
 - `pwa/src/components/note-form.tsx` — minimal note-posting Preact form. Replaces `ComposerPlaceholder` from B0b. Discovers micropub endpoint on first post (cached in component state for the session), shows discovering / posting / posted / error states with `aria-live` regions, surfaces the new post URL as a clickable link.
@@ -105,5 +117,6 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Notes
 - This release does not yet include the PWA shell, composer modes, REST endpoints, or service worker. Those land in subsequent sessions per the build plan.
 
-[Unreleased]: https://github.com/courtneyr-dev/outpost/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/courtneyr-dev/outpost/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/courtneyr-dev/outpost/compare/v0.1.0...v0.1.4
 [0.1.0]: https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.0
