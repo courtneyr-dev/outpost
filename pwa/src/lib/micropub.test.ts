@@ -199,6 +199,46 @@ describe('post_note', () => {
 		).rejects.toMatchObject({ code: 'post_failed' });
 	});
 
+	it('throws invalid_location when Location is a javascript: URL (compromised endpoint defense)', async () => {
+		const env: MicropubEnvironment = {
+			fetch: async () =>
+				make_response({
+					status: 201,
+					headers: { Location: 'javascript:alert(1)' },
+				}),
+		};
+		await expect(
+			post_note(
+				{
+					content: 'attempt',
+					accessToken: 'abc',
+					micropubEndpoint: 'https://example.test/mp',
+				},
+				env,
+			),
+		).rejects.toMatchObject({ code: 'invalid_location' });
+	});
+
+	it('throws invalid_location when Location is a data: URL', async () => {
+		const env: MicropubEnvironment = {
+			fetch: async () =>
+				make_response({
+					status: 201,
+					headers: { Location: 'data:text/html,<script>1</script>' },
+				}),
+		};
+		await expect(
+			post_note(
+				{
+					content: 'attempt',
+					accessToken: 'abc',
+					micropubEndpoint: 'https://example.test/mp',
+				},
+				env,
+			),
+		).rejects.toMatchObject({ code: 'invalid_location' });
+	});
+
 	it('reads lowercase "location" header (HTTP/2 convention)', async () => {
 		const env: MicropubEnvironment = {
 			fetch: async () =>

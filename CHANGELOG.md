@@ -7,10 +7,24 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Security hardening — wordpress-security follow-up audit)
+- `pwa/src/lib/url-validation.ts` — `is_safe_http_url(value)` rejects malformed URLs and any scheme other than `http://` / `https://`. Closes two attack vectors:
+  - **User-input `me` URL** (typed into LoginScreen) is now validated in `auth-flow.ts:begin_login` before reaching `fetch()`. Pasting `javascript:alert(1)` produces a clear inline error rather than failing opaquely.
+  - **Micropub-returned Location header** (rendered as `<a href>` in NoteForm) is now validated in `micropub.ts:post_note` before returning. A compromised endpoint or MitM that injects `javascript:` / `data:` Location can't get a clickable link rendered. New `MicropubError` code: `invalid_location`.
+- `pwa/src/lib/url-validation.test.ts` — 20 tests covering accepted schemes (http/https), rejected schemes (javascript, data, file, mailto, ws, wss, ftp, mixed-case javascript), and rejected malformed input (empty, whitespace, plain text, relative paths, bare hostname, protocol-relative).
+- 8 new tests added to `auth-flow.test.ts` and `micropub.test.ts` covering the validation paths. Vitest total: 58 → 86.
+
 ### Added (between-session tooling)
 - `.github/workflows/ci.yml` — CI gate for every push to `main` and every PR. Three jobs: `lint-php` (PHPCS + PHPStan), `test-php` matrix across PHP 8.2 / 8.3 / 8.4 (PHPUnit unit suite), `test-js` (TypeScript strict typecheck + Vitest + production-build smoke). Composer + npm caches keyed on lockfile hashes; concurrency group cancels in-flight runs on the same branch when a new commit lands; `permissions: contents: read` only.
 - `docs/security/PHP-SURFACE-CHECKLIST.md` extended with three cross-cutting patterns from the wordpress-security audit: object-injection avoidance (`json_decode` over `unserialize`), path-traversal validation (`realpath()` + base-directory check), inline JS / `data-*` attribute escaping context.
 - README badges (CI status, latest release, license) and v0.1.4 status line.
+
+### Changed (Security hardening)
+- `OUTPOST_VERSION` bumped to `0.1.5` per A2 Locked Decision #16: the JS bundle change ships new validation behavior on `/post/`, which counts as deployable behavior even though no PHP shifted.
+- `pwa/src/lib/auth-flow.ts:begin_login` validates `me` before discovery; throws a descriptive Error on non-http(s).
+- `pwa/src/lib/micropub.ts:post_note` validates the response Location header; throws `MicropubError('invalid_location')` on non-http(s).
+- `MicropubError`'s `code` union extended: `'discovery_failed' | 'no_endpoint' | 'post_failed' | 'no_location' | 'invalid_location'`.
+- Bundle: 27.88 KB JS / 10.00 KB gzipped (was 27.58 / 9.88 — +0.3 KB for the validator + its call sites).
 
 ### Changed (between-session tooling)
 - `phpstan.neon.dist`: `node_modules/` exclude path marked optional (`(?)`) so PHPStan tolerates absence in the lint-php CI job (which only runs `composer install`, not `npm install`).

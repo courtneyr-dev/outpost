@@ -33,6 +33,7 @@ import {
 	type IndieAuthEnvironment,
 } from './indieauth';
 import { write_token, type StoredToken, type TokenStoreEnvironment } from './token-store';
+import { is_safe_http_url } from './url-validation';
 
 const SESSION_KEY_VERIFIER = 'outpost.auth.verifier';
 const SESSION_KEY_STATE = 'outpost.auth.state';
@@ -83,6 +84,16 @@ export async function begin_login(
 	scope: string = DEFAULT_SCOPE,
 	env: AuthFlowEnvironment = default_env,
 ): Promise<BeginLoginResult> {
+	// Validate the user-input me URL before we hand it to fetch() or build
+	// any redirect URL with it. A malformed or non-http(s) URL (`javascript:`,
+	// `data:`, `file:`, etc.) gets a clear error here instead of failing
+	// opaquely deeper in the flow.
+	if (!is_safe_http_url(me)) {
+		throw new Error(
+			'Your site URL must be a valid http:// or https:// address (got: ' + me + ').',
+		);
+	}
+
 	const endpoints = await discover_endpoints(me, env.indieauth);
 	const pkce = await generate_pkce(env.indieauth);
 	const state = generate_state(env.indieauth);

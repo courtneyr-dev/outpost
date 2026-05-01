@@ -74,6 +74,25 @@ describe('begin_login', () => {
 		expect(env.sessionStorage.getItem('outpost.auth.token_endpoint')).toBe('https://a/token');
 		expect(env.sessionStorage.getItem('outpost.auth.me')).toBe('https://courtneyr.dev/');
 	});
+
+	it.each([
+		'javascript:alert(1)',
+		'data:text/html,<script>1</script>',
+		'file:///etc/passwd',
+		'mailto:foo@example.com',
+		'not a url',
+		'',
+	])('rejects non-http(s) me URL (%s) before any fetch', async (bad_me) => {
+		const fetch_impl = vi.fn(async () => new Response('', { status: 200 }));
+		const env = make_env(fetch_impl);
+
+		await expect(
+			begin_login(bad_me, 'https://courtneyr.dev/post/', 'https://courtneyr.dev/post/auth/callback', undefined, env),
+		).rejects.toThrow(/http:\/\/ or https:\/\//);
+
+		// Crucial: the bad URL must never reach fetch.
+		expect(fetch_impl).not.toHaveBeenCalled();
+	});
 });
 
 describe('handle_callback', () => {

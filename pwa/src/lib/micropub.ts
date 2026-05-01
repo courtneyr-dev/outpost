@@ -19,6 +19,7 @@
  */
 
 import { parse_link_header, parse_html_endpoints } from './indieauth';
+import { is_safe_http_url } from './url-validation';
 
 export interface MicropubEnvironment {
 	fetch: typeof fetch;
@@ -35,7 +36,8 @@ export class MicropubError extends Error {
 			| 'discovery_failed'
 			| 'no_endpoint'
 			| 'post_failed'
-			| 'no_location',
+			| 'no_location'
+			| 'invalid_location',
 	) {
 		super(message);
 		this.name = 'MicropubError';
@@ -153,6 +155,16 @@ export async function post_note(
 		throw new MicropubError(
 			'post_note: micropub response is missing the Location header',
 			'no_location',
+		);
+	}
+
+	// Defense in depth: a compromised Micropub endpoint or MitM could return
+	// a `javascript:` / `data:` / `file:` Location, which the UI would then
+	// render as a clickable <a href>. Validate the scheme before surfacing.
+	if (!is_safe_http_url(location)) {
+		throw new MicropubError(
+			'post_note: micropub returned an unsafe Location URL: ' + location,
+			'invalid_location',
 		);
 	}
 
