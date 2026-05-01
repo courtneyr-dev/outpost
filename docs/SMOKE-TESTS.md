@@ -1,0 +1,117 @@
+# Smoke Tests
+
+End-to-end verification plans for sessions that ship observable behavior to staging. Smoke tests run on real mobile devices because they exercise paths that unit tests can't reach: cookie persistence across redirects, IndexedDB writes, service worker registration, manifest parsing, PWA install flows.
+
+## Device matrix
+
+Three viable platforms. Stages 1–5 are device-agnostic; Stages 4 and 6 have platform-specific verification paths.
+
+| Platform | Remote DevTools setup | True PWA install (standalone window) |
+|----------|----------------------|--------------------------------------|
+| **Android Chrome** | On the phone: Settings → About → tap Build number 7×, then System → Developer options → enable USB debugging. Connect by USB; on desktop Chrome visit `chrome://inspect/#devices` and click **inspect** next to the live tab. Full DevTools attaches — Application panel, IndexedDB, service workers, network. | Yes — Chrome offers an "Install" affordance (address-bar `+` icon, banner, or three-dot menu → "Install app"). Creates a launcher icon that opens the PWA in standalone mode. |
+| **iPhone Safari** | On the phone: Settings → Safari → Advanced → Web Inspector ON. On the Mac: Safari → Settings → Advanced → "Show Develop menu in menu bar". Connect by USB; on the Mac use Develop → [device name] → [tab]. Full DevTools attaches. | Add-to-Home-Screen (Share → Add to Home Screen). Related but distinct platform path; observe complementarily, do not treat as a substitute for Android's true install. |
+| **iOS Chrome** | Not available — Apple's iOS rules block remote inspection of third-party browsers. iOS Chrome can run the smoke test for stages 1/2/3/5 (user-visible behavior is fine), but no Stage 4 inspection, and Add-to-Home-Screen makes a bookmark rather than a real PWA. | Bookmark only. |
+
+**Pick the platform you have at hand.** If you want full Stage 4 + Stage 6 coverage, use Android Chrome with USB DevTools. If you only have iPhone, use Safari (not Chrome) for Stage 4, and treat A2HS as a Stage-6-adjacent observation. If you only have iOS Chrome, run stages 1/2/3/5 and skip the rest.
+
+## Cache-buster query string
+
+Managed-WP edge caches (GoDaddy in our case, Varnish/nginx FastCGI elsewhere) can promote 302/301 responses to cached entries, so a fix that landed at deploy-time can appear absent on the next visit. Append `?_cb=<timestamp>` (or any unique query string) when verifying staging changes; the new key forces a real PHP request. Confirmed working when the response carries `x-gateway-skip-cache: 1`.
+
+## B0b — IndieAuth login + token persistence
+
+**Build under test:** the latest commit on `outpost main` whose `OUTPOST_VERSION` is at least `0.1.3` (the readable-button hotfix). Verify with `git log --oneline -1` in `~/projects/staging-courtneyr-dev/plugins/outpost/`.
+
+**Pre-flight:**
+
+1. Confirm staging is on the build under test (`wp-admin/plugins.php` shows Outpost at the expected version).
+2. Open Query Monitor on the staging site so PHP errors are observable.
+3. Choose your platform per the matrix above.
+
+### Stage 1 — login screen renders
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>` on the phone.
+
+**Expected:**
+
+- Card titled "Sign in to Outpost".
+- Lede: "Outpost posts to your site through Micropub. Sign in with your domain to authorize this device."
+- "Your site" label above an input field pre-filled with `https://qkf.b0d.myftpupload.com/`.
+- A "Sign in" button with **visible text** (not a black-on-black rectangle — the 0.1.3 hotfix uses the `revert` keyword for color/background fallbacks).
+- No console errors.
+- Query Monitor PHP errors panel: empty.
+
+**Stop here if:** the page is blank, the bundle didn't load (DevTools Network tab → expect a 200 on `assets/index-*.js`), the button is unreadable, or QM shows PHP errors.
+
+### Stage 2 — IndieAuth round-trip
+
+1. Tap "Sign in".
+2. **Expected:** the browser navigates to `https://qkf.b0d.myftpupload.com/wp-json/indieauth/1.0/auth?...`. The IndieAuth plugin's authorization page renders, identifying the client as `https://qkf.b0d.myftpupload.com/post/`.
+3. Tap "Allow".
+4. **Expected:** the browser redirects back to `/post/auth/callback?code=...&state=...`. The PWA briefly shows "Signing you in…", then "Signed in", then the URL changes to `/post/` and the ComposerPlaceholder mounts.
+
+**Stop here if:** the authorization page doesn't appear, the redirect-back URL is wrong, or the PWA shows an `AuthFlowError` (look for `state_mismatch`, `missing_state`, `exchange_failed`, `no_code` in the surfaced message).
+
+### Stage 3 — ComposerPlaceholder renders authenticated state
+
+**Expected after the redirect lands:**
+
+- Card titled "You're signed in".
+- Lede mentions Phase C.
+- Definition list:
+  - Identity: `https://qkf.b0d.myftpupload.com/`
+  - Scope: `create update media`
+- A "Sign out" button.
+
+**DevTools verification (Android Chrome OR iPhone Safari with desktop DevTools attached):**
+
+- Application → Storage → IndexedDB → `outpost`:
+  - `tokens` object store: one row with `iv` (12-byte Uint8Array), `ciphertext` (opaque bytes — NOT the raw token), `meta` containing `tokenType: "Bearer"`, `scope`, `me`, `storedAt`.
+  - `crypto-keys` object store: one row with a `CryptoKey` reference (DevTools should indicate non-extractable).
+- Application → Storage → Session storage: empty (the auth flow cleared verifier, state, me, and token_endpoint after exchange).
+
+**Stop here if:** the placeholder doesn't render, fields are blank, or the token isn't in IndexedDB.
+
+### Stage 4 — service worker + manifest
+
+**Android Chrome (USB DevTools) OR iPhone Safari (Develop menu):**
+
+- Application → Service Workers: one registered SW with scope `https://qkf.b0d.myftpupload.com/post/`, source URL `/post/sw` (note the missing `.js` — managed-WP nginx short-circuits `.js` requests before they reach WordPress).
+- Application → Manifest: shows "Outpost", scope `/post/`, display `standalone`, start_url `/post/`.
+
+**iOS Chrome:** skip this stage.
+
+### Stage 5 — sign out + repeat
+
+1. Tap "Sign out".
+2. Page reloads.
+3. **Expected:** back to LoginScreen.
+4. **DevTools (any platform with DevTools):** `tokens` row gone, `crypto-keys` row still present (the encryption key persists across sign-outs intentionally).
+5. Optional: complete a second login and confirm everything works repeatably.
+
+### Stage 6 — install / Add-to-Home-Screen
+
+**Android Chrome (true PWA install):**
+
+1. Look for "Install" — address-bar `+` icon, install banner, or three-dot menu → "Install app" (the install variant, not the bookmark variant).
+2. Tap install. Chrome creates a launcher icon.
+3. Tap the launcher icon. The PWA opens in its own window with no Chrome chrome — that's `display: standalone` from the manifest.
+4. **Expected:** LoginScreen renders again (the standalone window has its own IndexedDB scope, separate from the Chrome tab). Sign in once more to confirm the standalone path.
+
+**iPhone Safari (Add-to-Home-Screen — separate observation):**
+
+1. Tap Share → Add to Home Screen → Confirm.
+2. Tap the home-screen icon. Opens in iOS's Add-to-Home-Screen standalone mode.
+3. Treat the result as a complementary data point, not a substitute for Android's install verification — A2HS goes through a different platform code path.
+
+**iOS Chrome:** skip — the install option creates a bookmark, not a real PWA.
+
+## Reporting
+
+After running, reply with one of:
+
+- "All stages pass" → close the session, queue the next.
+- "Stage X failed because Y" + screenshot → triage, ship a fix commit if needed.
+- "Got blocked on Z, need a tweak before I can test" → describe the obstacle.
+
+If you only have iOS Chrome at hand: "Stages 1/2/3/5 pass on iOS Chrome, Stages 4 and 6 deferred until I have Android Chrome / iPhone Safari" is an acceptable partial sign-off — the user-visible flow is verified; the inspector + install paths land later.
