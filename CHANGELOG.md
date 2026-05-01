@@ -7,6 +7,11 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (WordPress.org compliance — wordpress-org-compliance audit)
+- CLAUDE.md gains a "WordPress.org Compliance" section locking the no-trialware, no-license-key, no-paid-tier policy. Includes the adapter-behavior corollary for Phase F: integrations may detect paid companions and surface their features, but Outpost's own functionality must never be gated by whether a user has the paid version of any companion.
+- Explicit rejection list for future contributions (Pro tier, license keys, time-limited trials, per-post quotas, adapter logic that disables Outpost when a free companion is present but a paid one isn't).
+- No code change; audit found no violations to fix. Outpost is GPL v2-or-later, single-tier, fully functional out of the box.
+
 ### Added (Accessibility — wordpress-accessibility audit)
 - `docs/accessibility/A11Y-CHECKLIST.md` — WCAG 2.1/2.2 Level AA per-surface audit. Status at v0.1.8 documents what's already correct (semantic landmarks, single `<h1>` per surface, `<label for>` ↔ `<input id>` association, `aria-labelledby` on cards, `aria-live="polite"` on AuthCallback transient states, `role="alert"` on error blocks, real `<button>`/`<a>`/`<input>` elements, 44px touch targets, focus rings). Forward-looking gates for A3 contrast verification, Phase C composer-mode focus management (WAI-ARIA tabs pattern), Phase D reduced-motion + offline announcements, Phase G axe-core CI job, Phase J real-device screen reader testing matrix.
 - `docs/A3-REQUIREMENTS.md` extended with **A3-4** — token defaults must verify at WCAG 4.5:1 contrast. Documents the theme contract corollary (themes that override Outpost tokens must themselves meet 4.5:1).

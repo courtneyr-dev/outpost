@@ -127,6 +127,27 @@ bin/                        Helper scripts
 - Token in encrypted IndexedDB, never localStorage or cookies.
 - Service worker scope is `/post/` only, never the whole site.
 
+## WordPress.org Compliance
+
+Outpost is GPLv2-or-later, free, fully functional. Per [WordPress.org Plugin Guideline §5](https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/#5-trialware-is-not-permitted), every feature in the WordPress.org version must work without payment. There are no:
+
+- License keys
+- Trial periods or time limits
+- Usage quotas
+- Features gated by payment
+- Intrusive nag screens
+
+**Adapter behavior corollary (Phase F):** when Outpost integrates with paid companion plugins (Yoast SEO Premium, paid ActivityPub variants), the *integration* may detect the paid plugin's presence and surface its features (focus keyphrase, custom federation routing). But Outpost's *own* functionality (note posting, reply, photo, etc.) MUST work whether or not the user has the paid companion. Detection enables; absence does not disable Outpost.
+
+**Reject contributions that propose:**
+- A "Pro" tier of Outpost itself
+- Feature flags gated by license keys
+- Time-limited trials
+- Per-post or per-action quotas
+- Adapter logic that disables Outpost features when a free companion is present but a paid one isn't
+
+Informational comparison tables and feature-detection patterns are fine. The Hard Contract above (plugin owns layout, theme owns paint) takes precedence — Outpost's UI must not become an upsell surface for any third-party plugin or service either.
+
 ## Security Hot Spots
 
 - **Server-side mf2 preview** (`/wp-json/outpost/v1/preview`) is the SSRF surface. Use `wp_safe_remote_get`, cap response size at 5MB, validate content-type, strip scripts before returning. See Section 8.4 of the original prompt and `docs/security/csp.md`.
