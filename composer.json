@@ -13,10 +13,11 @@
     "php": ">=8.2"
   },
   "require-dev": {
+    "10up/wp_mock": "^1.0",
     "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
     "phpcompatibility/phpcompatibility-wp": "^2.1",
     "phpstan/phpstan": "^2.0",
-    "phpunit/phpunit": "^10.5",
+    "phpunit/phpunit": "^9.6",
     "szepeviktor/phpstan-wordpress": "^2.0",
     "wp-coding-standards/wpcs": "^3.1",
     "yoast/phpunit-polyfills": "^4.0"
@@ -28,7 +29,8 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Outpost\\Tests\\": "tests/phpunit/"
+      "Outpost\\Tests\\Unit\\": "tests/unit/",
+      "Outpost\\Tests\\Integration\\": "tests/integration/"
     }
   },
   "scripts": {

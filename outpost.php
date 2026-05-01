@@ -34,8 +34,23 @@ define( 'OUTPOST_MIN_WP', '6.5' );
 define( 'OUTPOST_MIN_PHP', '8.2' );
 
 // Companion plugin file paths (for is_plugin_active checks).
-define( 'OUTPOST_MICROPUB_PLUGIN_FILE', 'micropub/micropub.php' );
+// Required chain (upstream-first; see Outpost_Companion_Detector::dependency_chain).
 define( 'OUTPOST_INDIEAUTH_PLUGIN_FILE', 'indieauth/indieauth.php' );
+define( 'OUTPOST_MICROPUB_PLUGIN_FILE', 'micropub/micropub.php' );
+
+// Optional companions (enable feature surfaces; never block the gate).
+define( 'OUTPOST_POST_KINDS_PLUGIN_FILE', 'post-kinds-for-indieweb/post-kinds-for-indieweb.php' );
+define( 'OUTPOST_POST_FORMATS_PLUGIN_FILE', 'post-formats-for-block-themes/post-formats-for-block-themes.php' );
+define( 'OUTPOST_LINK_EXTENSION_XFN_PLUGIN_FILE', 'link-extension-for-xfn/link-extension-for-xfn.php' );
+define( 'OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE', 'syndication-links/syndication-links.php' );
+// Yoast: slug is `wordpress-seo` but the main file is `wp-seo.php`.
+define( 'OUTPOST_YOAST_PLUGIN_FILE', 'wordpress-seo/wp-seo.php' );
+define( 'OUTPOST_ACTIVITYPUB_PLUGIN_FILE', 'activitypub/activitypub.php' );
+
+// Load the detector class and the companion-adapter base class up front so the
+// rest of this bootstrap file can stay procedural shims that delegate to them.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.
@@ -52,15 +67,9 @@ function outpost_meets_requirements(): bool {
 /**
  * Detect the registration state of any companion plugin by its main file path.
  *
- * Returns one of three values:
- * - 'active'   — `is_plugin_active()` reports true
- * - 'inactive' — file is on disk under wp-content/plugins but not activated
- * - 'absent'   — file is not on disk
- *
- * Note: 'active' here is WordPress's registration state, not "fully functional."
- * Some plugins (notably Micropub) self-disable when their own dependencies are
- * missing; that case looks 'active' to WP but is functionally inactive. The
- * caller is responsible for chaining dependency checks in upstream-first order.
+ * Thin shim around {@see Outpost_Companion_Detector::status()}. Kept as a
+ * procedural wrapper because earlier sessions and external callers reference
+ * it; new code should call the detector class directly.
  *
  * @since 0.1.0
  *
@@ -68,35 +77,18 @@ function outpost_meets_requirements(): bool {
  * @return string One of 'active', 'inactive', or 'absent'.
  */
 function outpost_companion_plugin_status( string $plugin_file ): string {
-	if ( ! function_exists( 'is_plugin_active' ) ) {
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-	}
-
-	if ( is_plugin_active( $plugin_file ) ) {
-		return 'active';
-	}
-
-	$installed = get_plugins();
-	if ( isset( $installed[ $plugin_file ] ) ) {
-		return 'inactive';
-	}
-
-	return 'absent';
+	return Outpost_Companion_Detector::status( $plugin_file );
 }
 
 /**
  * Detect the state of the IndieAuth companion plugin.
- *
- * IndieAuth is a hard dependency of the Micropub plugin (David Shanske), so
- * Outpost surfaces IndieAuth status as the most-upstream notice — without
- * IndieAuth, Micropub itself refuses to register its endpoints.
  *
  * @since 0.1.0
  *
  * @return string One of 'active', 'inactive', or 'absent'.
  */
 function outpost_indieauth_status(): string {
-	return outpost_companion_plugin_status( OUTPOST_INDIEAUTH_PLUGIN_FILE );
+	return Outpost_Companion_Detector::is_indieauth_active();
 }
 
 /**
@@ -107,27 +99,24 @@ function outpost_indieauth_status(): string {
  * @return string One of 'active', 'inactive', or 'absent'.
  */
 function outpost_micropub_status(): string {
-	return outpost_companion_plugin_status( OUTPOST_MICROPUB_PLUGIN_FILE );
+	return Outpost_Companion_Detector::is_micropub_active();
 }
 
 /**
  * Whether the plugin's full feature surface (PWA composer, REST endpoints) is available.
  *
- * Both IndieAuth and Micropub must be active. The Micropub plugin hard-requires
+ * Both required companions must be active. The Micropub plugin hard-requires
  * IndieAuth at its own preflight, so a Micropub-active-but-IndieAuth-missing
- * environment is functionally broken from Outpost's perspective.
- *
- * Used by the route handler and REST controller in later sessions to decide whether
- * to render the composer or a friendly install-prompt page (PWA) / 503 response (REST).
+ * environment is functionally broken from Outpost's perspective. The dependency
+ * order lives in {@see Outpost_Companion_Detector::dependency_chain()}.
  *
  * @since 0.1.0
  *
- * @return bool True only when both IndieAuth and Micropub are active.
+ * @return bool True only when host requirements are met and the dependency chain is fully satisfied.
  */
 function outpost_is_ready(): bool {
 	return outpost_meets_requirements()
-		&& 'active' === outpost_indieauth_status()
-		&& 'active' === outpost_micropub_status();
+		&& null === Outpost_Companion_Detector::first_unsatisfied();
 }
 
 /**
@@ -185,15 +174,14 @@ function outpost_render_dependency_notice( string $plugin_label, string $plugin_
  * Render the dependency-status admin notice on every admin screen.
  *
  * Hybrid gate: plugin loads regardless, but warns when a required dependency
- * is missing or inactive. Notices surface in upstream-first order:
+ * is missing or inactive. Notices surface in upstream-first order driven by
+ * {@see Outpost_Companion_Detector::first_unsatisfied()}; host requirements
+ * are checked before the chain so an unsupported PHP/WP version doesn't get
+ * masked by a missing companion.
  *
- *   1. Host requirements (WP and PHP versions)
- *   2. IndieAuth (required by Micropub's own preflight)
- *   3. Micropub (required by Outpost's PWA and REST surfaces)
- *
- * The chain short-circuits — once a notice is shown, downstream checks
- * are skipped because they can't be satisfied without the upstream one.
- * Admins without `install_plugins` capability see nothing.
+ * Optional companions (Post Kinds, Yoast, ActivityPub, etc.) never produce a
+ * notice here — their absence reduces feature surface without breaking the
+ * gate. Admins without `install_plugins` capability see nothing.
  *
  * @since 0.1.0
  */
@@ -217,17 +205,35 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
-	$indieauth = outpost_indieauth_status();
-	if ( 'active' !== $indieauth ) {
-		outpost_render_dependency_notice( 'IndieAuth', OUTPOST_INDIEAUTH_PLUGIN_FILE, 'indieauth', $indieauth );
+	$blocker = Outpost_Companion_Detector::first_unsatisfied();
+	if ( null === $blocker ) {
 		return;
 	}
 
-	$micropub = outpost_micropub_status();
-	if ( 'active' !== $micropub ) {
-		outpost_render_dependency_notice( 'Micropub', OUTPOST_MICROPUB_PLUGIN_FILE, 'micropub', $micropub );
+	$presentation = array(
+		OUTPOST_INDIEAUTH_PLUGIN_FILE => array( 'IndieAuth', 'indieauth' ),
+		OUTPOST_MICROPUB_PLUGIN_FILE  => array( 'Micropub', 'micropub' ),
+	);
+
+	if ( ! isset( $presentation[ $blocker ] ) ) {
+		// If dependency_chain() ever extends without a matching presentation entry
+		// the notice would silently disappear. Surface it via Query Monitor's
+		// doing_it_wrong panel instead so the gap can't hide.
+		_doing_it_wrong(
+			__FUNCTION__,
+			'Dependency chain entry has no presentation mapping: ' . $blocker,
+			'0.1.0'
+		);
 		return;
 	}
+
+	[ $label, $slug ] = $presentation[ $blocker ];
+	outpost_render_dependency_notice(
+		$label,
+		$blocker,
+		$slug,
+		Outpost_Companion_Detector::status( $blocker )
+	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
 
