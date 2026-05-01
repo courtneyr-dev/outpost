@@ -307,6 +307,34 @@ add_filter( 'plugin_action_links_' . OUTPOST_PLUGIN_BASENAME, 'outpost_filter_pl
 Outpost_Route_Handler::init();
 
 /**
+ * One-shot rewrite-rule flush on version change.
+ *
+ * The activation hook only runs when an admin clicks "Activate" — not when a
+ * deploy/update replaces the plugin file in place. Without this guard the
+ * route table from the previous version stays cached in `rewrite_rules`
+ * and `/post/*` URLs fall through to canonical-redirect into unrelated
+ * permalinks.
+ *
+ * Compares the running OUTPOST_VERSION against the value stashed in
+ * `outpost_rewrite_version`. On mismatch, re-registers and flushes once,
+ * then writes the new version. Idempotent — registers/flushes do nothing on
+ * subsequent requests.
+ *
+ * Hooked at priority 11 so it runs immediately after Outpost_Route_Handler's
+ * own register_rewrite_rules call (default priority 10).
+ *
+ * @since 0.1.0
+ */
+function outpost_maybe_flush_rewrite_rules(): void {
+	if ( get_option( 'outpost_rewrite_version' ) === OUTPOST_VERSION ) {
+		return;
+	}
+	flush_rewrite_rules();
+	update_option( 'outpost_rewrite_version', OUTPOST_VERSION );
+}
+add_action( 'init', 'outpost_maybe_flush_rewrite_rules', 11 );
+
+/**
  * Activation hook. Registers the rewrite rules immediately, then flushes so
  * the freshly-registered rules land in the rewrite rule cache without
  * requiring a manual Settings → Permalinks visit.
