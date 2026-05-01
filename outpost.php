@@ -51,6 +51,8 @@ define( 'OUTPOST_ACTIVITYPUB_PLUGIN_FILE', 'activitypub/activitypub.php' );
 // rest of this bootstrap file can stay procedural shims that delegate to them.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.
@@ -117,6 +119,52 @@ function outpost_micropub_status(): string {
 function outpost_is_ready(): bool {
 	return outpost_meets_requirements()
 		&& null === Outpost_Companion_Detector::first_unsatisfied();
+}
+
+/**
+ * Resolve a dependency-chain plugin file to its presentation pair (label + wp.org slug).
+ *
+ * Returns `array( 'label' => string, 'slug' => string )` for known dependency
+ * files and `null` for unknown ones. The map is filterable through
+ * `outpost_dependency_presentation` so future chain extensions and third-party
+ * plugins can register their own labels/slugs without editing this file.
+ *
+ * Two consumers share this helper today: the admin notice path
+ * (`outpost_render_admin_notices()`) and the PWA install-prompt page rendered
+ * by `Outpost_PWA_Shell`. Keeping the source-of-truth in one place stops the
+ * two surfaces from drifting.
+ *
+ * @since 0.1.0
+ *
+ * @param string $plugin_file Plugin main file path relative to wp-content/plugins/.
+ * @return array{label:string,slug:string}|null Presentation pair or null when the
+ *                                              file isn't a known dependency.
+ */
+function outpost_dependency_presentation( string $plugin_file ): ?array {
+	$map = array(
+		OUTPOST_INDIEAUTH_PLUGIN_FILE => array(
+			'label' => 'IndieAuth',
+			'slug'  => 'indieauth',
+		),
+		OUTPOST_MICROPUB_PLUGIN_FILE  => array(
+			'label' => 'Micropub',
+			'slug'  => 'micropub',
+		),
+	);
+
+	/**
+	 * Filter the dependency presentation map.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, array{label:string,slug:string}> $map Map of plugin file
+	 *        path to presentation pair. Keys are OUTPOST_*_PLUGIN_FILE values; values
+	 *        are arrays with `label` (untranslated brand name) and `slug` (wp.org
+	 *        plugin slug for the install link).
+	 */
+	$map = apply_filters( 'outpost_dependency_presentation', $map );
+
+	return $map[ $plugin_file ] ?? null;
 }
 
 /**
@@ -210,12 +258,8 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
-	$presentation = array(
-		OUTPOST_INDIEAUTH_PLUGIN_FILE => array( 'IndieAuth', 'indieauth' ),
-		OUTPOST_MICROPUB_PLUGIN_FILE  => array( 'Micropub', 'micropub' ),
-	);
-
-	if ( ! isset( $presentation[ $blocker ] ) ) {
+	$presentation = outpost_dependency_presentation( $blocker );
+	if ( null === $presentation ) {
 		// If dependency_chain() ever extends without a matching presentation entry
 		// the notice would silently disappear. Surface it via Query Monitor's
 		// doing_it_wrong panel instead so the gap can't hide.
@@ -227,11 +271,10 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
-	[ $label, $slug ] = $presentation[ $blocker ];
 	outpost_render_dependency_notice(
-		$label,
+		$presentation['label'],
 		$blocker,
-		$slug,
+		$presentation['slug'],
 		Outpost_Companion_Detector::status( $blocker )
 	);
 }
@@ -254,18 +297,33 @@ function outpost_filter_plugin_action_links( array $links ): array {
 add_filter( 'plugin_action_links_' . OUTPOST_PLUGIN_BASENAME, 'outpost_filter_plugin_action_links' );
 
 /**
- * Activation hook. Flushes rewrite rules so /post/* routes register cleanly
- * once Session A2 introduces them.
+ * Wire the route handler on each page load so /post/* requests get routed.
+ *
+ * Hooks register on `init` (rewrite rules + query var) and `template_redirect`
+ * (dispatch). See {@see Outpost_Route_Handler::init()} for details.
+ *
+ * @since 0.1.0
+ */
+Outpost_Route_Handler::init();
+
+/**
+ * Activation hook. Registers the rewrite rules immediately, then flushes so
+ * the freshly-registered rules land in the rewrite rule cache without
+ * requiring a manual Settings → Permalinks visit.
  *
  * @since 0.1.0
  */
 function outpost_activate(): void {
+	Outpost_Route_Handler::register_rewrite_rules();
 	flush_rewrite_rules();
 }
 register_activation_hook( __FILE__, 'outpost_activate' );
 
 /**
- * Deactivation hook. Flushes rewrite rules so /post/* routes are removed cleanly.
+ * Deactivation hook. Flushes rewrite rules so /post/* rules are dropped from
+ * the cache. The rules themselves don't need explicit removal — they're
+ * regenerated on every `init` and naturally disappear when this plugin is
+ * inactive (the `init` hook stops firing).
  *
  * @since 0.1.0
  */

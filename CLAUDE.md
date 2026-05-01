@@ -162,13 +162,34 @@ Closed 2026-05-01. The constraints below are now production code; the rationale 
 8. **PHPUnit is pinned to `^9.6` because of `10up/wp_mock`'s Mockery compat window.** PHPUnit 9.6 has support through 2026; promoting to 10.x will wait until WP_Mock supports it. Test namespaces split into `Outpost\Tests\Unit\` and `Outpost\Tests\Integration\` so each suite has a clean PSR-4 root.
 9. **Yoast file path is `wordpress-seo/wp-seo.php`**, not the slug-derived `wordpress-seo/wordpress-seo.php`. The slug-vs-file mismatch is a known gotcha for Yoast — captured as test data in `provide_companion_files()` so a regression flips the matrix.
 
-## Session A2 — Design Constraints
+## Session A2 — Locked Decisions (shipped)
 
-A2 introduces the `/post/*` route handler that consumes the detector for the PWA install-prompt page. Honor these when starting that session:
+Closed 2026-05-01 (same day as A1; A1 + A2 deployed together to staging because A1 was scaffolding A2 consumed). The constraints below are now production code; the rationale stays here so future sessions don't re-litigate.
 
-1. **PWA install-prompt page consumes `first_unsatisfied()`.** When the user hits `/post/*` and the chain is unsatisfied, render a friendly HTML page with the blocker's label and install/activate button — same presentation map shape as admin notices, just rendered on the frontend. Same upstream-first short-circuit. The map should probably extract into a shared helper (`outpost_dependency_presentation()` function or a static method on the detector) so admin notices and the PWA page reference one place. Decide where the helper lives when you reach A2; the constraint here is *don't duplicate the map*.
-2. **REST 503 reasons (B2's territory, not A2's, but capture now).** When `outpost_is_ready()` is false and a REST request hits `/wp-json/outpost/v1/*`, return `503 Service Unavailable` with a JSON body that names `first_unsatisfied()` as the missing dependency. The PWA client uses this to drive its install prompt. Same single source of truth.
-3. **`Outpost_Companion_Detector::optional_companions()` has no consumers yet.** Don't build them. Phase F adapters are where the optional set gets exercised — adapter classes consult `is_post_kinds_active()` etc. before declaring their capabilities. Premature consumers would invert the dependency direction.
+1. **`outpost_dependency_presentation($plugin_file): ?array` is a procedural function in `outpost.php`, not a static method on the detector.** The detector is concerned with state (active/inactive/absent); presentation belongs with whoever renders it. Two consumers share the helper: `outpost_render_admin_notices()` and `Outpost_PWA_Shell::render_install_prompt()`. Returns `array{label:string,slug:string}` for known files, `null` otherwise.
+2. **Filter `outpost_dependency_presentation` extends or overrides the map.** Future chain extensions and third-party integrations register through this filter without editing core. Filter signature: `apply_filters('outpost_dependency_presentation', array<string, array{label:string,slug:string}>)`. Locked associative shape (not positional `[label, slug]`) so filter callers can read by name.
+3. **Five `/post/*` rewrite rules in upstream-first order.** Specific routes register before the catch-all so `/post/manifest.json` and `/post/sw.js` don't get hijacked by the composer regex:
+   - `^post/manifest\.json$` → `manifest`
+   - `^post/sw\.js$` → `sw`
+   - `^post/share-target/?$` → `share-target` (Phase E body)
+   - `^post/auth/callback/?$` → `auth-callback` (Phase B body)
+   - `^post/?$` → `composer`
+   Every rule registers with the `top` flag so the order survives WP's internal rewrite-rule sort. The single source of truth is `Outpost_Route_Handler::rules()` — tests assert the whole table at once.
+4. **`Outpost_Route_Handler::QUERY_VAR === 'outpost_route'`.** The query var carries the matched target (`composer`, `manifest`, etc.) into `template_redirect` where `dispatch()` hands off to the right `Outpost_PWA_Shell` method. Unknown values silently no-op so WP's normal 404 still applies.
+5. **`Outpost_PWA_Shell` has two main rendering branches and two artefact endpoints.** `render()` branches on `outpost_is_ready()`: `render_shell()` emits the composer envelope HTML; `render_install_prompt()` consumes `first_unsatisfied()` + `outpost_dependency_presentation()` to produce the install/activate UI. `render_manifest()` and `render_service_worker()` emit JSON and JS with correct content-types. The composer body is intentionally empty in A2 — Phase C lands the modes.
+6. **Service-worker scope is `/post/`** in both the registration script (`navigator.serviceWorker.register('/post/sw.js', { scope: '/post/' })`) and the manifest scope/start_url. The SW never tries to control the parent WordPress site (Standards §128 in this file).
+7. **Activation registers rules eagerly + flushes.** `outpost_activate()` calls `Outpost_Route_Handler::register_rewrite_rules()` then `flush_rewrite_rules()` so the rules land in the rewrite cache without requiring the user to visit Settings → Permalinks. Deactivation only flushes — the rules drop naturally because the `init` hook stops firing.
+8. **WP_Mock 1.x has a static-state leak via `Filter::$filtersWithAnyArgs`.** `withAnyArgs()` writes to a class-level static that `flush()` doesn't clear; the next test's `apply_filters` returns a random integer instead of the input. Workaround: `setUp()` resets the static with `ReflectionClass::getProperty()->setValue(null, [])`. Pattern travels to any future test file that calls `WP_Mock::onFilter()->withAnyArgs()`.
+9. **Integration test for the rewrite flow is stubbed via `markTestSkipped`.** `tests/integration/RouteHandlerIntegrationTest.php` documents the assertions the wp-env-backed test will make (Content-Type per route, query-var dispatch, register_activation_hook side effects). Lands in a later session when wp-env is wired up — A2 can't run it because real WP_Rewrite needs a real WordPress core.
+10. **REST 503 reasons stay deferred to B2.** `outpost_is_ready()` already drives them today via `first_unsatisfied()`; B2 just adds the `/wp-json/outpost/v1/*` route handler that returns the JSON 503 body. No work in A2.
+
+## Session A3 — Design Constraints
+
+A2's PWA shell renders an empty composer envelope with no styling tokens or static assets. A3 lands the structural CSS, the `--outpost-*` token defaults, and the icon set. Honor these when starting:
+
+1. **`styles/outpost-tokens.css` is server-rendered, not bundled.** Themes need to inspect the cascade and override; a Vite-bundled-and-hashed token file makes that fragile. Keep the token file at a stable URL.
+2. **The forced `padding-bottom: env(safe-area-inset-bottom)` on the iOS bottom toolbar is the only paint default Outpost ships.** Hard Contract above. Anything else is theme territory.
+3. **Service worker fetch handler stays out of A3.** A2 ships a no-op SW so the registration script succeeds; the real fetch/cache strategy lands in Phase D after the composer modes exist (otherwise we cache a shell that's about to be replaced).
 
 ## Build Order (40 sessions)
 
