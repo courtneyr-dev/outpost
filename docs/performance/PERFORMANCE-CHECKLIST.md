@@ -127,6 +127,20 @@ The composer adds Preact components per mode (Note, Reply, Photo, Listen group, 
 - Use `'fields' => 'ids'` when only IDs are needed
 - Use `'update_post_meta_cache' => false` and `'update_post_term_cache' => false` when those caches aren't read
 - Custom-table queries via `$wpdb->prepare` only
+- **Avoid `post__not_in`** — the SQL exclusion subquery is expensive at scale. Filter in PHP after the query when the exclusion set is small, or invert via `tax_query` / a custom column when it's large.
+- **Prefer taxonomies over `meta_query`** for filtering whenever the values are categorical and finite. Taxonomies have proper indexes; postmeta `LIKE '%foo%'` does not.
+- **Never `posts_per_page => -1`** — set an explicit ceiling and paginate or batch beyond it.
+- Plain `update_option( $key, $value )` defaults to `autoload=yes`. For options that aren't read every request, pass `'no'`: `update_option( $key, $value, 'no' )`. Total autoloaded options size should stay well under 800 KB (WordPress core's soft ceiling).
+
+**Hook removal (when adding many filters):**
+
+- `remove_action()` / `remove_filter()` only succeed when the priority and argument count match the original `add_action` exactly. Defaulting to priority 10 and 1 arg is fine for most callbacks, but if Outpost ever adds high-priority hooks (e.g. `init` priority 11 like the flush guard), removal must specify the same priority.
+
+**Cache invalidation patterns (when caches land):**
+
+- Event-driven invalidation: clear the cache on the action that mutates the cached source, not on a timer.
+- Versioned cache keys: include a generation number in the key, bump the generation to invalidate everything keyed under it (avoids the "delete all keys with prefix" anti-pattern).
+- Per-user vs site-wide: keys for user-specific data include `get_current_user_id()`; site-wide keys don't, so they're shared across users.
 
 ---
 
