@@ -189,7 +189,7 @@ function outpost_render_dependency_notice( string $plugin_label, string $plugin_
 			__( 'Activate %s', 'outpost' ),
 			$plugin_label
 		);
-		$message      = sprintf(
+		$message = sprintf(
 			/* translators: %s: plugin name. */
 			__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost' ),
 			$plugin_label
@@ -204,7 +204,7 @@ function outpost_render_dependency_notice( string $plugin_label, string $plugin_
 			__( 'Install %s', 'outpost' ),
 			$plugin_label
 		);
-		$message      = sprintf(
+		$message = sprintf(
 			/* translators: %s: plugin name. */
 			__( 'Outpost requires the %s plugin. Install it from WordPress.org to continue.', 'outpost' ),
 			$plugin_label
@@ -263,10 +263,12 @@ function outpost_render_admin_notices(): void {
 	if ( null === $presentation ) {
 		// If dependency_chain() ever extends without a matching presentation entry
 		// the notice would silently disappear. Surface it via Query Monitor's
-		// doing_it_wrong panel instead so the gap can't hide.
+		// doing_it_wrong panel instead so the gap can't hide. esc_html() is
+		// defensive — $blocker comes from dependency_chain()'s known-safe set,
+		// but the message reaches the doing_it_wrong panel which renders HTML.
 		_doing_it_wrong(
 			__FUNCTION__,
-			'Dependency chain entry has no presentation mapping: ' . $blocker,
+			esc_html( 'Dependency chain entry has no presentation mapping: ' . $blocker ),
 			'0.1.0'
 		);
 		return;

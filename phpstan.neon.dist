@@ -1,0 +1,21 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - outpost.php
+        - includes/
+    excludePaths:
+        - vendor/
+        - node_modules/
+        - build/
+        - pwa/
+        - tests/
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    # PHPStan reasons that PHP_VERSION must satisfy `>= 8.2` because composer.json
+    # platform sets 8.2 — but the runtime check in outpost_meets_requirements()
+    # is genuinely useful (covers users on older PHP). PHPDoc-derived certainty
+    # would mark the second version_compare as redundant; turn it off.
+    treatPhpDocTypesAsCertain: false

@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<ruleset name="Outpost">
+	<description>Coding standards for Outpost.</description>
+
+	<!-- Files to scan. Tests are excluded for now: PSR-4 namespaced test
+	     classes (Outpost\Tests\Unit\) fight WordPress.Files.FileName's
+	     class-{slug}.php convention. Add tests/ back when there's a clean
+	     way to scope WPCS rules per-directory. -->
+	<file>./outpost.php</file>
+	<file>./includes</file>
+
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<exclude-pattern>*/pwa/*</exclude-pattern>
+	<exclude-pattern>*/coverage/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+	<arg name="colors"/>
+	<arg value="ps"/>
+
+	<rule ref="WordPress-Extra">
+		<!-- Outpost convention: includes/class-{thing}.php (no slug prefix).
+		     The directory itself is `outpost/`, so prepending `outpost-` to
+		     every class file is redundant. WPCS's strict naming rule expects
+		     class-outpost-foo.php for class Outpost_Foo — we deliberately
+		     deviate. -->
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+	</rule>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<config name="testVersion" value="8.2-"/>
+	<config name="minimum_wp_version" value="6.5"/>
+
+	<!-- Lock the text domain so any rogue translation gets flagged. -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="outpost"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

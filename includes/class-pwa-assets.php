@@ -96,6 +96,9 @@ final class Outpost_PWA_Assets {
 			return null;
 		}
 
+		// WPCS suggests wp_remote_get(), which is for HTTP. This is a local
+		// filesystem read of the build artefact deployed alongside the plugin.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$contents = file_get_contents( $path );
 		if ( false === $contents ) {
 			self::$cached = null;
@@ -128,7 +131,7 @@ final class Outpost_PWA_Assets {
 			return null;
 		}
 
-		return self::build_url_prefix() .$file;
+		return self::build_url_prefix() . $file;
 	}
 
 	/**
@@ -156,7 +159,7 @@ final class Outpost_PWA_Assets {
 		$urls = array();
 		foreach ( $css as $css_file ) {
 			if ( is_string( $css_file ) && '' !== $css_file ) {
-				$urls[] = self::build_url_prefix() .$css_file;
+				$urls[] = self::build_url_prefix() . $css_file;
 			}
 		}
 		return $urls;

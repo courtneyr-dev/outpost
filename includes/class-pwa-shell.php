@@ -55,6 +55,12 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		$entry_url = Outpost_PWA_Assets::entry_url();
 		$css_urls  = Outpost_PWA_Assets::entry_css_urls();
+		// Outpost shell IS the entire HTML document, not an enrichment of WP's
+		// page template — template_redirect priority 1 + self::halt() bypasses
+		// wp_head/wp_footer entirely. wp_enqueue_style/script can't reach this
+		// rendering path. The <link rel="stylesheet"> and <script type="module">
+		// tags below are intentional inline outputs.
+		// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet, WordPress.WP.EnqueuedResources.NonEnqueuedScript
 		?><!doctype html>
 <html lang="en">
 <head>
@@ -83,6 +89,7 @@ final class Outpost_PWA_Shell {
 </body>
 </html>
 		<?php
+		// phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet, WordPress.WP.EnqueuedResources.NonEnqueuedScript
 		self::halt();
 	}
 
@@ -109,7 +116,7 @@ final class Outpost_PWA_Shell {
 		if ( null === $presentation ) {
 			_doing_it_wrong(
 				__METHOD__,
-				'Dependency chain entry has no presentation mapping: ' . $blocker,
+				esc_html( 'Dependency chain entry has no presentation mapping: ' . $blocker ),
 				'0.1.0'
 			);
 			self::render_host_unmet_prompt();
@@ -120,7 +127,7 @@ final class Outpost_PWA_Shell {
 		$is_install = ( 'absent' === $status );
 
 		if ( $is_install ) {
-			$action_url = wp_nonce_url(
+			$action_url   = wp_nonce_url(
 				self_admin_url( 'update.php?action=install-plugin&plugin=' . $presentation['slug'] ),
 				'install-plugin_' . $presentation['slug']
 			);
@@ -135,7 +142,7 @@ final class Outpost_PWA_Shell {
 				$presentation['label']
 			);
 		} else {
-			$action_url = wp_nonce_url(
+			$action_url   = wp_nonce_url(
 				self_admin_url( 'plugins.php?action=activate&plugin=' . $blocker ),
 				'activate-plugin_' . $blocker
 			);
@@ -152,7 +159,8 @@ final class Outpost_PWA_Shell {
 		}
 
 		self::send_html_header();
-		?><!doctype html>
+		?>
+		<!doctype html>
 <html lang="en">
 <head>
 	<meta charset="utf-8">
@@ -182,7 +190,8 @@ final class Outpost_PWA_Shell {
 			OUTPOST_MIN_WP,
 			OUTPOST_MIN_PHP
 		);
-		?><!doctype html>
+		?>
+		<!doctype html>
 <html lang="en">
 <head>
 	<meta charset="utf-8">
