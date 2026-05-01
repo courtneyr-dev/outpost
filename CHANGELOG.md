@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-05-01
+
+This release consolidates a 7-skill audit cycle (`/wordpress-testing`, `/wordpress-pro`, `/wordpress-security`, `/wordpress-performance`, `/wordpress-plugin-core`, `/wordpress-accessibility`, `/wordpress-org-compliance`) plus the wordpress-performance-best-practices follow-up. Six concrete shipped improvements: CI workflow, URL-scheme validation hardening, modulepreload + critical layout CSS, `uninstall.php` hygiene, `<html lang>` site-locale fix, plus six durable forward-looking checklists (security, performance, accessibility, A3 token requirements, smoke tests, plugin-core cleanup enumeration). Outpost is end-to-end functional: sign in via IndieAuth, post a note via Micropub, see the new post URL — verified on iPhone Safari with desktop Safari Web Inspector.
+
 ### Added (WordPress.org compliance — wordpress-org-compliance audit)
 - CLAUDE.md gains a "WordPress.org Compliance" section locking the no-trialware, no-license-key, no-paid-tier policy. Includes the adapter-behavior corollary for Phase F: integrations may detect paid companions and surface their features, but Outpost's own functionality must never be gated by whether a user has the paid version of any companion.
 - Explicit rejection list for future contributions (Pro tier, license keys, time-limited trials, per-post quotas, adapter logic that disables Outpost when a free companion is present but a paid one isn't).
@@ -156,6 +160,7 @@ This release consolidates Sessions A1 + A2 (foundation → routes/shell), B0a + 
 ### Notes
 - This release does not yet include the PWA shell, composer modes, REST endpoints, or service worker. Those land in subsequent sessions per the build plan.
 
-[Unreleased]: https://github.com/courtneyr-dev/outpost/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/courtneyr-dev/outpost/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/courtneyr-dev/outpost/compare/v0.1.4...v0.1.8
 [0.1.4]: https://github.com/courtneyr-dev/outpost/compare/v0.1.0...v0.1.4
 [0.1.0]: https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.0
