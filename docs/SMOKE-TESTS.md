@@ -66,9 +66,9 @@ Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>` on the phone.
 **DevTools verification (Android Chrome OR iPhone Safari with desktop DevTools attached):**
 
 - Application → Storage → IndexedDB → `outpost`:
-  - `tokens` object store: one row with `iv` (12-byte Uint8Array), `ciphertext` (opaque bytes — NOT the raw token), `meta` containing `tokenType: "Bearer"`, `scope`, `me`, `storedAt`.
-  - `crypto-keys` object store: one row with a `CryptoKey` reference (DevTools should indicate non-extractable).
-- Application → Storage → Session storage: empty (the auth flow cleared verifier, state, me, and token_endpoint after exchange).
+  - `tokens` object store: one row keyed `"micropub"` with `iv` (12-byte Uint8Array), `ciphertext` (opaque bytes ~144 bytes for a typical bearer token — NOT the raw token), `meta` containing `tokenType: "Bearer"`, `scope: "create update media"` (or whatever the IndieAuth Allow page granted), `me`, `storedAt` (epoch ms).
+  - `crypto-keys` object store: one row keyed `"token-encryption-key"` with a `CryptoKey` reference. DevTools shows `algorithm: AES-GCM`, `length: 256`, **`extractable: false`** (load-bearing — without this, `exportKey()` could dump raw bytes), `usages: ["decrypt", "encrypt"]`.
+- Application → Storage → Session storage: empty (auth-flow's `finally{}` cleared `verifier`, `state`, `me`, `token_endpoint` regardless of exchange success).
 
 **Stop here if:** the placeholder doesn't render, fields are blank, or the token isn't in IndexedDB.
 
@@ -76,18 +76,24 @@ Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>` on the phone.
 
 **Android Chrome (USB DevTools) OR iPhone Safari (Develop menu):**
 
-- Application → Service Workers: one registered SW with scope `https://qkf.b0d.myftpupload.com/post/`, source URL `/post/sw` (note the missing `.js` — managed-WP nginx short-circuits `.js` requests before they reach WordPress).
-- Application → Manifest: shows "Outpost", scope `/post/`, display `standalone`, start_url `/post/`.
+- Application → Service Workers: one registered SW with scope `https://qkf.b0d.myftpupload.com/post/`, scriptURL `https://qkf.b0d.myftpupload.com/post/sw` (note the missing `.js` — A2 staging fix #4: managed-WP nginx short-circuits `.js` requests before they reach WordPress). State should be **`activated`**.
+- Manifest at `/post/manifest.json` (raw GET in browser): `{ "name": "Outpost", "scope": "/post/", "display": "standalone", "start_url": "/post/", "icons": [{ "src": "/wp-content/plugins/outpost/assets/icons/icon-192.png", ... }, { "src": "/wp-content/plugins/outpost/assets/icons/icon-512.png", ... }] }`.
+- **Known gap:** the icon files referenced in the manifest don't ship until A3. Browsers tolerate missing icons (the manifest stays valid, install prompts may use a fallback) — this is tracked in `docs/A3-REQUIREMENTS.md`. Don't fail Stage 4 because of missing icons.
 
 **iOS Chrome:** skip this stage.
 
-### Stage 5 — sign out + repeat
+### Stage 5 — sign out + repeat (with IV-freshness check)
 
 1. Tap "Sign out".
 2. Page reloads.
 3. **Expected:** back to LoginScreen.
-4. **DevTools (any platform with DevTools):** `tokens` row gone, `crypto-keys` row still present (the encryption key persists across sign-outs intentionally).
-5. Optional: complete a second login and confirm everything works repeatably.
+4. **DevTools (any platform with DevTools):**
+   - `tokens` row: gone.
+   - `crypto-keys` row: still present (the encryption key persists across sign-outs intentionally — re-login is one round-trip, not a key-regeneration round-trip too).
+   - Note the IV bytes from Stage 3's token row before signing out (`iv: [157, 159, 220, ...]` or similar).
+5. Sign in a second time. After Stage 2 + Stage 3 complete:
+   - **Expected:** the new `tokens` row's `iv` is a **fresh random 12 bytes** — should NOT match Stage 3's IV. AES-GCM's contract requires unique IVs per key per encryption; `crypto.getRandomValues(new Uint8Array(12))` provides them. Verifying this once on staging confirms the `write_token` path is regenerating IVs (and not, for example, reusing a constant).
+6. Session storage should still be empty after the second login.
 
 ### Stage 6 — install / Add-to-Home-Screen
 
@@ -101,8 +107,10 @@ Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>` on the phone.
 **iPhone Safari (Add-to-Home-Screen — separate observation):**
 
 1. Tap Share → Add to Home Screen → Confirm.
-2. Tap the home-screen icon. Opens in iOS's Add-to-Home-Screen standalone mode.
-3. Treat the result as a complementary data point, not a substitute for Android's install verification — A2HS goes through a different platform code path.
+2. Tap the home-screen icon. Opens in iOS standalone mode (no Safari chrome — `apple-mobile-web-app-capable: yes` in the shell head triggers this).
+3. **Expected:** the auth flow completes inside the standalone window — no pop-out to regular Safari. iOS keeps standalone-mode navigations within the same window.
+4. **Expected:** separate IndexedDB scope from the regular Safari tab. The standalone window starts logged-out even if the Safari tab is logged in — they're isolated browser storage contexts.
+5. Treat the result as a complementary data point, not a substitute for Android's install verification — A2HS goes through a different platform code path. Apple-touch-icon and tuned status-bar styling land in A3; until then expect the placeholder favicon and `status-bar-style: default`.
 
 **iOS Chrome:** skip — the install option creates a bookmark, not a real PWA.
 
