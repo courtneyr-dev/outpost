@@ -259,9 +259,21 @@ self.addEventListener('activate', (event) => {
 	 * Send headers for an HTML response. Skipped when headers have already been
 	 * sent (e.g. WP startup printed something) so test output can still capture
 	 * the body via ob_start.
+	 *
+	 * Cache-Control: managed-WP page caches (Varnish on GoDaddy, nginx FastCGI
+	 * on others) cache anonymous responses by default. Without nocache_headers()
+	 * the install-prompt page rendered to one user could be served to another.
+	 * The composer shell itself is anonymous-safe (state lives in IndexedDB,
+	 * not in the HTML), but no-cache here keeps the caching policy explicit
+	 * and makes B0b's auth-callback handling correct without a follow-up.
+	 *
+	 * Manifest and SW responses keep their own cache semantics (browsers want
+	 * to re-fetch them on a defined cadence) — we don't apply nocache_headers()
+	 * to those.
 	 */
 	private static function send_html_header(): void {
 		if ( ! headers_sent() ) {
+			nocache_headers();
 			header( 'Content-Type: text/html; charset=utf-8' );
 		}
 	}
