@@ -81,6 +81,12 @@ export async function fetch_composer_config(
 	try {
 		response = await env.fetch(ENDPOINT_PATH, {
 			method: 'GET',
+			// credentials: 'include' so wp-admin login cookies authenticate the
+			// request when the IndieAuth plugin's bearer-to-user translation
+			// hasn't fired (it's specific to /wp-json/micropub/* on some
+			// installs and doesn't cover our Outpost-namespaced routes).
+			// Same-origin only — this never leaks cookies cross-origin.
+			credentials: 'include',
 			headers: {
 				Authorization: 'Bearer ' + access_token,
 				Accept: 'application/json',

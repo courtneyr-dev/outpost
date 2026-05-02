@@ -79,6 +79,10 @@ export async function fetch_preview(
 	try {
 		response = await env.fetch(PREVIEW_ENDPOINT, {
 			method: 'POST',
+			// credentials: 'include' falls back to wp-admin cookie auth when
+			// the IndieAuth bearer-to-user translation hasn't fired for our
+			// Outpost-namespaced routes. Same-origin only.
+			credentials: 'include',
 			headers: {
 				Authorization: 'Bearer ' + params.accessToken,
 				'Content-Type': 'application/json',

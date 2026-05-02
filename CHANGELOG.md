@@ -7,6 +7,11 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Phase H hotfix — cookie-credential fallback for Outpost REST endpoints)
+- **`fetch_composer_config` and `fetch_preview` now send `credentials: 'include'`** so wp-admin login cookies authenticate the request when the IndieAuth plugin's bearer-to-user translation hasn't fired for our Outpost-namespaced routes. Same-origin only — never leaks cookies cross-origin.
+- Diagnosis: the WordPress IndieAuth plugin's `determine_current_user` filter is path-scoped on some installs (covers `/wp-json/micropub/*` but not `/wp-json/outpost/*`). When the plugin doesn't translate the bearer for our routes, `current_user_can('edit_posts')` returns false and the endpoint 401s — even with a valid token. Cookie fallback works because the user is logged into wp-admin in the same browser.
+- Two paths now authenticate the request: bearer (when IndieAuth's middleware covers the route) AND cookie (when admin session is active). Both succeed with `current_user_can`. Failure happens only when neither is available — which is also the only case where the user genuinely shouldn't be authenticated.
+
 ### Added (Session H — site settings + onboarding intro)
 
 - **`Outpost_Settings`** — site-wide preferences via the WordPress Settings API. Single option `outpost_settings` (array) covering:
