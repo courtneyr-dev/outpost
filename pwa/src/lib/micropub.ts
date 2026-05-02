@@ -67,6 +67,11 @@ export interface HEntryProperties {
 	'repost-of'?: string;
 	'bookmark-of'?: string;
 	'follow-of'?: string;
+	'listen-of'?: string;
+	'watch-of'?: string;
+	'read-of'?: string;
+	'play-of'?: string;
+	location?: string;
 	rsvp?: 'yes' | 'no' | 'maybe' | 'interested';
 	photo?: string;
 	/** Per David Shanske's Micropub plugin convention for alt text on photos. */

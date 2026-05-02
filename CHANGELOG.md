@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C3 — Listen group)
+- `pwa/src/components/modes/listen-mode.tsx` — replaces the C0 stub. Five sub-modes under one tab via radio picker: Listen (`listen-of`), Watch (`watch-of`), Read (`read-of`), Play (`play-of`), Checkin (`location`). Each variant has its own target-input label, content-textarea label, and submit-button label. Checkin adds an extra optional Place-name field that posts as `name`. None require text content; all require a target URL. Same status-state machine as Note/Reply/Photo (`idle` → `discovering-endpoint` → `posting` → `posted` | `error`).
+- `HEntryProperties` interface in `micropub.ts` extended with `'listen-of'?: string`, `'watch-of'?: string`, `'read-of'?: string`, `'play-of'?: string`, `location?: string`.
+
+### Changed (Session C3)
+- `OUTPOST_VERSION` bumped to `0.1.15` per A2 #16.
+- `composer-tabs.tsx`: Listen tab now passes `token` and `micropubEnv` to the real `ListenMode` component (was a stub).
+- Companion gating note: these post kinds render best with Post Kinds for IndieWeb active. Without it, posts still go through Micropub but render as generic notes. Outpost doesn't runtime-detect Post Kinds at the PWA level yet — the Listen tab is always visible. Phase F can add a "requires Post Kinds" notice when client-side companion detection lands.
+
 ### Added (Session A3 — Visual polish)
 - `styles/outpost-tokens.css` — server-rendered CSS custom-property defaults mapped to Courtney's palette. Russian-violet primary buttons (white text, 13:1 contrast), prussian-blue body text on white (13:1), cerulean focus ring (7:1 against white, passes WCAG 3:1 for non-text), light-orange error backgrounds with ut-orange borders. Verified WCAG AA across all interactive surfaces.
 - `assets/icons/outpost-icon.svg` and `outpost-icon-maskable.svg` — branded geometric icon (russian-violet rounded square + ut-orange ring + center dot, evokes a satellite/transmitter). Maskable variant adds extra padding for Android adaptive-icon safe zone.

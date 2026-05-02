@@ -82,7 +82,11 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 			label: 'Photo',
 			render: () => <PhotoMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
 		},
-		{ id: 'listen', label: 'Listen', render: () => <ListenMode /> },
+		{
+			id: 'listen',
+			label: 'Listen',
+			render: () => <ListenMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
+		},
 		{ id: 'article', label: 'Article', render: () => <ArticleMode /> },
 	];
 
