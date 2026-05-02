@@ -63,6 +63,11 @@
 	--outpost-error-fg: #023047;
 	--outpost-error-border: #fb8500;
 
+	/* Warning — softer than error; used for the offline-queue banner.
+	 * Pale-cream background with prussian-blue text reads as informational. */
+	--outpost-warning-bg: #fdf2dc;
+	--outpost-warning-fg: #023047;
+
 	/* Active syndication chips — russian-violet, matches primary */
 	--outpost-chip-active-bg: #241c4a;
 	--outpost-chip-active-fg: #ffffff;

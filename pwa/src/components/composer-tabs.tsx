@@ -12,6 +12,8 @@ import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { AboutTab } from './modes/about-tab';
+import { QueueBanner } from './queue-banner';
+import type { OfflineQueueEnvironment } from '../lib/offline-queue';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -55,6 +57,7 @@ export interface ComposerTabsProps {
 	tokenStore: TokenStoreEnvironment;
 	micropubEnv?: MicropubEnvironment;
 	composerConfigEnv?: ComposerConfigEnvironment;
+	queueEnv?: OfflineQueueEnvironment;
 }
 
 export function ComposerTabs({
@@ -62,6 +65,7 @@ export function ComposerTabs({
 	tokenStore,
 	micropubEnv,
 	composerConfigEnv,
+	queueEnv,
 }: ComposerTabsProps) {
 	const [active, setActive] = useState<ModeId>('note');
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
@@ -171,6 +175,10 @@ export function ComposerTabs({
 
 	return (
 		<div class="outpost-composer">
+			<QueueBanner
+				{...(micropubEnv ? { micropubEnv } : {})}
+				{...(queueEnv ? { queueEnv } : {})}
+			/>
 			<div role="tablist" aria-label="Composer modes" class="outpost-tablist">
 				{modes.map((mode, index) => (
 					<button

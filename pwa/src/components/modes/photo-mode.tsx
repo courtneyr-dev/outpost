@@ -10,6 +10,7 @@ import {
 import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
+import { enqueue, is_network_error } from '../../lib/offline-queue';
 import {
 	MorePanel,
 	empty_more_values,
@@ -59,6 +60,7 @@ type Status =
 	| { kind: 'uploading-photo' }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location: string }
+	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
 export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps) {
@@ -133,15 +135,29 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				...(trimmed_content ? { content: trimmed_content } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
-			const result = await post_h_entry(
-				{
-					properties,
-					accessToken: token.accessToken,
-					micropubEndpoint: mp,
-				},
-				micropubEnv,
-			);
-			setStatus({ kind: 'posted', location: result.location });
+			try {
+				const result = await post_h_entry(
+					{
+						properties,
+						accessToken: token.accessToken,
+						micropubEndpoint: mp,
+					},
+					micropubEnv,
+				);
+				setStatus({ kind: 'posted', location: result.location });
+			} catch (post_err) {
+				if (is_network_error(post_err)) {
+					await enqueue({
+						source: 'photo',
+						properties,
+						accessToken: token.accessToken,
+						micropubEndpoint: mp,
+					});
+					setStatus({ kind: 'queued' });
+				} else {
+					throw post_err;
+				}
+			}
 
 			// Reset form for next post.
 			if (preview_url) URL.revokeObjectURL(preview_url);
@@ -260,6 +276,12 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 								</a>
 							</>
 						)}
+					</p>
+				)}
+
+				{status.kind === 'queued' && (
+					<p class="outpost-status" aria-live="polite">
+						Saved for later. Outpost will post this when you&apos;re back online.
 					</p>
 				)}
 

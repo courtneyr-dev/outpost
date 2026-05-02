@@ -9,6 +9,7 @@ import {
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
+import { enqueue, is_network_error } from '../../lib/offline-queue';
 import {
 	MorePanel,
 	empty_more_values,
@@ -100,6 +101,7 @@ type Status =
 	| { kind: 'discovering-endpoint' }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location: string }
+	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
 export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
@@ -142,19 +144,42 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
-			const result = await post_h_entry(
-				{
-					properties,
-					accessToken: token.accessToken,
-					micropubEndpoint: micropub_endpoint,
-				},
-				micropubEnv,
-			);
-			setStatus({ kind: 'posted', location: result.location });
-			setTargetUrl('');
-			setPlaceName('');
-			setContent('');
-			setMoreValues(empty_more_values());
+			try {
+				const result = await post_h_entry(
+					{
+						properties,
+						accessToken: token.accessToken,
+						micropubEndpoint: micropub_endpoint,
+					},
+					micropubEnv,
+				);
+				setStatus({ kind: 'posted', location: result.location });
+				setTargetUrl('');
+				setPlaceName('');
+				setContent('');
+				setMoreValues(empty_more_values());
+				return;
+			} catch (post_err) {
+				if (is_network_error(post_err)) {
+					try {
+						await enqueue({
+							source: 'listen',
+							properties,
+							accessToken: token.accessToken,
+							micropubEndpoint: micropub_endpoint,
+						});
+						setStatus({ kind: 'queued' });
+						setTargetUrl('');
+						setPlaceName('');
+						setContent('');
+						setMoreValues(empty_more_values());
+						return;
+					} catch (_q_err) {
+						// Queue write failed; fall through to error display.
+					}
+				}
+				throw post_err;
+			}
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -271,6 +296,12 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								</a>
 							</>
 						)}
+					</p>
+				)}
+
+				{status.kind === 'queued' && (
+					<p class="outpost-status" aria-live="polite">
+						Saved for later. Outpost will post this when you&apos;re back online.
 					</p>
 				)}
 

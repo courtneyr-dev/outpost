@@ -8,6 +8,7 @@ import {
 } from '../../lib/micropub';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
+import { enqueue, is_network_error } from '../../lib/offline-queue';
 import {
 	MorePanel,
 	empty_more_values,
@@ -62,6 +63,7 @@ type Status =
 	| { kind: 'discovering' }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location: string }
+	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
 type Variant = 'note' | 'status' | 'aside' | 'article' | 'quote';
@@ -165,18 +167,41 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				...(config.postFormat ? { 'mp-post-format': config.postFormat } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
-			const result = await post_h_entry(
-				{
-					properties,
-					accessToken: token.accessToken,
-					micropubEndpoint: micropub_endpoint,
-				},
-				micropubEnv,
-			);
-			setStatus({ kind: 'posted', location: result.location });
-			setContent('');
-			setTitle('');
-			setMoreValues(empty_more_values());
+
+			try {
+				const result = await post_h_entry(
+					{
+						properties,
+						accessToken: token.accessToken,
+						micropubEndpoint: micropub_endpoint,
+					},
+					micropubEnv,
+				);
+				setStatus({ kind: 'posted', location: result.location });
+				setContent('');
+				setTitle('');
+				setMoreValues(empty_more_values());
+				return;
+			} catch (post_err) {
+				if (is_network_error(post_err)) {
+					try {
+						await enqueue({
+							source: 'note',
+							properties,
+							accessToken: token.accessToken,
+							micropubEndpoint: micropub_endpoint,
+						});
+						setStatus({ kind: 'queued' });
+						setContent('');
+						setTitle('');
+						setMoreValues(empty_more_values());
+						return;
+					} catch (_q_err) {
+						// Queue write failed; fall through to error display.
+					}
+				}
+				throw post_err;
+			}
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -290,6 +315,12 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 								</a>
 							</>
 						)}
+					</p>
+				)}
+
+				{status.kind === 'queued' && (
+					<p class="outpost-status" aria-live="polite">
+						Saved for later. Outpost will post this when you&apos;re back online.
 					</p>
 				)}
 
