@@ -7,6 +7,23 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session F — companion adapter classes + registry)
+
+Phase F formalizes the C5 bridges into the adapter contract A1 #4 specified. The bridges in `class-micropub-bridges.php` keep their behavior; the new adapters provide the inventory + capability listing the composer + admin code can ask against.
+
+- **Seven concrete adapters**, one per optional companion plugin Outpost knows about — each in its own file under `includes/companions/`:
+  - `Outpost_Post_Kinds_Adapter` — capability slugs for each Post Kind (`post-kinds.listen`, `post-kinds.watch`, `post-kinds.read`, `post-kinds.play`, `post-kinds.checkin`, `post-kinds.like`, `post-kinds.repost`, `post-kinds.bookmark`, `post-kinds.rsvp`, `post-kinds.follow`, `post-kinds.quotation`)
+  - `Outpost_Post_Formats_Adapter` — `post-formats.format`, `post-formats.inference`
+  - `Outpost_XFN_Adapter` — `xfn.relationships`
+  - `Outpost_Syndication_Links_Adapter` — `syndication.chips`
+  - `Outpost_Yoast_Adapter` — `yoast.focus-keyphrase`
+  - `Outpost_ActivityPub_Adapter` — `activitypub.federate` (passive marker; downstream POSSE plugins consume the same posts)
+  - `Outpost_Accessibility_Checker_Adapter` — `accessibility-checker.report`
+- **`Outpost_Companion_Registry`** — single source of truth for which adapters Outpost knows about. `all()` returns one instance per default adapter class; `active()` filters to those whose underlying plugin is currently active; `all_active_capabilities()` aggregates capability slugs across active adapters with de-duplication + alphabetical sort.
+- **Filter `outpost_companion_adapters`** lets future plugins or site-config code register additional adapter classes without forking core. The registry validates each candidate is a string class name pointing at an `Outpost_Companion_Base` subclass; bogus entries get silently dropped.
+- Per-request instance cache: `get($class)` returns the same instance on repeat calls so consumers can compare by reference. `reset_for_tests()` is a test-only hook.
+- **`tests/unit/CompanionRegistryTest.php`** — 6 PHPUnit tests covering `all()` returns 7 default adapters, `get()` caches, adapter shape (file/label/capabilities) for Post Kinds + XFN + Yoast, `all_active_capabilities()` de-dup + sort. PHPUnit 118 → 124.
+
 ### Changed (Session DS-1 — Outpost Design System v1.0 token taxonomy)
 
 The Outpost Design System v1.0 (drafted by Courtney) is now authoritative. This commit adopts the token system. Component refactors land in DS-2.

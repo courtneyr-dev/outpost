@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.33
+ * Version:           0.1.34
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.33' );
+define( 'OUTPOST_VERSION', '0.1.34' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -52,6 +52,14 @@ define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/acce
 // rest of this bootstrap file can stay procedural shims that delegate to them.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-kinds-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-formats-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-xfn-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-syndication-links-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-yoast-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-activitypub-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-accessibility-checker-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
