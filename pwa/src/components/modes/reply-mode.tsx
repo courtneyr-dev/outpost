@@ -14,6 +14,7 @@ import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
+import { CharCounter } from '../char-counter';
 import {
 	MorePanel,
 	empty_more_values,
@@ -388,6 +389,12 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					}
 					disabled={submitting || fetching_preview}
 					required={config.contentRequired}
+				/>
+				<CharCounter
+					value={content}
+					{...(more_values.syndicateTo.some((u) => /brid\.gy\/publish\/twitter/.test(u))
+						? { limit: 280 }
+						: {})}
 				/>
 
 				{status.kind === 'error' && (

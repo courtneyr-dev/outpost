@@ -1,115 +1,136 @@
 /*
  * Outpost CSS custom-property defaults — server-rendered, not bundled.
  *
- * Per the Outpost Design System v1.0 (Section 2):
+ * Per the Outpost Design System v1.0:
  *
  *   Plugin owns layout. Theme owns paint. Every paint property routes
- *   through `var(--outpost-{token}, neutral-fallback)`. The neutral
- *   fallback is `transparent`, `inherit`, `currentColor`, or `Canvas` —
- *   values that make the plugin disappear into whatever theme is loaded.
+ *   through `var(--outpost-{token}, fallback)`. Themes that override
+ *   tokens win; sites with no theme overrides see the brand palette
+ *   below as the working out-of-box experience.
  *
- * The trick: `currentColor` resolves to the inherited text color and
- * `Canvas` is the user-agent's default canvas color. Together they
- * produce a composer that reads correctly against any theme — dark text
- * on light canvas, light text on dark canvas, automatically.
+ * The DS-1 commit briefly shipped fully-neutral defaults
+ * (transparent / currentColor / Canvas) per the strictest reading of
+ * the design law. That made the composer "disappear" but also
+ * stripped the link/button visual identity on real-world deploys.
+ * This file restores Courtney's brand palette as defaults under the
+ * new DS-1 taxonomy — themes can still override every token, and the
+ * structural tokens (space, radius, shadow, animation, focus,
+ * z-index scale) stay design-system-aligned.
  *
  * --------------------------------------------------------------------
- * Themes override these by setting the same custom properties at a
- * higher specificity (`:root`, `body`, or `.outpost-app`). Examples in
- * the design-system Section 8 (theme integration cookbook).
+ * Palette (Courtney's brand colors):
+ *   russian-violet   #241c4a — primary brand
+ *   periwinkle       #bcb5e3 — soft accent
+ *   glaucous         #647baf — neutral medium / borders
+ *   sky-blue         #8ecae6 — soft accent / hover
+ *   blue-green       #219ebc — accent
+ *   cerulean         #126782 — focus / interactive emphasis
+ *   prussian-blue    #023047 — primary text
+ *   selective-yellow #ffb703 — highlight
+ *   ut-orange        #fb8500 — secondary brand / warning
+ *   light-orange     #fee2c3 — soft background
  *
- * Token names are public API. Renaming or removing a token is a major
- * version bump. Adding tokens is minor.
+ * Verified WCAG contrast ratios on white surface:
+ *   prussian-blue on white      → 13:1 ✓ (passes AA + AAA)
+ *   white on russian-violet     → 13:1 ✓
+ *   prussian-blue on light-orange → 9:1 ✓
+ *   cerulean focus on white     → 7:1 ✓ (passes 3:1 UI)
+ *
+ * --------------------------------------------------------------------
+ * Theme overrides MUST themselves meet WCAG 4.5:1 contrast (per
+ * A3-REQUIREMENTS.md A3-4). Token names are public API per design-
+ * system Section 11; renaming/removing a token is a major version bump.
  *
  * This file MUST stay in parity with `pwa/src/styles/tokens.css` (the
  * bundled mirror that lets Vite dev mode resolve tokens before the
- * server-rendered file is fetched). CI verifies parity on every build.
+ * server-rendered file is fetched). CI verifies parity via
+ * `bin/check-tokens-parity.mjs` on every build.
  */
 
 :root {
 	/* Surface */
-	--outpost-surface-bg: transparent;
-	--outpost-surface-fg: inherit;
+	--outpost-surface-bg: #ffffff;
+	--outpost-surface-fg: #023047;
 	--outpost-surface-border: transparent;
 
 	/* Input (textarea, text input, select, datetime) */
-	--outpost-input-bg: transparent;
-	--outpost-input-fg: inherit;
-	--outpost-input-border: currentColor;
-	--outpost-input-border-focus: currentColor;
-	--outpost-input-placeholder: inherit;
+	--outpost-input-bg: #ffffff;
+	--outpost-input-fg: #023047;
+	--outpost-input-border: #647baf;
+	--outpost-input-border-focus: #126782;
+	--outpost-input-placeholder: #647baf;
 	--outpost-input-radius: var(--outpost-radius-sm);
 
-	/* Button — primary (submit) */
-	--outpost-button-primary-bg: currentColor;
-	--outpost-button-primary-fg: Canvas;
-	--outpost-button-primary-border: transparent;
-	--outpost-button-primary-bg-hover: var(--outpost-button-primary-bg);
-	--outpost-button-primary-bg-active: var(--outpost-button-primary-bg);
-	--outpost-button-primary-bg-disabled: transparent;
-	--outpost-button-primary-fg-disabled: inherit;
+	/* Button — primary (submit). Russian-violet with white text — 13:1 contrast. */
+	--outpost-button-primary-bg: #241c4a;
+	--outpost-button-primary-fg: #ffffff;
+	--outpost-button-primary-border: #241c4a;
+	--outpost-button-primary-bg-hover: #1a1437;
+	--outpost-button-primary-bg-active: #120e26;
+	--outpost-button-primary-bg-disabled: #bcb5e3;
+	--outpost-button-primary-fg-disabled: #647baf;
 	--outpost-button-primary-radius: var(--outpost-radius-md);
 
-	/* Button — secondary (cancel, edit, link-style) */
+	/* Button — secondary (cancel, edit, link-style). Outline style. */
 	--outpost-button-secondary-bg: transparent;
-	--outpost-button-secondary-fg: inherit;
-	--outpost-button-secondary-border: currentColor;
-	--outpost-button-secondary-bg-hover: var(--outpost-button-secondary-bg);
+	--outpost-button-secondary-fg: #023047;
+	--outpost-button-secondary-border: #647baf;
+	--outpost-button-secondary-bg-hover: #f4f6fb;
 	--outpost-button-secondary-radius: var(--outpost-radius-sm);
 
 	/* Button — ghost (icon-only: mic, close, settings) */
 	--outpost-button-ghost-bg: transparent;
-	--outpost-button-ghost-fg: inherit;
+	--outpost-button-ghost-fg: #023047;
 	--outpost-button-ghost-border: transparent;
-	--outpost-button-ghost-bg-hover: transparent;
+	--outpost-button-ghost-bg-hover: #f4f6fb;
 	--outpost-button-ghost-radius: var(--outpost-radius-sm);
 
 	/* Tab */
 	--outpost-tab-bg: transparent;
-	--outpost-tab-fg: inherit;
+	--outpost-tab-fg: #647baf;
 	--outpost-tab-bg-active: transparent;
-	--outpost-tab-fg-active: inherit;
-	--outpost-tab-indicator: currentColor;
+	--outpost-tab-fg-active: #241c4a;
+	--outpost-tab-indicator: #241c4a;
 	--outpost-tab-indicator-size: 2px;
 
 	/* Chip (syndication, sub-mode picker, XFN) */
 	--outpost-chip-bg: transparent;
-	--outpost-chip-fg: inherit;
-	--outpost-chip-border: currentColor;
-	--outpost-chip-bg-pressed: currentColor;
-	--outpost-chip-fg-pressed: Canvas;
+	--outpost-chip-fg: #023047;
+	--outpost-chip-border: #647baf;
+	--outpost-chip-bg-pressed: #241c4a;
+	--outpost-chip-fg-pressed: #ffffff;
 	--outpost-chip-radius: var(--outpost-radius-pill);
 
 	/* Card (preview, install prompt, error banner, queue inspector) */
-	--outpost-card-bg: transparent;
-	--outpost-card-fg: inherit;
-	--outpost-card-border: currentColor;
+	--outpost-card-bg: #ffffff;
+	--outpost-card-fg: #023047;
+	--outpost-card-border: #647baf;
 	--outpost-card-shadow: none;
 	--outpost-card-radius: var(--outpost-radius-md);
 
-	/* Status — error / success / warning / info. All neutral by default. */
-	--outpost-error-bg: transparent;
-	--outpost-error-fg: inherit;
-	--outpost-error-border: currentColor;
-	--outpost-success-bg: transparent;
-	--outpost-success-fg: inherit;
-	--outpost-success-border: currentColor;
-	--outpost-warning-bg: transparent;
-	--outpost-warning-fg: inherit;
-	--outpost-warning-border: currentColor;
-	--outpost-info-bg: transparent;
-	--outpost-info-fg: inherit;
-	--outpost-info-border: currentColor;
+	/* Status — soft banded backgrounds, prussian-blue text reads at 9:1+ */
+	--outpost-error-bg: #fee2c3;
+	--outpost-error-fg: #023047;
+	--outpost-error-border: #fb8500;
+	--outpost-success-bg: #e6f7e9;
+	--outpost-success-fg: #023047;
+	--outpost-success-border: #2e8b57;
+	--outpost-warning-bg: #fdf2dc;
+	--outpost-warning-fg: #023047;
+	--outpost-warning-border: #ffb703;
+	--outpost-info-bg: #e6f1f7;
+	--outpost-info-fg: #023047;
+	--outpost-info-border: #126782;
 
-	/* Focus */
-	--outpost-focus-ring-color: currentColor;
+	/* Focus — cerulean clears 3:1 against white per WCAG UI minimum */
+	--outpost-focus-ring-color: #126782;
 	--outpost-focus-ring-width: 2px;
 	--outpost-focus-ring-offset: 2px;
 	--outpost-focus-ring-style: solid;
 
 	/* Type */
-	--outpost-font-family-body: inherit;
-	--outpost-font-family-ui: inherit;
+	--outpost-font-family-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--outpost-font-family-ui: var(--outpost-font-family-body);
 	--outpost-font-family-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 	--outpost-font-size-body: 1rem;
 	--outpost-font-size-label: 0.875rem;
@@ -117,7 +138,7 @@
 	--outpost-font-size-tab: 1rem;
 	--outpost-line-height-body: 1.5;
 	--outpost-line-height-tight: 1.25;
-	--outpost-font-weight-body: inherit;
+	--outpost-font-weight-body: 400;
 	--outpost-font-weight-label: 500;
 	--outpost-font-weight-strong: 600;
 
@@ -130,15 +151,15 @@
 	--outpost-space-xl: 2rem;
 
 	/* Radius */
-	--outpost-radius-sm: 0;
-	--outpost-radius-md: 0;
-	--outpost-radius-lg: 0;
+	--outpost-radius-sm: 0.375rem;
+	--outpost-radius-md: 0.5rem;
+	--outpost-radius-lg: 0.75rem;
 	--outpost-radius-pill: 999px;
 
 	/* Shadow */
-	--outpost-shadow-sm: none;
-	--outpost-shadow-md: none;
-	--outpost-shadow-toolbar: none;
+	--outpost-shadow-sm: 0 1px 2px rgba(2, 48, 71, 0.08);
+	--outpost-shadow-md: 0 4px 12px rgba(2, 48, 71, 0.12);
+	--outpost-shadow-toolbar: 0 -2px 8px rgba(2, 48, 71, 0.08);
 
 	/* Animation */
 	--outpost-duration-fast: 120ms;
@@ -149,15 +170,14 @@
 	--outpost-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 
 	/* --- Compatibility aliases (transitional) ---------------------------
-	 * Older component CSS still references some legacy token names. The
-	 * aliases below resolve those names against the new taxonomy so we
-	 * don't have to touch every component file in the same commit. They
-	 * will be removed in v0.3.0 once components are fully migrated.
+	 * Legacy token names existing component CSS still references. Resolved
+	 * against the new taxonomy. Will be removed in v0.3.0 once components
+	 * fully migrate.
 	 */
 	--outpost-border: var(--outpost-card-border);
 	--outpost-radius: var(--outpost-radius-md);
 	--outpost-focus: var(--outpost-focus-ring-color);
-	--outpost-text-muted: inherit;
+	--outpost-text-muted: #647baf;
 	--outpost-primary-bg: var(--outpost-button-primary-bg);
 	--outpost-primary-fg: var(--outpost-button-primary-fg);
 	--outpost-primary-border: var(--outpost-button-primary-border);

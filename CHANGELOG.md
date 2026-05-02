@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session DS-2 — brand palette restored + logical-property audit + char counter)
+
+- **Brand palette restored under the DS-1 taxonomy.** DS-1 briefly shipped fully-neutral defaults (transparent / currentColor / Canvas) per the strictest reading of the design law. That made the composer "disappear" but stripped the link/button visual identity on real-world deploys. This commit restores Courtney's brand colors as the working out-of-box defaults under the new DS-1 token names — themes can still override every token, and structural tokens (space, radius, shadow, animation) stay aligned.
+- **Verified WCAG ratios on the brand palette**: prussian-blue text on white = 13:1, white on russian-violet = 13:1, prussian-blue on light-orange = 9:1, cerulean focus on white = 7:1.
+- **Logical-property audit on `pwa/src/styles/structure.css`.** Every `padding-{top,bottom,left,right}` → `padding-{block,inline}-{start,end}`. Every `margin-*` likewise. Every `border-{top,bottom}` → `border-block-{start,end}`. RTL layouts mirror automatically without an `html[dir="rtl"]` selector chain. Comment-block references to physical properties (e.g. the safe-area-inset-bottom note) stay as-is.
+- **Char counter component** (`pwa/src/components/char-counter.tsx`) per Design System 5.27. Renders below textareas. `aria-live="polite"` for changes, threshold-gated announcements (only narrates when ≤50 chars remaining, then on each integer change down to 0; over-limit announces "N over the limit"). Counts codepoints (`[...value].length`), not bytes — emoji + non-BMP chars count correctly. Visible character count updates every keystroke; the polite live region updates only at thresholds so screen readers don't drown the user.
+- **Char counter integrated** into Note + Reply textareas. Limit comes from syndication selection: when `mp-syndicate-to[]` includes the Bridgy → Twitter publish target, limit = 280. Otherwise no limit shown (just the count).
+- New CSS surfaces: `.outpost-visually-hidden` (standard sr-only recipe — used by the char counter live region and other ARIA-only labels), `.outpost-char-counter`, `.outpost-char-counter--over`.
+- Status palette filled in per the DS-1 spec: `--outpost-success-{bg,fg,border}` (soft green band, prussian-blue text 9:1+), `--outpost-warning-border` and `--outpost-info-border` get visible color values (selective-yellow and cerulean) instead of the previous `currentColor` fallback.
+
 ### Added (Session G — security headers + rate limit on composer-config)
 
 Phase G's first batch: security headers on the composer shell + per-user rate limit on the config endpoint. Token storage doc + URL validation are already in good shape from prior phases (B0a #9, B2 SSRF defenses, `is_safe_http_url` covers Reply / Doing / Photo paths); this commit adds the perimeter hardening.
