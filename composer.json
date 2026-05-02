@@ -40,7 +40,7 @@
     "analyze:baseline": "phpstan analyse --generate-baseline",
     "test": "phpunit",
     "test:unit": "phpunit --testsuite=unit",
-    "test:integration": "phpunit --testsuite=integration",
+    "test:integration": "phpunit --bootstrap=tests/integration/bootstrap.php --testsuite=integration",
     "test:coverage": "phpunit --coverage-html coverage/php",
     "audit": "composer audit",
     "security": "@audit",

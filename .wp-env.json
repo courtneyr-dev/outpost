@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/WordPress/gutenberg/trunk/schemas/json/wp-env.json",
+  "core": "WordPress/WordPress#tags/6.7",
+  "plugins": [
+    ".",
+    "https://downloads.wordpress.org/plugin/indieauth.zip",
+    "https://downloads.wordpress.org/plugin/micropub.zip"
+  ],
+  "themes": [],
+  "config": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_LOG": true,
+    "WP_DEBUG_DISPLAY": false,
+    "SCRIPT_DEBUG": true,
+    "WP_DISABLE_FATAL_ERROR_HANDLER": true
+  },
+  "env": {
+    "tests": {
+      "config": {
+        "WP_DEBUG": true,
+        "WP_DEBUG_LOG": true
+      }
+    }
+  }
+}
