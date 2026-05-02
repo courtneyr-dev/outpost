@@ -31,19 +31,38 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		return $ref->invoke( null, ...$args );
 	}
 
-	public function test_permission_check_requires_edit_posts(): void {
+	public function test_permission_check_allows_edit_posts(): void {
 		WP_Mock::userFunction( 'current_user_can' )
-			->once()
 			->with( 'edit_posts' )
 			->andReturn( true );
+		// is_user_logged_in is short-circuited by current_user_can succeeding
+		// but we stub it just in case.
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::onFilter( 'outpost_composer_config_permission' )
+			->with( true )
+			->reply( true );
 		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
-	public function test_permission_check_denies_unauthorized_user(): void {
+	public function test_permission_check_falls_back_to_logged_in_user(): void {
 		WP_Mock::userFunction( 'current_user_can' )
-			->once()
 			->with( 'edit_posts' )
 			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::onFilter( 'outpost_composer_config_permission' )
+			->with( true )
+			->reply( true );
+		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
+	}
+
+	public function test_permission_check_denies_when_neither_path_passes(): void {
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_composer_config_permission' )
+			->with( false )
+			->reply( false );
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 

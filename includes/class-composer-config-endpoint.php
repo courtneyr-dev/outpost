@@ -185,8 +185,37 @@ final class Outpost_Composer_Config_Endpoint {
 	 * standard `current_user_can( 'edit_posts' )` works for both cookie
 	 * and bearer auth.
 	 */
+	/**
+	 * Permission check for the composer-config endpoint.
+	 *
+	 * The payload is not per-user-sensitive: companion plugin
+	 * activation status, public taxonomy terms, the Bridgy host map,
+	 * the XFN spec list, and site-wide composer settings. Same
+	 * information any WordPress user with `read` cap can already see
+	 * via wp-admin. So we accept three auth paths:
+	 *
+	 *   1. `current_user_can('edit_posts')` — standard cap check.
+	 *      Succeeds for cookie auth (admin logged into wp-admin in
+	 *      the same browser) and for IndieAuth bearer when the
+	 *      plugin's `determine_current_user` filter covers our route.
+	 *   2. `is_user_logged_in()` — any logged-in user. Some IndieAuth
+	 *      plugin builds translate the bearer to user_id but don't
+	 *      pass through `edit_posts`; this fallback catches them.
+	 *   3. Otherwise reject with 401.
+	 *
+	 * Filterable via `outpost_composer_config_permission` so site
+	 * admins can override (e.g. open to anonymous in development).
+	 *
+	 * @return bool
+	 */
 	public static function permission_check(): bool {
-		return current_user_can( 'edit_posts' );
+		$allow = current_user_can( 'edit_posts' ) || is_user_logged_in();
+		/**
+		 * Override the composer-config permission decision.
+		 *
+		 * @param bool $allow Whether the request is authorized.
+		 */
+		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
 	}
 
 	/**

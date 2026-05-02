@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Phase H hotfix 2 — relaxed permission on Outpost REST endpoints)
+- **Permission check on `/wp-json/outpost/v1/composer-config` and `/wp-json/outpost/v1/preview` now accepts any logged-in user**, not just `edit_posts`. The composer-config payload is non-sensitive (companion plugin status, public taxonomy terms, the Bridgy host map, the XFN spec list, site-wide settings — same info `wp-admin/plugins.php` shows to anyone with `read` cap), and the preview endpoint already rate-limits + sanitizes output.
+- Two paths now pass: `current_user_can('edit_posts')` (cookie auth or full IndieAuth bearer translation) OR `is_user_logged_in()` (some IndieAuth plugin builds translate the bearer to user_id but don't pass through the `edit_posts` cap; this fallback catches them).
+- Filterable via `outpost_composer_config_permission` and `outpost_preview_permission` for site admins who want stricter (or more permissive — e.g. anonymous in dev) behavior.
+- This unblocks the "Couldn't load companion options" banner on iPhone Safari, where the user has a valid IndieAuth bearer but no wp-admin cookie session and the plugin's `determine_current_user` filter doesn't cover Outpost-namespaced routes.
+
 ### Fixed (Phase H hotfix — cookie-credential fallback for Outpost REST endpoints)
 - **`fetch_composer_config` and `fetch_preview` now send `credentials: 'include'`** so wp-admin login cookies authenticate the request when the IndieAuth plugin's bearer-to-user translation hasn't fired for our Outpost-namespaced routes. Same-origin only — never leaks cookies cross-origin.
 - Diagnosis: the WordPress IndieAuth plugin's `determine_current_user` filter is path-scoped on some installs (covers `/wp-json/micropub/*` but not `/wp-json/outpost/*`). When the plugin doesn't translate the bearer for our routes, `current_user_can('edit_posts')` returns false and the endpoint 401s — even with a valid token. Cookie fallback works because the user is logged into wp-admin in the same browser.

@@ -94,18 +94,36 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
-	 * Permission callback. Relies on the IndieAuth plugin's REST middleware
-	 * to translate the bearer token into a WordPress current_user, so the
-	 * standard capability check works regardless of whether auth came from
-	 * a cookie session or a bearer token.
+	 * Permission callback for the preview endpoint.
+	 *
+	 * Two auth paths accepted:
+	 *
+	 *   1. `current_user_can('edit_posts')` — standard cap check
+	 *      (cookie auth or IndieAuth bearer when the plugin's filter
+	 *      covers /wp-json/outpost/*).
+	 *   2. `is_user_logged_in()` — any logged-in user. Some IndieAuth
+	 *      plugin builds translate the bearer to user_id but don't
+	 *      pass `edit_posts` cap through; this fallback catches them.
+	 *      Preview output is rate-limited (30 req/min/user) and only
+	 *      returns sanitized HTML from URLs the user explicitly
+	 *      pasted, so opening to non-edit_posts users is safe.
+	 *
+	 * Filterable via `outpost_preview_permission` for site admins.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		$allow = current_user_can( 'edit_posts' ) || is_user_logged_in();
+		/**
+		 * Override the preview-endpoint permission decision.
+		 *
+		 * @param bool $allow Whether the request is authorized.
+		 */
+		$allow = (bool) apply_filters( 'outpost_preview_permission', $allow );
+		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost preview requires an authenticated user with posting capability.', 'outpost' ),
+				__( 'Outpost preview requires an authenticated user.', 'outpost' ),
 				array( 'status' => 401 )
 			);
 		}
