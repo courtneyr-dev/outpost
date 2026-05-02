@@ -236,21 +236,25 @@ final class Outpost_Composer_Config_Endpoint {
 	 * sites.
 	 */
 	private static function has_bearer_header(): bool {
-		// REST requests pass headers via $_SERVER['HTTP_AUTHORIZATION']
-		// or — on some FastCGI setups — REDIRECT_HTTP_AUTHORIZATION.
-		// Hit both keys.
+		// Path 1: standard Authorization header.
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
 			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
 		}
-		if ( '' === $header ) {
-			return false;
+		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
+			return true;
 		}
-		// Accept "Bearer <token>" — case-insensitive scheme, token
-		// non-empty.
-		return (bool) preg_match( '/^\s*Bearer\s+\S+/i', $header );
+		// Path 2: query-string fallback. Some managed-WP hosts (GoDaddy,
+		// WP Engine on certain configs) strip the Authorization header
+		// before it reaches PHP. The composer client sends `_o_token`
+		// as a query param when present so the endpoint still authenticates.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**

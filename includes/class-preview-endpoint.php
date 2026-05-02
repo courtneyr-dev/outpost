@@ -145,10 +145,15 @@ final class Outpost_Preview_Endpoint {
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
 		}
-		if ( '' === $header ) {
-			return false;
+		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
+			return true;
 		}
-		return (bool) preg_match( '/^\s*Bearer\s+\S+/i', $header );
+		// Query-string fallback for managed-WP hosts that strip Authorization.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**

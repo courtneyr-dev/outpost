@@ -77,15 +77,15 @@ export async function fetch_composer_config(
 	access_token: string,
 	env: ComposerConfigEnvironment = default_env,
 ): Promise<ComposerConfig> {
+	// Belt-and-suspenders bearer: managed-WP hosts (GoDaddy, certain
+	// WP Engine configs) strip the Authorization header before it
+	// reaches PHP. We send the token via header AND via `_o_token` query
+	// string so the endpoint authenticates regardless of host config.
+	const url = ENDPOINT_PATH + '?_o_token=' + encodeURIComponent(access_token);
 	let response: Response;
 	try {
-		response = await env.fetch(ENDPOINT_PATH, {
+		response = await env.fetch(url, {
 			method: 'GET',
-			// credentials: 'include' so wp-admin login cookies authenticate the
-			// request when the IndieAuth plugin's bearer-to-user translation
-			// hasn't fired (it's specific to /wp-json/micropub/* on some
-			// installs and doesn't cover our Outpost-namespaced routes).
-			// Same-origin only — this never leaks cookies cross-origin.
 			credentials: 'include',
 			headers: {
 				Authorization: 'Bearer ' + access_token,

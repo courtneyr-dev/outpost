@@ -77,11 +77,13 @@ export async function fetch_preview(
 
 	let response: Response;
 	try {
-		response = await env.fetch(PREVIEW_ENDPOINT, {
+		// Belt-and-suspenders bearer: send via Authorization header AND
+		// `_o_token` query string. Managed-WP hosts strip the standard
+		// header on some configs.
+		const url_with_token =
+			PREVIEW_ENDPOINT + '?_o_token=' + encodeURIComponent(params.accessToken);
+		response = await env.fetch(url_with_token, {
 			method: 'POST',
-			// credentials: 'include' falls back to wp-admin cookie auth when
-			// the IndieAuth bearer-to-user translation hasn't fired for our
-			// Outpost-namespaced routes. Same-origin only.
 			credentials: 'include',
 			headers: {
 				Authorization: 'Bearer ' + params.accessToken,
