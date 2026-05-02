@@ -141,19 +141,31 @@ type Status =
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
-function consume_share_target_for_reply(): { url?: string; content?: string } | null {
+function consume_share_target_for_reply(): {
+	url?: string;
+	content?: string;
+	variant?: Variant;
+} | null {
 	const data = peek_share_target();
 	if (!data || data.tab !== 'reply') return null;
 	consume_share_target();
-	const out: { url?: string; content?: string } = {};
+	const out: { url?: string; content?: string; variant?: Variant } = {};
 	if (data.url) out.url = data.url;
 	if (data.content) out.content = data.content;
+	if (
+		data.replyVariant &&
+		(['reply', 'like', 'repost', 'bookmark', 'rsvp', 'follow'] as Variant[]).includes(
+			data.replyVariant as Variant,
+		)
+	) {
+		out.variant = data.replyVariant as Variant;
+	}
 	return out;
 }
 
 export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
 	const initial_share = consume_share_target_for_reply();
-	const [variant, setVariant] = useState<Variant>('reply');
+	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'reply');
 	const [target_url, setTargetUrl] = useState(initial_share?.url ?? '');
 	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');

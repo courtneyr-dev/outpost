@@ -23,13 +23,27 @@
  * the next launch should be a fresh composer.
  */
 
+export type ReplyVariant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
+
 export interface ShareTargetData {
 	tab: 'note' | 'reply';
+	/** Note tab variant — one of the 5 Post-tab variants. */
 	variant?: 'note' | 'article' | 'status' | 'aside' | 'quote';
+	/** Reply tab variant — one of the 6 Reply-tab variants. Set by E1 bookmarklets. */
+	replyVariant?: ReplyVariant;
 	title?: string;
 	content?: string;
 	url?: string;
 }
+
+const REPLY_VARIANT_VALUES: ReplyVariant[] = [
+	'reply',
+	'like',
+	'repost',
+	'bookmark',
+	'rsvp',
+	'follow',
+];
 
 const KEY = 'outpost.share_target';
 
@@ -70,6 +84,11 @@ export function parse_share_target(search: string): ShareTargetData | null {
 	const title = (params.get('title') ?? '').trim();
 	const text = (params.get('text') ?? '').trim();
 	const url = (params.get('url') ?? '').trim();
+	const variant_raw = (params.get('variant') ?? '').trim();
+	const reply_variant: ReplyVariant | undefined =
+		REPLY_VARIANT_VALUES.includes(variant_raw as ReplyVariant)
+			? (variant_raw as ReplyVariant)
+			: undefined;
 
 	if (!title && !text && !url) {
 		return null;
@@ -78,6 +97,7 @@ export function parse_share_target(search: string): ShareTargetData | null {
 	if (url) {
 		return {
 			tab: 'reply',
+			...(reply_variant ? { replyVariant: reply_variant } : {}),
 			...(text ? { content: text } : {}),
 			url,
 		};

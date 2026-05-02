@@ -7,6 +7,14 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session E1 — bookmarklet generator + admin page)
+- **New top-level Outpost menu in wp-admin** (`Outpost_Admin_Page`, `final`, static-only). Hosts the bookmarklet generator. Capability gate: `manage_options`. Icon: `dashicons-share-alt2`. Menu position 76.
+- **Bookmarklet generator** outputs ready-to-drag `javascript:` URLs for each Reply variant: Reply, Like, Repost, Bookmark. Each bookmarklet body grabs `location.href`, `document.title`, and `window.getSelection()`, encodes them, and opens `/post/share-target?variant=<variant>&url=…&title=…&text=…` in a new tab.
+- The admin page presents each bookmarklet as a draggable button, a description, and a copy-able source-code textarea. Plus a "How it works" section and an "iOS Shortcut alternative" pointing users at A2HS + the system Share sheet (since Mobile Safari can't drag to bookmarks bar).
+- **`pwa/src/lib/share-target.ts`** parses the `variant` query param when present and tags the data with `replyVariant`. Type extended: `ReplyVariant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow'`.
+- **ReplyMode honors the `replyVariant`** field on share-target intake — the variant picker opens to the bookmarklet's chosen variant. So clicking "Outpost: Like" on any page lands the user in Reply mode → Like variant with the URL pre-filled.
+- All strings translatable via the `outpost` text domain. Output escaped per the Security Trinity (`esc_html__`, `esc_attr`, `esc_url`, `esc_textarea`, `esc_js`).
+
 ### Added (Session E2 — Bridgy auto-suggest)
 - **Composer-config endpoint** now returns a `bridgyHostMap` of host → `{name, uid}` pairs. Default map covers Twitter / X (`brid.gy/publish/twitter`), Mastodon (`fed.brid.gy/`) for major instances (mastodon.social, mas.to, fosstodon.org, mastodon.online, indieweb.social), GitHub (`brid.gy/publish/github`), and Bluesky (`bsky.brid.gy/`).
 - **Filter `outpost_bridgy_host_map`** lets sites add hosts (e.g. their own Mastodon instance, custom Bridgy variants) without forking. Filter signature: `apply_filters('outpost_bridgy_host_map', array<string, array{name: string, uid: string}>)`.

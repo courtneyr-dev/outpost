@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.31
+ * Version:           0.1.32
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.31' );
+define( 'OUTPOST_VERSION', '0.1.32' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -58,6 +58,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 
 // Register the /wp-json/outpost/v1/preview REST route (Phase B2).
 Outpost_Preview_Endpoint::register();
@@ -65,6 +66,8 @@ Outpost_Preview_Endpoint::register();
 Outpost_Composer_Config_Endpoint::register();
 // Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
 Outpost_Micropub_Bridges::register();
+// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).
+Outpost_Admin_Page::register();
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.
