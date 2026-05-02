@@ -229,6 +229,80 @@ If you have a moment with VoiceOver enabled:
 
 Skip this if VoiceOver setup isn't convenient — A11Y-CHECKLIST Phase J formalizes the real-device screen reader testing matrix; for now, the unit tests cover the keyboard contract and the rendered ARIA attributes.
 
+## B2 + C1 — Preview endpoint + Reply mode
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.10`. Should already be authenticated from B0b.
+
+### B2-Stage 1 — Preview endpoint sanity check (terminal)
+
+```bash
+# Get the bearer token from your IndexedDB token row (DevTools → Storage → IndexedDB → outpost → tokens) or from a previous successful login.
+TOKEN="..."
+
+# Happy path — should return JSON with html, finalUrl, contentType
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://courtneyr.dev/"}' \
+  "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview" | head -c 500
+
+# Bad URL — should return 400 invalid_scheme
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"javascript:alert(1)"}' \
+  "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
+
+# Image URL — should return 415 unsupported_content_type
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/image.png"}' \
+  "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
+
+# Anonymous (no Authorization) — should return 401
+curl -sS -H 'Content-Type: application/json' \
+  -d '{"url":"https://courtneyr.dev/"}' \
+  "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
+```
+
+The route should also NOT appear in `/wp-json/outpost/v1` index (the `show_in_index => false` setting) — `curl https://qkf.b0d.myftpupload.com/wp-json/outpost/v1` returns the namespace listing without `/preview`.
+
+### C1-Stage 1 — Reply mode UI
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`. Tap the **Reply** tab.
+
+**Expected:**
+
+- Card titled "Reply" (was a placeholder card before; now a real form).
+- "In reply to" label above a URL input (placeholder `https://example.com/post`).
+- "Your reply" label above a textarea.
+- Two buttons: **Post reply** (primary, disabled until both fields have content) and **Show preview** (secondary, disabled until URL is filled).
+
+### C1-Stage 2 — Preview a target URL
+
+1. Paste a URL of one of your own published posts (or any IndieWeb-shaped post) into the "In reply to" field.
+2. Tap **Show preview**.
+3. **Expected:**
+   - Button briefly says "Fetching…".
+   - A citation card appears below the URL input: small "Replying to:" label, the page title in bold, the URL as a clickable link.
+   - No errors. If you see `unsupported_content_type` the URL didn't return HTML; try a different page. If you see `unauthorized` your IndieAuth token is stale — sign out and back in.
+
+### C1-Stage 3 — Post a reply end-to-end
+
+1. With a URL filled in, type a reply in the textarea.
+2. Tap **Post reply**.
+3. **Expected sequence:**
+   - "Finding endpoint…" (first post in the session) → "Posting…" → button returns to "Post reply" + status line: "Posted to: `https://qkf.b0d.myftpupload.com/...`".
+4. Open the posted URL. **Expected:** the post renders, and on staging WordPress with Post Kinds active it appears as a Reply post type with the `in-reply-to` URL surfaced as the citation. Without Post Kinds, the post is a regular note with the in-reply-to URL stored as post meta.
+5. Form should reset (URL + content cleared, preview gone) ready for the next reply.
+
+### C1-Stage 4 — Switch to Note tab + back, verify state preservation
+
+1. Tap **Note** tab — should show NoteMode (textarea, etc.), unchanged from C0.
+2. Type a few characters in Note's textarea.
+3. Tap **Reply** tab — should still show the Reply form (post-submit, fresh) without losing whatever you typed in Note.
+4. Tap **Note** tab again — your typed characters are still there.
+
+State preservation is confirmed by the `hidden`-attribute pattern: panels render eagerly, only visibility toggles, so component state survives switches.
+
 ## Reporting
 
 After running, reply with one of:
