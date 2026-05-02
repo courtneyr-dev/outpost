@@ -139,6 +139,16 @@
 	outline-offset: 2px;
 }
 
+.outpost-textarea--tall {
+	min-height: 18rem;
+}
+
+.outpost-help {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--outpost-text-muted, inherit);
+}
+
 .outpost-form-actions {
 	display: flex;
 	gap: 0.5rem;

@@ -1,28 +1,173 @@
+import { useState } from 'preact/hooks';
+import {
+	discover_micropub_endpoint,
+	post_h_entry,
+	MicropubError,
+	type MicropubEnvironment,
+} from '../../lib/micropub';
+import type { StoredToken } from '../../lib/token-store';
+
 /**
- * Article mode — placeholder for Phase C4.
+ * Article mode — long-form posts (h-entry with both `name` and `content`).
  *
- * Will handle long-form posts: an h-entry with both `name` (title) and
- * `content` (body). Unlike Note, Article supports the title field. The
- * content field uses a richer editor than Note's textarea — likely a
- * minimal markdown surface, since the Block Editor is unwieldy on
- * mobile and the IndieWeb-typical Article author already knows
- * markdown.
+ * The IndieWeb shape distinction: an h-entry with a `name` property IS an
+ * article; one without is a note. So the title field isn't decorative —
+ * it's the structural marker that makes this a different post kind from
+ * the Note tab.
  *
- * Phase C4 lands Article. The More pull-out (Phase C5) adds Post
- * Formats / Yoast SEO / Syndication Links integration on top, available
- * across all modes but most-relevant for Article.
+ * Editor surface: a plain textarea, not a Block Editor instance. Two
+ * reasons: the Block Editor is unwieldy on mobile (touch targets, popover
+ * positioning, sidebar collapse), and the IndieWeb-typical Article author
+ * already writes in markdown or HTML. Outpost stays neutral — sends raw
+ * content. WordPress then runs `wpautop` + `the_content` filter on it; if
+ * the site has Jetpack Markdown or WP-Markdown active, markdown gets
+ * converted server-side. If not, paragraphs still flow correctly via
+ * `wpautop`.
+ *
+ * Both fields are required. An article without a title is a note; without
+ * body content there's nothing to publish. Submit is disabled until both
+ * have non-whitespace content.
+ *
+ * Same status-state machine as Note / Reply / Photo / Listen
+ * (idle → discovering-endpoint → posting → posted | error).
  */
 
-export function ArticleMode() {
+export interface ArticleModeProps {
+	token: StoredToken;
+	micropubEnv?: MicropubEnvironment;
+}
+
+type Status =
+	| { kind: 'idle' }
+	| { kind: 'discovering-endpoint' }
+	| { kind: 'posting' }
+	| { kind: 'posted'; location: string }
+	| { kind: 'error'; message: string };
+
+export function ArticleMode({ token, micropubEnv }: ArticleModeProps) {
+	const [title, setTitle] = useState('');
+	const [content, setContent] = useState('');
+	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const [endpoint, setEndpoint] = useState<string | null>(null);
+
+	const handle_submit = async (event: Event): Promise<void> => {
+		event.preventDefault();
+		const trimmed_title = title.trim();
+		const trimmed_content = content.trim();
+		if (!trimmed_title || !trimmed_content) return;
+
+		try {
+			let micropub_endpoint = endpoint;
+			if (!micropub_endpoint) {
+				setStatus({ kind: 'discovering-endpoint' });
+				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
+				setEndpoint(micropub_endpoint);
+			}
+
+			setStatus({ kind: 'posting' });
+			const result = await post_h_entry(
+				{
+					properties: {
+						name: trimmed_title,
+						content: trimmed_content,
+					},
+					accessToken: token.accessToken,
+					micropubEndpoint: micropub_endpoint,
+				},
+				micropubEnv,
+			);
+			setStatus({ kind: 'posted', location: result.location });
+			setTitle('');
+			setContent('');
+		} catch (err) {
+			const message =
+				err instanceof MicropubError
+					? err.code + ': ' + err.message
+					: err instanceof Error
+						? err.message
+						: 'Unknown error';
+			setStatus({ kind: 'error', message });
+		}
+	};
+
+	const submitting = status.kind === 'discovering-endpoint' || status.kind === 'posting';
+	const submit_label =
+		status.kind === 'discovering-endpoint'
+			? 'Finding endpoint…'
+			: status.kind === 'posting'
+				? 'Posting…'
+				: 'Post article';
+	const can_submit = !!title.trim() && !!content.trim();
+
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-article-mode-title">
 			<h2 id="outpost-article-mode-title" class="outpost-card__title">
 				Article
 			</h2>
 			<p class="outpost-card__lede">
-				Article posting (title + body) lands in Phase C4. Uses h-entry with `name` and
-				`content` properties.
+				Signed in as <code>{token.me || '—'}</code>
 			</p>
+
+			<form class="outpost-form-row" onSubmit={handle_submit}>
+				<label class="outpost-label" for="outpost-article-title">
+					Title
+				</label>
+				<input
+					id="outpost-article-title"
+					class="outpost-input"
+					type="text"
+					value={title}
+					onInput={(event): void => setTitle((event.target as HTMLInputElement).value)}
+					autoCapitalize="sentences"
+					spellcheck={true}
+					disabled={submitting}
+					required
+				/>
+
+				<label class="outpost-label" for="outpost-article-content">
+					Body
+				</label>
+				<textarea
+					id="outpost-article-content"
+					class="outpost-textarea outpost-textarea--tall"
+					rows={12}
+					value={content}
+					onInput={(event): void =>
+						setContent((event.target as HTMLTextAreaElement).value)
+					}
+					disabled={submitting}
+					required
+				/>
+				<p class="outpost-help">
+					Markdown and HTML pass through as-is. Your site renders them based on its
+					own filters (Jetpack Markdown, WP-Markdown, or plain `wpautop`).
+				</p>
+
+				{status.kind === 'error' && (
+					<div class="outpost-error" role="alert">
+						{status.message}
+					</div>
+				)}
+
+				{status.kind === 'posted' && (
+					<p class="outpost-status" aria-live="polite">
+						Posted to{' '}
+						<a href={status.location} target="_blank" rel="noopener noreferrer">
+							{status.location}
+						</a>
+					</p>
+				)}
+
+				<div class="outpost-form-actions">
+					<button
+						class="outpost-button"
+						type="submit"
+						disabled={submitting || !can_submit}
+					>
+						{submit_label}
+					</button>
+				</div>
+			</form>
 		</section>
 	);
 }

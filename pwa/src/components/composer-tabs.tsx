@@ -84,10 +84,16 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 		},
 		{
 			id: 'listen',
-			label: 'Listen',
+			label: 'Doing',
 			render: () => <ListenMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
 		},
-		{ id: 'article', label: 'Article', render: () => <ArticleMode /> },
+		{
+			id: 'article',
+			label: 'Article',
+			render: () => (
+				<ArticleMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />
+			),
+		},
 	];
 
 	const handle_keydown = (event: KeyboardEvent, current_index: number): void => {

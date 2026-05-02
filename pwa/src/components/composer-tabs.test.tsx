@@ -60,7 +60,7 @@ describe('ComposerTabs', () => {
 	it('renders five tabs with the expected labels', () => {
 		mount();
 		const labels = tabs().map((t) => t.textContent);
-		expect(labels).toEqual(['Note', 'Reply', 'Photo', 'Listen', 'Article']);
+		expect(labels).toEqual(['Note', 'Reply', 'Photo', 'Doing', 'Article']);
 	});
 
 	it('selects Note by default', () => {

@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C4 — Article mode)
+- `pwa/src/components/modes/article-mode.tsx` — replaces the C0 stub. Long-form posts: title (`name` property) + body (`content`). Both fields required (a titled h-entry without body content has nothing to publish; an h-entry without a title is a Note). Same status-state machine as Note / Reply / Photo / Listen. Tall textarea (12 rows / 18 rem min-height) for comfortable mobile writing. Help text notes that markdown and HTML pass through as-is — your site renders them via its own filters (Jetpack Markdown, WP-Markdown, or plain `wpautop`).
+- `pwa/src/styles/structure.css` adds `.outpost-textarea--tall` modifier (18 rem min-height for long-form writing) and `.outpost-help` (smaller-font muted help text under fields).
+
+### Changed (Session C4)
+- `OUTPOST_VERSION` bumped to `0.1.16` per A2 #16.
+- `composer-tabs.tsx`: Article tab now passes `token` and `micropubEnv` to the real `ArticleMode` component (was a stub).
+- **Tab rename: "Listen" → "Doing".** The Doing tab still hosts five sub-modes (Listen / Watch / Read / Play / Checkin); the tab label changes to fit all five umbrellas in plain English. Tab id stays `listen` so analytics, tests, and any future deep-links don't move. The sub-variant labels (Listen / Watch / Read / Play / Checkin) are unchanged inside the Doing tab.
+
 ### Added (Session C3 — Listen group)
 - `pwa/src/components/modes/listen-mode.tsx` — replaces the C0 stub. Five sub-modes under one tab via radio picker: Listen (`listen-of`), Watch (`watch-of`), Read (`read-of`), Play (`play-of`), Checkin (`location`). Each variant has its own target-input label, content-textarea label, and submit-button label. Checkin adds an extra optional Place-name field that posts as `name`. None require text content; all require a target URL. Same status-state machine as Note/Reply/Photo (`idle` → `discovering-endpoint` → `posting` → `posted` | `error`).
 - `HEntryProperties` interface in `micropub.ts` extended with `'listen-of'?: string`, `'watch-of'?: string`, `'read-of'?: string`, `'play-of'?: string`, `location?: string`.
