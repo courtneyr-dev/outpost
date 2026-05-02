@@ -114,8 +114,12 @@ export function MorePanel(props: MorePanelProps) {
 	// pre-checked syndication chip. Distinct from the user's Micropub-
 	// configured syndicate-to list (which loads async above) so the user
 	// can see WHY the chip appeared (it's contextual to the target URL).
+	// Site admins can disable this entirely via Settings → Bridgy auto-suggest.
 	const bridgy_target = ((): SyndicationTarget | null => {
 		if (!xfnTargetUrl) return null;
+		if (composerConfig.siteSettings && !composerConfig.siteSettings.bridgyAutoSuggest) {
+			return null;
+		}
 		try {
 			const u = new URL(xfnTargetUrl);
 			const match = composerConfig.bridgyHostMap[u.host.toLowerCase()];

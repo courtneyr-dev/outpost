@@ -161,7 +161,14 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	// One-shot — sessionStorage clears on read.
 	const initial_share = consume_share_target_for_note();
 
-	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'article');
+	// Variant precedence: share-target intake (when posting from a share)
+	// > site-admin default (Outpost_Settings → defaultPostVariant)
+	// > hard-coded 'article'.
+	const initial_variant: Variant =
+		initial_share?.variant ??
+		(composerConfig?.siteSettings?.defaultPostVariant as Variant | undefined) ??
+		'article';
+	const [variant, setVariant] = useState<Variant>(initial_variant);
 	const [title, setTitle] = useState(initial_share?.title ?? '');
 	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });

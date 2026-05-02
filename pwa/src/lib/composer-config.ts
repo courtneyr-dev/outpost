@@ -31,6 +31,11 @@ export interface BridgyTarget {
 	uid: string;
 }
 
+export interface SiteSettings {
+	bridgyAutoSuggest: boolean;
+	defaultPostVariant: 'note' | 'status' | 'aside' | 'article' | 'quote';
+}
+
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
 	postFormats: string[] | null;
@@ -38,6 +43,7 @@ export interface ComposerConfig {
 	existingCategories: TermSuggestion[];
 	existingTags: TermSuggestion[];
 	bridgyHostMap: Record<string, BridgyTarget>;
+	siteSettings: SiteSettings;
 }
 
 export interface ComposerConfigEnvironment {
@@ -132,5 +138,6 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!Array.isArray(v.existingCategories)) return false;
 	if (!Array.isArray(v.existingTags)) return false;
 	if (!v.bridgyHostMap || typeof v.bridgyHostMap !== 'object') return false;
+	if (!v.siteSettings || typeof v.siteSettings !== 'object') return false;
 	return true;
 }

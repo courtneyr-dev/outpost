@@ -182,12 +182,73 @@ final class Outpost_PWA_Shell {
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<title><?php echo esc_html( __( 'Outpost setup', 'outpost' ) ); ?></title>
+	<style>
+		body.outpost-install-prompt {
+			max-width: 36rem;
+			margin: 2rem auto;
+			padding: 1.5rem;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			line-height: 1.55;
+			color: #023047;
+		}
+		.outpost-onboarding {
+			background: #e6f1f7;
+			border: 1px solid #126782;
+			border-radius: 0.5rem;
+			padding: 1.25rem;
+			margin-block-end: 1.5rem;
+		}
+		.outpost-onboarding h1 {
+			margin: 0 0 0.5rem;
+			font-size: 1.4rem;
+		}
+		.outpost-onboarding p {
+			margin: 0.5rem 0;
+		}
+		.outpost-install-prompt__action {
+			display: inline-block;
+			padding: 0.625rem 1.25rem;
+			background: #241c4a;
+			color: #ffffff;
+			border-radius: 0.5rem;
+			text-decoration: none;
+			font-weight: 600;
+		}
+		.outpost-install-prompt__skip {
+			color: #647baf;
+			text-decoration: underline;
+			margin-inline-start: 1rem;
+		}
+	</style>
 </head>
 <body class="outpost-install-prompt" data-outpost-blocker="<?php echo esc_attr( $blocker ); ?>">
 	<main>
-		<h1><?php echo esc_html( __( 'One more step', 'outpost' ) ); ?></h1>
+		<section class="outpost-onboarding" aria-labelledby="outpost-onboarding-title">
+			<h1 id="outpost-onboarding-title"><?php echo esc_html( __( 'Welcome to Outpost', 'outpost' ) ); ?></h1>
+			<p>
+				<?php
+				echo esc_html__(
+					'Outpost is a mobile-first composer for posting to your own WordPress site, built on the IndieWeb specs (Micropub, IndieAuth, microformats2). It only writes posts — not Pages or custom post types — and it leaves the visual paint to your active theme.',
+					'outpost'
+				);
+				?>
+			</p>
+			<p>
+				<strong><?php echo esc_html__( 'POSSE', 'outpost' ); ?></strong>
+				<?php
+				echo esc_html__(
+					' — Publish (on your) Own Site, Syndicate Elsewhere. Your domain stays the canonical source; copies go to Mastodon, Twitter / X, Bluesky, or wherever your audience is.',
+					'outpost'
+				);
+				?>
+			</p>
+		</section>
+
+		<h2><?php echo esc_html( __( 'One more step', 'outpost' ) ); ?></h2>
 		<p><?php echo esc_html( $message ); ?></p>
-		<p><a class="outpost-install-prompt__action" href="<?php echo esc_url( $action_url ); ?>"><?php echo esc_html( $action_label ); ?></a></p>
+		<p>
+			<a class="outpost-install-prompt__action" href="<?php echo esc_url( $action_url ); ?>"><?php echo esc_html( $action_label ); ?></a>
+		</p>
 	</main>
 </body>
 </html>

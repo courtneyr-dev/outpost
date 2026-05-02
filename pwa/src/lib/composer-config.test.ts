@@ -35,6 +35,10 @@ const valid_config: ComposerConfig = {
 	bridgyHostMap: {
 		'twitter.com': { name: 'Twitter (via Bridgy)', uid: 'https://brid.gy/publish/twitter' },
 	},
+	siteSettings: {
+		bridgyAutoSuggest: true,
+		defaultPostVariant: 'article',
+	},
 };
 
 describe('fetch_composer_config', () => {

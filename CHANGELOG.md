@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session H — site settings + onboarding intro)
+
+- **`Outpost_Settings`** — site-wide preferences via the WordPress Settings API. Single option `outpost_settings` (array) covering:
+  - `bridgy_auto_suggest` (bool, default true) — whether the composer surfaces the "Suggested (from target URL)" Bridgy chip when reply target host matches a known silo.
+  - `default_post_variant` (string, default 'article', enum 'note'/'status'/'aside'/'article'/'quote') — which variant the Post tab opens to on every fresh composer load.
+  - `default_post_format_inference` (bool, default true) — controls the C5 Post-Format auto-inference bridge (declared but not yet wired into the bridge's gate; F2 stretch).
+- **Settings form rendered on the existing Outpost admin page** (Tools → Outpost menu) below the bookmarklet generator, separated by `<hr>`. Capability gate: `manage_options`. Sanitized via `Outpost_Settings::sanitize` (variant whitelisted; checkboxes coerced to bool; unknown values fall back to defaults).
+- **Composer-config endpoint** now returns `siteSettings: { bridgyAutoSuggest, defaultPostVariant }`. TypeScript `ComposerConfig` extended with the `SiteSettings` interface.
+- **NoteMode honors `siteSettings.defaultPostVariant`** as the initial variant, with precedence: share-target intake > site-admin default > hard-coded 'article'.
+- **MorePanel honors `siteSettings.bridgyAutoSuggest`** — when false, the Bridgy auto-suggest chip never renders even on matching hosts.
+- **Onboarding intro card** added to the install-prompt page (rendered when IndieAuth or Micropub is missing). Welcomes the user with what Outpost is + a one-paragraph POSSE primer before the "Install [plugin]" call to action. Inline CSS in the page (no Vite bundle, since the bundle isn't available pre-install).
+
 ### Added (Session C2b — multi-photo gallery support)
 
 - **PhotoMode now accepts multiple photos.** `<input type="file" multiple>` lets the user pick a batch in one tap. Each picked file becomes a `PhotoEntry` in a list with its own thumbnail, alt-text textarea, decorative toggle, remove button, and reorder controls. Picking again appends — doesn't replace — so the user can build a gallery from multiple picker invocations.

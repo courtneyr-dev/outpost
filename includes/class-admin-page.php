@@ -162,6 +162,11 @@ final class Outpost_Admin_Page {
 				);
 				?>
 			</p>
+
+			<hr style="margin: 2rem 0;" />
+
+			<h2><?php echo esc_html__( 'Settings', 'outpost' ); ?></h2>
+			<?php Outpost_Settings::render_form(); ?>
 		</div>
 		<?php
 	}

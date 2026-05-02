@@ -250,6 +250,10 @@ final class Outpost_Composer_Config_Endpoint {
 		 */
 		$bridgy_map = apply_filters( 'outpost_bridgy_host_map', self::DEFAULT_BRIDGY_HOST_MAP );
 
+		$settings_payload = class_exists( 'Outpost_Settings' )
+			? Outpost_Settings::get()
+			: array();
+
 		$response = new WP_REST_Response(
 			array(
 				'companions'         => $companions,
@@ -258,6 +262,12 @@ final class Outpost_Composer_Config_Endpoint {
 				'existingCategories' => self::list_terms( 'category' ),
 				'existingTags'       => self::list_terms( 'post_tag' ),
 				'bridgyHostMap'      => is_array( $bridgy_map ) ? $bridgy_map : self::DEFAULT_BRIDGY_HOST_MAP,
+				'siteSettings'       => array(
+					'bridgyAutoSuggest'  => ! empty( $settings_payload['bridgy_auto_suggest'] ),
+					'defaultPostVariant' => isset( $settings_payload['default_post_variant'] )
+						? (string) $settings_payload['default_post_variant']
+						: 'article',
+				),
 			),
 			200
 		);
