@@ -7,6 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session E2 — Bridgy auto-suggest)
+- **Composer-config endpoint** now returns a `bridgyHostMap` of host → `{name, uid}` pairs. Default map covers Twitter / X (`brid.gy/publish/twitter`), Mastodon (`fed.brid.gy/`) for major instances (mastodon.social, mas.to, fosstodon.org, mastodon.online, indieweb.social), GitHub (`brid.gy/publish/github`), and Bluesky (`bsky.brid.gy/`).
+- **Filter `outpost_bridgy_host_map`** lets sites add hosts (e.g. their own Mastodon instance, custom Bridgy variants) without forking. Filter signature: `apply_filters('outpost_bridgy_host_map', array<string, array{name: string, uid: string}>)`.
+- **MorePanel detects when the Reply / Doing target URL host matches** a bridgyHostMap entry. When it does, the matching publish target appears as a separate "Suggested (from target URL)" syndication chip, **pre-checked by default**. The user can uncheck it; the next time they paste a different URL or clear the field, the auto-suggest follows.
+- The auto-suggest is structurally distinct from the user's Micropub-configured `?q=syndicate-to` chips so the user can see WHY the chip appeared (it's contextual to the target URL, not their site config).
+- The chip's UID is sent as part of `mp-syndicate-to[]` on submit; downstream the Micropub plugin POSTs to that URL after creating the post, and Bridgy reads the post via webmention and reposts it on the silo.
+
 ### Added (Session E0 — Web Share Target)
 - **Outpost is now a Web Share Target.** When the user shares text + URL from another app (iOS Share sheet, Android Sharesheet), the OS surfaces Outpost as a destination. Tapping Outpost lands the shared content in the right composer mode pre-filled.
 - **Manifest `share_target` action** at `/post/share-target` (GET, application/x-www-form-urlencoded). Accepts `title`, `text`, and `url` params per the Web Share Target spec.

@@ -109,6 +109,33 @@ export function MorePanel(props: MorePanelProps) {
 	const yoast_active = composerConfig.companions['yoast'] === 'active';
 	const xfn_active = composerConfig.companions['xfn'] === 'active';
 
+	// Bridgy auto-suggest: when the Reply / Doing target URL host matches a
+	// known silo, the matching publish target gets surfaced as a separate
+	// pre-checked syndication chip. Distinct from the user's Micropub-
+	// configured syndicate-to list (which loads async above) so the user
+	// can see WHY the chip appeared (it's contextual to the target URL).
+	const bridgy_target = ((): SyndicationTarget | null => {
+		if (!xfnTargetUrl) return null;
+		try {
+			const u = new URL(xfnTargetUrl);
+			const match = composerConfig.bridgyHostMap[u.host.toLowerCase()];
+			return match ? { uid: match.uid, name: match.name } : null;
+		} catch (_err) {
+			return null;
+		}
+	})();
+
+	// When a Bridgy target appears for a fresh URL, default to checked.
+	useEffect(() => {
+		if (!bridgy_target) return;
+		if (values.syndicateTo.includes(bridgy_target.uid)) return;
+		onChange({
+			...values,
+			syndicateTo: [...values.syndicateTo, bridgy_target.uid],
+		});
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL host change, not every value mutation
+	}, [bridgy_target?.uid]);
+
 	// Lazy-load syndication targets when the panel knows the endpoint.
 	useEffect(() => {
 		if (!micropubEndpoint) return;
@@ -313,6 +340,21 @@ export function MorePanel(props: MorePanelProps) {
 								<span>{rel}</span>
 							</label>
 						))}
+					</fieldset>
+				)}
+
+				{bridgy_target && (
+					<fieldset class="outpost-syndication-picker outpost-bridgy-suggest">
+						<legend class="outpost-label">Suggested (from target URL)</legend>
+						<label class="outpost-checkbox">
+							<input
+								type="checkbox"
+								checked={values.syndicateTo.includes(bridgy_target.uid)}
+								onChange={(): void => toggle_syndication(bridgy_target.uid)}
+								disabled={disabled}
+							/>
+							<span>{bridgy_target.name}</span>
+						</label>
 					</fieldset>
 				)}
 

@@ -65,6 +65,57 @@ final class Outpost_Composer_Config_Endpoint {
 		'chat',
 	);
 
+	/**
+	 * Default Bridgy host map. Maps a Reply / Like / Repost / Bookmark
+	 * target URL's host to the matching Bridgy publish endpoint, so the
+	 * composer can auto-suggest the right syndication chip when the
+	 * user pastes a silo URL.
+	 *
+	 * Extensible via the `outpost_bridgy_host_map` filter. Filter
+	 * callers add hosts (e.g. their own Mastodon instance) by appending
+	 * to the returned array.
+	 *
+	 * @var array<string, array{name: string, uid: string}>
+	 */
+	private const DEFAULT_BRIDGY_HOST_MAP = array(
+		'twitter.com'     => array(
+			'name' => 'Twitter (via Bridgy)',
+			'uid'  => 'https://brid.gy/publish/twitter',
+		),
+		'x.com'           => array(
+			'name' => 'X (via Bridgy)',
+			'uid'  => 'https://brid.gy/publish/twitter',
+		),
+		'mastodon.social' => array(
+			'name' => 'Mastodon (via Bridgy Fed)',
+			'uid'  => 'https://fed.brid.gy/',
+		),
+		'mas.to'          => array(
+			'name' => 'Mastodon (via Bridgy Fed)',
+			'uid'  => 'https://fed.brid.gy/',
+		),
+		'fosstodon.org'   => array(
+			'name' => 'Mastodon (via Bridgy Fed)',
+			'uid'  => 'https://fed.brid.gy/',
+		),
+		'mastodon.online' => array(
+			'name' => 'Mastodon (via Bridgy Fed)',
+			'uid'  => 'https://fed.brid.gy/',
+		),
+		'indieweb.social' => array(
+			'name' => 'Mastodon (via Bridgy Fed)',
+			'uid'  => 'https://fed.brid.gy/',
+		),
+		'github.com'      => array(
+			'name' => 'GitHub (via Bridgy)',
+			'uid'  => 'https://brid.gy/publish/github',
+		),
+		'bsky.app'        => array(
+			'name' => 'Bluesky (via Bridgy)',
+			'uid'  => 'https://bsky.brid.gy/',
+		),
+	);
+
 	/** XFN spec relationships. Source: https://gmpg.org/xfn/11. */
 	private const XFN_RELS = array(
 		// Friendship (mutually exclusive within the family).
@@ -149,6 +200,16 @@ final class Outpost_Composer_Config_Endpoint {
 
 		$post_formats = self::resolve_post_formats( $companions['post-formats'] );
 
+		/**
+		 * Filter the Bridgy host → publish-endpoint map.
+		 *
+		 * Allows themes / site-config plugins to add hosts (e.g. a
+		 * specific Mastodon instance) without forking Outpost.
+		 *
+		 * @param array<string, array{name: string, uid: string}> $map Default host map.
+		 */
+		$bridgy_map = apply_filters( 'outpost_bridgy_host_map', self::DEFAULT_BRIDGY_HOST_MAP );
+
 		$response = new WP_REST_Response(
 			array(
 				'companions'         => $companions,
@@ -156,6 +217,7 @@ final class Outpost_Composer_Config_Endpoint {
 				'xfnRels'            => self::XFN_RELS,
 				'existingCategories' => self::list_terms( 'category' ),
 				'existingTags'       => self::list_terms( 'post_tag' ),
+				'bridgyHostMap'      => is_array( $bridgy_map ) ? $bridgy_map : self::DEFAULT_BRIDGY_HOST_MAP,
 			),
 			200
 		);

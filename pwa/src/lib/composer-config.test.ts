@@ -32,6 +32,9 @@ const valid_config: ComposerConfig = {
 	xfnRels: ['friend', 'met'],
 	existingCategories: [{ slug: 'tech', name: 'Tech' }],
 	existingTags: [{ slug: 'indieweb', name: 'IndieWeb' }],
+	bridgyHostMap: {
+		'twitter.com': { name: 'Twitter (via Bridgy)', uid: 'https://brid.gy/publish/twitter' },
+	},
 };
 
 describe('fetch_composer_config', () => {

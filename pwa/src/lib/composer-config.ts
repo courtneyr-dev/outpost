@@ -26,12 +26,18 @@ export interface TermSuggestion {
 	name: string;
 }
 
+export interface BridgyTarget {
+	name: string;
+	uid: string;
+}
+
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
 	postFormats: string[] | null;
 	xfnRels: string[];
 	existingCategories: TermSuggestion[];
 	existingTags: TermSuggestion[];
+	bridgyHostMap: Record<string, BridgyTarget>;
 }
 
 export interface ComposerConfigEnvironment {
@@ -125,5 +131,6 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!Array.isArray(v.xfnRels)) return false;
 	if (!Array.isArray(v.existingCategories)) return false;
 	if (!Array.isArray(v.existingTags)) return false;
+	if (!v.bridgyHostMap || typeof v.bridgyHostMap !== 'object') return false;
 	return true;
 }
