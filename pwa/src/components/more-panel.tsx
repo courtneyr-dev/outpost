@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { ComposerConfig } from '../lib/composer-config';
+import type { ComposerConfig, TermSuggestion } from '../lib/composer-config';
 import { discover_syndication_targets, type SyndicationTarget } from '../lib/micropub';
 import type { MicropubEnvironment } from '../lib/micropub';
 import type { StoredToken } from '../lib/token-store';
@@ -130,18 +130,54 @@ export function MorePanel(props: MorePanelProps) {
 		};
 	}, [micropubEndpoint, syndication_status, token.accessToken, micropubEnv]);
 
-	const split_csv = (raw: string): string[] =>
-		raw
-			.split(',')
-			.map((s) => s.trim())
-			.filter((s) => s.length > 0);
+	// New-term input state — typed name, separate from values until the
+	// user explicitly taps "Add" so accidental typing doesn't create
+	// terms. Once added, the name moves into values.{categories|tags}
+	// and the input clears.
+	const [new_category, setNewCategory] = useState('');
+	const [new_tag, setNewTag] = useState('');
 
-	const handle_categories = (raw: string): void => {
-		onChange({ ...values, categories: split_csv(raw) });
+	const toggle_category = (name: string): void => {
+		const next = values.categories.includes(name)
+			? values.categories.filter((c) => c !== name)
+			: [...values.categories, name];
+		onChange({ ...values, categories: next });
 	};
 
-	const handle_tags = (raw: string): void => {
-		onChange({ ...values, tags: split_csv(raw) });
+	const toggle_tag = (name: string): void => {
+		const next = values.tags.includes(name)
+			? values.tags.filter((t) => t !== name)
+			: [...values.tags, name];
+		onChange({ ...values, tags: next });
+	};
+
+	const add_new_category = (): void => {
+		const trimmed = new_category.trim();
+		if (!trimmed) return;
+		if (values.categories.includes(trimmed)) {
+			setNewCategory('');
+			return;
+		}
+		onChange({ ...values, categories: [...values.categories, trimmed] });
+		setNewCategory('');
+	};
+
+	const add_new_tag = (): void => {
+		const trimmed = new_tag.trim();
+		if (!trimmed) return;
+		if (values.tags.includes(trimmed)) {
+			setNewTag('');
+			return;
+		}
+		onChange({ ...values, tags: [...values.tags, trimmed] });
+		setNewTag('');
+	};
+
+	const remove_term = (kind: 'categories' | 'tags', name: string): void => {
+		onChange({
+			...values,
+			[kind]: values[kind].filter((t) => t !== name),
+		});
 	};
 
 	const handle_slug = (raw: string): void => {
@@ -172,8 +208,6 @@ export function MorePanel(props: MorePanelProps) {
 		onChange({ ...values, syndicateTo: next });
 	};
 
-	const categories_display = values.categories.join(', ');
-	const tags_display = values.tags.join(', ');
 	const slug_display = values.slug ?? '';
 	const post_format_display = values.postFormat ?? '';
 	const focuskw_display = values.yoastFocusKw ?? '';
@@ -182,45 +216,31 @@ export function MorePanel(props: MorePanelProps) {
 		<details class="outpost-more-panel">
 			<summary class="outpost-more-panel__summary">More options</summary>
 			<div class="outpost-more-panel__body">
-				<label class="outpost-label" for={`${idPrefix}-categories`}>
-					Categories
-				</label>
-				<input
-					id={`${idPrefix}-categories`}
-					class="outpost-input"
-					type="text"
-					value={categories_display}
-					onInput={(e): void =>
-						handle_categories((e.target as HTMLInputElement).value)
-					}
-					list={`${idPrefix}-categories-list`}
-					placeholder="Existing or new — comma separated"
-					disabled={disabled}
+				<TermPicker
+					legend="Categories"
+					existing={composerConfig.existingCategories}
+					selected={values.categories}
+					onToggle={toggle_category}
+					onRemove={(name): void => remove_term('categories', name)}
+					newValue={new_category}
+					onNewChange={setNewCategory}
+					onNewAdd={add_new_category}
+					disabled={!!disabled}
+					idPrefix={`${idPrefix}-categories`}
 				/>
-				<datalist id={`${idPrefix}-categories-list`}>
-					{composerConfig.existingCategories.map((cat) => (
-						<option key={cat.slug} value={cat.name} />
-					))}
-				</datalist>
 
-				<label class="outpost-label" for={`${idPrefix}-tags`}>
-					Tags
-				</label>
-				<input
-					id={`${idPrefix}-tags`}
-					class="outpost-input"
-					type="text"
-					value={tags_display}
-					onInput={(e): void => handle_tags((e.target as HTMLInputElement).value)}
-					list={`${idPrefix}-tags-list`}
-					placeholder="Existing or new — comma separated"
-					disabled={disabled}
+				<TermPicker
+					legend="Tags"
+					existing={composerConfig.existingTags}
+					selected={values.tags}
+					onToggle={toggle_tag}
+					onRemove={(name): void => remove_term('tags', name)}
+					newValue={new_tag}
+					onNewChange={setNewTag}
+					onNewAdd={add_new_tag}
+					disabled={!!disabled}
+					idPrefix={`${idPrefix}-tags`}
 				/>
-				<datalist id={`${idPrefix}-tags-list`}>
-					{composerConfig.existingTags.map((tag) => (
-						<option key={tag.slug} value={tag.name} />
-					))}
-				</datalist>
 
 				<label class="outpost-label" for={`${idPrefix}-slug`}>
 					Slug
@@ -322,6 +342,119 @@ export function MorePanel(props: MorePanelProps) {
 				)}
 			</div>
 		</details>
+	);
+}
+
+/**
+ * TermPicker — chip UI for picking from existing terms + adding new ones.
+ *
+ * Existing terms render as toggleable checkboxes (visible at a glance,
+ * tap to include). Newly-added names that don't match an existing term
+ * render as removable pills with a "(new)" marker — visually distinct
+ * so the user sees they're creating something. The new-name input is
+ * separate from the chip list with an explicit "Add" button so creation
+ * is a deliberate action, not a side effect of typing in the field.
+ *
+ * Reused for both Categories and Tags in MorePanel.
+ */
+interface TermPickerProps {
+	legend: string;
+	existing: TermSuggestion[];
+	selected: string[];
+	onToggle: (name: string) => void;
+	onRemove: (name: string) => void;
+	newValue: string;
+	onNewChange: (raw: string) => void;
+	onNewAdd: () => void;
+	disabled: boolean;
+	idPrefix: string;
+}
+
+function TermPicker(props: TermPickerProps) {
+	const {
+		legend,
+		existing,
+		selected,
+		onToggle,
+		onRemove,
+		newValue,
+		onNewChange,
+		onNewAdd,
+		disabled,
+		idPrefix,
+	} = props;
+
+	const existing_names = new Set(existing.map((e) => e.name));
+	// Names the user added that don't already exist on the site — render
+	// these as removable pills with a "(new)" marker.
+	const new_chips = selected.filter((name) => !existing_names.has(name));
+
+	const handle_new_keydown = (event: KeyboardEvent): void => {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			onNewAdd();
+		}
+	};
+
+	return (
+		<fieldset class="outpost-term-picker">
+			<legend class="outpost-label">{legend}</legend>
+			{existing.length === 0 ? (
+				<p class="outpost-help">None on this site yet — add a new one below.</p>
+			) : (
+				<div class="outpost-chip-list">
+					{existing.map((term) => (
+						<label key={term.slug} class="outpost-checkbox">
+							<input
+								type="checkbox"
+								checked={selected.includes(term.name)}
+								onChange={(): void => onToggle(term.name)}
+								disabled={disabled}
+							/>
+							<span>{term.name}</span>
+						</label>
+					))}
+				</div>
+			)}
+
+			{new_chips.length > 0 && (
+				<div class="outpost-chip-list outpost-chip-list--new">
+					{new_chips.map((name) => (
+						<button
+							key={name}
+							type="button"
+							class="outpost-new-chip"
+							onClick={(): void => onRemove(name)}
+							disabled={disabled}
+							aria-label={`Remove new ${legend.toLowerCase().slice(0, -1)} ${name}`}
+						>
+							{name} <span aria-hidden="true">(new) ✕</span>
+						</button>
+					))}
+				</div>
+			)}
+
+			<div class="outpost-term-picker__add">
+				<input
+					id={`${idPrefix}-new`}
+					class="outpost-input"
+					type="text"
+					value={newValue}
+					onInput={(e): void => onNewChange((e.target as HTMLInputElement).value)}
+					onKeyDown={handle_new_keydown}
+					placeholder={`Add a new ${legend.toLowerCase().slice(0, -1)}…`}
+					disabled={disabled}
+				/>
+				<button
+					type="button"
+					class="outpost-button outpost-button--secondary"
+					onClick={onNewAdd}
+					disabled={disabled || !newValue.trim()}
+				>
+					Add
+				</button>
+			</div>
+		</fieldset>
 	);
 }
 

@@ -7,6 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session C5d — visible chip picker for categories/tags)
+- **Categories and Tags now use a chip picker** instead of an autocomplete textbox. Existing terms render as toggleable checkbox chips so the user sees every option at a glance — no need to start typing before suggestions appear (which is how HTML5 `<datalist>` works on every browser, and was the source of "I don't see existing categories"). Tap to include/exclude.
+- **New-term creation is now a deliberate action.** A separate input + "Add" button below the chip list. Typing alone doesn't create a new term; you have to tap Add (or press Enter inside the field). Newly-added names appear as removable "(new)" pills with a different visual treatment so the user sees they're creating something — discourages accidental tag/category sprawl.
+- Friction added on purpose: the explicit Add step makes it obvious the user is creating a new term, while still keeping creation possible when needed. Mirrors the design intent that the WordPress.org consumers of this plugin shouldn't accidentally produce hundreds of one-off tags.
+- New CSS surfaces: `.outpost-term-picker`, `.outpost-chip-list`, `.outpost-chip-list--new`, `.outpost-new-chip`, `.outpost-term-picker__add`.
+- Internal: extracted a `TermPicker` sub-component shared between the Categories and Tags fields. The data model (`MorePanelValues.categories: string[]` and `tags: string[]`) didn't change — just the rendering.
+
 ### Fixed (Session C5c hotfix — categories/tags suggestions surfacing)
 - `get_terms()` in the composer-config endpoint now uses `hide_empty => false`. Was `true`, which excluded categories/tags that exist but haven't been applied to a post yet — on a fresh site or one with reorganized content, the user wouldn't see existing terms as suggestions and would be retyping them by hand.
 - Composer-config response gains explicit `Cache-Control: private, no-store, max-age=0` header. Defense in depth against managed-WP edge caches (GoDaddy gateway, Varnish, nginx FastCGI) serving one user's response to another. Bearer auth already makes the response per-request, but the header is free.

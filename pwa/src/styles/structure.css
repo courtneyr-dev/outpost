@@ -334,6 +334,73 @@
 	outline-offset: 2px;
 }
 
+/*
+ * Term picker (Categories, Tags). Existing terms render as toggleable
+ * checkbox chips; newly-added terms render as removable pill buttons
+ * with a (new) marker so the user can see they're creating.
+ */
+.outpost-term-picker {
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	padding: 0.5rem;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.outpost-term-picker legend {
+	font-weight: 600;
+	font-size: 0.9rem;
+	padding: 0 0.25rem;
+}
+
+.outpost-chip-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+}
+
+.outpost-chip-list--new {
+	border-top: 1px dashed var(--outpost-border, currentColor);
+	padding-top: 0.5rem;
+	margin-top: 0.25rem;
+}
+
+.outpost-new-chip {
+	font: inherit;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.25rem 0.625rem;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	background: var(--outpost-input-bg, transparent);
+	color: var(--outpost-input-fg, inherit);
+	cursor: pointer;
+	font-size: 0.9rem;
+}
+
+.outpost-new-chip span {
+	font-size: 0.8rem;
+	opacity: 0.7;
+}
+
+.outpost-new-chip:focus-visible {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-term-picker__add {
+	display: flex;
+	gap: 0.5rem;
+	align-items: stretch;
+}
+
+.outpost-term-picker__add .outpost-input {
+	flex: 1;
+}
+
 .outpost-xfn-picker,
 .outpost-syndication-picker {
 	border: 1px solid var(--outpost-border, currentColor);
