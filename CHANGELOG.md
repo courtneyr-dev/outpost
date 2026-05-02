@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C2b — multi-photo gallery support)
+
+- **PhotoMode now accepts multiple photos.** `<input type="file" multiple>` lets the user pick a batch in one tap. Each picked file becomes a `PhotoEntry` in a list with its own thumbnail, alt-text textarea, decorative toggle, remove button, and reorder controls. Picking again appends — doesn't replace — so the user can build a gallery from multiple picker invocations.
+- **Per-photo alt text** required by default. Each entry's submit gates on either a non-empty alt or an explicit Decorative toggle. Decorative entries submit `alt=""` per the WCAG / Hard Contract convention for purely-visual images.
+- **Reorder via Move up / Move down buttons** at the array boundaries. Drag-and-drop on mobile is finicky and inconsistent across browsers; explicit buttons work everywhere and have clear `aria-label`s for screen readers.
+- **Submit pipeline**: every photo goes through `process_photo` (canvas downscale + EXIF strip + JPEG re-encode) in sequence before any upload starts, so a failing photo doesn't leave half-uploaded media stranded. Each processed blob then uploads to the Micropub media endpoint sequentially with progress reported as `Uploading N of M…` in the submit-button label. Then a single `post_h_entry` posts with `photo[]` (array of media URLs in gallery order) + `mp-photo-alt[]` (parallel alt-text array).
+- **Single-photo posts retain the string shape** for `photo` and `mp-photo-alt` (back-compat with sites that don't yet handle array form).
+- **`HEntryProperties.photo` and `mp-photo-alt` types extended** to `string | string[]`.
+- **Auto-format inference** (already in the C5 bridge) picks `image` for single photos, `gallery` for arrays length > 1. No bridge changes needed.
+- New CSS surfaces: `.outpost-photo-list`, `.outpost-photo-list__item` (responsive 2-col → 3-col grid at ≥ 40 rem), `.outpost-photo-list__thumb`, `.outpost-photo-list__fields`, `.outpost-photo-list__actions`.
+- Mode title flips between "Photo" and "Gallery" based on entry count. Submit button label flips between "Post photo" and "Post gallery."
+
 ### Changed (Session DS-3b — queue badge + visible config-error banner)
 
 - **Queue banner replaced with `QueueBadge`** in the composer header. Compact button showing count of queued offline posts; tap to open a Drawer with per-entry retry/dismiss controls. Per Design System Section 5.26. Auto-flush triggers (browser `online` event + first mount) preserved from the prior banner. The full-width banner above the tab strip is gone.

@@ -73,9 +73,13 @@ export interface HEntryProperties {
 	'play-of'?: string;
 	location?: string;
 	rsvp?: 'yes' | 'no' | 'maybe' | 'interested';
-	photo?: string;
-	/** Per David Shanske's Micropub plugin convention for alt text on photos. */
-	'mp-photo-alt'?: string;
+	/** Photo URL — string for single-photo posts, string[] for galleries. */
+	photo?: string | string[];
+	/**
+	 * Per David Shanske's Micropub plugin convention. Parallel array to `photo`
+	 * when `photo` is an array; otherwise a string.
+	 */
+	'mp-photo-alt'?: string | string[];
 	category?: string[];
 	'mp-syndicate-to'?: string[];
 	/** Optional permalink slug. Native Micropub spec property. */

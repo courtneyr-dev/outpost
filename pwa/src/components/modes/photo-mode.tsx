@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
 	discover_media_endpoint,
@@ -22,32 +22,33 @@ import {
 } from '../more-panel';
 
 /**
- * Photo mode — pick a photo, type alt text, post.
+ * Photo mode — single photo or multi-photo gallery.
  *
- * Pipeline:
- *   1. User picks a file via the system file picker (iOS Safari shows
- *      camera + photo library options). Accepted MIME types: JPEG, PNG,
- *      WebP, GIF, AVIF (SVG explicitly excluded).
- *   2. The picked image is loaded into a canvas, downscaled to fit
- *      2048 on the long edge, and re-encoded as JPEG at quality 0.9.
- *      Side effect: EXIF metadata (including GPS) is stripped — there's
- *      no path for it to survive the canvas round-trip.
- *   3. Discover the Micropub media endpoint via `?q=config` (cached in
- *      component state for the session, alongside the regular Micropub
- *      endpoint).
- *   4. Upload the processed blob to the media endpoint as
- *      multipart/form-data; the response Location header is the URL of
- *      the uploaded media.
- *   5. Post an h-entry with `photo` (the media URL), `mp-photo-alt` (the
- *      alt text — required by the Hard Contract; structural, not
- *      configurable), and optional `content` (caption).
+ * Phase C2b extends C2's single-photo flow to galleries:
  *
- * Required alt text: the Submit button stays disabled until the alt text
- * field has content. CLAUDE.md: "Required alt text on photos. Structural,
- * not configurable. Decorative toggle submits alt=''."
+ *   1. User picks one or many files via `<input type="file" multiple>`.
+ *      Each entry gets a thumbnail, alt-text input, decorative toggle,
+ *      remove button, and reorder controls.
+ *   2. On submit, every entry runs through process_photo (canvas
+ *      downscale + EXIF strip + JPEG re-encode) in sequence.
+ *   3. Each processed blob uploads to the Micropub media endpoint;
+ *      the resulting URL is collected.
+ *   4. A single h-entry posts with `photo[]` (array of media URLs in
+ *      gallery order) + `mp-photo-alt[]` (parallel alt-text array).
+ *      Single-photo posts still send `photo` and `mp-photo-alt` as
+ *      strings for backward compatibility with sites that don't yet
+ *      handle the array shape.
  *
- * (Decorative toggle defers to a future C2b — every photo posted today
- * must have a real alt-text description.)
+ * Auto-format mapping (Phase C5 bridge): 1 photo → image, 2+ →
+ * gallery. Same auto-inference; same Post Format taxonomy.
+ *
+ * Required alt text remains structural (Hard Contract): each entry's
+ * Decorative toggle, when checked, submits alt="" for that entry.
+ * Otherwise the entry's Submit gates on a non-empty alt string.
+ *
+ * Reorder: per-entry Move up / Move down buttons (drag-and-drop on
+ * mobile is finicky; explicit buttons work everywhere). The buttons
+ * disable at array boundaries.
  */
 
 export interface PhotoModeProps {
@@ -56,20 +57,29 @@ export interface PhotoModeProps {
 	composerConfig?: ComposerConfig;
 }
 
+interface PhotoEntry {
+	id: string;
+	file: File;
+	preview_url: string;
+	alt: string;
+	decorative: boolean;
+}
+
 type Status =
 	| { kind: 'idle' }
 	| { kind: 'processing-photo' }
 	| { kind: 'discovering-endpoints' }
-	| { kind: 'uploading-photo' }
+	| { kind: 'uploading-photo'; current: number; total: number }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location: string }
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
+let next_id = 1;
+const make_id = (): string => `photo-${String(next_id++)}`;
+
 export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps) {
-	const [file, setFile] = useState<File | null>(null);
-	const [preview_url, setPreviewUrl] = useState<string | null>(null);
-	const [alt, setAlt] = useState('');
+	const [entries, setEntries] = useState<PhotoEntry[]>([]);
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
@@ -79,33 +89,90 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
+	// Revoke blob URLs on unmount or when entries change.
+	useEffect(() => {
+		return (): void => {
+			for (const entry of entries) {
+				URL.revokeObjectURL(entry.preview_url);
+			}
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-time unmount cleanup
+	}, []);
+
 	const handle_file_change = (event: Event): void => {
 		const input = event.target as HTMLInputElement;
-		const picked = input.files?.[0] ?? null;
-		setFile(picked);
-		if (preview_url) {
-			URL.revokeObjectURL(preview_url);
+		const picked = input.files;
+		if (!picked || picked.length === 0) return;
+		const new_entries: PhotoEntry[] = [];
+		for (const file of Array.from(picked)) {
+			new_entries.push({
+				id: make_id(),
+				file,
+				preview_url: URL.createObjectURL(file),
+				alt: '',
+				decorative: false,
+			});
 		}
-		if (picked) {
-			setPreviewUrl(URL.createObjectURL(picked));
-			// Clear any prior posted-state when a new file is picked.
-			if (status.kind === 'posted' || status.kind === 'error') {
-				setStatus({ kind: 'idle' });
-			}
-		} else {
-			setPreviewUrl(null);
+		setEntries((prev) => [...prev, ...new_entries]);
+		// Clear the file input so the user can pick the same file again
+		// after removing it (browsers cache the previous selection
+		// otherwise — picking the same filename does nothing).
+		input.value = '';
+		if (status.kind === 'posted' || status.kind === 'error' || status.kind === 'queued') {
+			setStatus({ kind: 'idle' });
 		}
+	};
+
+	const remove_entry = (id: string): void => {
+		setEntries((prev) => {
+			const target = prev.find((e) => e.id === id);
+			if (target) URL.revokeObjectURL(target.preview_url);
+			return prev.filter((e) => e.id !== id);
+		});
+	};
+
+	const update_entry = (id: string, patch: Partial<PhotoEntry>): void => {
+		setEntries((prev) =>
+			prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
+		);
+	};
+
+	const move_entry = (id: string, direction: -1 | 1): void => {
+		setEntries((prev) => {
+			const idx = prev.findIndex((e) => e.id === id);
+			const target_idx = idx + direction;
+			if (idx === -1 || target_idx < 0 || target_idx >= prev.length) return prev;
+			const next = [...prev];
+			[next[idx], next[target_idx]] = [next[target_idx]!, next[idx]!];
+			return next;
+		});
 	};
 
 	const handle_submit = async (event: Event): Promise<void> => {
 		event.preventDefault();
-		const trimmed_alt = alt.trim();
-		const trimmed_content = content.trim();
-		if (!file || !trimmed_alt) return;
+		if (entries.length === 0) return;
+		// Each entry must have alt text OR be marked decorative.
+		const incomplete = entries.find(
+			(entry) => !entry.decorative && entry.alt.trim().length === 0,
+		);
+		if (incomplete) {
+			setStatus({
+				kind: 'error',
+				message:
+					'Every photo needs alt text, or mark it decorative. Decorative photos submit empty alt to indicate they\'re purely visual.',
+			});
+			return;
+		}
 
 		try {
+			// Process every photo to a sanitized blob first, so a failing
+			// photo doesn't leave half-uploaded media stranded.
 			setStatus({ kind: 'processing-photo' });
-			const processed = await process_photo(file);
+			const processed_blobs: Blob[] = [];
+			for (const entry of entries) {
+				const processed = await process_photo(entry.file);
+				processed_blobs.push(processed.blob);
+			}
 
 			let mp = micropub_endpoint;
 			let media = media_endpoint;
@@ -121,21 +188,37 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				}
 			}
 
-			setStatus({ kind: 'uploading-photo' });
-			const upload = await upload_media(
-				{
-					blob: processed.blob,
-					filename: 'photo.jpg',
-					accessToken: token.accessToken,
-					mediaEndpoint: media,
-				},
-				micropubEnv,
-			);
+			// Upload each processed blob in sequence so the user sees
+			// progress and a single failure doesn't cascade.
+			const uploaded_urls: string[] = [];
+			for (let i = 0; i < processed_blobs.length; i++) {
+				setStatus({
+					kind: 'uploading-photo',
+					current: i + 1,
+					total: processed_blobs.length,
+				});
+				const upload = await upload_media(
+					{
+						blob: processed_blobs[i]!,
+						filename: `photo-${String(i + 1)}.jpg`,
+						accessToken: token.accessToken,
+						mediaEndpoint: media,
+					},
+					micropubEnv,
+				);
+				uploaded_urls.push(upload.location);
+			}
 
 			setStatus({ kind: 'posting' });
+			// Single-photo posts retain the string-shape for back-compat.
+			// Multi-photo posts use the array shape per Micropub spec.
+			const photo_value = uploaded_urls.length === 1 ? uploaded_urls[0]! : uploaded_urls;
+			const alt_array = entries.map((e) => (e.decorative ? '' : e.alt.trim()));
+			const alt_value = alt_array.length === 1 ? alt_array[0]! : alt_array;
+			const trimmed_content = content.trim();
 			const base = {
-				photo: upload.location,
-				'mp-photo-alt': trimmed_alt,
+				photo: photo_value,
+				'mp-photo-alt': alt_value,
 				...(trimmed_content ? { content: trimmed_content } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
@@ -164,11 +247,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				}
 			}
 
-			// Reset form for next post.
-			if (preview_url) URL.revokeObjectURL(preview_url);
-			setFile(null);
-			setPreviewUrl(null);
-			setAlt('');
+			// Reset for next post.
+			for (const entry of entries) URL.revokeObjectURL(entry.preview_url);
+			setEntries([]);
 			setContent('');
 			setMoreValues(empty_more_values());
 		} catch (err) {
@@ -194,21 +275,26 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 	const submit_label =
 		status.kind === 'processing-photo'
-			? 'Preparing photo…'
+			? 'Preparing photos…'
 			: status.kind === 'discovering-endpoints'
 				? 'Finding endpoints…'
 				: status.kind === 'uploading-photo'
-					? 'Uploading…'
+					? `Uploading ${String(status.current)} of ${String(status.total)}…`
 					: status.kind === 'posting'
 						? 'Posting…'
-						: 'Post photo';
+						: entries.length > 1
+							? 'Post gallery'
+							: 'Post photo';
 
-	const can_submit = !!file && !!alt.trim() && !submitting;
+	const all_have_alt = entries.every(
+		(entry) => entry.decorative || entry.alt.trim().length > 0,
+	);
+	const can_submit = entries.length > 0 && all_have_alt && !submitting;
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-photo-mode-title">
 			<h2 id="outpost-photo-mode-title" class="outpost-card__title">
-				Photo
+				{entries.length > 1 ? 'Gallery' : 'Photo'}
 			</h2>
 			<p class="outpost-card__lede">
 				Signed in as <code>{token.me || '—'}</code>
@@ -216,42 +302,105 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 			<form class="outpost-form-row" onSubmit={handle_submit}>
 				<label class="outpost-label" for="outpost-photo-file">
-					Photo
+					{entries.length === 0 ? 'Photo' : 'Add more photos'}
 				</label>
 				<input
 					id="outpost-photo-file"
 					class="outpost-input"
 					type="file"
 					accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+					multiple
 					onChange={handle_file_change}
 					disabled={submitting}
 				/>
 
-				{preview_url && (
-					<img
-						class="outpost-photo-preview"
-						src={preview_url}
-						alt={alt || 'Selected photo (alt text not yet entered)'}
-					/>
+				{entries.length > 0 && (
+					<ul class="outpost-photo-list">
+						{entries.map((entry, index) => (
+							<li key={entry.id} class="outpost-photo-list__item">
+								<img
+									class="outpost-photo-list__thumb"
+									src={entry.preview_url}
+									alt={
+										entry.alt ||
+										`Photo ${String(index + 1)} (alt text not yet entered)`
+									}
+								/>
+								<div class="outpost-photo-list__fields">
+									<label
+										class="outpost-label"
+										for={`outpost-photo-alt-${entry.id}`}
+									>
+										Alt text{' '}
+										{!entry.decorative && (
+											<span class="outpost-required">(required)</span>
+										)}
+									</label>
+									<textarea
+										id={`outpost-photo-alt-${entry.id}`}
+										class="outpost-textarea"
+										rows={2}
+										value={entry.alt}
+										onInput={(event): void =>
+											update_entry(entry.id, {
+												alt: (event.target as HTMLTextAreaElement).value,
+											})
+										}
+										placeholder="Describe what's in the photo for screen readers"
+										disabled={submitting || entry.decorative}
+									/>
+									<label class="outpost-checkbox">
+										<input
+											type="checkbox"
+											checked={entry.decorative}
+											onChange={(event): void =>
+												update_entry(entry.id, {
+													decorative: (event.target as HTMLInputElement)
+														.checked,
+												})
+											}
+											disabled={submitting}
+										/>
+										<span>Decorative (no alt text needed)</span>
+									</label>
+								</div>
+								<div class="outpost-photo-list__actions">
+									<button
+										type="button"
+										class="outpost-button outpost-button--secondary"
+										onClick={(): void => move_entry(entry.id, -1)}
+										disabled={submitting || index === 0}
+										aria-label={`Move photo ${String(index + 1)} earlier`}
+									>
+										<span aria-hidden="true">↑</span>
+									</button>
+									<button
+										type="button"
+										class="outpost-button outpost-button--secondary"
+										onClick={(): void => move_entry(entry.id, 1)}
+										disabled={submitting || index === entries.length - 1}
+										aria-label={`Move photo ${String(index + 1)} later`}
+									>
+										<span aria-hidden="true">↓</span>
+									</button>
+									<button
+										type="button"
+										class="outpost-button outpost-button--secondary"
+										onClick={(): void => remove_entry(entry.id)}
+										disabled={submitting}
+										aria-label={`Remove photo ${String(index + 1)}`}
+									>
+										Remove
+									</button>
+								</div>
+							</li>
+						))}
+					</ul>
 				)}
-
-				<label class="outpost-label" for="outpost-photo-alt">
-					Alt text <span class="outpost-required">(required)</span>
-				</label>
-				<textarea
-					id="outpost-photo-alt"
-					class="outpost-textarea"
-					rows={3}
-					value={alt}
-					onInput={(event): void => setAlt((event.target as HTMLTextAreaElement).value)}
-					placeholder="Describe what's in the photo for screen readers"
-					disabled={submitting}
-					required
-				/>
 
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-photo-content">
-						Caption (optional)
+						{entries.length > 1 ? 'Caption (optional)' : 'Caption (optional)'}
 					</label>
 					<VoiceButton
 						onTranscript={(text): void =>
