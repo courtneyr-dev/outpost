@@ -177,6 +177,58 @@ If you want to verify the error UI without breaking your real account:
 
 This is "nice to verify" not "must verify." Skipping it is fine for the B1 sign-off.
 
+## C0 — Composer tab framework + Note mode plugged in
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.9`. Verify with `git -C ~/projects/staging-courtneyr-dev/plugins/outpost log --oneline -1`.
+
+**Pre-flight:** sign in via the B0b flow first if not already authenticated. The C0 tab framework only renders for authenticated users — pre-auth, the LoginScreen still renders.
+
+### C0-Stage 1 — Tab strip renders
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`.
+
+**Expected:**
+
+- A horizontal strip of 5 tabs at the top: **Note**, **Reply**, **Photo**, **Listen**, **Article**.
+- The **Note** tab is selected (visually distinguished with a slightly heavier border, sitting on top of the panel boundary).
+- Below the strip: the Note posting form (textarea + "Post note" + "Sign out" buttons), unchanged from B1.
+- Other panels are hidden.
+
+**Stop here if:** the tab strip doesn't render, or the wrong tab is initially selected.
+
+### C0-Stage 2 — Click + tap to switch tabs
+
+1. Tap the **Reply** tab.
+2. **Expected:** Reply panel becomes visible — placeholder card titled "Reply" with text "Reply, Like, Repost, Bookmark, RSVP, and Follow modes land in Phase C1." The Note panel is hidden but its state is preserved (text typed into Note's textarea is still there when you switch back).
+3. Tap **Photo**, **Listen**, **Article** in turn — each shows a placeholder card naming the Phase C session that lands the real mode.
+4. Tap **Note** again — your previously-typed text is still in the textarea. Posting from here still works (B1's flow is untouched).
+
+### C0-Stage 3 — Keyboard navigation (desktop)
+
+If you have a keyboard available (Mac with the iPhone connected via Universal Control, or open the staging URL in desktop Safari):
+
+1. Press Tab until focus lands on a tab in the strip (the focus ring is visible inside the tab — outline-offset is negative so it doesn't clip on the bottom border).
+2. **Expected:** focus lands on the currently-selected tab (Note).
+3. Press **ArrowRight** — focus + selection move to **Reply**. The previous tab loses `aria-selected`; the new tab gains it.
+4. Press **ArrowRight** four more times — focus cycles through Photo → Listen → Article → wraps back to **Note**.
+5. Press **ArrowLeft** — wraps to **Article** (last tab).
+6. Press **Home** — jumps to **Note**.
+7. Press **End** — jumps to **Article**.
+8. Press **Tab** — focus moves OUT of the tablist into the active panel (Note's textarea).
+
+This is the WAI-ARIA tabs pattern with automatic activation. iPhone VoiceOver announces tab role + selection state correctly when swiping through the tablist.
+
+### C0-Stage 4 — VoiceOver (iPhone Safari)
+
+If you have a moment with VoiceOver enabled:
+
+1. Triple-click the side button (or however you toggle VoiceOver).
+2. Swipe right through the tabs.
+3. **Expected announcements:** "Note, tab, selected" → "Reply, tab" → "Photo, tab" → "Listen, tab" → "Article, tab".
+4. Double-tap a tab to activate it. **Expected:** the panel's heading announces ("Reply, heading level 2"). The placeholder card content reads through normally.
+
+Skip this if VoiceOver setup isn't convenient — A11Y-CHECKLIST Phase J formalizes the real-device screen reader testing matrix; for now, the unit tests cover the keyboard contract and the rendered ARIA attributes.
+
 ## Reporting
 
 After running, reply with one of:
