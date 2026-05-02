@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C2 — Photo posting)
+- `pwa/src/lib/photo.ts` — `process_photo(file, options)` validates MIME (JPEG/PNG/WebP/GIF/AVIF; SVG explicitly excluded), checks size cap (10 MB default), loads the image, downscales to 2048 on the long edge via canvas, and re-encodes as JPEG at quality 0.9. Side effect: EXIF metadata (including GPS coordinates) is stripped — no path for it to survive the canvas round-trip. `PhotoError` discriminates `unsupported_type` / `too_large` / `load_failed` / `encode_failed`.
+- `pwa/src/lib/micropub.ts` extended with `discover_media_endpoint(micropub_endpoint, access_token)` (queries `?q=config` to find the media endpoint) and `upload_media({blob, filename, accessToken, mediaEndpoint})` (POSTs multipart/form-data, parses Location).
+- `pwa/src/components/modes/photo-mode.tsx` — replaces the C0 stub. File picker (camera + library on iOS), live preview, required alt-text input, optional caption. Pipeline: process_photo → discover endpoints (cached) → upload → post h-entry with `photo` + `mp-photo-alt`.
+- `HEntryProperties` interface gains `photo?: string` and `'mp-photo-alt'?: string` (David Shanske's Micropub plugin convention for photo alt text).
+- `pwa/src/lib/photo.test.ts` — 17 vitest tests covering MIME allowlist (5 accepted, 5 rejected including SVG and HEIC), `scale_to_fit` (already-fits / landscape / portrait / square / aspect-ratio precision), and `process_photo` validation paths (unsupported MIME, oversized files, PhotoError instanceof). Vitest 124 → 144.
+
+### Changed (Session C2)
+- `OUTPOST_VERSION` bumped to `0.1.13` per A2 #16.
+- `composer-tabs.tsx`: Photo tab now passes `token` and `micropubEnv` to the real `PhotoMode` component (was a stub).
+- `structure.css`: added `.outpost-photo-preview` (constrains preview height to 24rem so portrait phone photos don't blow out the card) and `.outpost-required` (small italic-style label modifier for "(required)" notes).
+
 ### Added (Session C1c — RSVP + Follow variants)
 - Two more variants under the Reply tab: RSVP (h-entry with `in-reply-to` event URL + `rsvp` value yes/no/maybe/interested) and Follow (h-entry with `follow-of` person/feed URL).
 - RSVP gets a second radio group ("Response") that appears only when RSVP is selected — Yes / No / Maybe / Interested. The chosen value is added as the `rsvp` property on submission.

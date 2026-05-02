@@ -1,28 +1,252 @@
+import { useState } from 'preact/hooks';
+import {
+	discover_micropub_endpoint,
+	discover_media_endpoint,
+	upload_media,
+	post_h_entry,
+	MicropubError,
+	type MicropubEnvironment,
+} from '../../lib/micropub';
+import { process_photo, PhotoError } from '../../lib/photo';
+import type { StoredToken } from '../../lib/token-store';
+
 /**
- * Photo mode — placeholder for Phase C2.
+ * Photo mode — pick a photo, type alt text, post.
  *
- * Will handle photo posts: the Micropub media endpoint upload flow with
- * client-side EXIF stripping (privacy: prevents location leak from camera
- * roll) and required alt text per the Hard Contract's "structural, not
- * configurable" rule. A "decorative" toggle submits `alt=""` for purely
- * decorative images.
+ * Pipeline:
+ *   1. User picks a file via the system file picker (iOS Safari shows
+ *      camera + photo library options). Accepted MIME types: JPEG, PNG,
+ *      WebP, GIF, AVIF (SVG explicitly excluded).
+ *   2. The picked image is loaded into a canvas, downscaled to fit
+ *      2048 on the long edge, and re-encoded as JPEG at quality 0.9.
+ *      Side effect: EXIF metadata (including GPS) is stripped — there's
+ *      no path for it to survive the canvas round-trip.
+ *   3. Discover the Micropub media endpoint via `?q=config` (cached in
+ *      component state for the session, alongside the regular Micropub
+ *      endpoint).
+ *   4. Upload the processed blob to the media endpoint as
+ *      multipart/form-data; the response Location header is the URL of
+ *      the uploaded media.
+ *   5. Post an h-entry with `photo` (the media URL), `mp-photo-alt` (the
+ *      alt text — required by the Hard Contract; structural, not
+ *      configurable), and optional `content` (caption).
  *
- * Phase C2 lands the upload pipeline. Pairs with the security checklist
- * items: MIME validation against an allowlist (JPEG, PNG, WebP, GIF,
- * AVIF; SVG excluded until a separate sanitizer is wired), 10 MB size
- * cap (configurable via filter), Canvas-based downscale before upload.
+ * Required alt text: the Submit button stays disabled until the alt text
+ * field has content. CLAUDE.md: "Required alt text on photos. Structural,
+ * not configurable. Decorative toggle submits alt=''."
+ *
+ * (Decorative toggle defers to a future C2b — every photo posted today
+ * must have a real alt-text description.)
  */
 
-export function PhotoMode() {
+export interface PhotoModeProps {
+	token: StoredToken;
+	micropubEnv?: MicropubEnvironment;
+}
+
+type Status =
+	| { kind: 'idle' }
+	| { kind: 'processing-photo' }
+	| { kind: 'discovering-endpoints' }
+	| { kind: 'uploading-photo' }
+	| { kind: 'posting' }
+	| { kind: 'posted'; location: string }
+	| { kind: 'error'; message: string };
+
+export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
+	const [file, setFile] = useState<File | null>(null);
+	const [preview_url, setPreviewUrl] = useState<string | null>(null);
+	const [alt, setAlt] = useState('');
+	const [content, setContent] = useState('');
+	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
+	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
+
+	const handle_file_change = (event: Event): void => {
+		const input = event.target as HTMLInputElement;
+		const picked = input.files?.[0] ?? null;
+		setFile(picked);
+		if (preview_url) {
+			URL.revokeObjectURL(preview_url);
+		}
+		if (picked) {
+			setPreviewUrl(URL.createObjectURL(picked));
+			// Clear any prior posted-state when a new file is picked.
+			if (status.kind === 'posted' || status.kind === 'error') {
+				setStatus({ kind: 'idle' });
+			}
+		} else {
+			setPreviewUrl(null);
+		}
+	};
+
+	const handle_submit = async (event: Event): Promise<void> => {
+		event.preventDefault();
+		const trimmed_alt = alt.trim();
+		const trimmed_content = content.trim();
+		if (!file || !trimmed_alt) return;
+
+		try {
+			setStatus({ kind: 'processing-photo' });
+			const processed = await process_photo(file);
+
+			let mp = micropub_endpoint;
+			let media = media_endpoint;
+			if (!mp || !media) {
+				setStatus({ kind: 'discovering-endpoints' });
+				if (!mp) {
+					mp = await discover_micropub_endpoint(token.me, micropubEnv);
+					setMicropubEndpoint(mp);
+				}
+				if (!media) {
+					media = await discover_media_endpoint(mp, token.accessToken, micropubEnv);
+					setMediaEndpoint(media);
+				}
+			}
+
+			setStatus({ kind: 'uploading-photo' });
+			const upload = await upload_media(
+				{
+					blob: processed.blob,
+					filename: 'photo.jpg',
+					accessToken: token.accessToken,
+					mediaEndpoint: media,
+				},
+				micropubEnv,
+			);
+
+			setStatus({ kind: 'posting' });
+			const result = await post_h_entry(
+				{
+					properties: {
+						photo: upload.location,
+						'mp-photo-alt': trimmed_alt,
+						...(trimmed_content ? { content: trimmed_content } : {}),
+					},
+					accessToken: token.accessToken,
+					micropubEndpoint: mp,
+				},
+				micropubEnv,
+			);
+			setStatus({ kind: 'posted', location: result.location });
+
+			// Reset form for next post.
+			if (preview_url) URL.revokeObjectURL(preview_url);
+			setFile(null);
+			setPreviewUrl(null);
+			setAlt('');
+			setContent('');
+		} catch (err) {
+			let message: string;
+			if (err instanceof PhotoError) {
+				message = err.code + ': ' + err.message;
+			} else if (err instanceof MicropubError) {
+				message = err.code + ': ' + err.message;
+			} else if (err instanceof Error) {
+				message = err.message;
+			} else {
+				message = 'Unknown error';
+			}
+			setStatus({ kind: 'error', message });
+		}
+	};
+
+	const submitting =
+		status.kind === 'processing-photo' ||
+		status.kind === 'discovering-endpoints' ||
+		status.kind === 'uploading-photo' ||
+		status.kind === 'posting';
+
+	const submit_label =
+		status.kind === 'processing-photo'
+			? 'Preparing photo…'
+			: status.kind === 'discovering-endpoints'
+				? 'Finding endpoints…'
+				: status.kind === 'uploading-photo'
+					? 'Uploading…'
+					: status.kind === 'posting'
+						? 'Posting…'
+						: 'Post photo';
+
+	const can_submit = !!file && !!alt.trim() && !submitting;
+
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-photo-mode-title">
 			<h2 id="outpost-photo-mode-title" class="outpost-card__title">
 				Photo
 			</h2>
 			<p class="outpost-card__lede">
-				Photo posting with EXIF stripping and required alt text lands in Phase C2. Uses the
-				Micropub media endpoint; MIME allowlist + 10 MB size cap.
+				Signed in as <code>{token.me || '—'}</code>
 			</p>
+
+			<form class="outpost-form-row" onSubmit={handle_submit}>
+				<label class="outpost-label" for="outpost-photo-file">
+					Photo
+				</label>
+				<input
+					id="outpost-photo-file"
+					class="outpost-input"
+					type="file"
+					accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+					onChange={handle_file_change}
+					disabled={submitting}
+				/>
+
+				{preview_url && (
+					<img
+						class="outpost-photo-preview"
+						src={preview_url}
+						alt={alt || 'Selected photo (alt text not yet entered)'}
+					/>
+				)}
+
+				<label class="outpost-label" for="outpost-photo-alt">
+					Alt text <span class="outpost-required">(required)</span>
+				</label>
+				<textarea
+					id="outpost-photo-alt"
+					class="outpost-textarea"
+					rows={3}
+					value={alt}
+					onInput={(event): void => setAlt((event.target as HTMLTextAreaElement).value)}
+					placeholder="Describe what's in the photo for screen readers"
+					disabled={submitting}
+					required
+				/>
+
+				<label class="outpost-label" for="outpost-photo-content">
+					Caption (optional)
+				</label>
+				<textarea
+					id="outpost-photo-content"
+					class="outpost-textarea"
+					rows={3}
+					value={content}
+					onInput={(event): void => setContent((event.target as HTMLTextAreaElement).value)}
+					disabled={submitting}
+				/>
+
+				{status.kind === 'error' && (
+					<div class="outpost-error" role="alert">
+						{status.message}
+					</div>
+				)}
+
+				{status.kind === 'posted' && (
+					<p class="outpost-status" aria-live="polite">
+						Posted to{' '}
+						<a href={status.location} target="_blank" rel="noopener noreferrer">
+							{status.location}
+						</a>
+					</p>
+				)}
+
+				<div class="outpost-form-actions">
+					<button class="outpost-button" type="submit" disabled={!can_submit}>
+						{submit_label}
+					</button>
+				</div>
+			</form>
 		</section>
 	);
 }

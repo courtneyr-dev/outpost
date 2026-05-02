@@ -68,6 +68,9 @@ export interface HEntryProperties {
 	'bookmark-of'?: string;
 	'follow-of'?: string;
 	rsvp?: 'yes' | 'no' | 'maybe' | 'interested';
+	photo?: string;
+	/** Per David Shanske's Micropub plugin convention for alt text on photos. */
+	'mp-photo-alt'?: string;
 	category?: string[];
 	'mp-syndicate-to'?: string[];
 }
@@ -238,4 +241,120 @@ async function safe_read_text(response: Response): Promise<string> {
 	} catch {
 		return '';
 	}
+}
+
+/**
+ * Discover the Micropub media endpoint via `?q=config`.
+ *
+ * Per the Micropub spec, querying the micropub endpoint with `?q=config`
+ * returns JSON that includes the media-endpoint URL. The bearer token is
+ * required (the response is per-user).
+ */
+export async function discover_media_endpoint(
+	micropub_endpoint: string,
+	access_token: string,
+	env: MicropubEnvironment = default_env,
+): Promise<string> {
+	const url = micropub_endpoint + (micropub_endpoint.includes('?') ? '&' : '?') + 'q=config';
+	let response: Response;
+	try {
+		response = await env.fetch(url, {
+			method: 'GET',
+			headers: {
+				Authorization: 'Bearer ' + access_token,
+				Accept: 'application/json',
+			},
+		});
+	} catch (err) {
+		throw new MicropubError(
+			'discover_media_endpoint: fetch threw — ' +
+				(err instanceof Error ? err.message : String(err)),
+			'discovery_failed',
+		);
+	}
+
+	if (!response.ok) {
+		throw new MicropubError(
+			'discover_media_endpoint: ' + String(response.status) + ' from config query',
+			'discovery_failed',
+		);
+	}
+
+	const json = (await response.json()) as { 'media-endpoint'?: string };
+	const media_endpoint = json['media-endpoint'];
+	if (!media_endpoint || typeof media_endpoint !== 'string') {
+		throw new MicropubError(
+			'discover_media_endpoint: config response did not include a media-endpoint.',
+			'no_endpoint',
+		);
+	}
+	return media_endpoint;
+}
+
+export interface UploadMediaParams {
+	blob: Blob;
+	filename: string;
+	accessToken: string;
+	mediaEndpoint: string;
+}
+
+export interface UploadMediaResult {
+	location: string;
+}
+
+/**
+ * Upload a media blob (photo) to the Micropub media endpoint.
+ *
+ * Multipart/form-data with `file` field. The endpoint responds with 201
+ * Created and a Location header pointing at the uploaded media URL.
+ */
+export async function upload_media(
+	params: UploadMediaParams,
+	env: MicropubEnvironment = default_env,
+): Promise<UploadMediaResult> {
+	const form = new FormData();
+	form.append('file', params.blob, params.filename);
+
+	let response: Response;
+	try {
+		response = await env.fetch(params.mediaEndpoint, {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer ' + params.accessToken,
+				Accept: 'application/json',
+			},
+			body: form,
+		});
+	} catch (err) {
+		throw new MicropubError(
+			'upload_media: fetch threw — ' + (err instanceof Error ? err.message : String(err)),
+			'post_failed',
+		);
+	}
+
+	if (response.status !== 201 && response.status !== 202) {
+		const error_text = await safe_read_text(response);
+		throw new MicropubError(
+			'upload_media: media endpoint returned ' +
+				String(response.status) +
+				(error_text ? ' — ' + error_text : ''),
+			'post_failed',
+		);
+	}
+
+	const location = response.headers.get('location') ?? response.headers.get('Location');
+	if (!location) {
+		throw new MicropubError(
+			'upload_media: media endpoint response is missing the Location header',
+			'no_location',
+		);
+	}
+	if (!is_safe_http_url(location)) {
+		throw new MicropubError(
+			'upload_media: media endpoint returned an unsafe Location URL: ' + location,
+			'invalid_location',
+		);
+	}
+
+	return { location };
 }

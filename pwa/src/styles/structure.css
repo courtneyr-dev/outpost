@@ -262,3 +262,24 @@
 	outline: 2px solid var(--outpost-focus, currentColor);
 	outline-offset: 2px;
 }
+
+/*
+ * Photo mode preview image. Constrains size so a 4096-px portrait doesn't
+ * blow out the card layout while still showing enough detail to verify
+ * the right photo was picked. Border + radius are structural; no paint.
+ */
+.outpost-photo-preview {
+	display: block;
+	max-width: 100%;
+	max-height: 24rem;
+	width: auto;
+	height: auto;
+	border-radius: var(--outpost-radius, 0.375rem);
+	border: 1px solid var(--outpost-border, currentColor);
+}
+
+.outpost-required {
+	font-weight: 400;
+	font-size: 0.85rem;
+	opacity: 0.75;
+}

@@ -7,6 +7,7 @@ import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { ArticleMode } from './modes/article-mode';
+// PhotoMode now takes props.
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -76,7 +77,11 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 				<ReplyMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />
 			),
 		},
-		{ id: 'photo', label: 'Photo', render: () => <PhotoMode /> },
+		{
+			id: 'photo',
+			label: 'Photo',
+			render: () => <PhotoMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
+		},
 		{ id: 'listen', label: 'Listen', render: () => <ListenMode /> },
 		{ id: 'article', label: 'Article', render: () => <ArticleMode /> },
 	];
