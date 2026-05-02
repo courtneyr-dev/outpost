@@ -209,13 +209,48 @@ final class Outpost_Composer_Config_Endpoint {
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
-		$allow = current_user_can( 'edit_posts' ) || is_user_logged_in();
+		$allow = current_user_can( 'edit_posts' )
+			|| is_user_logged_in()
+			|| self::has_bearer_header();
 		/**
 		 * Override the composer-config permission decision.
 		 *
 		 * @param bool $allow Whether the request is authorized.
 		 */
 		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
+	}
+
+	/**
+	 * True when the incoming request has an `Authorization: Bearer ...`
+	 * header. Used as a third permission path when the IndieAuth
+	 * plugin's `determine_current_user` filter doesn't cover our route
+	 * (the bearer reaches the endpoint but isn't translated to a WP
+	 * user, so `is_user_logged_in()` returns false).
+	 *
+	 * Security trade-off: we don't validate the bearer ourselves —
+	 * just accept its presence. The composer-config payload is
+	 * non-sensitive (companion plugin status, public taxonomy terms,
+	 * site settings). If the bearer is invalid the user can't post
+	 * via Micropub anyway, so reading the config gets them nothing
+	 * useful. Filter `outpost_composer_config_permission` for stricter
+	 * sites.
+	 */
+	private static function has_bearer_header(): bool {
+		// REST requests pass headers via $_SERVER['HTTP_AUTHORIZATION']
+		// or — on some FastCGI setups — REDIRECT_HTTP_AUTHORIZATION.
+		// Hit both keys.
+		$header = '';
+		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+		}
+		if ( '' === $header ) {
+			return false;
+		}
+		// Accept "Bearer <token>" — case-insensitive scheme, token
+		// non-empty.
+		return (bool) preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**

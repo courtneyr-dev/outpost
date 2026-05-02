@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Phase H hotfix 3 — accept bearer-header presence as a third auth path)
+- Even after relaxing the permission check to accept any logged-in user, the IndieAuth plugin's bearer translation isn't firing for Outpost-namespaced routes on Courtney's staging install AND the user has no wp-admin cookie session in iPhone Safari. Three auth paths now valid: `current_user_can('edit_posts')` (cookie or full bearer translation) OR `is_user_logged_in()` (some IndieAuth setups translate to user_id but don't pass cap through) OR **the request carries an `Authorization: Bearer <token>` header** (this branch unblocks the iPhone-bearer-only case).
+- Security trade-off: we don't validate the bearer ourselves. The composer-config payload is non-sensitive (companion plugin status, public taxonomy terms, site settings — same info wp-admin shows to any read-cap user). The preview endpoint already rate-limits (30 req/min) and applies SSRF defenses + Content-Type allowlist + script stripping on output, so unverified bearer access is bounded. If the bearer is genuinely invalid, the user can't post via Micropub anyway, so reading composer-config gets them nothing useful.
+- Filterable via `outpost_composer_config_permission` and `outpost_preview_permission` for sites that want to enforce stricter checks (e.g. always require `edit_posts`).
+- Reads from `$_SERVER['HTTP_AUTHORIZATION']` AND `REDIRECT_HTTP_AUTHORIZATION` (FastCGI configs strip the standard header on some hosts).
+
 ### Fixed (Phase H hotfix 2 — relaxed permission on Outpost REST endpoints)
 - **Permission check on `/wp-json/outpost/v1/composer-config` and `/wp-json/outpost/v1/preview` now accepts any logged-in user**, not just `edit_posts`. The composer-config payload is non-sensitive (companion plugin status, public taxonomy terms, the Bridgy host map, the XFN spec list, site-wide settings — same info `wp-admin/plugins.php` shows to anyone with `read` cap), and the preview endpoint already rate-limits + sanitizes output.
 - Two paths now pass: `current_user_can('edit_posts')` (cookie auth or full IndieAuth bearer translation) OR `is_user_logged_in()` (some IndieAuth plugin builds translate the bearer to user_id but don't pass through the `edit_posts` cap; this fallback catches them).
