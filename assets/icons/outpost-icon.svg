@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Outpost">
+  <title>Outpost</title>
+  <rect width="192" height="192" fill="#241c4a" rx="36" ry="36"/>
+  <circle cx="96" cy="96" r="48" fill="none" stroke="#fb8500" stroke-width="14"/>
+  <circle cx="96" cy="96" r="14" fill="#fb8500"/>
+</svg>

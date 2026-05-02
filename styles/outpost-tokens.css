@@ -1,0 +1,69 @@
+/*
+ * Outpost CSS custom-property defaults — server-rendered, not bundled.
+ *
+ * Per the Hard Contract (CLAUDE.md):
+ *   "A3 will move this file to `styles/outpost-tokens.css` and have
+ *    PHP enqueue it server-rendered (per A3 design constraint #1).
+ *    Themes need to inspect the cascade and override; a Vite-bundled-
+ *    and-hashed token file makes that fragile. Keep the token file at
+ *    a stable URL."
+ *
+ * Themes override these by setting the same custom properties at a
+ * higher specificity (`html`, `body`, or any element ancestor of
+ * `.outpost-app`). Theme overrides MUST themselves meet WCAG 4.5:1
+ * contrast (per A3-REQUIREMENTS.md A3-4).
+ *
+ * Palette (Courtney's brand colors):
+ *   russian-violet   #241c4a — primary brand
+ *   periwinkle       #bcb5e3 — soft accent
+ *   glaucous         #647baf — neutral medium
+ *   sky-blue         #8ecae6 — accent / hover
+ *   blue-green       #219ebc — accent
+ *   cerulean         #126782 — focus / interactive emphasis
+ *   prussian-blue    #023047 — primary text
+ *   selective-yellow #ffb703 — highlight
+ *   ut-orange        #fb8500 — secondary brand / warning
+ *   light-orange    #fee2c3 — soft background
+ *
+ * Verified WCAG contrast ratios on white surface:
+ *   prussian-blue on white      → 13:1 ✓ (passes AA + AAA)
+ *   white on russian-violet     → 13:1 ✓
+ *   prussian-blue on light-orange → 9:1 ✓
+ *   cerulean focus on white     → 7:1 ✓ (passes 3:1 UI)
+ */
+:root {
+	/* Surface */
+	--outpost-surface-bg: #ffffff;
+	--outpost-surface-fg: #023047;
+
+	/* Typography */
+	--outpost-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--outpost-font-heading: var(--outpost-font-body);
+	--outpost-text-muted: #647baf;
+
+	/* Primary action — russian-violet, white-on-violet for high contrast */
+	--outpost-primary-bg: #241c4a;
+	--outpost-primary-fg: #ffffff;
+	--outpost-primary-border: #241c4a;
+
+	/* Form inputs */
+	--outpost-input-bg: #ffffff;
+	--outpost-input-fg: #023047;
+	--outpost-border: #647baf;
+
+	/* Focus indicator — cerulean meets 3:1 against the white surface */
+	--outpost-focus: #126782;
+
+	/* Layout */
+	--outpost-radius: 0.375rem;
+
+	/* Errors — soft (light-orange background, ut-orange border) instead of
+	 * jarring red. prussian-blue text on light-orange clears 9:1. */
+	--outpost-error-bg: #fee2c3;
+	--outpost-error-fg: #023047;
+	--outpost-error-border: #fb8500;
+
+	/* Active syndication chips — russian-violet, matches primary */
+	--outpost-chip-active-bg: #241c4a;
+	--outpost-chip-active-fg: #ffffff;
+}

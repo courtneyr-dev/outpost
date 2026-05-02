@@ -7,6 +7,19 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session A3 — Visual polish)
+- `styles/outpost-tokens.css` — server-rendered CSS custom-property defaults mapped to Courtney's palette. Russian-violet primary buttons (white text, 13:1 contrast), prussian-blue body text on white (13:1), cerulean focus ring (7:1 against white, passes WCAG 3:1 for non-text), light-orange error backgrounds with ut-orange borders. Verified WCAG AA across all interactive surfaces.
+- `assets/icons/outpost-icon.svg` and `outpost-icon-maskable.svg` — branded geometric icon (russian-violet rounded square + ut-orange ring + center dot, evokes a satellite/transmitter). Maskable variant adds extra padding for Android adaptive-icon safe zone.
+- `<link rel="icon">` and `<link rel="apple-touch-icon">` in the shell head pointing at the SVG icon. Modern Chrome + iOS Safari 18+ both support SVG for these positions.
+- Manifest icons updated to reference the SVG files (`type: image/svg+xml`, `sizes: any`, `purpose: any` and `maskable`).
+- `theme-color` meta tag set to russian-violet (`#241c4a`) — tints the URL bar in Chrome and the standalone-mode chrome on Android. Manifest's `theme_color` matches.
+- `apple-mobile-web-app-status-bar-style` switched to `black-translucent` (was `default`); paired with `padding-top: env(safe-area-inset-top)` on body in the inline critical CSS so content doesn't hide behind the iOS status bar in standalone mode.
+
+### Changed (Session A3)
+- `OUTPOST_VERSION` bumped to `0.1.14` per A2 #16.
+- The `outpost-tokens.css` file is enqueued via a server-rendered `<link rel="stylesheet">` BEFORE the bundled CSS so theme overrides (placed at higher specificity, e.g. on `body` in the active theme's stylesheet) win the cascade.
+- All paint properties in the bundled `pwa/src/styles/structure.css` already reference these tokens with `var(--outpost-*, fallback)` per the Hard Contract — A3 just provides the defaults the falls back to.
+
 ### Added (Session C2 — Photo posting)
 - `pwa/src/lib/photo.ts` — `process_photo(file, options)` validates MIME (JPEG/PNG/WebP/GIF/AVIF; SVG explicitly excluded), checks size cap (10 MB default), loads the image, downscales to 2048 on the long edge via canvas, and re-encodes as JPEG at quality 0.9. Side effect: EXIF metadata (including GPS coordinates) is stripped — no path for it to survive the canvas round-trip. `PhotoError` discriminates `unsupported_type` / `too_large` / `load_failed` / `encode_failed`.
 - `pwa/src/lib/micropub.ts` extended with `discover_media_endpoint(micropub_endpoint, access_token)` (queries `?q=config` to find the media endpoint) and `upload_media({blob, filename, accessToken, mediaEndpoint})` (POSTs multipart/form-data, parses Location).

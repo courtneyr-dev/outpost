@@ -68,20 +68,26 @@ final class Outpost_PWA_Shell {
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<title>Outpost</title>
 	<link rel="manifest" href="/post/manifest.json">
+	<link rel="icon" type="image/svg+xml" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
+	<link rel="apple-touch-icon" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
 		<?php if ( null !== $entry_url ) : ?>
 	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
 		<?php endif; ?>
-	<meta name="theme-color" content="">
+	<meta name="theme-color" content="#241c4a">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
-	<meta name="apple-mobile-web-app-status-bar-style" content="default">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<style>
 		/* Critical layout — reserves space before the bundled CSS loads,
 			prevents CLS when JS mounts the .outpost-app class onto #outpost-root.
-			Layout primitives only (no paint) per the Hard Contract. */
-		body { margin: 0; min-height: 100dvh; min-height: 100vh; }
+			Layout primitives only (no paint) per the Hard Contract.
+			padding-top reserves room for the iOS status bar in standalone
+			mode (apple-mobile-web-app-status-bar-style: black-translucent
+			puts content under the bar). */
+		body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }
 		#outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }
 	</style>
+	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css' ); ?>">
 		<?php foreach ( $css_urls as $css_url ) : ?>
 	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 		<?php endforeach; ?>
@@ -236,17 +242,19 @@ final class Outpost_PWA_Shell {
 			'display'          => 'standalone',
 			'orientation'      => 'portrait',
 			'background_color' => '#ffffff',
-			'theme_color'      => '#ffffff',
+			'theme_color'      => '#241c4a',
 			'icons'            => array(
 				array(
-					'src'   => '/wp-content/plugins/outpost/assets/icons/icon-192.png',
-					'sizes' => '192x192',
-					'type'  => 'image/png',
+					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon.svg',
+					'sizes'   => 'any',
+					'type'    => 'image/svg+xml',
+					'purpose' => 'any',
 				),
 				array(
-					'src'   => '/wp-content/plugins/outpost/assets/icons/icon-512.png',
-					'sizes' => '512x512',
-					'type'  => 'image/png',
+					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-maskable.svg',
+					'sizes'   => 'any',
+					'type'    => 'image/svg+xml',
+					'purpose' => 'maskable',
 				),
 			),
 		);
