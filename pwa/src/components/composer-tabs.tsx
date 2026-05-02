@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
-import type { StoredToken, TokenStoreEnvironment } from '../lib/token-store';
+import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../lib/token-store';
 import type { MicropubEnvironment } from '../lib/micropub';
 import {
 	fetch_composer_config,
@@ -12,7 +12,7 @@ import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { AboutTab } from './modes/about-tab';
-import { QueueBanner } from './queue-banner';
+import { QueueBadge } from './queue-badge';
 import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
 import { peek_share_target } from '../lib/share-target';
@@ -75,21 +75,31 @@ export function ComposerTabs({
 	const initial_share = peek_share_target();
 	const [active, setActive] = useState<ModeId>(initial_share?.tab ?? 'note');
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
+	const [config_error, setConfigError] = useState<'unauthorized' | 'fetch_failed' | null>(null);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
 
-	// Fetch the composer config once on mount. Failure is non-fatal —
-	// modes still render their main forms; only the More pull-out is
-	// gated on this. Modes receive null until the fetch resolves.
+	// Fetch the composer config once on mount. On failure we surface a
+	// banner above the tab strip so the user can see WHY their More
+	// options + companion-gated fields aren't loading. The most common
+	// cause is an expired bearer token — the banner offers re-auth.
 	useEffect(() => {
 		let cancelled = false;
 		fetch_composer_config(token.accessToken, composerConfigEnv)
 			.then((cfg) => {
-				if (!cancelled) setComposerConfig(cfg);
+				if (!cancelled) {
+					setComposerConfig(cfg);
+					setConfigError(null);
+				}
 			})
-			.catch(() => {
-				// Silent failure — log to console for triage but don't surface.
-				if (!cancelled && typeof console !== 'undefined') {
-					console.warn('Outpost: composer-config fetch failed; More pull-out hidden');
+			.catch((err: { code?: string }) => {
+				if (cancelled) return;
+				if (err && err.code === 'unauthorized') {
+					setConfigError('unauthorized');
+				} else {
+					setConfigError('fetch_failed');
+				}
+				if (typeof console !== 'undefined') {
+					console.warn('Outpost: composer-config fetch failed', err);
 				}
 			});
 		return (): void => {
@@ -182,10 +192,38 @@ export function ComposerTabs({
 	return (
 		<div class="outpost-composer">
 			<InstallPrompt />
-			<QueueBanner
-				{...(micropubEnv ? { micropubEnv } : {})}
-				{...(queueEnv ? { queueEnv } : {})}
-			/>
+			{config_error && (
+				<aside class="outpost-config-error" role="alert">
+					<div class="outpost-config-error__body">
+						<strong>
+							{config_error === 'unauthorized'
+								? "Couldn't load companion options."
+								: "Couldn't reach your site."}
+						</strong>
+						<p>
+							{config_error === 'unauthorized'
+								? 'Your sign-in may have expired. Sign out and back in to refresh — your Yoast keyphrase, categories, tags, and XFN options will appear once your token is renewed.'
+								: 'The composer-config endpoint is unreachable. Check your connection and reload. The composer still works for posting; only the More options surface needs the config.'}
+						</p>
+					</div>
+					<button
+						class="outpost-button outpost-button--secondary"
+						type="button"
+						onClick={async (): Promise<void> => {
+							await clear_token(tokenStore);
+							window.location.reload();
+						}}
+					>
+						Sign out + back in
+					</button>
+				</aside>
+			)}
+			<div class="outpost-composer__header">
+				<QueueBadge
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(queueEnv ? { queueEnv } : {})}
+				/>
+			</div>
 			<div role="tablist" aria-label="Composer modes" class="outpost-tablist">
 				{modes.map((mode, index) => (
 					<button

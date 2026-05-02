@@ -7,6 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session DS-3b — queue badge + visible config-error banner)
+
+- **Queue banner replaced with `QueueBadge`** in the composer header. Compact button showing count of queued offline posts; tap to open a Drawer with per-entry retry/dismiss controls. Per Design System Section 5.26. Auto-flush triggers (browser `online` event + first mount) preserved from the prior banner. The full-width banner above the tab strip is gone.
+- **`pwa/src/components/queue-banner.tsx` deleted** — replaced by `queue-badge.tsx`.
+- **New `outpost-composer__header` row** above the tab strip — right-aligned, hosts the queue badge + future global affordances (settings, account info).
+- **Visible config-error banner** when `fetch_composer_config` fails. Distinguishes `unauthorized` (token expired — most common cause of "I can't see Yoast / categories / tags / XFN options") from `fetch_failed` (network unreachable). Includes a "Sign out + back in" button that calls `clear_token()` + reloads. Replaces the previous silent `console.warn` so users have a clear path to recovery instead of wondering why companion-gated fields disappeared.
+
 ### Changed (Session DS-3a — drawer pattern for More options)
 
 - **`pwa/src/components/drawer.tsx`** — Drawer primitive per Design System 4.9 + 5.25. Slides up from the bottom of the viewport. Used by every composing mode for the More options pull-out (was a `<details>` panel inline).

@@ -553,6 +553,153 @@
 }
 
 /*
+ * Composer-level config error banner. Shown when fetch_composer_config
+ * fails — most often because the user's bearer token expired. Surfaces
+ * the failure visibly so the user understands why More options +
+ * companion-gated fields are missing, and offers a one-tap re-auth.
+ */
+.outpost-config-error {
+	display: flex;
+	flex-direction: column;
+	gap: var(--outpost-space-sm, 0.75rem);
+	padding: var(--outpost-space-md, 1rem);
+	margin-block-end: var(--outpost-space-md, 1rem);
+	border: 1px solid var(--outpost-error-border, currentColor);
+	border-radius: var(--outpost-radius-md, 0.5rem);
+	background: var(--outpost-error-bg, transparent);
+	color: var(--outpost-error-fg, inherit);
+}
+
+.outpost-config-error__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--outpost-space-2xs, 0.25rem);
+}
+
+.outpost-config-error p {
+	margin: 0;
+}
+
+@media (min-width: 40rem) {
+	.outpost-config-error {
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: space-between;
+	}
+	.outpost-config-error__body {
+		flex: 1;
+	}
+}
+
+/*
+ * Composer header — a row above the tab strip for global affordances
+ * (queue badge, future settings entry point). Right-aligned so the
+ * tab strip takes the most-tappable left/center.
+ */
+.outpost-composer__header {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: var(--outpost-space-xs, 0.5rem);
+	padding-inline: var(--outpost-space-md, 1rem);
+	min-block-size: 1.5rem;
+}
+
+/*
+ * Queue badge (Design System 5.26). Compact button showing count of
+ * queued offline posts. Visible only when count > 0 (the component
+ * returns null otherwise, so this style only applies when present).
+ */
+.outpost-queue-badge {
+	font: inherit;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--outpost-space-2xs, 0.25rem);
+	padding: 0.25rem 0.625rem;
+	border: 1px solid var(--outpost-warning-border, currentColor);
+	border-radius: var(--outpost-radius-pill, 999px);
+	background: var(--outpost-warning-bg, transparent);
+	color: var(--outpost-warning-fg, inherit);
+	cursor: pointer;
+	font-size: 0.85rem;
+	font-weight: 600;
+	min-block-size: 2rem;
+}
+
+.outpost-queue-badge:focus-visible {
+	outline: var(--outpost-focus-ring-width, 2px) var(--outpost-focus-ring-style, solid)
+		var(--outpost-focus-ring-color, currentColor);
+	outline-offset: var(--outpost-focus-ring-offset, 2px);
+}
+
+.outpost-queue-badge__icon {
+	font-size: 1rem;
+}
+
+.outpost-queue-badge__count {
+	font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Queue inspector — drawer body that lists each queued entry with
+ * retry/dismiss actions. Sibling of the More options drawer; same
+ * Drawer primitive.
+ */
+.outpost-queue-inspector {
+	display: flex;
+	flex-direction: column;
+	gap: var(--outpost-space-md, 1rem);
+}
+
+.outpost-queue-inspector__actions {
+	display: flex;
+	gap: var(--outpost-space-sm, 0.75rem);
+}
+
+.outpost-queue-inspector__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--outpost-space-sm, 0.75rem);
+}
+
+.outpost-queue-inspector__item {
+	border: 1px solid var(--outpost-card-border, currentColor);
+	border-radius: var(--outpost-radius-md, 0.5rem);
+	padding: var(--outpost-space-sm, 0.75rem);
+	display: flex;
+	flex-direction: column;
+	gap: var(--outpost-space-2xs, 0.25rem);
+}
+
+.outpost-queue-inspector__head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--outpost-space-sm, 0.75rem);
+}
+
+.outpost-queue-inspector__source {
+	font-weight: 600;
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	opacity: 0.75;
+}
+
+.outpost-queue-inspector__excerpt {
+	margin: 0;
+}
+
+.outpost-queue-inspector__error {
+	margin: 0;
+	font-size: 0.85rem;
+	opacity: 0.75;
+	color: var(--outpost-error-fg, inherit);
+}
+
+/*
  * Drawer primitive (Design System 4.9 + 5.25). Slides up from the
  * bottom of the viewport. Scrim + drawer always in the DOM; the
  * `data-open` attribute drives the slide animation. body scroll locks
