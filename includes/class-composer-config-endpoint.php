@@ -149,7 +149,7 @@ final class Outpost_Composer_Config_Endpoint {
 
 		$post_formats = self::resolve_post_formats( $companions['post-formats'] );
 
-		return new WP_REST_Response(
+		$response = new WP_REST_Response(
 			array(
 				'companions'         => $companions,
 				'postFormats'        => $post_formats,
@@ -159,15 +159,21 @@ final class Outpost_Composer_Config_Endpoint {
 			),
 			200
 		);
+		// Composer-config is per-user (term lists, companion status). Forbid
+		// edge caches (GoDaddy / Varnish / nginx FastCGI) from serving one
+		// user's response to another. Bearer auth already makes the response
+		// per-request, but explicit headers cost nothing.
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		return $response;
 	}
 
 	/**
 	 * Read existing terms for a taxonomy as a flat list of {slug, name}.
 	 *
-	 * Capped at 200 entries. Excludes empty terms (count = 0) — for the
-	 * autocomplete UI on mobile, only suggesting terms the user has
-	 * actually used keeps the dropdown short. Users can still type new
-	 * values; the list is suggestions, not a constraint.
+	 * Capped at 200 entries. `hide_empty => false` so terms that exist
+	 * but haven't been used yet still surface as suggestions — on a
+	 * fresh site or one with reorganized content, the user shouldn't
+	 * have to retype categories/tags that already exist.
 	 *
 	 * Returns the empty array when the taxonomy isn't registered or the
 	 * lookup errors — callers treat that as "no suggestions" rather than
@@ -183,7 +189,7 @@ final class Outpost_Composer_Config_Endpoint {
 		$terms = get_terms(
 			array(
 				'taxonomy'   => $taxonomy,
-				'hide_empty' => true,
+				'hide_empty' => false,
 				'number'     => 200,
 				'orderby'    => 'count',
 				'order'      => 'DESC',

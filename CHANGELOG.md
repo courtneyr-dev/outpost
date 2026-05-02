@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Session C5c hotfix — categories/tags suggestions surfacing)
+- `get_terms()` in the composer-config endpoint now uses `hide_empty => false`. Was `true`, which excluded categories/tags that exist but haven't been applied to a post yet — on a fresh site or one with reorganized content, the user wouldn't see existing terms as suggestions and would be retyping them by hand.
+- Composer-config response gains explicit `Cache-Control: private, no-store, max-age=0` header. Defense in depth against managed-WP edge caches (GoDaddy gateway, Varnish, nginx FastCGI) serving one user's response to another. Bearer auth already makes the response per-request, but the header is free.
+
 ### Added (Session C5c — Note + Article merge with Quote variant + categories/tags autocomplete)
 
 #### Tab merge
