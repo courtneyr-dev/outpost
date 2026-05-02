@@ -7,6 +7,9 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (C5d hotfix — disclosure triangle missing on Categories/Tags)
+- The native `<details>` triangle (▶ closed / ▼ open) was hidden because `display: flex` on the `<summary>` element drops the `::marker` pseudo-element in WebKit and Chromium. Now uses a plain block summary with the count rendered as an inline span. Triangles match the More options panel.
+
 ### Changed (Session C5d follow-up — collapsible chip pickers)
 - **Categories and Tags pickers are now collapsible.** Each one is a native `<details>`/`<summary>` (zero-JS, full keyboard support, screen-reader friendly). Closed by default so the More options panel stays compact. The summary line shows " — N selected" when any are picked, so you can see state without expanding.
 - New CSS: `.outpost-term-picker__summary`, `.outpost-term-picker__count`, `.outpost-term-picker__body`. The picker wrapper drops its old `<fieldset>`/`<legend>` for `<details>`/`<summary>` since the disclosure widget covers the grouping semantics.

@@ -405,7 +405,7 @@ function TermPicker(props: TermPickerProps) {
 	return (
 		<details class="outpost-term-picker">
 			<summary class="outpost-term-picker__summary">
-				<span class="outpost-label">{legend}</span>
+				{legend}
 				{summary_count && <span class="outpost-term-picker__count">{summary_count}</span>}
 			</summary>
 			<div class="outpost-term-picker__body">

@@ -351,9 +351,7 @@
 	cursor: pointer;
 	user-select: none;
 	padding: 0.25rem 0;
-	display: flex;
-	align-items: baseline;
-	gap: 0.25rem;
+	font-weight: 600;
 }
 
 .outpost-term-picker__summary:focus-visible {
@@ -362,8 +360,10 @@
 }
 
 .outpost-term-picker__count {
+	font-weight: 400;
 	font-size: 0.85rem;
 	opacity: 0.75;
+	margin-left: 0.25rem;
 }
 
 .outpost-term-picker__body {
