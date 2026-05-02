@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C5e — About tab + Post tab rename + Article default variant)
+- **New About tab** at the right end of the tab strip — informational content for users who land on the composer not knowing what POSSE is or which IndieWeb specs Outpost speaks. Sections: what Outpost posts (only the standard `post` post type, not Pages or CPTs without server-side filter routing), POSSE explanation with the four-bullet "why it matters" set, IndieWeb specs Outpost speaks (Micropub, IndieAuth, h-entry, h-card, h-cite, microformats2, Webmention) with links to each, XFN with links to gmpg.org/xfn and the 1.1 spec, Post Formats with the auto-inference mapping table + WordPress documentation links, companion-plugin descriptions, and a link to the Outpost source on GitHub. All external links open in new tabs with `rel="noopener noreferrer"`.
+- **Tab rename: "Note" → "Post".** The combined writing tab now reads "Post" since it covers all post-style writing (Note / Status / Aside / Article / Quote variants). Tab id stays `note` so existing analytics, tests, and any future deep-links don't move. The five-mode tab strip is now: Post · Reply · Photo · Doing · About.
+- **Article is now the default variant** in the Post tab and moved to first in the variant order. The user explicitly requested deliberate writing as the default surface — the Article variant shows the Title + tall body composer when the tab opens. Note / Status / Aside / Quote still available as one-tap radios. (Earlier user-stated preference for short-form remains served — those variants are still adjacent to the default.)
+- New CSS surfaces: `.outpost-about` (heading rhythm), `.outpost-spec-list` (responsive dl/dt/dd grid that becomes two-column at ≥ 40 rem viewport).
+
 ### Added (Session D0 — real service worker with offline caching)
 - The service worker is no longer a no-op stub. `Outpost_PWA_Shell::render_service_worker()` now emits a real worker that caches the PWA shell + bundled assets so the composer loads on a cold device with no connection.
 - **Cache name includes `OUTPOST_VERSION`** (e.g. `outpost-0.1.24`). The activate handler deletes any cache that doesn't match the current version, so plugin updates land cleanly without users having to clear their browser data.

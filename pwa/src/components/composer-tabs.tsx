@@ -11,6 +11,7 @@ import { NoteMode } from './modes/note-mode';
 import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
+import { AboutTab } from './modes/about-tab';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -41,7 +42,7 @@ import { ListenMode } from './modes/listen-mode';
  * ModeId union and the modes array would extend then.
  */
 
-type ModeId = 'note' | 'reply' | 'photo' | 'listen';
+type ModeId = 'note' | 'reply' | 'photo' | 'listen' | 'about';
 
 interface ModeDefinition {
 	id: ModeId;
@@ -89,7 +90,7 @@ export function ComposerTabs({
 	const modes: ModeDefinition[] = [
 		{
 			id: 'note',
-			label: 'Note',
+			label: 'Post',
 			// Spread micropubEnv conditionally — exactOptionalPropertyTypes
 			// rejects passing `undefined` to an optional prop.
 			render: () => (
@@ -133,6 +134,11 @@ export function ComposerTabs({
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
 			),
+		},
+		{
+			id: 'about',
+			label: 'About',
+			render: () => <AboutTab />,
 		},
 	];
 

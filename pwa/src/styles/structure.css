@@ -437,6 +437,60 @@
 	padding: 0 0.25rem;
 }
 
+/*
+ * About tab — informational content. Heading hierarchy matches the rest
+ * of the composer (h2 = card title, h3 = section). Spec lists use a
+ * dl/dt/dd shape so spec name and description are paired semantically;
+ * the dt is bold and the dd is indented.
+ */
+.outpost-about h3 {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-size: 1.05rem;
+}
+
+.outpost-about p,
+.outpost-about ul,
+.outpost-about dl {
+	margin-top: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.outpost-about ul {
+	padding-left: 1.25rem;
+}
+
+.outpost-about li + li {
+	margin-top: 0.25rem;
+}
+
+.outpost-spec-list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.5rem 1rem;
+}
+
+@media (min-width: 40rem) {
+	.outpost-spec-list {
+		grid-template-columns: max-content 1fr;
+	}
+}
+
+.outpost-spec-list dt {
+	font-weight: 600;
+}
+
+.outpost-spec-list dd {
+	margin: 0;
+	padding-left: 1rem;
+}
+
+@media (min-width: 40rem) {
+	.outpost-spec-list dd {
+		padding-left: 0;
+	}
+}
+
 .outpost-required {
 	font-weight: 400;
 	font-size: 0.85rem;

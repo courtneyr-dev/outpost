@@ -124,10 +124,10 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	},
 };
 
-const VARIANT_ORDER: Variant[] = ['note', 'status', 'aside', 'article', 'quote'];
+const VARIANT_ORDER: Variant[] = ['article', 'note', 'status', 'aside', 'quote'];
 
 export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: NoteModeProps) {
-	const [variant, setVariant] = useState<Variant>('note');
+	const [variant, setVariant] = useState<Variant>('article');
 	const [title, setTitle] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
