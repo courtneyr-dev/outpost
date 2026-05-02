@@ -77,11 +77,20 @@ export async function fetch_composer_config(
 	access_token: string,
 	env: ComposerConfigEnvironment = default_env,
 ): Promise<ComposerConfig> {
-	// Belt-and-suspenders bearer: managed-WP hosts (GoDaddy, certain
-	// WP Engine configs) strip the Authorization header before it
-	// reaches PHP. We send the token via header AND via `_o_token` query
-	// string so the endpoint authenticates regardless of host config.
-	const url = ENDPOINT_PATH + '?_o_token=' + encodeURIComponent(access_token);
+	// Belt-and-suspenders bearer + cache-bust:
+	//   - `_o_token` carries the bearer when managed-WP hosts (GoDaddy,
+	//     certain WP Engine configs) strip the Authorization header.
+	//   - `_t=<timestamp>` makes every request URL unique so Cloudflare
+	//     edge caches can't serve a previously cached response (e.g. a
+	//     stale 429 from a prior rate-limit window). Critical for
+	//     environments where edge cache can't be flushed independently
+	//     of production (GoDaddy's staging mirror is one such case).
+	const url =
+		ENDPOINT_PATH +
+		'?_o_token=' +
+		encodeURIComponent(access_token) +
+		'&_t=' +
+		String(Date.now());
 	let response: Response;
 	try {
 		response = await env.fetch(url, {

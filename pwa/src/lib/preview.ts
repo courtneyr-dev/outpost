@@ -77,11 +77,19 @@ export async function fetch_preview(
 
 	let response: Response;
 	try {
-		// Belt-and-suspenders bearer: send via Authorization header AND
-		// `_o_token` query string. Managed-WP hosts strip the standard
-		// header on some configs.
+		// Belt-and-suspenders bearer + cache-bust:
+		//   - `_o_token` carries the bearer when managed-WP hosts strip
+		//     the Authorization header.
+		//   - `_t=<timestamp>` defeats Cloudflare's URL-keyed cache.
+		//     Critical for staging mirrors that share Cloudflare with
+		//     production (GoDaddy's setup) where the staging edge cache
+		//     can't be purged independently.
 		const url_with_token =
-			PREVIEW_ENDPOINT + '?_o_token=' + encodeURIComponent(params.accessToken);
+			PREVIEW_ENDPOINT +
+			'?_o_token=' +
+			encodeURIComponent(params.accessToken) +
+			'&_t=' +
+			String(Date.now());
 		response = await env.fetch(url_with_token, {
 			method: 'POST',
 			credentials: 'include',

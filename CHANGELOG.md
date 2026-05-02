@@ -7,6 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Per-request timestamp cache-bust + rate limit bump)
+
+The staging environment has a known limitation — the GoDaddy/Cloudflare partnership only exposes a "Purge Everything" button for the production cache, not for the staging mirror. So when staging Cloudflare caches an error response (e.g. a stale 429), it stays cached until natural TTL expires. The fix has to come from the client side.
+
+- **Every composer-config and preview request now appends `_t=<Date.now()>` to the URL**, alongside the `_o_token` query param. Each request gets a unique URL → Cloudflare cache miss every time → request always reaches origin. Critical for environments where the edge cache can't be purged independently of production.
+- **Rate limit raised from 300/min to 600/min** (10/sec sustained). The earlier limits were too tight for active debugging cycles. 600/min still blocks pathological abuse — that's a sustained 10 req/sec, no real user produces that pattern.
+
 ### Added (Cache-layer documentation + wp-cli flush script)
 
 - **`docs/CACHE-LAYERS.md`** — comprehensive doc covering the four-layer cache stack on managed-WP hosts (object cache → CSS/JS minifier → page cache → CDN edge). Symptom-to-layer table. Order to flush in (innermost outward — outer repopulates from inner; wrong order means flushed inner gets re-staled). Defensive patterns Outpost uses (per-user `Cache-Control: no-store`, asset versioning via `?ver=`, SW cache-name versioning, no inline-script nonces).
