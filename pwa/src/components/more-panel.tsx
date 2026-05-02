@@ -396,65 +396,76 @@ function TermPicker(props: TermPickerProps) {
 		}
 	};
 
+	const singular = legend.toLowerCase().endsWith('s')
+		? legend.toLowerCase().slice(0, -1)
+		: legend.toLowerCase();
+	const summary_count =
+		selected.length > 0 ? ` — ${String(selected.length)} selected` : '';
+
 	return (
-		<fieldset class="outpost-term-picker">
-			<legend class="outpost-label">{legend}</legend>
-			{existing.length === 0 ? (
-				<p class="outpost-help">None on this site yet — add a new one below.</p>
-			) : (
-				<div class="outpost-chip-list">
-					{existing.map((term) => (
-						<label key={term.slug} class="outpost-checkbox">
-							<input
-								type="checkbox"
-								checked={selected.includes(term.name)}
-								onChange={(): void => onToggle(term.name)}
+		<details class="outpost-term-picker">
+			<summary class="outpost-term-picker__summary">
+				<span class="outpost-label">{legend}</span>
+				{summary_count && <span class="outpost-term-picker__count">{summary_count}</span>}
+			</summary>
+			<div class="outpost-term-picker__body">
+				{existing.length === 0 ? (
+					<p class="outpost-help">None on this site yet — add a new one below.</p>
+				) : (
+					<div class="outpost-chip-list">
+						{existing.map((term) => (
+							<label key={term.slug} class="outpost-checkbox">
+								<input
+									type="checkbox"
+									checked={selected.includes(term.name)}
+									onChange={(): void => onToggle(term.name)}
+									disabled={disabled}
+								/>
+								<span>{term.name}</span>
+							</label>
+						))}
+					</div>
+				)}
+
+				{new_chips.length > 0 && (
+					<div class="outpost-chip-list outpost-chip-list--new">
+						{new_chips.map((name) => (
+							<button
+								key={name}
+								type="button"
+								class="outpost-new-chip"
+								onClick={(): void => onRemove(name)}
 								disabled={disabled}
-							/>
-							<span>{term.name}</span>
-						</label>
-					))}
-				</div>
-			)}
+								aria-label={`Remove new ${singular} ${name}`}
+							>
+								{name} <span aria-hidden="true">(new) ✕</span>
+							</button>
+						))}
+					</div>
+				)}
 
-			{new_chips.length > 0 && (
-				<div class="outpost-chip-list outpost-chip-list--new">
-					{new_chips.map((name) => (
-						<button
-							key={name}
-							type="button"
-							class="outpost-new-chip"
-							onClick={(): void => onRemove(name)}
-							disabled={disabled}
-							aria-label={`Remove new ${legend.toLowerCase().slice(0, -1)} ${name}`}
-						>
-							{name} <span aria-hidden="true">(new) ✕</span>
-						</button>
-					))}
+				<div class="outpost-term-picker__add">
+					<input
+						id={`${idPrefix}-new`}
+						class="outpost-input"
+						type="text"
+						value={newValue}
+						onInput={(e): void => onNewChange((e.target as HTMLInputElement).value)}
+						onKeyDown={handle_new_keydown}
+						placeholder={`Add a new ${singular}…`}
+						disabled={disabled}
+					/>
+					<button
+						type="button"
+						class="outpost-button outpost-button--secondary"
+						onClick={onNewAdd}
+						disabled={disabled || !newValue.trim()}
+					>
+						Add
+					</button>
 				</div>
-			)}
-
-			<div class="outpost-term-picker__add">
-				<input
-					id={`${idPrefix}-new`}
-					class="outpost-input"
-					type="text"
-					value={newValue}
-					onInput={(e): void => onNewChange((e.target as HTMLInputElement).value)}
-					onKeyDown={handle_new_keydown}
-					placeholder={`Add a new ${legend.toLowerCase().slice(0, -1)}…`}
-					disabled={disabled}
-				/>
-				<button
-					type="button"
-					class="outpost-button outpost-button--secondary"
-					onClick={onNewAdd}
-					disabled={disabled || !newValue.trim()}
-				>
-					Add
-				</button>
 			</div>
-		</fieldset>
+		</details>
 	);
 }
 

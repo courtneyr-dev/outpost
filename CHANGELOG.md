@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session C5d follow-up — collapsible chip pickers)
+- **Categories and Tags pickers are now collapsible.** Each one is a native `<details>`/`<summary>` (zero-JS, full keyboard support, screen-reader friendly). Closed by default so the More options panel stays compact. The summary line shows " — N selected" when any are picked, so you can see state without expanding.
+- New CSS: `.outpost-term-picker__summary`, `.outpost-term-picker__count`, `.outpost-term-picker__body`. The picker wrapper drops its old `<fieldset>`/`<legend>` for `<details>`/`<summary>` since the disclosure widget covers the grouping semantics.
+
 ### Changed (Session C5d — visible chip picker for categories/tags)
 - **Categories and Tags now use a chip picker** instead of an autocomplete textbox. Existing terms render as toggleable checkbox chips so the user sees every option at a glance — no need to start typing before suggestions appear (which is how HTML5 `<datalist>` works on every browser, and was the source of "I don't see existing categories"). Tap to include/exclude.
 - **New-term creation is now a deliberate action.** A separate input + "Add" button below the chip list. Typing alone doesn't create a new term; you have to tap Add (or press Enter inside the field). Newly-added names appear as removable "(new)" pills with a different visual treatment so the user sees they're creating something — discourages accidental tag/category sprawl.
