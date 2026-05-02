@@ -257,6 +257,21 @@ final class Outpost_PWA_Shell {
 					'purpose' => 'maskable',
 				),
 			),
+			// Web Share Target API (Phase E0). When the user shares text + URL
+			// from another app, the browser navigates to action with params
+			// merged into the query string. Our /post/share-target route
+			// stashes the data and forwards to the composer with the right
+			// mode pre-filled.
+			'share_target'     => array(
+				'action'  => '/post/share-target',
+				'method'  => 'GET',
+				'enctype' => 'application/x-www-form-urlencoded',
+				'params'  => array(
+					'title' => 'title',
+					'text'  => 'text',
+					'url'   => 'url',
+				),
+			),
 		);
 
 		self::send_json_header();

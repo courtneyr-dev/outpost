@@ -7,6 +7,20 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session E0 — Web Share Target)
+- **Outpost is now a Web Share Target.** When the user shares text + URL from another app (iOS Share sheet, Android Sharesheet), the OS surfaces Outpost as a destination. Tapping Outpost lands the shared content in the right composer mode pre-filled.
+- **Manifest `share_target` action** at `/post/share-target` (GET, application/x-www-form-urlencoded). Accepts `title`, `text`, and `url` params per the Web Share Target spec.
+- **Routing rule** for shared content (per the C5e design defaults):
+  - `text + url` → Reply tab (target = url, content = text). The classic "share an article with my comment" flow.
+  - `url only` → Reply tab (target = url). Bookmark/Like/Repost prep.
+  - `text only` → Post tab, Note variant (content = text).
+  - `title + text` → Post tab, Article variant (name = title, content = text).
+  - empty params → composer opens normally.
+- **`pwa/src/lib/share-target.ts`** — small intake module. `parse_share_target(search)` extracts and tags the data; `stash_share_target(data)` persists to sessionStorage; `peek_share_target()` reads without clearing; `consume_share_target()` reads and clears.
+- **One-shot semantics**: `peek` then `consume` so multiple modes can race-mount in parallel without one draining the other's data. Only the tagged-target mode actually clears.
+- **`/post/share-target` route handler** in `index.tsx`: parse params, stash, then `location.replace('/post/')` so the URL bar reads cleanly and a refresh doesn't re-trigger the intake.
+- ComposerTabs reads `peek_share_target()` on mount to set the initial active tab to the share target's destination (Post or Reply), so the user lands on the right tab without a manual switch.
+
 ### Added (Session D4 — voice input on every textarea)
 - **`pwa/src/components/voice-button.tsx`** — round mic button that drops next to every content textarea (Post body, Reply content, Doing content, Photo caption). Tap to start dictation, tap again to stop. While recording, the button switches to a stop icon and pulses (respects `prefers-reduced-motion`) so the user has visible feedback that audio is being captured. Uses the standard Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`).
 - **Per-textarea integration**: each mode's content textarea sits below a `.outpost-textarea-row` flex container that pairs the label with the mic button. Transcripts append to existing content with a leading space when the existing content doesn't already end in whitespace, so successive dictations don't run together.

@@ -10,6 +10,7 @@ import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../..
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import {
 	MorePanel,
@@ -130,10 +131,37 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 
 const VARIANT_ORDER: Variant[] = ['article', 'note', 'status', 'aside', 'quote'];
 
+/**
+ * Read share-target intake if it's tagged for the Post tab. Drains
+ * the stash only on tab match — peek-then-consume so the parallel
+ * ReplyMode mount can still see its own data.
+ */
+function consume_share_target_for_note(): {
+	variant?: Variant;
+	title?: string;
+	content?: string;
+} | null {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'note') return null;
+	consume_share_target(); // clear the stash now that we're claiming it
+	const out: { variant?: Variant; title?: string; content?: string } = {};
+	if (data.variant && (['note', 'article', 'status', 'aside', 'quote'] as Variant[]).includes(data.variant)) {
+		out.variant = data.variant;
+	}
+	if (data.title) out.title = data.title;
+	if (data.content) out.content = data.content;
+	return out;
+}
+
 export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: NoteModeProps) {
-	const [variant, setVariant] = useState<Variant>('article');
-	const [title, setTitle] = useState('');
-	const [content, setContent] = useState('');
+	// Web Share Target intake (Phase E0): when this tab is the share
+	// destination, consume the stashed payload as the initial state.
+	// One-shot — sessionStorage clears on read.
+	const initial_share = consume_share_target_for_note();
+
+	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'article');
+	const [title, setTitle] = useState(initial_share?.title ?? '');
+	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());

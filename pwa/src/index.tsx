@@ -21,6 +21,7 @@ import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
 import { ComposerTabs } from './components/composer-tabs';
 import { read_token, type StoredToken, type TokenStoreEnvironment } from './lib/token-store';
+import { parse_share_target, stash_share_target } from './lib/share-target';
 
 type OutpostRoute = 'composer' | 'share-target' | 'auth-callback' | 'unknown';
 
@@ -79,16 +80,19 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	}
 
 	if (route === 'share-target') {
+		// Phase E0: parse params, stash, and forward to the composer URL
+		// so the URL bar reads cleanly. The composer reads sessionStorage
+		// on mount and pre-fills the appropriate mode.
+		if (typeof window !== 'undefined') {
+			const data = parse_share_target(window.location.search);
+			if (data) {
+				stash_share_target(data);
+			}
+			window.location.replace(composerUrl);
+		}
 		return (
-			<section class="outpost-card">
-				<h1 class="outpost-card__title">Share target</h1>
-				<p class="outpost-card__lede">
-					Sharing into Outpost from another app lands in Phase E. For now, open the composer
-					directly.
-				</p>
-				<a class="outpost-button outpost-button--secondary" href={composerUrl}>
-					Open composer
-				</a>
+			<section class="outpost-card" aria-live="polite">
+				<p class="outpost-status">Opening composer…</p>
 			</section>
 		);
 	}

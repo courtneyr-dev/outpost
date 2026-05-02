@@ -12,6 +12,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import {
 	MorePanel,
@@ -140,10 +141,21 @@ type Status =
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
+function consume_share_target_for_reply(): { url?: string; content?: string } | null {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'reply') return null;
+	consume_share_target();
+	const out: { url?: string; content?: string } = {};
+	if (data.url) out.url = data.url;
+	if (data.content) out.content = data.content;
+	return out;
+}
+
 export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
+	const initial_share = consume_share_target_for_reply();
 	const [variant, setVariant] = useState<Variant>('reply');
-	const [target_url, setTargetUrl] = useState('');
-	const [content, setContent] = useState('');
+	const [target_url, setTargetUrl] = useState(initial_share?.url ?? '');
+	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);

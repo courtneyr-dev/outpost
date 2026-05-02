@@ -15,6 +15,7 @@ import { AboutTab } from './modes/about-tab';
 import { QueueBanner } from './queue-banner';
 import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
+import { peek_share_target } from '../lib/share-target';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -68,7 +69,11 @@ export function ComposerTabs({
 	composerConfigEnv,
 	queueEnv,
 }: ComposerTabsProps) {
-	const [active, setActive] = useState<ModeId>('note');
+	// Initial tab respects an in-flight share-target intake when present.
+	// peek_share_target() doesn't clear sessionStorage — the targeted mode
+	// drains it via consume_share_target() during its own mount.
+	const initial_share = peek_share_target();
+	const [active, setActive] = useState<ModeId>(initial_share?.tab ?? 'note');
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
 
