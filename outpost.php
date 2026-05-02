@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.16
+ * Version:           0.1.17
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.16' );
+define( 'OUTPOST_VERSION', '0.1.17' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -46,6 +46,7 @@ define( 'OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE', 'syndication-links/syndication-
 // Yoast: slug is `wordpress-seo` but the main file is `wp-seo.php`.
 define( 'OUTPOST_YOAST_PLUGIN_FILE', 'wordpress-seo/wp-seo.php' );
 define( 'OUTPOST_ACTIVITYPUB_PLUGIN_FILE', 'activitypub/activitypub.php' );
+define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/accessibility-checker.php' );
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
@@ -55,9 +56,15 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 
 // Register the /wp-json/outpost/v1/preview REST route (Phase B2).
 Outpost_Preview_Endpoint::register();
+// Register the /wp-json/outpost/v1/composer-config REST route (Phase C5).
+Outpost_Composer_Config_Endpoint::register();
+// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
+Outpost_Micropub_Bridges::register();
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.

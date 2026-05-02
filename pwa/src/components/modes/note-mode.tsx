@@ -1,11 +1,18 @@
 import { useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
-	post_note,
+	post_h_entry,
 	MicropubError,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
+import type { ComposerConfig } from '../../lib/composer-config';
+import {
+	MorePanel,
+	empty_more_values,
+	merge_more_values,
+	type MorePanelValues,
+} from '../more-panel';
 
 /**
  * Note mode — short-form posting (h-entry with content, no name).
@@ -29,6 +36,7 @@ export interface NoteModeProps {
 	token: StoredToken;
 	tokenStore: TokenStoreEnvironment;
 	micropubEnv?: MicropubEnvironment;
+	composerConfig?: ComposerConfig;
 }
 
 type Status =
@@ -38,10 +46,13 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function NoteMode({ token, tokenStore, micropubEnv }: NoteModeProps) {
+export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: NoteModeProps) {
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
+	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+
+	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_signout = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -63,9 +74,10 @@ export function NoteMode({ token, tokenStore, micropubEnv }: NoteModeProps) {
 			}
 
 			setStatus({ kind: 'posting' });
-			const result = await post_note(
+			const properties = merge_more_values({ content: trimmed }, more_values);
+			const result = await post_h_entry(
 				{
-					content: trimmed,
+					properties,
 					accessToken: token.accessToken,
 					micropubEndpoint: micropub_endpoint,
 				},
@@ -73,6 +85,7 @@ export function NoteMode({ token, tokenStore, micropubEnv }: NoteModeProps) {
 			);
 			setStatus({ kind: 'posted', location: result.location });
 			setContent('');
+			setMoreValues(empty_more_values());
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -129,7 +142,28 @@ export function NoteMode({ token, tokenStore, micropubEnv }: NoteModeProps) {
 						<a href={status.location} target="_blank" rel="noopener noreferrer">
 							{status.location}
 						</a>
+						{a11y_active && (
+							<>
+								{' · '}
+								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+									View accessibility report
+								</a>
+							</>
+						)}
 					</p>
+				)}
+
+				{composerConfig && (
+					<MorePanel
+						token={token}
+						composerConfig={composerConfig}
+						values={more_values}
+						onChange={setMoreValues}
+						micropubEndpoint={endpoint}
+						{...(micropubEnv ? { micropubEnv } : {})}
+						disabled={submitting}
+						idPrefix="outpost-note"
+					/>
 				)}
 
 				<div class="outpost-form-actions">

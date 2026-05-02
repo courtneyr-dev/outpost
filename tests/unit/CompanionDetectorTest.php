@@ -65,14 +65,15 @@ final class CompanionDetectorTest extends TestCase {
 	 */
 	private function companion_files(): array {
 		return array(
-			'indieauth'         => OUTPOST_INDIEAUTH_PLUGIN_FILE,
-			'micropub'          => OUTPOST_MICROPUB_PLUGIN_FILE,
-			'post_kinds'        => OUTPOST_POST_KINDS_PLUGIN_FILE,
-			'post_formats'      => OUTPOST_POST_FORMATS_PLUGIN_FILE,
-			'link_extension'    => OUTPOST_LINK_EXTENSION_XFN_PLUGIN_FILE,
-			'syndication_links' => OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE,
-			'yoast'             => OUTPOST_YOAST_PLUGIN_FILE,
-			'activitypub'       => OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
+			'indieauth'             => OUTPOST_INDIEAUTH_PLUGIN_FILE,
+			'micropub'              => OUTPOST_MICROPUB_PLUGIN_FILE,
+			'post_kinds'            => OUTPOST_POST_KINDS_PLUGIN_FILE,
+			'post_formats'          => OUTPOST_POST_FORMATS_PLUGIN_FILE,
+			'link_extension'        => OUTPOST_LINK_EXTENSION_XFN_PLUGIN_FILE,
+			'syndication_links'     => OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE,
+			'yoast'                 => OUTPOST_YOAST_PLUGIN_FILE,
+			'activitypub'           => OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
+			'accessibility_checker' => OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE,
 		);
 	}
 
@@ -130,6 +131,7 @@ final class CompanionDetectorTest extends TestCase {
 			'Syndication Links'               => array( 'syndication-links/syndication-links.php' ),
 			'Yoast SEO (slug vs file gotcha)' => array( 'wordpress-seo/wp-seo.php' ),
 			'ActivityPub'                     => array( 'activitypub/activitypub.php' ),
+			'Accessibility Checker'           => array( 'accessibility-checker/accessibility-checker.php' ),
 		);
 	}
 
@@ -154,6 +156,7 @@ final class CompanionDetectorTest extends TestCase {
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_syndication_links_active() );
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_yoast_active() );
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_activitypub_active() );
+		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_accessibility_checker_active() );
 	}
 
 	/** @test */
@@ -168,7 +171,7 @@ final class CompanionDetectorTest extends TestCase {
 	}
 
 	/** @test */
-	public function optional_companions_returns_the_six_optional_file_paths(): void {
+	public function optional_companions_returns_the_seven_optional_file_paths(): void {
 		$this->assertEqualsCanonicalizing(
 			array(
 				OUTPOST_POST_KINDS_PLUGIN_FILE,
@@ -177,6 +180,7 @@ final class CompanionDetectorTest extends TestCase {
 				OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE,
 				OUTPOST_YOAST_PLUGIN_FILE,
 				OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
+				OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE,
 			),
 			Outpost_Companion_Detector::optional_companions()
 		);

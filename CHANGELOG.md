@@ -7,6 +7,35 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C5 — More pull-out + companion bridges)
+- **Composer-config REST endpoint** at `/wp-json/outpost/v1/composer-config` (`Outpost_Composer_Config_Endpoint`, `final`, static-only). GET-only. Returns the active/inactive/absent status of every optional companion plugin Outpost knows about (Post Kinds, Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast SEO, ActivityPub, Accessibility Checker), the resolved Post Format list (theme-declared subset or full spec list, null when Post Formats is absent), and the canonical XFN value list per gmpg.org/xfn/11. `show_in_index => false` per the AI Engine CVE-2025-11749 vulnerability class.
+- **Micropub bridges** (`Outpost_Micropub_Bridges`, `final`, static-only). Hooks `after_micropub` at priority 20 to map three Outpost-namespaced properties to companion-plugin storage:
+  - `mp-post-format` → `wp_set_post_format()` (validates against `get_post_format_slugs()`).
+  - `mp-yoast-focuskw` → postmeta `_yoast_wpseo_focuskw` (sanitized text, length-capped at 191 chars to match Yoast's UI cap).
+  - `mp-xfn` + `mp-xfn-target` → postmeta `_outpost_xfn` (JSON-encoded `{target, rels}`; rels validated against the XFN spec allowlist).
+  Each bridge no-ops when its companion plugin is not active — extra Micropub properties never error, just silently don't apply.
+- **POSSE-aware Post Format auto-inference.** When the user posts via Outpost and doesn't explicitly pick a format in the More pull-out, the bridge infers one from h-entry signals using the same rules Post Kinds for IndieWeb uses for kind taxonomy: `like-of`/`repost-of`/`bookmark-of` → `link`; single `photo` → `image`, multiple `photo` → `gallery`; `listen-of` → `audio`; `watch-of` → `video`; `in-reply-to` → `status`; `name` (article) → `standard`; content-only post → `status` if ≤ 280 chars else `standard`. Both Post Kinds and Post Formats then carry consistent classification — downstream POSSE plugins (Bridgy, ActivityPub variants, Mastodon Autopost) get whichever taxonomy they're wired for.
+- **`OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE` constant** + detection in `Outpost_Companion_Detector::is_accessibility_checker_active()` + entry in `optional_companions()`. Equalize Digital's Accessibility Checker plugin scans posts on save_post automatically; Outpost only needs to know it's active to surface a "View accessibility report" link in the success message of every mode.
+- **`pwa/src/lib/composer-config.ts`** — client wrapper for the new REST endpoint. `fetch_composer_config(accessToken, env?)` returns the typed `ComposerConfig` shape with companions, postFormats, xfnRels. `ComposerConfigError` discriminates `unauthorized` / `fetch_failed` / `invalid_response`. Same B0a-locked injectable env pattern as the other clients.
+- **`pwa/src/lib/micropub.ts`** extended with `discover_syndication_targets(micropub_endpoint, access_token, env?)` — queries `?q=syndicate-to` per Micropub spec, returns `SyndicationTarget[]` (uid + name pairs). Empty array when no targets configured.
+- **`HEntryProperties` interface** extended with `mp-slug?`, `mp-post-format?`, `mp-yoast-focuskw?`, `mp-xfn?: string[]`, `mp-xfn-target?`.
+- **`pwa/src/components/more-panel.tsx`** — collapsible `<details>` panel rendered below each mode's main form. Native expand/collapse (zero-JS, full keyboard support, screen-reader friendly). Always-on fields: Categories (free-text comma-split → `category[]`), Slug (`mp-slug`). Companion-gated fields: Post Format selector ("Auto (from post kind)" default), Yoast focus keyphrase, XFN relationship picker (only when both XFN plugin active AND a target URL is set), Syndication targets (lazy-loaded on endpoint discovery via `?q=syndicate-to`). `merge_more_values()` exported helper merges values into HEntryProperties using the conditional-spread pattern (B0a #4) so undefined never lands on optional fields.
+- **All five modes** (Note, Reply, Photo, Doing, Article) wired to render `<MorePanel>` and merge its values into the post properties on submit. Reply mode passes its `target_url` as `xfnTargetUrl` so the XFN picker only shows once a target is set.
+- **Accessibility Checker post-publish report link.** Every mode's success message ("Posted to …") appends "View accessibility report" linking to `<location>?edac_view=1` when the plugin is detected. The actual scan happens automatically on save_post — Outpost just surfaces the link.
+
+### Changed (Session C5)
+- `OUTPOST_VERSION` bumped to `0.1.17` per A2 #16.
+- `composer-tabs.tsx` fetches the composer config once on mount via `useEffect` and threads it down to each mode through props. Failure is non-fatal (logged via `console.warn` only) — modes still render their main forms; only the More pull-out hides until config arrives.
+- `pwa/src/styles/structure.css` adds `.outpost-more-panel`, `.outpost-more-panel__summary`, `.outpost-more-panel__body`, `.outpost-checkbox`, `.outpost-xfn-picker`, `.outpost-syndication-picker`. All structural; paint via `var(--outpost-*, fallback)` per the Hard Contract.
+- `outpost.php`: registers the new endpoint + bridges at file-load time (parallel to the existing Preview Endpoint registration).
+
+### Tests
+- `tests/unit/MicropubBridgesTest.php` — 22 PHPUnit tests covering `infer_post_format` for every h-entry signal, `scalar` property reading (form-encoded vs JSON Micropub), `has_property` truthiness, and `extract_properties` form/JSON shapes.
+- `tests/unit/ComposerConfigEndpointTest.php` — 7 PHPUnit tests covering the permission check + `resolve_post_formats` (null when absent/inactive, theme subset when declared, full list when no subset, filters non-string values).
+- `tests/unit/CompanionDetectorTest.php` — extended for Accessibility Checker (data provider, named-wrapper assertion, optional_companions count).
+- `pwa/src/lib/composer-config.test.ts` — 7 vitest tests covering parse/validate of valid response, 401/403 → `unauthorized`, 500 → `fetch_failed`, fetch-rejects → `fetch_failed`, wrong-shape → `invalid_response`, ComposerConfigError instanceof.
+- `composer-tabs.test.tsx` updated to pass a never-resolving `composerConfigEnv` so the new `useEffect` doesn't hit the real network in tests.
+
 ### Added (Session C4 — Article mode)
 - `pwa/src/components/modes/article-mode.tsx` — replaces the C0 stub. Long-form posts: title (`name` property) + body (`content`). Both fields required (a titled h-entry without body content has nothing to publish; an h-entry without a title is a Note). Same status-state machine as Note / Reply / Photo / Listen. Tall textarea (12 rows / 18 rem min-height) for comfortable mobile writing. Help text notes that markdown and HTML pass through as-is — your site renders them via its own filters (Jetpack Markdown, WP-Markdown, or plain `wpautop`).
 - `pwa/src/styles/structure.css` adds `.outpost-textarea--tall` modifier (18 rem min-height for long-form writing) and `.outpost-help` (smaller-font muted help text under fields).

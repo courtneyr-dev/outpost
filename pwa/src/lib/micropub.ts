@@ -78,6 +78,21 @@ export interface HEntryProperties {
 	'mp-photo-alt'?: string;
 	category?: string[];
 	'mp-syndicate-to'?: string[];
+	/** Optional permalink slug. Native Micropub spec property. */
+	'mp-slug'?: string;
+	/** Outpost-specific: WordPress Post Format. Bridge maps to wp_set_post_format. */
+	'mp-post-format'?: string;
+	/** Outpost-specific: Yoast focus keyphrase. Bridge writes _yoast_wpseo_focuskw postmeta. */
+	'mp-yoast-focuskw'?: string;
+	/** Outpost-specific: XFN relationships for the in-reply-to / target URL. */
+	'mp-xfn'?: string[];
+	/** Outpost-specific: target URL for the XFN rels. */
+	'mp-xfn-target'?: string;
+}
+
+export interface SyndicationTarget {
+	uid: string;
+	name: string;
 }
 
 export interface PostHEntryParams {
@@ -294,6 +309,67 @@ export async function discover_media_endpoint(
 		);
 	}
 	return media_endpoint;
+}
+
+/**
+ * Discover the user's configured syndication targets via `?q=syndicate-to`.
+ *
+ * Per the Micropub spec, querying the micropub endpoint with
+ * `?q=syndicate-to` returns JSON of the form:
+ *
+ *   { "syndicate-to": [ { "uid": "https://...", "name": "Display name" }, ... ] }
+ *
+ * Returns the empty array when no targets are configured; throws
+ * MicropubError when the query itself fails.
+ */
+export async function discover_syndication_targets(
+	micropub_endpoint: string,
+	access_token: string,
+	env: MicropubEnvironment = default_env,
+): Promise<SyndicationTarget[]> {
+	const url =
+		micropub_endpoint + (micropub_endpoint.includes('?') ? '&' : '?') + 'q=syndicate-to';
+	let response: Response;
+	try {
+		response = await env.fetch(url, {
+			method: 'GET',
+			headers: {
+				Authorization: 'Bearer ' + access_token,
+				Accept: 'application/json',
+			},
+		});
+	} catch (err) {
+		throw new MicropubError(
+			'discover_syndication_targets: fetch threw — ' +
+				(err instanceof Error ? err.message : String(err)),
+			'discovery_failed',
+		);
+	}
+
+	if (!response.ok) {
+		throw new MicropubError(
+			'discover_syndication_targets: ' +
+				String(response.status) +
+				' from syndicate-to query',
+			'discovery_failed',
+		);
+	}
+
+	const json = (await response.json()) as { 'syndicate-to'?: unknown };
+	const raw = json['syndicate-to'];
+	if (!Array.isArray(raw)) {
+		return [];
+	}
+	const targets: SyndicationTarget[] = [];
+	for (const entry of raw) {
+		if (entry && typeof entry === 'object') {
+			const candidate = entry as { uid?: unknown; name?: unknown };
+			if (typeof candidate.uid === 'string' && typeof candidate.name === 'string') {
+				targets.push({ uid: candidate.uid, name: candidate.name });
+			}
+		}
+	}
+	return targets;
 }
 
 export interface UploadMediaParams {

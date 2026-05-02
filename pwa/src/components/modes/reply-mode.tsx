@@ -9,6 +9,13 @@ import {
 import { fetch_preview, PreviewError, type PreviewResult } from '../../lib/preview';
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
+import type { ComposerConfig } from '../../lib/composer-config';
+import {
+	MorePanel,
+	empty_more_values,
+	merge_more_values,
+	type MorePanelValues,
+} from '../more-panel';
 
 /**
  * Reply mode — h-entry with a target URL plus optional content.
@@ -36,6 +43,7 @@ import type { StoredToken } from '../../lib/token-store';
 export interface ReplyModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
+	composerConfig?: ComposerConfig;
 }
 
 type Variant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
@@ -128,7 +136,7 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
+export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
 	const [variant, setVariant] = useState<Variant>('reply');
 	const [target_url, setTargetUrl] = useState('');
 	const [content, setContent] = useState('');
@@ -136,8 +144,11 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
+	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 
 	const config = VARIANTS[variant];
+	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
+	const trimmed_target_url = target_url.trim();
 
 	const handle_preview = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -183,11 +194,12 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 				setEndpoint(micropub_endpoint);
 			}
 
-			const properties: HEntryProperties = {
+			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'rsvp' ? { rsvp: rsvp_value } : {}),
 			};
+			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
 			const result = await post_h_entry(
@@ -202,6 +214,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 			setContent('');
 			setTargetUrl('');
 			setPreview(null);
+			setMoreValues(empty_more_values());
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -327,7 +340,29 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 						<a href={status.location} target="_blank" rel="noopener noreferrer">
 							{status.location}
 						</a>
+						{a11y_active && (
+							<>
+								{' · '}
+								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+									View accessibility report
+								</a>
+							</>
+						)}
 					</p>
+				)}
+
+				{composerConfig && (
+					<MorePanel
+						token={token}
+						composerConfig={composerConfig}
+						values={more_values}
+						onChange={setMoreValues}
+						micropubEndpoint={endpoint}
+						{...(micropubEnv ? { micropubEnv } : {})}
+						xfnTargetUrl={trimmed_target_url || null}
+						disabled={submitting || fetching_preview}
+						idPrefix="outpost-reply"
+					/>
 				)}
 
 				<div class="outpost-form-actions">

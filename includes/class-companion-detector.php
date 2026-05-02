@@ -102,6 +102,7 @@ final class Outpost_Companion_Detector {
 			OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE,
 			OUTPOST_YOAST_PLUGIN_FILE,
 			OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
+			OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE,
 		);
 	}
 
@@ -161,5 +162,9 @@ final class Outpost_Companion_Detector {
 
 	public static function is_activitypub_active(): string {
 		return self::status( OUTPOST_ACTIVITYPUB_PLUGIN_FILE );
+	}
+
+	public static function is_accessibility_checker_active(): string {
+		return self::status( OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE );
 	}
 }

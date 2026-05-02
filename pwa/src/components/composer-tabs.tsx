@@ -1,13 +1,17 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 import type { StoredToken, TokenStoreEnvironment } from '../lib/token-store';
 import type { MicropubEnvironment } from '../lib/micropub';
+import {
+	fetch_composer_config,
+	type ComposerConfig,
+	type ComposerConfigEnvironment,
+} from '../lib/composer-config';
 import { NoteMode } from './modes/note-mode';
 import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { ArticleMode } from './modes/article-mode';
-// PhotoMode now takes props.
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -50,11 +54,38 @@ export interface ComposerTabsProps {
 	token: StoredToken;
 	tokenStore: TokenStoreEnvironment;
 	micropubEnv?: MicropubEnvironment;
+	composerConfigEnv?: ComposerConfigEnvironment;
 }
 
-export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsProps) {
+export function ComposerTabs({
+	token,
+	tokenStore,
+	micropubEnv,
+	composerConfigEnv,
+}: ComposerTabsProps) {
 	const [active, setActive] = useState<ModeId>('note');
+	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
+
+	// Fetch the composer config once on mount. Failure is non-fatal —
+	// modes still render their main forms; only the More pull-out is
+	// gated on this. Modes receive null until the fetch resolves.
+	useEffect(() => {
+		let cancelled = false;
+		fetch_composer_config(token.accessToken, composerConfigEnv)
+			.then((cfg) => {
+				if (!cancelled) setComposerConfig(cfg);
+			})
+			.catch(() => {
+				// Silent failure — log to console for triage but don't surface.
+				if (!cancelled && typeof console !== 'undefined') {
+					console.warn('Outpost: composer-config fetch failed; More pull-out hidden');
+				}
+			});
+		return (): void => {
+			cancelled = true;
+		};
+	}, [token.accessToken, composerConfigEnv]);
 
 	const modes: ModeDefinition[] = [
 		{
@@ -67,6 +98,7 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 					token={token}
 					tokenStore={tokenStore}
 					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
 			),
 		},
@@ -74,24 +106,44 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 			id: 'reply',
 			label: 'Reply',
 			render: () => (
-				<ReplyMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />
+				<ReplyMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
 			),
 		},
 		{
 			id: 'photo',
 			label: 'Photo',
-			render: () => <PhotoMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
+			render: () => (
+				<PhotoMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
+			),
 		},
 		{
 			id: 'listen',
 			label: 'Doing',
-			render: () => <ListenMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />,
+			render: () => (
+				<ListenMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
+			),
 		},
 		{
 			id: 'article',
 			label: 'Article',
 			render: () => (
-				<ArticleMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />
+				<ArticleMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
 			),
 		},
 	];

@@ -31,8 +31,25 @@ afterEach(() => {
 	root.remove();
 });
 
+function mock_composer_config_env(): { fetch: typeof fetch } {
+	// Stub fetch so the composer-config request never hits the network in tests.
+	// Returns a never-resolving promise — the catch handler in ComposerTabs
+	// suppresses the rejection on unmount, and tests don't depend on the
+	// More panel rendering.
+	return {
+		fetch: ((): Promise<Response> => new Promise(() => {})) as typeof fetch,
+	};
+}
+
 function mount(): void {
-	render(<ComposerTabs token={mock_token} tokenStore={mock_token_store()} />, root);
+	render(
+		<ComposerTabs
+			token={mock_token}
+			tokenStore={mock_token_store()}
+			composerConfigEnv={mock_composer_config_env()}
+		/>,
+		root,
+	);
 }
 
 function tabs(): HTMLButtonElement[] {

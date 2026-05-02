@@ -9,6 +9,13 @@ import {
 } from '../../lib/micropub';
 import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
+import type { ComposerConfig } from '../../lib/composer-config';
+import {
+	MorePanel,
+	empty_more_values,
+	merge_more_values,
+	type MorePanelValues,
+} from '../more-panel';
 
 /**
  * Photo mode — pick a photo, type alt text, post.
@@ -42,6 +49,7 @@ import type { StoredToken } from '../../lib/token-store';
 export interface PhotoModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
+	composerConfig?: ComposerConfig;
 }
 
 type Status =
@@ -53,7 +61,7 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
+export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps) {
 	const [file, setFile] = useState<File | null>(null);
 	const [preview_url, setPreviewUrl] = useState<string | null>(null);
 	const [alt, setAlt] = useState('');
@@ -61,6 +69,9 @@ export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
+	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+
+	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_file_change = (event: Event): void => {
 		const input = event.target as HTMLInputElement;
@@ -116,13 +127,15 @@ export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
 			);
 
 			setStatus({ kind: 'posting' });
+			const base = {
+				photo: upload.location,
+				'mp-photo-alt': trimmed_alt,
+				...(trimmed_content ? { content: trimmed_content } : {}),
+			};
+			const properties = merge_more_values(base, more_values);
 			const result = await post_h_entry(
 				{
-					properties: {
-						photo: upload.location,
-						'mp-photo-alt': trimmed_alt,
-						...(trimmed_content ? { content: trimmed_content } : {}),
-					},
+					properties,
 					accessToken: token.accessToken,
 					micropubEndpoint: mp,
 				},
@@ -136,6 +149,7 @@ export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
 			setPreviewUrl(null);
 			setAlt('');
 			setContent('');
+			setMoreValues(empty_more_values());
 		} catch (err) {
 			let message: string;
 			if (err instanceof PhotoError) {
@@ -238,7 +252,28 @@ export function PhotoMode({ token, micropubEnv }: PhotoModeProps) {
 						<a href={status.location} target="_blank" rel="noopener noreferrer">
 							{status.location}
 						</a>
+						{a11y_active && (
+							<>
+								{' · '}
+								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+									View accessibility report
+								</a>
+							</>
+						)}
 					</p>
+				)}
+
+				{composerConfig && (
+					<MorePanel
+						token={token}
+						composerConfig={composerConfig}
+						values={more_values}
+						onChange={setMoreValues}
+						micropubEndpoint={micropub_endpoint}
+						{...(micropubEnv ? { micropubEnv } : {})}
+						disabled={submitting}
+						idPrefix="outpost-photo"
+					/>
 				)}
 
 				<div class="outpost-form-actions">

@@ -8,6 +8,13 @@ import {
 } from '../../lib/micropub';
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
+import type { ComposerConfig } from '../../lib/composer-config';
+import {
+	MorePanel,
+	empty_more_values,
+	merge_more_values,
+	type MorePanelValues,
+} from '../more-panel';
 
 /**
  * Listen group — life-tracking posts that point at media or places.
@@ -33,6 +40,7 @@ import type { StoredToken } from '../../lib/token-store';
 export interface ListenModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
+	composerConfig?: ComposerConfig;
 }
 
 type Variant = 'listen' | 'watch' | 'read' | 'play' | 'checkin';
@@ -94,15 +102,17 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function ListenMode({ token, micropubEnv }: ListenModeProps) {
+export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
 	const [variant, setVariant] = useState<Variant>('listen');
 	const [target_url, setTargetUrl] = useState('');
 	const [place_name, setPlaceName] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
+	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 
 	const config = VARIANTS[variant];
+	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_submit = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -123,11 +133,12 @@ export function ListenMode({ token, micropubEnv }: ListenModeProps) {
 				setEndpoint(micropub_endpoint);
 			}
 
-			const properties: HEntryProperties = {
+			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'checkin' && trimmed_name ? { name: trimmed_name } : {}),
 			};
+			const properties = merge_more_values(base, more_values);
 
 			setStatus({ kind: 'posting' });
 			const result = await post_h_entry(
@@ -142,6 +153,7 @@ export function ListenMode({ token, micropubEnv }: ListenModeProps) {
 			setTargetUrl('');
 			setPlaceName('');
 			setContent('');
+			setMoreValues(empty_more_values());
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -250,7 +262,28 @@ export function ListenMode({ token, micropubEnv }: ListenModeProps) {
 						<a href={status.location} target="_blank" rel="noopener noreferrer">
 							{status.location}
 						</a>
+						{a11y_active && (
+							<>
+								{' · '}
+								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+									View accessibility report
+								</a>
+							</>
+						)}
 					</p>
+				)}
+
+				{composerConfig && (
+					<MorePanel
+						token={token}
+						composerConfig={composerConfig}
+						values={more_values}
+						onChange={setMoreValues}
+						micropubEndpoint={endpoint}
+						{...(micropubEnv ? { micropubEnv } : {})}
+						disabled={submitting}
+						idPrefix="outpost-listen"
+					/>
 				)}
 
 				<div class="outpost-form-actions">

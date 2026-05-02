@@ -6,6 +6,13 @@ import {
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
+import type { ComposerConfig } from '../../lib/composer-config';
+import {
+	MorePanel,
+	empty_more_values,
+	merge_more_values,
+	type MorePanelValues,
+} from '../more-panel';
 
 /**
  * Article mode — long-form posts (h-entry with both `name` and `content`).
@@ -35,6 +42,7 @@ import type { StoredToken } from '../../lib/token-store';
 export interface ArticleModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
+	composerConfig?: ComposerConfig;
 }
 
 type Status =
@@ -44,11 +52,14 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function ArticleMode({ token, micropubEnv }: ArticleModeProps) {
+export function ArticleMode({ token, micropubEnv, composerConfig }: ArticleModeProps) {
 	const [title, setTitle] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
+	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+
+	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_submit = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -65,12 +76,16 @@ export function ArticleMode({ token, micropubEnv }: ArticleModeProps) {
 			}
 
 			setStatus({ kind: 'posting' });
+			const properties = merge_more_values(
+				{
+					name: trimmed_title,
+					content: trimmed_content,
+				},
+				more_values,
+			);
 			const result = await post_h_entry(
 				{
-					properties: {
-						name: trimmed_title,
-						content: trimmed_content,
-					},
+					properties,
 					accessToken: token.accessToken,
 					micropubEndpoint: micropub_endpoint,
 				},
@@ -79,6 +94,7 @@ export function ArticleMode({ token, micropubEnv }: ArticleModeProps) {
 			setStatus({ kind: 'posted', location: result.location });
 			setTitle('');
 			setContent('');
+			setMoreValues(empty_more_values());
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -155,7 +171,28 @@ export function ArticleMode({ token, micropubEnv }: ArticleModeProps) {
 						<a href={status.location} target="_blank" rel="noopener noreferrer">
 							{status.location}
 						</a>
+						{a11y_active && (
+							<>
+								{' · '}
+								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+									View accessibility report
+								</a>
+							</>
+						)}
 					</p>
+				)}
+
+				{composerConfig && (
+					<MorePanel
+						token={token}
+						composerConfig={composerConfig}
+						values={more_values}
+						onChange={setMoreValues}
+						micropubEndpoint={endpoint}
+						{...(micropubEnv ? { micropubEnv } : {})}
+						disabled={submitting}
+						idPrefix="outpost-article"
+					/>
 				)}
 
 				<div class="outpost-form-actions">
