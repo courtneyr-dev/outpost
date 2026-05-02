@@ -231,39 +231,92 @@ Skip this if VoiceOver setup isn't convenient — A11Y-CHECKLIST Phase J formali
 
 ## B2 + C1 — Preview endpoint + Reply mode
 
-**Build under test:** `OUTPOST_VERSION` ≥ `0.1.10`. Should already be authenticated from B0b.
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.10`. Verify with `git -C ~/projects/staging-courtneyr-dev/plugins/outpost log --oneline -1`.
 
-### B2-Stage 1 — Preview endpoint sanity check (terminal)
+**Pre-flight:**
+
+1. Confirm staging shows Outpost 0.1.10 in `wp-admin/plugins.php`.
+2. You should already be signed in from B0b. If not, run B0b Stages 1–3 first.
+3. The simple path is **C1-Stages 1–4 only** — those exercise the B2 endpoint indirectly through the Reply mode UI, which is enough to confirm everything works end-to-end. **B2-Stage 1 is an optional terminal-side smoke** that probes the endpoint contract directly (error paths, anonymous rejection, route hiding). Skip it if curl/terminal isn't comfortable.
+
+### B2-Stage 1 — Preview endpoint sanity check (optional, terminal)
+
+This stage probes the B2 REST endpoint with `curl` to confirm the SSRF defenses, content-type allowlist, and authentication gate behave correctly. Each curl is independent — run whichever ones you care about.
+
+**Step 1 — Get your bearer token from the iPhone's IndexedDB.**
+
+The token is stored encrypted in IndexedDB, so you can't read it directly. The easiest way to surface the plaintext is to **capture it from a real outgoing request** — when you post a Note, the PWA sends `Authorization: Bearer <token>` to the Micropub endpoint, and that header is plaintext in the network log:
+
+1. Plug your iPhone into the Mac. On the iPhone, open `https://qkf.b0d.myftpupload.com/post/`. On the Mac, open Safari → **Develop** → [your iPhone] → [`https://qkf.b0d.myftpupload.com/post/`]. The Web Inspector window opens, attached to the live tab.
+2. In the Web Inspector, switch to the **Network** tab. Leave it open.
+3. On the iPhone: tap the **Note** tab if it isn't already active, type a few characters, tap **Post note**. Wait for "Posted to: …".
+4. In the Mac's Web Inspector Network tab, find the row whose URL ends in `/wp-json/micropub/1.0/endpoint`. Click it.
+5. In the right panel, expand **Request Headers**. Find `Authorization: Bearer xyz...`. Copy everything after `Bearer ` (the token itself, no quotes).
+
+**Step 2 — Set the token in your terminal session.**
+
+In a Mac terminal, paste the token into a shell variable so you don't have to retype it for each curl:
 
 ```bash
-# Get the bearer token from your IndexedDB token row (DevTools → Storage → IndexedDB → outpost → tokens) or from a previous successful login.
-TOKEN="..."
+TOKEN="paste-your-token-here"
+```
 
-# Happy path — should return JSON with html, finalUrl, contentType
+**Step 3 — Run the curl checks one at a time.**
+
+Each command is annotated with what to expect.
+
+**Happy path** — should return JSON with `html`, `finalUrl`, `contentType`. The `head -c 500` truncates the (potentially-large) HTML to the first 500 characters so the terminal isn't flooded.
+
+```bash
 curl -sS -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://courtneyr.dev/"}' \
   "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview" | head -c 500
+```
 
-# Bad URL — should return 400 invalid_scheme
+Expect: a JSON blob beginning with `{"html":"<!DOCTYPE html>...`.
+
+**Bad scheme** — `javascript:` URLs are rejected by the SSRF defense. Should return HTTP 400 with `invalid_scheme`.
+
+```bash
 curl -sS -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"javascript:alert(1)"}' \
   "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
+```
 
-# Image URL — should return 415 unsupported_content_type
+Expect: `{"code":"invalid_scheme","message":"Only http and https URLs are allowed.","data":{"status":400}}`.
+
+**Wrong content type** — image URLs return PNG, which isn't HTML. Should return HTTP 415.
+
+```bash
 curl -sS -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com/image.png"}' \
   "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
+```
 
-# Anonymous (no Authorization) — should return 401
+Expect: `{"code":"unsupported_content_type",..."status":415,...}`. (Or `fetch_failed` 502 if `example.com/image.png` doesn't actually exist — substitute any real image URL if you want to exercise the 415 path specifically.)
+
+**Anonymous (no Authorization header)** — should return HTTP 401.
+
+```bash
 curl -sS -H 'Content-Type: application/json' \
   -d '{"url":"https://courtneyr.dev/"}' \
   "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1/preview"
 ```
 
-The route should also NOT appear in `/wp-json/outpost/v1` index (the `show_in_index => false` setting) — `curl https://qkf.b0d.myftpupload.com/wp-json/outpost/v1` returns the namespace listing without `/preview`.
+Expect: `{"code":"rest_forbidden",..."status":401,...}`.
+
+**Route hidden from index** — Outpost's preview endpoint is registered with `show_in_index => false`, so it should NOT appear when you list the namespace's public routes:
+
+```bash
+curl -sS "https://qkf.b0d.myftpupload.com/wp-json/outpost/v1" | python3 -m json.tool | head -20
+```
+
+Expect: a JSON listing that does NOT mention `/preview` in any of the route paths. (If `python3 -m json.tool` isn't available, just pipe to `head` for a raw view.)
+
+**Stop here if:** any curl returns the wrong status code, the happy path returns an empty `html` field, or `/preview` shows up in the public route index. All four checks should match the expected status; the happy path's HTML should be substantive (not "").
 
 ### C1-Stage 1 — Reply mode UI
 
