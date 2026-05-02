@@ -52,6 +52,11 @@ final class Outpost_Composer_Config_Endpoint {
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PATH      = '/composer-config';
 
+	/** Per-user rate limit (requests per minute). Composer mounts pull
+	 * the config on every fresh load, so this is more permissive than
+	 * the preview endpoint's 30/min. */
+	private const RATE_LIMIT_PER_MINUTE = 60;
+
 	/** Default Post Format list when get_theme_support gives us no specifics. */
 	private const ALL_POST_FORMATS = array(
 		'aside',
@@ -185,9 +190,44 @@ final class Outpost_Composer_Config_Endpoint {
 	}
 
 	/**
+	 * Per-user rate limit check. Returns true if the user is over
+	 * quota; the handler responds 429 in that case.
+	 *
+	 * Transient-keyed by user ID — same pattern as the preview
+	 * endpoint. Uses a fixed-1-minute window (no sliding window) which
+	 * is good enough for this use case and cheap.
+	 */
+	private static function is_rate_limited(): bool {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return true;
+		}
+		$key   = 'outpost_config_rl_' . (string) $user_id;
+		$count = (int) get_transient( $key );
+		if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
+			return true;
+		}
+		set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
+		return false;
+	}
+
+	/**
 	 * Build the config response.
 	 */
 	public static function handle(): WP_REST_Response {
+		if ( self::is_rate_limited() ) {
+			$response = new WP_REST_Response(
+				array(
+					'code'       => 'rate_limited',
+					'message'    => 'Too many requests. Try again in a moment.',
+					'retryAfter' => MINUTE_IN_SECONDS,
+				),
+				429
+			);
+			$response->header( 'Retry-After', (string) MINUTE_IN_SECONDS );
+			return $response;
+		}
+
 		$companions = array(
 			'post-kinds'            => Outpost_Companion_Detector::is_post_kinds_active(),
 			'post-formats'          => Outpost_Companion_Detector::is_post_formats_active(),

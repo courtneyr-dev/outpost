@@ -49,6 +49,23 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 		return 'outpost/outpost.php';
 	}
 }
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4(): string {
+		// Test stub. Real WP uses random_bytes; we only need a stable
+		// shape (8-4-4-4-12 hex) so CSP nonce assertions can match.
+		return sprintf(
+			'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0xffff )
+		);
+	}
+}
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( ...$args ): bool {
 		return true;

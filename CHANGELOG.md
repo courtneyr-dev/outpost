@@ -7,6 +7,29 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session G — security headers + rate limit on composer-config)
+
+Phase G's first batch: security headers on the composer shell + per-user rate limit on the config endpoint. Token storage doc + URL validation are already in good shape from prior phases (B0a #9, B2 SSRF defenses, `is_safe_http_url` covers Reply / Doing / Photo paths); this commit adds the perimeter hardening.
+
+- **Content-Security-Policy** on every HTML response from `Outpost_PWA_Shell::send_html_header()`. Directive set:
+  - `default-src 'self'`
+  - `script-src 'self' 'nonce-<per-request>'` — Vite outputs plain ES modules (no eval); the one inline script (SW registration) gets a per-request UUID nonce.
+  - `style-src 'self' 'unsafe-inline'` — the shell has inline critical CSS; bundled CSS is from 'self'.
+  - `img-src 'self' data: blob: https:` — photo previews use blob URLs; uploaded media URLs come from the user's media endpoint and can be cross-origin.
+  - `connect-src 'self' https:` — Micropub endpoint discovery and the user's "me" URL fetch can be cross-origin.
+  - `font-src 'self' data:`
+  - `frame-src 'none'`, `frame-ancestors 'none'` — clickjacking + iframe-embed defense.
+  - `form-action 'self'`, `base-uri 'self'`, `object-src 'none'`, `upgrade-insecure-requests`.
+- **Filter `outpost_csp`** lets sites extend (e.g. allow analytics origin, embed CDN). Signature: `(string[] $directives, string $nonce) => string[]`.
+- **`X-Frame-Options: DENY`** — same intent as `frame-ancestors 'none'` for older browsers.
+- **`X-Content-Type-Options: nosniff`** — prevents MIME-confusion attacks.
+- **`Referrer-Policy: strict-origin-when-cross-origin`** — leaks only the origin (not full URL) on cross-origin requests.
+- **`Permissions-Policy`** on the shell:
+  - `microphone=(self), camera=(self)` — D4 voice and Photo file picker need these; same-origin only.
+  - `geolocation=(), payment=(), usb=(), midi=(), magnetometer=(), gyroscope=(), accelerometer=()` — disabled. Composer never uses them; a compromised dependency can't quietly turn them on.
+- **Per-user rate limit on `/wp-json/outpost/v1/composer-config`** — 60 req/min/user (more permissive than preview's 30/min since composer mounts pull on every fresh load). Returns 429 with `Retry-After: 60` on exceed. Transient-keyed by user ID per the preview-endpoint pattern.
+- **Test bootstrap** gains `wp_generate_uuid4` stub so PWAShellTest's render assertions resolve the per-request nonce without network ceremony.
+
 ### Added (Session F — companion adapter classes + registry)
 
 Phase F formalizes the C5 bridges into the adapter contract A1 #4 specified. The bridges in `class-micropub-bridges.php` keep their behavior; the new adapters provide the inventory + capability listing the composer + admin code can ask against.

@@ -97,7 +97,7 @@ final class Outpost_PWA_Shell {
 		<?php if ( null !== $entry_url ) : ?>
 	<script type="module" src="<?php echo esc_url( $entry_url ); ?>"></script>
 		<?php endif; ?>
-	<script>
+	<script nonce="<?php echo esc_attr( self::script_nonce() ); ?>">
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/post/sw', { scope: '/post/' });
 		}
@@ -491,7 +491,94 @@ async function cache_first(request) {
 		if ( ! headers_sent() ) {
 			nocache_headers();
 			header( 'Content-Type: text/html; charset=utf-8' );
+			header( 'Content-Security-Policy: ' . self::content_security_policy() );
+			header( 'X-Frame-Options: DENY' );
+			header( 'X-Content-Type-Options: nosniff' );
+			header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+			header( 'Permissions-Policy: ' . self::permissions_policy() );
 		}
+	}
+
+	/**
+	 * Content-Security-Policy for the composer shell (Phase G).
+	 *
+	 * The composer is a Preact SPA that fetches the user's "me" URL,
+	 * the user's Micropub endpoint, and the configured media endpoint —
+	 * any of which can be cross-origin. So `connect-src` must allow
+	 * https: broadly. Image src likewise needs https: + data: + blob:
+	 * for photo previews. All other directives stay tight.
+	 *
+	 * No 'unsafe-eval' — Vite's esbuild output is plain ES modules.
+	 * No 'unsafe-inline' on script-src — the SW registration script in
+	 * render_shell() is the one inline script; it gets a per-request
+	 * nonce that we attach to its tag.
+	 *
+	 * Filterable via `outpost_csp` for sites that need to extend
+	 * (e.g. allow a specific analytics origin, embed a CDN).
+	 */
+	private static function content_security_policy(): string {
+		$nonce = self::script_nonce();
+		$csp   = array(
+			"default-src 'self'",
+			"script-src 'self' 'nonce-" . $nonce . "'",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data: blob: https:",
+			"connect-src 'self' https:",
+			"font-src 'self' data:",
+			"frame-src 'none'",
+			"frame-ancestors 'none'",
+			"form-action 'self'",
+			"base-uri 'self'",
+			"object-src 'none'",
+			'upgrade-insecure-requests',
+		);
+		/**
+		 * Filter the Content-Security-Policy directive list for the
+		 * Outpost composer shell. Filter callers can append (or replace)
+		 * directives.
+		 *
+		 * @param string[] $csp   Default directive list.
+		 * @param string   $nonce Per-request script nonce attached to inline scripts.
+		 */
+		$csp = apply_filters( 'outpost_csp', $csp, $nonce );
+		return is_array( $csp ) ? implode( '; ', $csp ) : '';
+	}
+
+	/**
+	 * Permissions-Policy for the composer (Phase G).
+	 *
+	 * Allow microphone (D4 voice input — same-origin only). Disable
+	 * features the composer never uses so a compromised script
+	 * dependency can't quietly turn them on.
+	 */
+	private static function permissions_policy(): string {
+		return implode(
+			', ',
+			array(
+				'microphone=(self)',
+				'camera=(self)',
+				'geolocation=()',
+				'payment=()',
+				'usb=()',
+				'midi=()',
+				'magnetometer=()',
+				'gyroscope=()',
+				'accelerometer=()',
+			)
+		);
+	}
+
+	/**
+	 * Per-request script nonce. Generated lazily and cached for the
+	 * remainder of the request so the CSP header and the shell's inline
+	 * script tag agree.
+	 */
+	public static function script_nonce(): string {
+		static $nonce = null;
+		if ( null === $nonce ) {
+			$nonce = wp_generate_uuid4();
+		}
+		return $nonce;
 	}
 
 	private static function send_json_header(): void {
