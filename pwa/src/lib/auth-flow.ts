@@ -40,7 +40,12 @@ const SESSION_KEY_STATE = 'outpost.auth.state';
 const SESSION_KEY_ME = 'outpost.auth.me';
 const SESSION_KEY_TOKEN_ENDPOINT = 'outpost.auth.token_endpoint';
 
-const DEFAULT_SCOPE = 'create update media';
+// `profile` is required for the IndieAuth plugin to fully resolve the bearer
+// token to a WP_User. Without it the Micropub plugin downstream returns 403
+// "forbidden" when posting, even though the token has create/update/media.
+// Quill's working token request uses the same set; we match for parity with
+// current IndieAuth-plugin builds.
+const DEFAULT_SCOPE = 'create profile update media';
 
 export interface AuthFlowEnvironment {
 	indieauth: IndieAuthEnvironment;
@@ -75,7 +80,7 @@ export interface BeginLoginResult {
  * @param me            The user's "me" URL (e.g. https://courtneyr.dev/).
  * @param client_id     The PWA's client identifier (e.g. https://courtneyr.dev/post/).
  * @param redirect_uri  Where IndieAuth will redirect back (e.g. https://courtneyr.dev/post/auth/callback).
- * @param scope         Optional scope string; defaults to "create update media".
+ * @param scope         Optional scope string; defaults to "create profile update media".
  */
 export async function begin_login(
 	me: string,

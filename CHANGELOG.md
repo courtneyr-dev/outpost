@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Add `profile` to the IndieAuth default scope)
+
+After v0.1.51 the bundle loaded cleanly but Micropub still returned 403 on every post attempt. Quill (an independent IndieAuth client) posted successfully against the same staging install at the same time, proving IndieAuth + Micropub plugins were healthy. Comparing tokens revealed the gap: Quill requested `create profile update media` and got a fully-resolved token; Outpost requested `create update media` (no `profile`) and the WordPress IndieAuth plugin couldn't fully resolve the bearer to a `WP_User`, so the Micropub plugin's `mp-author` resolution rejected the request as forbidden.
+
+- **`pwa/src/lib/auth-flow.ts` `DEFAULT_SCOPE` is now `'create profile update media'`.** Matches Quill's working request shape; `profile` lets the IndieAuth plugin's `authenticate` filter materialise the full user identity from the bearer.
+- The `scope` parameter on `begin_login()` is still overridable, so callers (and future settings UI) can request a narrower or broader scope.
+- After deploy, users must sign out + back in via the orange banner button to mint a fresh token with the `profile` scope. Old tokens stay valid for endpoints that don't need full identity resolution but will keep failing Micropub posts until rotated.
+
+OUTPOST_VERSION: 0.1.51 → 0.1.52.
+
 ### Fixed (Bundle CSS + JS URLs gain `?ver=OUTPOST_VERSION` cache-bust)
 
 After v0.1.50 fixed the auth issue, the composer rendered with iOS native defaults instead of brand styling — the bundled CSS file (`index-CHHfkJsk.css`) was either not loading or returning a corrupted cached response. Cloudflare's edge cache had locked onto a stale cache entry for the file's hashed URL.
