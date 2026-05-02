@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (DS polish — outer margins, primary-button hardening, header collapse)
+
+- **`.outpost-composer` now has outer padding** (1rem inline + 1rem block-start) and `max-inline-size: 40rem` centered. Content no longer hugs the viewport edge on mobile, and reads at a comfortable measure on desktop.
+- **`.outpost-button` (primary)**: explicit hard-coded russian-violet (`#241c4a`) and white (`#ffffff`) as ultimate fallbacks at the end of the var() chain. Defends against service-worker caches serving stale `outpost-tokens.css` from the brief DS-1 neutral-defaults era — the token chain still resolves first; the literal is the safety net for edge-cached clients. Same for `.outpost-button--secondary` (prussian-blue text, glaucous border).
+- **`.outpost-composer__header:empty { display: none }`** — the empty header row above the tab strip (when the queue is empty and `QueueBadge` returns null) no longer reserves vertical space.
+
 ### Fixed (Phase H hotfix 4 — query-string token fallback for managed-WP hosts)
 - **Client now sends the bearer via `?_o_token=<token>` query param AND via the standard `Authorization` header** for both composer-config and preview endpoints. Managed-WP hosts (GoDaddy, certain WP Engine configs) strip the `Authorization` header before it reaches PHP, which is why bearer-only auth has been failing on Courtney's staging despite the bearer being valid.
 - **Server reads from `$_GET['_o_token']` as a fallback** in the `has_bearer_header()` permission gate. Sanitized via `is_string` check; the value is only used as a presence signal (we don't validate the token's authenticity, same trade-off as hotfix 3).

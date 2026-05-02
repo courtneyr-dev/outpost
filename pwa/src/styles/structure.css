@@ -78,22 +78,19 @@
 .outpost-button {
 	min-height: 2.75rem;
 	padding: 0.5rem 1rem;
-	border: 1px solid var(--outpost-primary-border, transparent);
-	border-radius: var(--outpost-radius, 0.375rem);
+	border: 1px solid var(--outpost-button-primary-border, var(--outpost-primary-border, #241c4a));
+	border-radius: var(--outpost-button-primary-radius, var(--outpost-radius-md, 0.5rem));
 	font: inherit;
 	font-weight: 600;
 	cursor: pointer;
 	/*
-	 * `revert` (rather than currentColor/inherit) is what the Hard Contract
-	 * asks for: when no --outpost-* token is set, fall back to whatever the
-	 * theme's `button { ... }` rules say, or the user-agent default if the
-	 * theme is silent. currentColor/inherit collapse foreground and
-	 * background to the same value on most themes — the button renders as
-	 * an unreadable black rectangle. revert never converges; it lets the
-	 * cascade resolve from the layer below ours.
+	 * Hard-coded russian-violet fallback (#241c4a) defends against
+	 * service-worker caches serving stale `outpost-tokens.css` from a
+	 * previous DS-1 build (when defaults were neutral). The token is
+	 * still the primary path; the literal is just the safety net.
 	 */
-	background: var(--outpost-primary-bg, revert);
-	color: var(--outpost-primary-fg, revert);
+	background: var(--outpost-button-primary-bg, var(--outpost-primary-bg, #241c4a));
+	color: var(--outpost-button-primary-fg, var(--outpost-primary-fg, #ffffff));
 }
 
 .outpost-button:focus {
@@ -107,9 +104,9 @@
 }
 
 .outpost-button--secondary {
-	background: transparent;
-	color: inherit;
-	border-color: var(--outpost-border, currentColor);
+	background: var(--outpost-button-secondary-bg, transparent);
+	color: var(--outpost-button-secondary-fg, #023047);
+	border-color: var(--outpost-button-secondary-border, var(--outpost-border, #647baf));
 }
 
 .outpost-error {
@@ -262,6 +259,14 @@
 .outpost-composer {
 	display: flex;
 	flex-direction: column;
+	max-inline-size: 40rem;
+	margin-inline: auto;
+	padding-inline: var(--outpost-space-md, 1rem);
+	padding-block-start: var(--outpost-space-md, 1rem);
+	padding-block-end: max(
+		var(--outpost-space-lg, 1.5rem),
+		env(safe-area-inset-bottom)
+	);
 }
 
 .outpost-tablist {
@@ -675,8 +680,14 @@
 	justify-content: flex-end;
 	align-items: center;
 	gap: var(--outpost-space-xs, 0.5rem);
-	padding-inline: var(--outpost-space-md, 1rem);
-	min-block-size: 1.5rem;
+}
+
+/* Collapse to zero when QueueBadge returns null (composer__header has no
+ * children visible). Otherwise the empty row eats vertical space above
+ * the tab strip. :empty doesn't fire if the child returns null in Preact
+ * (no DOM node), so this simply works. */
+.outpost-composer__header:empty {
+	display: none;
 }
 
 /*
