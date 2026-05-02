@@ -7,6 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Cache-layer documentation + wp-cli flush script)
+
+- **`docs/CACHE-LAYERS.md`** — comprehensive doc covering the four-layer cache stack on managed-WP hosts (object cache → CSS/JS minifier → page cache → CDN edge). Symptom-to-layer table. Order to flush in (innermost outward — outer repopulates from inner; wrong order means flushed inner gets re-staled). Defensive patterns Outpost uses (per-user `Cache-Control: no-store`, asset versioning via `?ver=`, SW cache-name versioning, no inline-script nonces).
+- **`bin/flush-caches.sh`** — wp-cli script that runs every available cache flush in inner-to-outer order: object cache → transients → Outpost rate-limit transients → rewrite rules → Perfmatters → WP Rocket → Autoptimize → LiteSpeed → GoDaddy MWP → WP Engine. Cloudflare API purge runs at the end when `CLOUDFLARE_ZONE_ID` + `CLOUDFLARE_API_TOKEN` env vars are set; otherwise skipped (use the GoDaddy admin UI for that layer).
+- Each cache-flush command is wrapped so missing optional plugins don't fail the script — only real failures (DB unreachable, etc.) surface. Idempotent; safe to run repeatedly.
+- Usage: `bin/flush-caches.sh` for local; `bin/flush-caches.sh --url=https://example.com` for remote via wp-cli aliases or SSH.
+
 ### Fixed (Diagnosed + fixed three Cloudflare-edge issues from staging Web Inspector)
 
 Web Inspector triage revealed three concrete problems that the rate of debugging refreshes amplified.
