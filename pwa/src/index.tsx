@@ -5,7 +5,7 @@
  * current URL + token state:
  *
  *   - /post/auth/callback → AuthCallback (handles the IndieAuth code exchange)
- *   - /post/* with a stored token → NoteForm (B1: minimal Micropub round-trip)
+ *   - /post/* with a stored token → ComposerTabs (Phase C0: tab framework + Note mode plugged in)
  *   - /post/* without a stored token → LoginScreen
  *   - /post/share-target → fallback message (Phase E lands this)
  *
@@ -19,7 +19,7 @@ import { useEffect, useState } from 'preact/hooks';
 import './styles/structure.css';
 import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
-import { NoteForm } from './components/note-form';
+import { ComposerTabs } from './components/composer-tabs';
 import { read_token, type StoredToken, type TokenStoreEnvironment } from './lib/token-store';
 
 type OutpostRoute = 'composer' | 'share-target' | 'auth-callback' | 'unknown';
@@ -114,7 +114,7 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	}
 
 	if (tokenState.status === 'present') {
-		return <NoteForm token={tokenState.token} tokenStore={tokenStore} />;
+		return <ComposerTabs token={tokenState.token} tokenStore={tokenStore} />;
 	}
 
 	return <LoginScreen clientId={clientId} redirectUri={redirectUri} />;

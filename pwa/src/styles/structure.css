@@ -144,3 +144,56 @@
 	gap: 0.5rem;
 	flex-wrap: wrap;
 }
+
+/*
+ * Composer tabs (Phase C0).
+ *
+ * WAI-ARIA tabs pattern. The visual tab strip is structural — paint comes
+ * from theme tokens with neutral fallbacks per the Hard Contract.
+ *
+ * The selected tab visually merges with the panel below it via a 1px
+ * negative margin and a transparent border-bottom that matches the
+ * theme's surface color (or transparent fallback). Inactive tabs have
+ * a transparent border so the underline reads as the panel boundary.
+ */
+.outpost-composer {
+	display: flex;
+	flex-direction: column;
+}
+
+.outpost-tablist {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	padding: 0.75rem 1.25rem 0;
+	border-bottom: 1px solid var(--outpost-border, currentColor);
+}
+
+.outpost-tab {
+	min-height: 2.75rem;
+	padding: 0.5rem 0.875rem;
+	border: 1px solid transparent;
+	border-bottom: none;
+	border-radius: var(--outpost-radius, 0.375rem) var(--outpost-radius, 0.375rem) 0 0;
+	font: inherit;
+	font-weight: 500;
+	cursor: pointer;
+	background: transparent;
+	color: inherit;
+	margin-bottom: -1px;
+}
+
+.outpost-tab:focus {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: -2px;
+}
+
+.outpost-tab[aria-selected="true"] {
+	border-color: var(--outpost-border, currentColor);
+	border-bottom-color: var(--outpost-surface-bg, transparent);
+	font-weight: 600;
+}
+
+[role="tabpanel"][hidden] {
+	display: none;
+}

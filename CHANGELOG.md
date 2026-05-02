@@ -7,6 +7,21 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C0 — Phase C kickoff: tab framework + Note mode plugged in)
+- `pwa/src/components/composer-tabs.tsx` — WAI-ARIA tabs scaffold (`role="tablist"` + `role="tab"` + `role="tabpanel"`, roving tabindex, automatic activation on arrow-key navigation, Home/End jumps, wrap-around at ends). `aria-label="Composer modes"` on the tablist. Closes A11Y-CHECKLIST Phase C focus-management forward gate.
+- `pwa/src/components/modes/note-mode.tsx` — Note mode plugged into the tab framework. Functionally identical to B1's NoteForm; heading shifts from `<h1>` (page-level) to `<h2>` (panel-level under the tablist). State persists across tab switches because all panels render eagerly with `hidden` toggling visibility.
+- `pwa/src/components/modes/reply-mode.tsx`, `photo-mode.tsx`, `listen-mode.tsx`, `article-mode.tsx` — placeholder cards naming which Phase C session lands the real implementation (Reply at C1, Photo at C2, Listen group at C3, Article at C4). Honest WIP indicator.
+- `pwa/src/components/composer-tabs.test.tsx` — 12 vitest tests covering: 5 tabs render with correct labels; Note selected by default; only active panel is visible; aria-controls / aria-labelledby pairing; click selection; ArrowRight / ArrowLeft / Home / End keyboard nav; wrap-around at both ends; non-handled keys don't change selection.
+- `pwa/src/styles/structure.css` — `.outpost-composer`, `.outpost-tablist`, `.outpost-tab` (selected variant + focus state with negative outline-offset so it doesn't clip on the bottom border), `[role="tabpanel"][hidden]` fallback. All paint via theme tokens with neutral fallbacks per the Hard Contract.
+
+### Changed (Session C0)
+- `OUTPOST_VERSION` bumped to `0.1.9` per A2 Locked Decision #16.
+- `pwa/src/index.tsx`: App mounts `ComposerTabs` instead of `NoteForm` for the authenticated composer route.
+- Bundle: 30.71 KB JS / 10.84 KB gzipped (was 27.88 / 10.00 at v0.1.8 — +0.84 KB gzipped for the tab framework + 4 stub components + tab CSS). 27% of the 40 KB Phase C bundle budget.
+
+### Removed (Session C0)
+- `pwa/src/components/note-form.tsx` — replaced by `modes/note-mode.tsx`. Same component logic; new file path matches the per-mode-file convention.
+
 ## [0.1.8] — 2026-05-01
 
 This release consolidates a 7-skill audit cycle (`/wordpress-testing`, `/wordpress-pro`, `/wordpress-security`, `/wordpress-performance`, `/wordpress-plugin-core`, `/wordpress-accessibility`, `/wordpress-org-compliance`) plus the wordpress-performance-best-practices follow-up. Six concrete shipped improvements: CI workflow, URL-scheme validation hardening, modulepreload + critical layout CSS, `uninstall.php` hygiene, `<html lang>` site-locale fix, plus six durable forward-looking checklists (security, performance, accessibility, A3 token requirements, smoke tests, plugin-core cleanup enumeration). Outpost is end-to-end functional: sign in via IndieAuth, post a note via Micropub, see the new post URL — verified on iPhone Safari with desktop Safari Web Inspector.

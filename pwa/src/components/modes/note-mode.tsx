@@ -4,27 +4,28 @@ import {
 	post_note,
 	MicropubError,
 	type MicropubEnvironment,
-} from '../lib/micropub';
-import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../lib/token-store';
+} from '../../lib/micropub';
+import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
 
 /**
- * Minimal note-posting form.
+ * Note mode — short-form posting (h-entry with content, no name).
  *
- * B1's user-visible surface — proves the IndieAuth → Micropub round-trip
- * works end-to-end on real staging. Replaces the B0b ComposerPlaceholder.
+ * The mode that lands first in Phase C: takes B1's NoteForm and slots it
+ * into the tab framework. Visual + behavioral shape is unchanged from
+ * B1; only the heading element shifts from `<h1>` (page-level) to `<h2>`
+ * (panel-level under the tablist).
  *
- * Phase C lands the actual composer modes (Note, Reply, Photo, Listen
- * group, Article); this form is the foundation NoteMode will extend.
+ * Endpoint caching: discovers the micropub endpoint on first post,
+ * holds it in component state for the session. Re-mounts (sign-out+in,
+ * page reload, A2HS launch) re-discover. State persists across tab
+ * switches because the parent ComposerTabs renders all panels eagerly
+ * and toggles visibility via the `hidden` attribute.
  *
- * Endpoint caching: discovers the micropub endpoint on first post, holds
- * it in component state for subsequent posts within the same mount.
- * Re-mounts (sign-out+in, page reload, A2HS launch) re-discover; the cost
- * is one extra HTTP request per session, traded for keeping the IDB
- * schema stable. B1c+ may persist micropub_endpoint in the token meta
- * if discovery latency becomes a UX issue.
+ * IndieWeb shape: posts an h-entry with `content` only — no `name`
+ * property. The Article mode (Phase C5) handles titled long-form posts.
  */
 
-export interface NoteFormProps {
+export interface NoteModeProps {
 	token: StoredToken;
 	tokenStore: TokenStoreEnvironment;
 	micropubEnv?: MicropubEnvironment;
@@ -37,7 +38,7 @@ type Status =
 	| { kind: 'posted'; location: string }
 	| { kind: 'error'; message: string };
 
-export function NoteForm({ token, tokenStore, micropubEnv }: NoteFormProps) {
+export function NoteMode({ token, tokenStore, micropubEnv }: NoteModeProps) {
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
@@ -92,10 +93,10 @@ export function NoteForm({ token, tokenStore, micropubEnv }: NoteFormProps) {
 				: 'Post note';
 
 	return (
-		<section class="outpost-card" aria-labelledby="outpost-note-form-title">
-			<h1 id="outpost-note-form-title" class="outpost-card__title">
-				Post a note
-			</h1>
+		<section class="outpost-card" aria-labelledby="outpost-note-mode-title">
+			<h2 id="outpost-note-mode-title" class="outpost-card__title">
+				Note
+			</h2>
 			<p class="outpost-card__lede">
 				Signed in as <code>{token.me || '—'}</code> · scope <code>{token.scope || '—'}</code>
 			</p>
