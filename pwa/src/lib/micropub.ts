@@ -66,6 +66,8 @@ export interface HEntryProperties {
 	'like-of'?: string;
 	'repost-of'?: string;
 	'bookmark-of'?: string;
+	'follow-of'?: string;
+	rsvp?: 'yes' | 'no' | 'maybe' | 'interested';
 	category?: string[];
 	'mp-syndicate-to'?: string[];
 }

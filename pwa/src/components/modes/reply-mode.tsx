@@ -38,9 +38,9 @@ export interface ReplyModeProps {
 	micropubEnv?: MicropubEnvironment;
 }
 
-type Variant = 'reply' | 'like' | 'repost' | 'bookmark';
+type Variant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
 
-type VariantProperty = 'in-reply-to' | 'like-of' | 'repost-of' | 'bookmark-of';
+type VariantProperty = 'in-reply-to' | 'like-of' | 'repost-of' | 'bookmark-of' | 'follow-of';
 
 interface VariantConfig {
 	label: string;
@@ -89,9 +89,35 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		submitLabel: 'Post bookmark',
 		previewIntro: 'Bookmarking:',
 	},
+	rsvp: {
+		// RSVP per IndieWeb: h-entry with `in-reply-to` (event URL) + `rsvp`
+		// (yes/no/maybe/interested). Submit handler adds the rsvp value.
+		label: 'RSVP',
+		property: 'in-reply-to',
+		contentRequired: false,
+		targetLabel: 'Event URL',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post RSVP',
+		previewIntro: 'RSVPing to:',
+	},
+	follow: {
+		// Follow per IndieWeb: h-entry with `follow-of` (target person URL).
+		// Spec is contested across servers; some prefer `mention-of`.
+		// `follow-of` is the most common convention as of 2026.
+		label: 'Follow',
+		property: 'follow-of',
+		contentRequired: false,
+		targetLabel: 'Person or feed URL',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post follow',
+		previewIntro: 'Following:',
+	},
 };
 
-const VARIANT_ORDER: Variant[] = ['reply', 'like', 'repost', 'bookmark'];
+const VARIANT_ORDER: Variant[] = ['reply', 'like', 'repost', 'bookmark', 'rsvp', 'follow'];
+
+type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
+const RSVP_VALUES: RsvpValue[] = ['yes', 'no', 'maybe', 'interested'];
 
 type Status =
 	| { kind: 'idle' }
@@ -106,6 +132,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 	const [variant, setVariant] = useState<Variant>('reply');
 	const [target_url, setTargetUrl] = useState('');
 	const [content, setContent] = useState('');
+	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -159,6 +186,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 			const properties: HEntryProperties = {
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
+				...(variant === 'rsvp' ? { rsvp: rsvp_value } : {}),
 			};
 
 			setStatus({ kind: 'posting' });
@@ -239,6 +267,25 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 					spellcheck={false}
 					required
 				/>
+
+				{variant === 'rsvp' && (
+					<fieldset class="outpost-variant-picker">
+						<legend class="outpost-label">Response</legend>
+						{RSVP_VALUES.map((value) => (
+							<label key={value} class="outpost-radio">
+								<input
+									type="radio"
+									name="outpost-rsvp-value"
+									value={value}
+									checked={rsvp_value === value}
+									onChange={(): void => setRsvpValue(value)}
+									disabled={submitting || fetching_preview}
+								/>
+								<span>{value.charAt(0).toUpperCase() + value.slice(1)}</span>
+							</label>
+						))}
+					</fieldset>
+				)}
 
 				{preview && (
 					<aside class="outpost-citation" aria-label="Preview">

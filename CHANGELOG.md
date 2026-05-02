@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C1c — RSVP + Follow variants)
+- Two more variants under the Reply tab: RSVP (h-entry with `in-reply-to` event URL + `rsvp` value yes/no/maybe/interested) and Follow (h-entry with `follow-of` person/feed URL).
+- RSVP gets a second radio group ("Response") that appears only when RSVP is selected — Yes / No / Maybe / Interested. The chosen value is added as the `rsvp` property on submission.
+- `HEntryProperties` interface in `micropub.ts` extended with `'follow-of'?: string` and `rsvp?: 'yes' | 'no' | 'maybe' | 'interested'`.
+- `reply-mode.test.tsx` updated for 6-variant order; new tests for Follow URL-only and RSVP picker show/hide. Vitest 122 → 124.
+
+### Changed (Session C1c)
+- `OUTPOST_VERSION` bumped to `0.1.12` per A2 #16.
+- VARIANT_ORDER now includes `'rsvp'` and `'follow'`. The Reply tab's radio group has 6 options.
+
 ### Added (Session C1b — Like, Repost, Bookmark variants under the Reply tab)
 - `pwa/src/components/modes/reply-mode.tsx` extended with a 4-way variant picker. `VARIANTS: Record<Variant, VariantConfig>` table maps each id to its target property name (`in-reply-to`, `like-of`, `repost-of`, `bookmark-of`), required-content boolean, and per-variant labels (target-input label, content-textarea label, submit button label, preview-intro string). Single `<fieldset>` + `<legend>` + 4 `<label>`-wrapped radios at the top of the form; selecting a variant switches the heading, labels, submit button, and target h-entry property.
 - `pwa/src/components/modes/reply-mode.test.tsx` — 7 new component-level vitest tests (first mode-component test in the suite). Covers radio order/default-Reply/heading-updates-on-change/submit-label-updates/Reply-requires-content/Like-only-requires-URL/target-input-label-per-variant. Vitest 115 → 122.
