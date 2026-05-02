@@ -1,6 +1,6 @@
 {
   "name": "outpost",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "description": "Mobile-first Progressive Web App composer for IndieWeb POSSE workflows.",
   "author": "Courtney Robertson <https://courtneyr.dev>",
   "license": "GPL-2.0-or-later",
@@ -16,7 +16,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node bin/check-tokens-parity.mjs && vite build",
+    "check:tokens": "node bin/check-tokens-parity.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint pwa/src",

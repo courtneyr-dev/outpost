@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session DS-1 — Outpost Design System v1.0 token taxonomy)
+
+The Outpost Design System v1.0 (drafted by Courtney) is now authoritative. This commit adopts the token system. Component refactors land in DS-2.
+
+- **`styles/outpost-tokens.css` rewritten** to the full DS taxonomy (~75 tokens across surface, input, button-primary/secondary/ghost, tab, chip, card, status, focus, type, space, radius, shadow, animation). All defaults are **neutral fallbacks** (`transparent`, `inherit`, `currentColor`, `Canvas`) per the design law: "plugin owns layout, theme owns paint." The composer renders correctly against any host theme without forcing colors.
+- **Hard break from prior brand-default behavior**: tokens previously shipped Courtney's russian-violet/prussian-blue palette as defaults, which violated the Hard Contract by forcing paint. Brand colors now belong in the active theme (or a site-level CSS override), not in plugin defaults. Theme integration cookbook in design-system Section 8.
+- **`pwa/src/styles/tokens.css`** — bundled mirror of the server-rendered tokens. Vite dev mode resolves tokens before the server-rendered file is fetched. Per design-system Section 9.
+- **`bin/check-tokens-parity.mjs`** — Node script that verifies the two token files have identical declarations. Wired into `npm run build` (build fails if parity drifts) and `npm run check:tokens` for ad-hoc.
+- **`pwa/src/styles/structure.css`** imports tokens.css at the top so the bundle has tokens available before any structural CSS rule resolves.
+- **Compatibility aliases** at the bottom of both token files: `--outpost-border`, `--outpost-radius`, `--outpost-focus`, `--outpost-text-muted`, `--outpost-primary-{bg,fg,border}`, `--outpost-chip-active-{bg,fg}` resolve to the new taxonomy. Existing component CSS keeps working without simultaneous edits. Aliases will be removed in v0.3.0 once components migrate fully (DS-2/DS-3).
+- **What's deferred to DS-2**: logical-property audit (RTL via `padding-inline-start` etc.), z-index scale scoped to `.outpost-shell`, focus-management consistency (always `:focus-visible` + `outline`, never `box-shadow`), reduced-motion gates around every transition, drawer pattern for the More pull-out, toast region, queue badge, char counter, citation card spec.
+
 ### Added (Session E1 — bookmarklet generator + admin page)
 - **New top-level Outpost menu in wp-admin** (`Outpost_Admin_Page`, `final`, static-only). Hosts the bookmarklet generator. Capability gate: `manage_options`. Icon: `dashicons-share-alt2`. Menu position 76.
 - **Bookmarklet generator** outputs ready-to-drag `javascript:` URLs for each Reply variant: Reply, Like, Repost, Bookmark. Each bookmarklet body grabs `location.href`, `document.title`, and `window.getSelection()`, encodes them, and opens `/post/share-target?variant=<variant>&url=…&title=…&text=…` in a new tab.

@@ -1,29 +1,15 @@
 /*
- * Outpost CSS custom-property defaults — server-rendered, not bundled.
+ * Bundled mirror of `styles/outpost-tokens.css`.
  *
- * Per the Outpost Design System v1.0 (Section 2):
+ * Per the Outpost Design System Section 9, this file exists so Vite dev
+ * mode (where the server-rendered tokens.css isn't fetched) still has
+ * token defaults available. The bundled CSS imports this before
+ * structure.css so dev rendering matches production.
  *
- *   Plugin owns layout. Theme owns paint. Every paint property routes
- *   through `var(--outpost-{token}, neutral-fallback)`. The neutral
- *   fallback is `transparent`, `inherit`, `currentColor`, or `Canvas` —
- *   values that make the plugin disappear into whatever theme is loaded.
- *
- * The trick: `currentColor` resolves to the inherited text color and
- * `Canvas` is the user-agent's default canvas color. Together they
- * produce a composer that reads correctly against any theme — dark text
- * on light canvas, light text on dark canvas, automatically.
- *
- * --------------------------------------------------------------------
- * Themes override these by setting the same custom properties at a
- * higher specificity (`:root`, `body`, or `.outpost-app`). Examples in
- * the design-system Section 8 (theme integration cookbook).
- *
- * Token names are public API. Renaming or removing a token is a major
- * version bump. Adding tokens is minor.
- *
- * This file MUST stay in parity with `pwa/src/styles/tokens.css` (the
- * bundled mirror that lets Vite dev mode resolve tokens before the
- * server-rendered file is fetched). CI verifies parity on every build.
+ * MUST stay in parity with `styles/outpost-tokens.css`. CI verifies
+ * parity on every build via `bin/check-tokens-parity` (added in the
+ * design-system adoption commit). If you edit one file you must
+ * mirror the change to the other.
  */
 
 :root {
@@ -148,12 +134,7 @@
 	--outpost-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
 	--outpost-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 
-	/* --- Compatibility aliases (transitional) ---------------------------
-	 * Older component CSS still references some legacy token names. The
-	 * aliases below resolve those names against the new taxonomy so we
-	 * don't have to touch every component file in the same commit. They
-	 * will be removed in v0.3.0 once components are fully migrated.
-	 */
+	/* --- Compatibility aliases (transitional) --------------------------- */
 	--outpost-border: var(--outpost-card-border);
 	--outpost-radius: var(--outpost-radius-md);
 	--outpost-focus: var(--outpost-focus-ring-color);
