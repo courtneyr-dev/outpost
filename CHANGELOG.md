@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C1b — Like, Repost, Bookmark variants under the Reply tab)
+- `pwa/src/components/modes/reply-mode.tsx` extended with a 4-way variant picker. `VARIANTS: Record<Variant, VariantConfig>` table maps each id to its target property name (`in-reply-to`, `like-of`, `repost-of`, `bookmark-of`), required-content boolean, and per-variant labels (target-input label, content-textarea label, submit button label, preview-intro string). Single `<fieldset>` + `<legend>` + 4 `<label>`-wrapped radios at the top of the form; selecting a variant switches the heading, labels, submit button, and target h-entry property.
+- `pwa/src/components/modes/reply-mode.test.tsx` — 7 new component-level vitest tests (first mode-component test in the suite). Covers radio order/default-Reply/heading-updates-on-change/submit-label-updates/Reply-requires-content/Like-only-requires-URL/target-input-label-per-variant. Vitest 115 → 122.
+- `pwa/src/styles/structure.css` adds `.outpost-variant-picker`, `.outpost-radio`, and `:has(input:checked)` selected-state styling. Modern `:has()` selector (iOS Safari 15.4+ / Chrome 105+) gives parent-state styling without JS.
+
+### Changed (Session C1b)
+- `OUTPOST_VERSION` bumped to `0.1.11` per A2 Locked Decision #16.
+- Reply mode now defaults to the Reply variant; tab label stays "Reply" as the umbrella for all 4 kinds. Submit button label is dynamic per variant ("Post reply" / "Post like" / "Post repost" / "Post bookmark").
+- Bundle: 36.38 KB JS / 12.34 KB gzipped (was 35.23 / 11.97 at v0.1.10 — +0.37 KB gzipped for the picker + table data + 3 additional submit paths). 31% of the 40 KB Phase C budget.
+
 ### Added (Session B2 + C1 — server-side preview endpoint + Reply mode)
 - **B2: `Outpost_Preview_Endpoint`** at `/wp-json/outpost/v1/preview` — POST `{ url }` returns `{ html, finalUrl, contentType }`. `final`, static-only. SSRF defenses: scheme allowlist (http/https), `wp_safe_remote_get` (auto-blocks loopback + private networks), 3-second timeout, 5 MB response-size cap, Content-Type allowlist (text/html + application/xhtml+xml), per-user rate limit 30/minute via transient. Response sanitization strips `<script>`, `<iframe>`, `<object>`, `<embed>`, event handlers, `javascript:`/`data:` URLs. `show_in_index => false` keeps the endpoint out of the public REST route index. Permission via IndieAuth plugin's bearer-token-to-WP-user translation; `current_user_can( 'edit_posts' )` works for both cookie and bearer auth.
 - **`pwa/src/lib/preview.ts`** — client wrapper for the B2 endpoint. `fetch_preview({ url, accessToken })` validates the URL client-side, POSTs with the bearer token, parses the response, extracts the page `<title>` via regex with entity decoding (no DOM/innerHTML dependency). `PreviewError` discriminates `unauthorized`, `invalid_url`, `unsupported_content_type`, `rate_limited`, `server_error`, `fetch_failed`.

@@ -3,6 +3,7 @@ import {
 	discover_micropub_endpoint,
 	post_h_entry,
 	MicropubError,
+	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { fetch_preview, PreviewError, type PreviewResult } from '../../lib/preview';
@@ -10,27 +11,87 @@ import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 
 /**
- * Reply mode — h-entry with content + `in-reply-to`.
+ * Reply mode — h-entry with a target URL plus optional content.
  *
- * Phase C1 first variant: plain Reply (Reply, Like, Repost, Bookmark, RSVP,
- * Follow are all the same shape with different property names; C1b extends
- * this component with a sub-mode picker for the others).
+ * Phase C1 + C1b ship four post kinds that share the same form shape
+ * (URL + optional content + target-property name) under a single tab,
+ * switched via a radio picker:
  *
- * Optional preview step: user pastes the target URL, optionally clicks
- * "Show preview" to fetch the citation context (page title) via the B2
- * preview endpoint. Preview is informational — user can submit without
- * previewing if they want.
+ *   - Reply    → in-reply-to  (content REQUIRED)
+ *   - Like     → like-of      (content optional)
+ *   - Repost   → repost-of    (content optional — annotation/commentary)
+ *   - Bookmark → bookmark-of  (content optional — annotation)
  *
- * Posting: form-encodes the h-entry with `content` and `in-reply-to`,
- * submits to the user's Micropub endpoint with the bearer token. The
- * `discover_micropub_endpoint` step is cached in component state for the
- * session, same as NoteMode.
+ * RSVP and Follow defer to a future C1c — RSVP needs an extra rsvp:
+ * yes/no/maybe control; Follow's spec is contested across servers.
+ *
+ * Optional preview step (Show preview button) runs the B2 preview
+ * endpoint to surface citation context (page title) before submission.
+ *
+ * State persists across tab switches (the parent ComposerTabs renders
+ * all panels eagerly and toggles visibility). Variant selection,
+ * URL, and content all survive tab switches.
  */
 
 export interface ReplyModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 }
+
+type Variant = 'reply' | 'like' | 'repost' | 'bookmark';
+
+type VariantProperty = 'in-reply-to' | 'like-of' | 'repost-of' | 'bookmark-of';
+
+interface VariantConfig {
+	label: string;
+	property: VariantProperty;
+	contentRequired: boolean;
+	targetLabel: string;
+	contentLabel: string;
+	submitLabel: string;
+	previewIntro: string;
+}
+
+const VARIANTS: Record<Variant, VariantConfig> = {
+	reply: {
+		label: 'Reply',
+		property: 'in-reply-to',
+		contentRequired: true,
+		targetLabel: 'In reply to',
+		contentLabel: 'Your reply',
+		submitLabel: 'Post reply',
+		previewIntro: 'Replying to:',
+	},
+	like: {
+		label: 'Like',
+		property: 'like-of',
+		contentRequired: false,
+		targetLabel: 'Like of',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post like',
+		previewIntro: 'Liking:',
+	},
+	repost: {
+		label: 'Repost',
+		property: 'repost-of',
+		contentRequired: false,
+		targetLabel: 'Repost of',
+		contentLabel: 'Optional commentary',
+		submitLabel: 'Post repost',
+		previewIntro: 'Reposting:',
+	},
+	bookmark: {
+		label: 'Bookmark',
+		property: 'bookmark-of',
+		contentRequired: false,
+		targetLabel: 'Bookmark of',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post bookmark',
+		previewIntro: 'Bookmarking:',
+	},
+};
+
+const VARIANT_ORDER: Variant[] = ['reply', 'like', 'repost', 'bookmark'];
 
 type Status =
 	| { kind: 'idle' }
@@ -42,11 +103,14 @@ type Status =
 	| { kind: 'error'; message: string };
 
 export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
+	const [variant, setVariant] = useState<Variant>('reply');
 	const [target_url, setTargetUrl] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
+
+	const config = VARIANTS[variant];
 
 	const handle_preview = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -77,7 +141,8 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 		event.preventDefault();
 		const trimmed_content = content.trim();
 		const trimmed_url = target_url.trim();
-		if (!trimmed_content || !trimmed_url) return;
+		if (!trimmed_url) return;
+		if (config.contentRequired && !trimmed_content) return;
 		if (!is_safe_http_url(trimmed_url)) {
 			setStatus({ kind: 'error', message: 'Target URL must be http:// or https://.' });
 			return;
@@ -91,13 +156,15 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 				setEndpoint(micropub_endpoint);
 			}
 
+			const properties: HEntryProperties = {
+				[config.property]: trimmed_url,
+				...(trimmed_content ? { content: trimmed_content } : {}),
+			};
+
 			setStatus({ kind: 'posting' });
 			const result = await post_h_entry(
 				{
-					properties: {
-						content: trimmed_content,
-						'in-reply-to': trimmed_url,
-					},
+					properties,
 					accessToken: token.accessToken,
 					micropubEndpoint: micropub_endpoint,
 				},
@@ -120,25 +187,44 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 
 	const submitting = status.kind === 'discovering-endpoint' || status.kind === 'posting';
 	const fetching_preview = status.kind === 'fetching-preview';
+	const can_submit =
+		!!target_url.trim() && (!config.contentRequired || !!content.trim());
 	const submit_label =
 		status.kind === 'discovering-endpoint'
 			? 'Finding endpoint…'
 			: status.kind === 'posting'
 				? 'Posting…'
-				: 'Post reply';
+				: config.submitLabel;
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-reply-mode-title">
 			<h2 id="outpost-reply-mode-title" class="outpost-card__title">
-				Reply
+				{config.label}
 			</h2>
 			<p class="outpost-card__lede">
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit}>
+				<fieldset class="outpost-variant-picker">
+					<legend class="outpost-label">Type</legend>
+					{VARIANT_ORDER.map((id) => (
+						<label key={id} class="outpost-radio">
+							<input
+								type="radio"
+								name="outpost-reply-variant"
+								value={id}
+								checked={variant === id}
+								onChange={(): void => setVariant(id)}
+								disabled={submitting || fetching_preview}
+							/>
+							<span>{VARIANTS[id].label}</span>
+						</label>
+					))}
+				</fieldset>
+
 				<label class="outpost-label" for="outpost-reply-target">
-					In reply to
+					{config.targetLabel}
 				</label>
 				<input
 					id="outpost-reply-target"
@@ -156,7 +242,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 
 				{preview && (
 					<aside class="outpost-citation" aria-label="Preview">
-						<small class="outpost-status">Replying to:</small>
+						<small class="outpost-status">{config.previewIntro}</small>
 						<p>
 							<strong>{preview.title ?? 'Untitled page'}</strong>
 							<br />
@@ -168,7 +254,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 				)}
 
 				<label class="outpost-label" for="outpost-reply-content">
-					Your reply
+					{config.contentLabel}
 				</label>
 				<textarea
 					id="outpost-reply-content"
@@ -179,7 +265,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 						setContent((event.target as HTMLTextAreaElement).value)
 					}
 					disabled={submitting || fetching_preview}
-					required
+					required={config.contentRequired}
 				/>
 
 				{status.kind === 'error' && (
@@ -201,7 +287,7 @@ export function ReplyMode({ token, micropubEnv }: ReplyModeProps) {
 					<button
 						class="outpost-button"
 						type="submit"
-						disabled={submitting || fetching_preview || !content.trim() || !target_url.trim()}
+						disabled={submitting || fetching_preview || !can_submit}
 					>
 						{submit_label}
 					</button>
