@@ -460,6 +460,31 @@
 }
 
 /*
+ * Install prompt — small banner above the composer for "Add to Home
+ * Screen". Closes the matchMedia(display-mode: standalone) gap and
+ * shows iOS-specific Share-button instructions when the browser can't
+ * fire beforeinstallprompt.
+ */
+.outpost-install-prompt {
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	padding: 0.5rem 0.75rem;
+	background: var(--outpost-info-bg, transparent);
+	color: var(--outpost-info-fg, inherit);
+	margin-bottom: 0.75rem;
+}
+
+.outpost-install-prompt p {
+	margin: 0.25rem 0 0.5rem;
+}
+
+.outpost-install-prompt__actions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+/*
  * Queue banner — surfaces queued offline posts above the tab strip.
  * Only renders when there's at least one queued entry. Soft warning
  * styling so it reads as informational, not error-state.

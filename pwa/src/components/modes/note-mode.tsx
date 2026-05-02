@@ -9,6 +9,7 @@ import {
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { mark_posted_once } from '../../lib/install-prompt-state';
 import {
 	MorePanel,
 	empty_more_values,
@@ -178,6 +179,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					micropubEnv,
 				);
 				setStatus({ kind: 'posted', location: result.location });
+				mark_posted_once();
 				setContent('');
 				setTitle('');
 				setMoreValues(empty_more_values());

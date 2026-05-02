@@ -10,6 +10,7 @@ import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { mark_posted_once } from '../../lib/install-prompt-state';
 import {
 	MorePanel,
 	empty_more_values,
@@ -154,6 +155,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					micropubEnv,
 				);
 				setStatus({ kind: 'posted', location: result.location });
+				mark_posted_once();
 				setTargetUrl('');
 				setPlaceName('');
 				setContent('');

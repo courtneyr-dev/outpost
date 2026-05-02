@@ -11,6 +11,7 @@ import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { mark_posted_once } from '../../lib/install-prompt-state';
 import {
 	MorePanel,
 	empty_more_values,
@@ -145,6 +146,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					micropubEnv,
 				);
 				setStatus({ kind: 'posted', location: result.location });
+				mark_posted_once();
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
 					await enqueue({

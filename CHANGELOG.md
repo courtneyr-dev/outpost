@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session D3 — Add-to-Home-Screen install prompt)
+- **`pwa/src/components/install-prompt.tsx`** — small banner above the composer that surfaces the A2HS prompt once the user has shown intent (one successful post). Two flows:
+  - **Android Chrome / Edge / Samsung Internet**: listens for `beforeinstallprompt`, prevents the default mini-infobar, captures the deferred event, and surfaces an "Install" button that calls `prompt()` on tap.
+  - **iOS Safari**: no programmatic A2HS exists, so the banner shows static instructions ("Tap the Share button, then Add to Home Screen") with a single Got it button.
+- **`pwa/src/lib/install-prompt-state.ts`** — localStorage helpers: `mark_posted_once()`, `has_posted()`, `mark_install_dismissed()`, `was_install_dismissed()`, `is_running_standalone()`, `is_ios_safari()`. Wraps localStorage in try/catch so private-browsing mode (where `setItem` throws) is a no-op rather than a crash.
+- **All four composing modes** call `mark_posted_once()` on successful post — this is the trigger the prompt watches for.
+- **Once-only dismiss**: tapping "Not now" / "Got it" sets `outpost.install_dismissed=1` and the banner never reappears for that device. Standalone-mode detection (`matchMedia('(display-mode: standalone)')` + iOS `navigator.standalone`) ensures the prompt never shows when the user is already running the installed PWA.
+- New token defaults: `--outpost-info-bg` (pale sky-blue) and `--outpost-info-fg` (prussian-blue) so the install prompt has visible styling without forcing colors. Distinct from the queue banner's warning palette so the two don't look like the same alert.
+
 ### Fixed (D1 hotfix — Yoast keyphrase field needs a visible border)
 - Wrapped the Yoast focus keyphrase label + input in a `<fieldset class="outpost-field-group">` so the field has an unambiguous border around the whole group, matching the visual weight of the XFN and Syndication picker fieldsets that sit beside it. New `.outpost-field-group` class is generic — future single-control bordered groups can reuse it.
 

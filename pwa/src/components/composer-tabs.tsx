@@ -13,6 +13,7 @@ import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { AboutTab } from './modes/about-tab';
 import { QueueBanner } from './queue-banner';
+import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
 
 /**
@@ -175,6 +176,7 @@ export function ComposerTabs({
 
 	return (
 		<div class="outpost-composer">
+			<InstallPrompt />
 			<QueueBanner
 				{...(micropubEnv ? { micropubEnv } : {})}
 				{...(queueEnv ? { queueEnv } : {})}

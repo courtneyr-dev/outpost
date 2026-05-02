@@ -68,6 +68,11 @@
 	--outpost-warning-bg: #fdf2dc;
 	--outpost-warning-fg: #023047;
 
+	/* Info — used for the Add-to-Home-Screen install prompt. Pale
+	 * sky-blue tint keeps it distinct from the queue's warning band. */
+	--outpost-info-bg: #e6f1f7;
+	--outpost-info-fg: #023047;
+
 	/* Active syndication chips — russian-violet, matches primary */
 	--outpost-chip-active-bg: #241c4a;
 	--outpost-chip-active-fg: #ffffff;
