@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Bundle CSS + JS URLs gain `?ver=OUTPOST_VERSION` cache-bust)
+
+After v0.1.50 fixed the auth issue, the composer rendered with iOS native defaults instead of brand styling — the bundled CSS file (`index-CHHfkJsk.css`) was either not loading or returning a corrupted cached response. Cloudflare's edge cache had locked onto a stale cache entry for the file's hashed URL.
+
+- **`<link rel="stylesheet">` (bundle CSS), `<link rel="modulepreload">`, and `<script type="module" src="…">` (bundle JS) all now have `?ver=OUTPOST_VERSION` appended.**
+- Vite content-hashes filenames already, but the version query adds a second invalidation axis (full URL uniqueness): every plugin version forces edge caches to re-fetch from origin even if the content hash hasn't changed.
+- Same trick already applied to the server-rendered `outpost-tokens.css` link in v0.1.46. Now consistent across all asset URLs the shell emits.
+
+OUTPOST_VERSION: 0.1.50 → 0.1.51.
+
 ### Fixed (Override `rest_authentication_errors` for the composer-config route)
 
 Direct visit to the composer-config URL on staging returned `{"code":"rest_forbidden","data":{"status":401}}` even after making the endpoint anonymous-readable. Diagnosis: a security plugin (Wordfence / "Disable REST API" / a `functions.php` snippet) had added a global `rest_authentication_errors` filter that rejects any anonymous REST request site-wide, **before** the per-route permission_callback gets called.

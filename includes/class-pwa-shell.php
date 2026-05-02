@@ -55,6 +55,16 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		$entry_url = Outpost_PWA_Assets::entry_url();
 		$css_urls  = Outpost_PWA_Assets::entry_css_urls();
+		// Append `?ver=OUTPOST_VERSION` to bundle CSS + JS URLs as a
+		// cache-bust against Cloudflare/managed-WP edge caches that may
+		// hold a corrupted or truncated version of the previous build's
+		// asset. Vite content-hashes filenames already, but the version
+		// query adds a second invalidation axis (full URL uniqueness)
+		// that defeats edge caches that may serve a stale cache entry
+		// for the current hashed URL.
+		$entry_url_versioned = null !== $entry_url
+			? add_query_arg( 'ver', OUTPOST_VERSION, $entry_url )
+			: null;
 		// Outpost shell IS the entire HTML document, not an enrichment of WP's
 		// page template — template_redirect priority 1 + self::halt() bypasses
 		// wp_head/wp_footer entirely. wp_enqueue_style/script can't reach this
@@ -70,8 +80,8 @@ final class Outpost_PWA_Shell {
 	<link rel="manifest" href="/post/manifest.json">
 	<link rel="icon" type="image/svg+xml" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
 	<link rel="apple-touch-icon" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
-		<?php if ( null !== $entry_url ) : ?>
-	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
+		<?php if ( null !== $entry_url_versioned ) : ?>
+	<link rel="modulepreload" href="<?php echo esc_url( $entry_url_versioned ); ?>">
 		<?php endif; ?>
 	<meta name="theme-color" content="#241c4a">
 	<meta name="apple-mobile-web-app-capable" content="yes">
@@ -88,14 +98,17 @@ final class Outpost_PWA_Shell {
 		#outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }
 	</style>
 	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css?ver=' . OUTPOST_VERSION ); ?>">
-		<?php foreach ( $css_urls as $css_url ) : ?>
-	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
+		<?php
+		foreach ( $css_urls as $css_url ) :
+			$css_url_versioned = add_query_arg( 'ver', OUTPOST_VERSION, $css_url );
+			?>
+	<link rel="stylesheet" href="<?php echo esc_url( $css_url_versioned ); ?>">
 		<?php endforeach; ?>
 </head>
 <body class="outpost-composer-shell">
 	<main id="outpost-root" data-outpost-route="composer"></main>
-		<?php if ( null !== $entry_url ) : ?>
-	<script type="module" src="<?php echo esc_url( $entry_url ); ?>"></script>
+		<?php if ( null !== $entry_url_versioned ) : ?>
+	<script type="module" src="<?php echo esc_url( $entry_url_versioned ); ?>"></script>
 		<?php endif; ?>
 		<?php
 		// SW registration moved into the bundled JS (pwa/src/index.tsx). The

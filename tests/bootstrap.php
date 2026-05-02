@@ -49,6 +49,20 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 		return 'outpost/outpost.php';
 	}
 }
+if ( ! function_exists( 'add_query_arg' ) ) {
+	function add_query_arg( ...$args ): string {
+		// Test stub matching WP's two-arg form: add_query_arg($key, $value, $url).
+		// Real WP supports many shapes; we only need the simple shape Outpost calls.
+		if ( count( $args ) >= 3 ) {
+			$key   = (string) $args[0];
+			$value = (string) $args[1];
+			$url   = (string) $args[2];
+			$separator = ( false === strpos( $url, '?' ) ) ? '?' : '&';
+			return $url . $separator . $key . '=' . rawurlencode( $value );
+		}
+		return (string) ( $args[0] ?? '' );
+	}
+}
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string {
 		// Test stub. Real WP uses random_bytes; we only need a stable
