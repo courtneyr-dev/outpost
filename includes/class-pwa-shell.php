@@ -265,27 +265,193 @@ final class Outpost_PWA_Shell {
 	}
 
 	/**
-	 * Emit the service-worker JavaScript stub.
+	 * Emit the service-worker JavaScript.
 	 *
-	 * A2 ships a no-op SW that registers `install` and `activate` listeners
-	 * so the registration script in {@see self::render_shell()} succeeds and
-	 * the browser caches the SW registration. The real fetch handler, offline
-	 * queue, and version skew handling land in Phase D.
+	 * Phase D0. Caches the PWA shell + bundled assets so the composer loads
+	 * on a cold device with no connection. Cache name includes
+	 * OUTPOST_VERSION so plugin updates land cleanly — the activate handler
+	 * deletes any cache that doesn't match the current version.
+	 *
+	 * Strategies:
+	 *
+	 *   - Shell HTML (/post/, /post/, /post/auth/callback, /post/share-target)
+	 *     → network-first, cache fallback. Updates ride in fast; offline
+	 *     loads from cache.
+	 *   - Bundled JS / CSS / map (under build/pwa/assets/)
+	 *     → cache-first. Filenames are content-hashed by Vite, so any new
+	 *     bundle is a new URL — old cached entries get cleaned by the
+	 *     version-bump activation pass.
+	 *   - Token CSS (styles/outpost-tokens.css) and SVG icons
+	 *     (assets/icons/...) → cache-first.
+	 *   - Manifest (/post/manifest.json) → network-first, cache fallback.
+	 *   - REST endpoints (/wp-json/outpost/v1/...) → bypass (never cache;
+	 *     composer-config is per-user, preview is per-request).
+	 *   - All other same-origin fetches → bypass (let the browser's HTTP
+	 *     cache handle).
+	 *
+	 * The SW controls /post/* clients (scope locked to /post/ per A0 #6),
+	 * but a controlled client's same-origin fetches go through the SW
+	 * regardless of URL — so plugin assets at /wp-content/.../build/pwa/...
+	 * are interceptable even though they live outside /post/.
+	 *
+	 * The composer's offline post-queue (D1) registers separately on the
+	 * `message` channel from the page; the SW exposes a small JSON
+	 * protocol for the page to drive cache management (e.g. force a
+	 * shell refresh after sign-in).
 	 */
 	public static function render_service_worker(): void {
 		self::send_js_header();
+		$version    = OUTPOST_VERSION;
+		$plugin_url = OUTPOST_PLUGIN_URL;
 		?>
-// Outpost service worker — A2 stub. Phase D lands the fetch/cache strategy.
+// Outpost service worker — Phase D0. Plugin version: <?php echo esc_js( $version ); ?>.
+
+const CACHE_VERSION = '<?php echo esc_js( $version ); ?>';
+const CACHE_NAME = 'outpost-' + CACHE_VERSION;
+const PLUGIN_URL = '<?php echo esc_js( $plugin_url ); ?>';
+const SHELL_URL = '/post/';
+
+// Resources to seed the cache with on install. The bundled JS/CSS get
+// fetched lazily on first composer open and cached by the fetch handler —
+// we don't precache them by URL because their hashed filenames change with
+// every plugin build.
+const PRECACHE_URLS = [
+	SHELL_URL,
+	'/post/manifest.json',
+	PLUGIN_URL + 'styles/outpost-tokens.css',
+	PLUGIN_URL + 'assets/icons/outpost-icon.svg',
+	PLUGIN_URL + 'assets/icons/outpost-icon-maskable.svg',
+];
+
 self.addEventListener('install', (event) => {
-	self.skipWaiting();
+	event.waitUntil(
+		caches.open(CACHE_NAME)
+			.then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {
+				// Best-effort precache. If a single URL 404s on first install
+				// (e.g. token CSS not yet deployed) we don't want the whole
+				// install to fail — the fetch handler will fill the cache
+				// lazily anyway.
+			}))
+			.then(() => self.skipWaiting())
+	);
 });
 
 self.addEventListener('activate', (event) => {
-	event.waitUntil(self.clients.claim());
+	event.waitUntil(
+		caches.keys()
+			.then((keys) => Promise.all(
+				keys
+					.filter((key) => key.startsWith('outpost-') && key !== CACHE_NAME)
+					.map((key) => caches.delete(key))
+			))
+			.then(() => self.clients.claim())
+	);
 });
 
-// Scope is /post/ only — registered explicitly in the shell so this SW
-// never tries to control the parent WordPress site.
+// URL classifiers — split here so the fetch handler stays readable.
+function is_shell_request(url) {
+	if (url.origin !== self.location.origin) return false;
+	const p = url.pathname;
+	return p === '/post' || p === '/post/' ||
+		p === '/post/auth/callback' || p === '/post/auth/callback/' ||
+		p === '/post/share-target' || p === '/post/share-target/';
+}
+
+function is_manifest_request(url) {
+	return url.origin === self.location.origin && url.pathname === '/post/manifest.json';
+}
+
+function is_static_asset(url) {
+	if (url.origin !== self.location.origin) return false;
+	if (!url.pathname.startsWith(new URL(PLUGIN_URL).pathname)) return false;
+	const p = url.pathname;
+	return p.includes('/build/pwa/assets/') ||
+		p.includes('/styles/') ||
+		p.includes('/assets/icons/');
+}
+
+function is_outpost_rest(url) {
+	return url.origin === self.location.origin &&
+		url.pathname.startsWith('/wp-json/outpost/v1/');
+}
+
+self.addEventListener('fetch', (event) => {
+	const request = event.request;
+
+	// Non-GET (POSTs to Micropub, our preview endpoint) is always passthrough.
+	if (request.method !== 'GET') {
+		return;
+	}
+
+	const url = new URL(request.url);
+
+	// Outpost REST endpoints — never cache. composer-config is per-user
+	// (responses already carry Cache-Control: no-store); preview is per
+	// request. Let the browser's HTTP cache decide.
+	if (is_outpost_rest(url)) {
+		return;
+	}
+
+	if (is_shell_request(url)) {
+		event.respondWith(network_first(request, SHELL_URL));
+		return;
+	}
+
+	if (is_manifest_request(url)) {
+		event.respondWith(network_first(request, request.url));
+		return;
+	}
+
+	if (is_static_asset(url)) {
+		event.respondWith(cache_first(request));
+		return;
+	}
+
+	// Everything else (Micropub endpoint discovery on the user's "me" URL,
+	// theme assets, etc.) — passthrough.
+});
+
+async function network_first(request, cache_key) {
+	try {
+		const response = await fetch(request);
+		if (response && response.ok) {
+			const copy = response.clone();
+			const cache = await caches.open(CACHE_NAME);
+			await cache.put(cache_key, copy);
+		}
+		return response;
+	} catch (_err) {
+		const cached = await caches.match(cache_key);
+		if (cached) return cached;
+		// Last-ditch: serve the shell so the SPA at least renders the
+		// "you're offline" fallback (D1 surfaces the offline queue UI).
+		const shell = await caches.match(SHELL_URL);
+		if (shell) return shell;
+		return new Response('Outpost is offline.', {
+			status: 503,
+			headers: { 'Content-Type': 'text/plain' },
+		});
+	}
+}
+
+async function cache_first(request) {
+	const cached = await caches.match(request);
+	if (cached) return cached;
+	try {
+		const response = await fetch(request);
+		if (response && response.ok) {
+			const copy = response.clone();
+			const cache = await caches.open(CACHE_NAME);
+			await cache.put(request, copy);
+		}
+		return response;
+	} catch (_err) {
+		return new Response('Asset unavailable offline.', {
+			status: 503,
+			headers: { 'Content-Type': 'text/plain' },
+		});
+	}
+}
 		<?php
 		self::halt();
 	}

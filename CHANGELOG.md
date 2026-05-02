@@ -7,6 +7,19 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session D0 — real service worker with offline caching)
+- The service worker is no longer a no-op stub. `Outpost_PWA_Shell::render_service_worker()` now emits a real worker that caches the PWA shell + bundled assets so the composer loads on a cold device with no connection.
+- **Cache name includes `OUTPOST_VERSION`** (e.g. `outpost-0.1.24`). The activate handler deletes any cache that doesn't match the current version, so plugin updates land cleanly without users having to clear their browser data.
+- **Strategies by URL pattern**:
+  - Shell HTML (`/post/`, `/post/auth/callback`, `/post/share-target`) → network-first, cache fallback. Updates ride in fast; offline loads from cache.
+  - Bundled JS / CSS / sourcemaps under `build/pwa/assets/` → cache-first (Vite's content-hashed filenames mean any new bundle is a new URL).
+  - Token CSS (`styles/outpost-tokens.css`) and SVG icons (`assets/icons/...`) → cache-first.
+  - Manifest (`/post/manifest.json`) → network-first, cache fallback.
+  - Outpost REST endpoints (`/wp-json/outpost/v1/...`) → bypass entirely. composer-config is per-user; preview is per-request. Never cached.
+- **PRECACHE_URLS seeded on install**: shell, manifest, token CSS, both icons. Uses `cache.addAll()` with a catch-all so a single 404 (e.g. token CSS not yet deployed) doesn't fail the whole install — the fetch handler fills the cache lazily anyway.
+- The SW controls `/post/*` clients (scope locked per A0 #6) but a controlled client's same-origin fetches go through the SW regardless of URL — so plugin assets at `/wp-content/.../build/pwa/...` are interceptable even though they live outside `/post/`.
+- Last-ditch fallback: when the network is down AND the requested URL isn't cached AND the shell isn't cached either, the SW returns a 503 plain-text "Outpost is offline" response. Phase D1 will replace this with a proper offline composer screen + the queued-post UI.
+
 ### Fixed (C5d hotfix — disclosure triangle missing on Categories/Tags)
 - The native `<details>` triangle (▶ closed / ▼ open) was hidden because `display: flex` on the `<summary>` element drops the `::marker` pseudo-element in WebKit and Chromium. Now uses a plain block summary with the count rendered as an inline span. Triangles match the More options panel.
 
