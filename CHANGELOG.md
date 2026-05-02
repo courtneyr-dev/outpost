@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Diagnosed + fixed three Cloudflare-edge issues from staging Web Inspector)
+
+Web Inspector triage revealed three concrete problems that the rate of debugging refreshes amplified.
+
+- **Composer-config rate limit raised from 60/min/user to 300/min/user.** Debug refreshes + auth-callback redirects + share-target intake reloads can stack 60 calls in a minute easily; 300 (5/sec sustained) is still defensive against pathological abuse but stops blocking real use.
+- **CSP nonce mismatch under edge caching → SW registration moved out of the inline `<script>`.** Cloudflare caches the shell HTML body while CSP regenerates per request — the cached nonce in the inline tag stops matching the per-request CSP header, so the inline script gets blocked. The fix: move SW registration into the bundled `index.tsx` (which loads via `<script type="module" src="…">` and matches CSP `script-src 'self'`). Inline `<script>` is gone from the shell. CSP now reads `script-src 'self'` (no nonce — no inline scripts to nonce).
+- **Cloudflare auto-minified `outpost-tokens.css` was serving stale values** (file `4204941ad64d.outpost-tokens.min.css`). The shell's `<link>` to the token file now appends `?ver=OUTPOST_VERSION`. Cloudflare treats query-string-distinct URLs as separate cache entries, so each plugin version forces a fresh fetch and the auto-minifier regenerates the bundle with current values. Solves the "buttons appearing orange because token file is stuck on a previous build" symptom.
+
+OUTPOST_VERSION: 0.1.45 → 0.1.46.
+
 ### Fixed (DS polish — outer margins, primary-button hardening, header collapse)
 
 - **`.outpost-composer` now has outer padding** (1rem inline + 1rem block-start) and `max-inline-size: 40rem` centered. Content no longer hugs the viewport edge on mobile, and reads at a comfortable measure on desktop.

@@ -87,7 +87,7 @@ final class Outpost_PWA_Shell {
 		body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }
 		#outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }
 	</style>
-	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css' ); ?>">
+	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css?ver=' . OUTPOST_VERSION ); ?>">
 		<?php foreach ( $css_urls as $css_url ) : ?>
 	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 		<?php endforeach; ?>
@@ -97,11 +97,12 @@ final class Outpost_PWA_Shell {
 		<?php if ( null !== $entry_url ) : ?>
 	<script type="module" src="<?php echo esc_url( $entry_url ); ?>"></script>
 		<?php endif; ?>
-	<script nonce="<?php echo esc_attr( self::script_nonce() ); ?>">
-		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/post/sw', { scope: '/post/' });
-		}
-	</script>
+		<?php
+		// SW registration moved into the bundled JS (pwa/src/index.tsx). The
+		// inline script approach used a per-request CSP nonce that breaks under
+		// edge caching — Cloudflare caches the HTML body but CSP regenerates
+		// per request, so the cached nonce diverges from the per-request CSP.
+		?>
 </body>
 </html>
 		<?php
@@ -578,10 +579,11 @@ async function cache_first(request) {
 	 * (e.g. allow a specific analytics origin, embed a CDN).
 	 */
 	private static function content_security_policy(): string {
-		$nonce = self::script_nonce();
-		$csp   = array(
+		$csp = array(
 			"default-src 'self'",
-			"script-src 'self' 'nonce-" . $nonce . "'",
+			// No inline scripts — SW registration lives in the bundled JS
+			// (pwa/src/index.tsx). 'self' covers the bundled script tag.
+			"script-src 'self'",
 			"style-src 'self' 'unsafe-inline'",
 			"img-src 'self' data: blob: https:",
 			"connect-src 'self' https:",
@@ -598,10 +600,9 @@ async function cache_first(request) {
 		 * Outpost composer shell. Filter callers can append (or replace)
 		 * directives.
 		 *
-		 * @param string[] $csp   Default directive list.
-		 * @param string   $nonce Per-request script nonce attached to inline scripts.
+		 * @param string[] $csp Default directive list.
 		 */
-		$csp = apply_filters( 'outpost_csp', $csp, $nonce );
+		$csp = apply_filters( 'outpost_csp', $csp );
 		return is_array( $csp ) ? implode( '; ', $csp ) : '';
 	}
 

@@ -142,4 +142,17 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 			},
 		});
 	}
+	// Service worker registration moved out of the shell's inline <script>
+	// because edge caching (Cloudflare) caches the HTML response while CSP
+	// nonces regenerate per request — the cached nonce in the inline tag
+	// stops matching the CSP header, blocking execution. Bundled JS uses
+	// the script-src 'self' allowlist directly, no nonce needed.
+	if ('serviceWorker' in navigator) {
+		navigator.serviceWorker
+			.register('/post/sw', { scope: '/post/' })
+			.catch(() => {
+				// SW registration failure is non-fatal — composer still works
+				// without offline cache. Silent.
+			});
+	}
 }

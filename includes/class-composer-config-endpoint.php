@@ -53,9 +53,10 @@ final class Outpost_Composer_Config_Endpoint {
 	private const ROUTE_PATH      = '/composer-config';
 
 	/** Per-user rate limit (requests per minute). Composer mounts pull
-	 * the config on every fresh load, so this is more permissive than
-	 * the preview endpoint's 30/min. */
-	private const RATE_LIMIT_PER_MINUTE = 60;
+	 * the config on every fresh load + dev/debug refreshes can stack
+	 * fast. 300/min (5/sec sustained) covers normal use comfortably
+	 * while still blocking pathological abuse. */
+	private const RATE_LIMIT_PER_MINUTE = 300;
 
 	/** Default Post Format list when get_theme_support gives us no specifics. */
 	private const ALL_POST_FORMATS = array(
