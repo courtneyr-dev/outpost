@@ -211,15 +211,24 @@ final class Outpost_Composer_Config_Endpoint {
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		// The composer-config payload is non-sensitive: companion plugin
+		// activation status (visible to any wp-admin user with `read`),
+		// public taxonomy terms (already exposed in /?taxonomy=...
+		// archives), the Bridgy host map (a public spec), the XFN spec
+		// list (public spec), and site-wide composer settings. Equivalent
+		// to what WordPress's own /wp-json/wp/v2/types and
+		// /wp-json/wp/v2/categories endpoints expose anonymously by
+		// default.
+		//
+		// Allow anonymous access. Sites that want to enforce auth can
+		// override via the `outpost_composer_config_permission` filter.
+		// Per-IP rate limiting in is_rate_limited() bounds abuse.
 		/**
 		 * Override the composer-config permission decision.
 		 *
 		 * @param bool $allow Whether the request is authorized.
 		 */
-		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
+		return (bool) apply_filters( 'outpost_composer_config_permission', true );
 	}
 
 	/**
@@ -237,27 +246,6 @@ final class Outpost_Composer_Config_Endpoint {
 	 * useful. Filter `outpost_composer_config_permission` for stricter
 	 * sites.
 	 */
-	private static function has_bearer_header(): bool {
-		// Path 1: standard Authorization header.
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-		}
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
-		}
-		// Path 2: query-string fallback. Some managed-WP hosts (GoDaddy,
-		// WP Engine on certain configs) strip the Authorization header
-		// before it reaches PHP. The composer client sends `_o_token`
-		// as a query param when present so the endpoint still authenticates.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
-			return true;
-		}
-		return false;
-	}
 
 	/**
 	 * Per-user rate limit check. Returns true if the user is over
@@ -268,17 +256,45 @@ final class Outpost_Composer_Config_Endpoint {
 	 * is good enough for this use case and cheap.
 	 */
 	private static function is_rate_limited(): bool {
+		// Prefer user-id keying when available (logged-in user); fall
+		// back to IP-keying for anonymous requests. IP-keying isn't
+		// perfect (NAT, shared proxies) but it bounds the abuse window.
 		$user_id = get_current_user_id();
-		if ( ! $user_id ) {
-			return true;
+		if ( $user_id ) {
+			$key = 'outpost_config_rl_u_' . (string) $user_id;
+		} else {
+			$ip  = self::client_ip();
+			$key = 'outpost_config_rl_a_' . md5( $ip );
 		}
-		$key   = 'outpost_config_rl_' . (string) $user_id;
 		$count = (int) get_transient( $key );
 		if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
 			return true;
 		}
 		set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
 		return false;
+	}
+
+	/**
+	 * Best-effort client IP for rate-limiting anonymous requests.
+	 *
+	 * REMOTE_ADDR is the canonical truth at the PHP layer. CDNs (Cloudflare,
+	 * Akamai) inject the real client IP into CF-Connecting-IP /
+	 * X-Forwarded-For — we honor those when present, but the fallback is
+	 * REMOTE_ADDR so spoofed headers can't bypass the limit on direct
+	 * connections.
+	 */
+	private static function client_ip(): string {
+		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+			return (string) $_SERVER['HTTP_CF_CONNECTING_IP'];
+		}
+		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			$forwarded = (string) $_SERVER['HTTP_X_FORWARDED_FOR'];
+			$first     = trim( explode( ',', $forwarded )[0] );
+			if ( '' !== $first ) {
+				return $first;
+			}
+		}
+		return isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
 	}
 
 	/**

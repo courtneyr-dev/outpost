@@ -31,37 +31,20 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		return $ref->invoke( null, ...$args );
 	}
 
-	public function test_permission_check_allows_edit_posts(): void {
-		WP_Mock::userFunction( 'current_user_can' )
-			->with( 'edit_posts' )
-			->andReturn( true );
-		// is_user_logged_in is short-circuited by current_user_can succeeding
-		// but we stub it just in case.
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+	public function test_permission_check_allows_anonymous_by_default(): void {
+		// As of 2026-05 the endpoint allows anonymous reads — payload is
+		// non-sensitive (companion plugin status, public taxonomy terms,
+		// site settings), equivalent to WP's own anonymous REST routes.
+		// Sites that want auth can override via the filter.
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( true )
 			->reply( true );
 		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
-	public function test_permission_check_falls_back_to_logged_in_user(): void {
-		WP_Mock::userFunction( 'current_user_can' )
-			->with( 'edit_posts' )
-			->andReturn( false );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+	public function test_permission_check_filter_can_deny(): void {
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( true )
-			->reply( true );
-		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
-	}
-
-	public function test_permission_check_denies_when_neither_path_passes(): void {
-		WP_Mock::userFunction( 'current_user_can' )
-			->with( 'edit_posts' )
-			->andReturn( false );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::onFilter( 'outpost_composer_config_permission' )
-			->with( false )
 			->reply( false );
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
 	}

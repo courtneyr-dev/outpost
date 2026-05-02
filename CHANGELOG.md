@@ -7,6 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Composer-config endpoint now anonymous-readable)
+
+After several rounds of auth fallbacks (cookie credential, is_user_logged_in fallback, bearer-header presence, query-string token) the staging environment continued to return errors despite the bearer being valid for actual posting via Micropub. The auth complexity wasn't worth the security benefit because the payload itself is non-sensitive.
+
+- **`/wp-json/outpost/v1/composer-config` is now readable anonymously.** Payload is companion plugin status, public taxonomy terms (already exposed in `/?taxonomy=...` archives and `/wp-json/wp/v2/categories`), the Bridgy host map (a public spec), the XFN spec list (a public spec), and site-wide composer settings. Equivalent to what WordPress's own `/wp-json/wp/v2/types` and `/wp-json/wp/v2/categories` expose anonymously by default.
+- **Filter `outpost_composer_config_permission` still works** for sites that want to restore auth gating. Filter receives `$allow = true` and any callback returning `false` denies the request.
+- **Rate limiting now keys on user-id when logged in, IP when anonymous.** Prevents anonymous abuse without depending on auth. IP detection honors `CF-Connecting-IP` (Cloudflare) and `X-Forwarded-For` (other CDNs), falling back to `REMOTE_ADDR`. Still 600 req/min/key.
+- **`has_bearer_header()` helper deleted** — no longer needed since we don't gate on bearer presence anymore.
+- The preview endpoint (`/wp-json/outpost/v1/preview`) keeps its existing auth (logged-in OR bearer-present) because it scrapes user-supplied URLs and anonymous access there could be abused for SSRF reconnaissance.
+
 ### Fixed (Per-request timestamp cache-bust + rate limit bump)
 
 The staging environment has a known limitation — the GoDaddy/Cloudflare partnership only exposes a "Purge Everything" button for the production cache, not for the staging mirror. So when staging Cloudflare caches an error response (e.g. a stale 429), it stays cached until natural TTL expires. The fix has to come from the client side.
