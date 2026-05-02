@@ -356,6 +356,63 @@ Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`. Tap the **Reply** 
 
 State preservation is confirmed by the `hidden`-attribute pattern: panels render eagerly, only visibility toggles, so component state survives switches.
 
+## C1b — Reply variants (Like, Repost, Bookmark)
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.11`. Carries forward from C1 (you should already be authenticated and the Reply tab works).
+
+### C1b-Stage 1 — Variant picker renders
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>` and tap the **Reply** tab.
+
+**Expected:**
+
+- A new **Type** row at the top of the form with 4 radio options: **Reply**, **Like**, **Repost**, **Bookmark**.
+- **Reply** is selected by default.
+- Card heading reads "Reply" (matches the selected variant).
+- "In reply to" label above the URL input (matches the selected variant).
+- "Your reply" label above the textarea.
+- Submit button reads "Post reply" (disabled until both URL and content are filled).
+
+### C1b-Stage 2 — Switch variants, verify form updates
+
+Tap each variant in turn. **Expected after each tap:**
+
+| Tap | Heading | URL label | Content label | Submit label |
+|-----|---------|-----------|---------------|--------------|
+| Like | Like | Like of | Optional note | Post like |
+| Repost | Repost | Repost of | Optional commentary | Post repost |
+| Bookmark | Bookmark | Bookmark of | Optional note | Post bookmark |
+| Reply (back) | Reply | In reply to | Your reply | Post reply |
+
+### C1b-Stage 3 — Submit a Like (URL-only)
+
+1. With **Like** selected, paste a URL into "Like of".
+2. Leave the content textarea empty.
+3. **Expected:** the **Post like** button is enabled (Like doesn't require content; only URL).
+4. Tap **Post like**. Watch the same "Finding endpoint…" → "Posting…" → "Posted to: …" sequence as Reply.
+5. Open the resulting URL. **Expected:** post renders with `like-of` property containing the target URL. On staging WordPress with Post Kinds active it appears as a Like post type. Without Post Kinds, the post is a regular note with the like-of URL stored as post meta.
+
+### C1b-Stage 4 — Submit a Repost with optional commentary
+
+1. Switch to **Repost**.
+2. Paste a URL.
+3. Optionally type a short note in "Optional commentary" (e.g. "Sharing this 👇").
+4. Tap **Post repost**. Same submit sequence; `repost-of` property carries the URL, `content` carries your commentary.
+
+### C1b-Stage 5 — Verify content-required behavior
+
+1. Switch back to **Reply**.
+2. Paste a URL but leave content empty.
+3. **Expected:** the **Post reply** button is **disabled** (Reply requires content; the other 3 variants don't).
+4. Switch to **Like** without filling content. **Expected:** **Post like** is **enabled** (URL alone is enough for Like/Repost/Bookmark).
+
+### C1b-Stage 6 — Variant + form state survives tab switch
+
+1. Select **Bookmark**, paste a URL, type "later".
+2. Switch to the Note tab.
+3. Switch back to Reply.
+4. **Expected:** Bookmark is still selected, URL is still filled, content is still "later". The eager-render-with-hidden pattern preserves all of mode state.
+
 ## Reporting
 
 After running, reply with one of:
