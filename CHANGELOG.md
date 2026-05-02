@@ -7,6 +7,17 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Override `rest_authentication_errors` for the composer-config route)
+
+Direct visit to the composer-config URL on staging returned `{"code":"rest_forbidden","data":{"status":401}}` even after making the endpoint anonymous-readable. Diagnosis: a security plugin (Wordfence / "Disable REST API" / a `functions.php` snippet) had added a global `rest_authentication_errors` filter that rejects any anonymous REST request site-wide, **before** the per-route permission_callback gets called.
+
+- **`Outpost_Composer_Config_Endpoint::allow_anonymous_for_self()`** — runs at filter priority 999 (after every other plugin's hook) and clears any error result when the request URI is for the composer-config route. Strictly scoped: never affects `rest_authentication_errors` decisions for any other endpoint.
+- Detects both standard URI shapes: `/wp-json/outpost/v1/composer-config` AND legacy `?rest_route=/outpost/v1/composer-config`.
+- Other plugins' hardening of `/wp-json/wp/v2/users` and similar sensitive routes stays intact — we only opt out for the one route we own.
+- Filterable indirectly via `outpost_composer_config_permission` if a site needs to lock the composer-config back down.
+
+OUTPOST_VERSION: 0.1.49 → 0.1.50.
+
 ### Changed (Composer-config endpoint now anonymous-readable)
 
 After several rounds of auth fallbacks (cookie credential, is_user_logged_in fallback, bearer-header presence, query-string token) the staging environment continued to return errors despite the bearer being valid for actual posting via Micropub. The auth complexity wasn't worth the security benefit because the payload itself is non-sensitive.

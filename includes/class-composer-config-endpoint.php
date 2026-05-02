@@ -157,6 +157,39 @@ final class Outpost_Composer_Config_Endpoint {
 	 */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
+		// Opt this route out of any global rest_authentication_errors
+		// gating that other plugins (Wordfence, "Disable REST API", any
+		// "API hardening" snippet) impose. Runs late (999) so it
+		// overrides whatever upstream callback added the error. Scoped
+		// strictly to the composer-config path — never broadens auth on
+		// other routes.
+		add_filter( 'rest_authentication_errors', array( self::class, 'allow_anonymous_for_self' ), 999 );
+	}
+
+	/**
+	 * Clears any rest_authentication_errors result for the composer-config
+	 * route. Other plugins commonly add a global "must be logged in"
+	 * error via this filter; without an opt-out the request never
+	 * reaches our permission_callback.
+	 *
+	 * @param mixed $result Existing filter result (null, true, WP_Error).
+	 * @return mixed Cleared (null) when the request is for our route;
+	 *               unchanged otherwise.
+	 */
+	public static function allow_anonymous_for_self( $result ) {
+		if ( ! isset( $_SERVER['REQUEST_URI'] ) ) {
+			return $result;
+		}
+		$uri = (string) $_SERVER['REQUEST_URI'];
+		if ( false !== strpos( $uri, '/wp-json/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
+			return null;
+		}
+		// Some installs serve REST under index.php?rest_route=/...
+		if ( false !== strpos( $uri, 'rest_route=' . rawurlencode( '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) )
+			|| false !== strpos( $uri, 'rest_route=/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
+			return null;
+		}
+		return $result;
 	}
 
 	/**
