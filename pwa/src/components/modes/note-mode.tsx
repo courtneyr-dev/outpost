@@ -13,6 +13,7 @@ import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { CharCounter } from '../char-counter';
+import { Drawer } from '../drawer';
 import {
 	MorePanel,
 	empty_more_values,
@@ -167,6 +168,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 
+	const [more_open, setMoreOpen] = useState(false);
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -373,16 +375,22 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				)}
 
 				{composerConfig && (
-					<MorePanel
-						token={token}
-						composerConfig={composerConfig}
-						values={more_values}
-						onChange={setMoreValues}
-						micropubEndpoint={endpoint}
-						{...(micropubEnv ? { micropubEnv } : {})}
-						disabled={submitting}
-						idPrefix="outpost-note"
-					/>
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							disabled={submitting}
+							idPrefix="outpost-note"
+						/>
+					</Drawer>
 				)}
 
 				<div class="outpost-form-actions">
@@ -393,6 +401,16 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					>
 						{button_label}
 					</button>
+					{composerConfig && (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting}
+						>
+							More options
+						</button>
+					)}
 					<button
 						class="outpost-button outpost-button--secondary"
 						type="button"

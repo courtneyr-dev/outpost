@@ -240,9 +240,7 @@ export function MorePanel(props: MorePanelProps) {
 	const focuskw_display = values.yoastFocusKw ?? '';
 
 	return (
-		<details class="outpost-more-panel">
-			<summary class="outpost-more-panel__summary">More options</summary>
-			<div class="outpost-more-panel__body">
+		<div class="outpost-more-panel__body">
 				<TermPicker
 					legend="Categories"
 					existing={composerConfig.existingCategories}
@@ -381,8 +379,7 @@ export function MorePanel(props: MorePanelProps) {
 						won't apply.
 					</p>
 				)}
-			</div>
-		</details>
+		</div>
 	);
 }
 

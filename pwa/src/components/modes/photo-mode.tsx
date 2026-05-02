@@ -13,6 +13,7 @@ import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { VoiceButton } from '../voice-button';
+import { Drawer } from '../drawer';
 import {
 	MorePanel,
 	empty_more_values,
@@ -74,6 +75,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_open, setMoreOpen] = useState(false);
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -299,22 +301,38 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				)}
 
 				{composerConfig && (
-					<MorePanel
-						token={token}
-						composerConfig={composerConfig}
-						values={more_values}
-						onChange={setMoreValues}
-						micropubEndpoint={micropub_endpoint}
-						{...(micropubEnv ? { micropubEnv } : {})}
-						disabled={submitting}
-						idPrefix="outpost-photo"
-					/>
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={micropub_endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							disabled={submitting}
+							idPrefix="outpost-photo"
+						/>
+					</Drawer>
 				)}
 
 				<div class="outpost-form-actions">
 					<button class="outpost-button" type="submit" disabled={!can_submit}>
 						{submit_label}
 					</button>
+					{composerConfig && (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting}
+						>
+							More options
+						</button>
+					)}
 				</div>
 			</form>
 		</section>

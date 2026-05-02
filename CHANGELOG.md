@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (Session DS-3a — drawer pattern for More options)
+
+- **`pwa/src/components/drawer.tsx`** — Drawer primitive per Design System 4.9 + 5.25. Slides up from the bottom of the viewport. Used by every composing mode for the More options pull-out (was a `<details>` panel inline).
+- **Drawer behavior**: scrim covers the page and taps it to close; Esc closes; focus moves into the drawer on open (first focusable element) and returns to the trigger on close; body scroll locks while open. ARIA: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` points at the header title. Slide animation gates on `prefers-reduced-motion: no-preference` — instant when reduced-motion is on.
+- **MorePanel internal change**: dropped the outer `<details>`/`<summary>` wrapper. The panel now renders its content directly so the Drawer (which already handles open/close + animation + scrim) doesn't double-wrap.
+- **Each mode** (Post, Reply, Photo, Doing) gains a `[More options]` button in the form-actions row. Tap to open the drawer with the existing chip-pickers, Yoast field, XFN picker, and syndication chips. Mode-specific behavior preserved (Reply passes `xfnTargetUrl`, Listen does too).
+- New CSS surfaces: `.outpost-drawer-scrim`, `.outpost-drawer`, `.outpost-drawer__header`, `.outpost-drawer__title`, `.outpost-drawer__body`. Both transition rules gate on `prefers-reduced-motion`.
+- **Deferred to DS-3b**: Toast region for post-publish success messages (currently still inline), queue badge in composer header (currently still a full-width banner).
+
 ### Changed (Session DS-2 — brand palette restored + logical-property audit + char counter)
 
 - **Brand palette restored under the DS-1 taxonomy.** DS-1 briefly shipped fully-neutral defaults (transparent / currentColor / Canvas) per the strictest reading of the design law. That made the composer "disappear" but stripped the link/button visual identity on real-world deploys. This commit restores Courtney's brand colors as the working out-of-box defaults under the new DS-1 token names — themes can still override every token, and structural tokens (space, radius, shadow, animation) stay aligned.

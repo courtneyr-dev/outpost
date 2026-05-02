@@ -553,6 +553,99 @@
 }
 
 /*
+ * Drawer primitive (Design System 4.9 + 5.25). Slides up from the
+ * bottom of the viewport. Scrim + drawer always in the DOM; the
+ * `data-open` attribute drives the slide animation. body scroll locks
+ * via JS while open.
+ */
+.outpost-drawer-scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	background: rgba(2, 48, 71, 0.5);
+	opacity: 0;
+	pointer-events: none;
+}
+
+.outpost-drawer-scrim[data-open='true'] {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.outpost-drawer-scrim {
+		transition: opacity var(--outpost-duration-base, 200ms)
+			var(--outpost-easing-standard, ease);
+	}
+}
+
+.outpost-drawer {
+	position: fixed;
+	inset-inline: 0;
+	inset-block-end: 0;
+	z-index: 50;
+	max-block-size: 90dvh;
+	display: flex;
+	flex-direction: column;
+	background: var(--outpost-card-bg, #ffffff);
+	color: var(--outpost-card-fg, inherit);
+	border-block-start: 1px solid var(--outpost-card-border, currentColor);
+	border-start-start-radius: var(--outpost-radius-lg, 0.75rem);
+	border-start-end-radius: var(--outpost-radius-lg, 0.75rem);
+	box-shadow: var(--outpost-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
+	transform: translateY(100%);
+	visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.outpost-drawer {
+		transition:
+			transform var(--outpost-duration-slow, 320ms)
+				var(--outpost-easing-standard, ease),
+			visibility var(--outpost-duration-slow, 320ms) step-end;
+	}
+}
+
+.outpost-drawer[data-open='true'] {
+	transform: translateY(0);
+	visibility: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.outpost-drawer[data-open='true'] {
+		transition:
+			transform var(--outpost-duration-slow, 320ms)
+				var(--outpost-easing-decelerate, ease-out),
+			visibility 0s step-start;
+	}
+}
+
+.outpost-drawer__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--outpost-space-sm, 0.75rem);
+	padding: var(--outpost-space-md, 1rem) var(--outpost-space-lg, 1.5rem);
+	border-block-end: 1px solid var(--outpost-card-border, currentColor);
+}
+
+.outpost-drawer__title {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: var(--outpost-font-weight-strong, 600);
+}
+
+.outpost-drawer__body {
+	flex: 1;
+	overflow-y: auto;
+	padding: var(--outpost-space-lg, 1.5rem);
+	padding-block-end: max(
+		var(--outpost-space-lg, 1.5rem),
+		env(safe-area-inset-bottom)
+	);
+}
+
+/*
  * Install prompt — small banner above the composer for "Add to Home
  * Screen". Closes the matchMedia(display-mode: standalone) gap and
  * shows iOS-specific Share-button instructions when the browser can't

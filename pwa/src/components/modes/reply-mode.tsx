@@ -15,6 +15,7 @@ import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { CharCounter } from '../char-counter';
+import { Drawer } from '../drawer';
 import {
 	MorePanel,
 	empty_more_values,
@@ -174,6 +175,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_open, setMoreOpen] = useState(false);
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -427,17 +429,23 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				)}
 
 				{composerConfig && (
-					<MorePanel
-						token={token}
-						composerConfig={composerConfig}
-						values={more_values}
-						onChange={setMoreValues}
-						micropubEndpoint={endpoint}
-						{...(micropubEnv ? { micropubEnv } : {})}
-						xfnTargetUrl={trimmed_target_url || null}
-						disabled={submitting || fetching_preview}
-						idPrefix="outpost-reply"
-					/>
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							xfnTargetUrl={trimmed_target_url || null}
+							disabled={submitting || fetching_preview}
+							idPrefix="outpost-reply"
+						/>
+					</Drawer>
 				)}
 
 				<div class="outpost-form-actions">
@@ -456,6 +464,16 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					>
 						{fetching_preview ? 'Fetching…' : 'Show preview'}
 					</button>
+					{composerConfig && (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting || fetching_preview}
+						>
+							More options
+						</button>
+					)}
 				</div>
 			</form>
 		</section>

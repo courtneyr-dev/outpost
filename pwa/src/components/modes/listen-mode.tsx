@@ -12,6 +12,7 @@ import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { VoiceButton } from '../voice-button';
+import { Drawer } from '../drawer';
 import {
 	MorePanel,
 	empty_more_values,
@@ -114,6 +115,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_open, setMoreOpen] = useState(false);
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -319,17 +321,23 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				)}
 
 				{composerConfig && (
-					<MorePanel
-						token={token}
-						composerConfig={composerConfig}
-						values={more_values}
-						onChange={setMoreValues}
-						micropubEndpoint={endpoint}
-						{...(micropubEnv ? { micropubEnv } : {})}
-						xfnTargetUrl={trimmed_target_url_for_xfn || null}
-						disabled={submitting}
-						idPrefix="outpost-listen"
-					/>
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							xfnTargetUrl={trimmed_target_url_for_xfn || null}
+							disabled={submitting}
+							idPrefix="outpost-listen"
+						/>
+					</Drawer>
 				)}
 
 				<div class="outpost-form-actions">
@@ -340,6 +348,16 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					>
 						{submit_label}
 					</button>
+					{composerConfig && (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting}
+						>
+							More options
+						</button>
+					)}
 				</div>
 			</form>
 		</section>
