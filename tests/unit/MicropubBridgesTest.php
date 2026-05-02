@@ -16,6 +16,7 @@ namespace Outpost\Tests\Unit;
 use Outpost_Micropub_Bridges;
 use Outpost_Companion_Detector;
 use WP_Mock;
+use WP_Term;
 
 final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 
@@ -266,5 +267,88 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			)
 		);
 		$this->assertEquals( array( 'content' => 'hi' ), $result );
+	}
+
+	// --- mp-categories[] auto-create bridge ------------------------------
+
+	public function test_apply_categories_no_op_when_property_missing(): void {
+		// No expectations on get_term_by/wp_insert_term/wp_set_post_categories —
+		// they shouldn't be called when the property is absent.
+		$this->invoke_private( 'apply_categories', array( 42, array() ) );
+		$this->assertTrue( true ); // reached without WP_Mock failures
+	}
+
+	public function test_apply_categories_no_op_when_property_empty_array(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )->never();
+		$this->invoke_private( 'apply_categories', array( 42, array( 'mp-categories' => array() ) ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_categories_uses_existing_term_when_name_matches(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->once()
+			->with( 'Tech' )
+			->andReturn( 'Tech' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->once()
+			->with( 'name', 'Tech', 'category' )
+			->andReturn( new WP_Term( array( 'term_id' => 7 ) ) );
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 7 ), true );
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Tech' ) ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_categories_creates_new_term_when_missing(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->andReturn( 'Brand New' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'sanitize_title' )
+			->andReturn( 'brand-new' );
+		WP_Mock::userFunction( 'wp_insert_term' )
+			->once()
+			->with( 'Brand New', 'category' )
+			->andReturn( array( 'term_id' => 99 ) );
+		WP_Mock::userFunction( 'is_wp_error' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 99 ), true );
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Brand New' ) ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_categories_reuses_term_found_by_slug_fallback(): void {
+		// First get_term_by('name', ...) returns false; second get_term_by('slug', ...) returns the term.
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->andReturn( 'Tech-Stuff' );
+		WP_Mock::userFunction( 'sanitize_title' )
+			->andReturn( 'tech-stuff' );
+		$call_count = 0;
+		WP_Mock::userFunction( 'get_term_by' )
+			->andReturnUsing(
+				function () use ( &$call_count ) {
+					$call_count++;
+					return $call_count === 1
+						? false
+						: new WP_Term( array( 'term_id' => 12 ) );
+				}
+			);
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 12 ), true );
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Tech-Stuff' ) ) )
+		);
+		$this->assertEquals( 2, $call_count );
 	}
 }

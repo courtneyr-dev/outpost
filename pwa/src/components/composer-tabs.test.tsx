@@ -74,10 +74,10 @@ async function flush(): Promise<void> {
 }
 
 describe('ComposerTabs', () => {
-	it('renders five tabs with the expected labels', () => {
+	it('renders four tabs with the expected labels', () => {
 		mount();
 		const labels = tabs().map((t) => t.textContent);
-		expect(labels).toEqual(['Note', 'Reply', 'Photo', 'Doing', 'Article']);
+		expect(labels).toEqual(['Note', 'Reply', 'Photo', 'Doing']);
 	});
 
 	it('selects Note by default', () => {
@@ -146,8 +146,8 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'End');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
-		press_key(tabs()[4]!, 'ArrowRight');
+		expect(tabs()[3]?.getAttribute('aria-selected')).toBe('true');
+		press_key(tabs()[3]!, 'ArrowRight');
 		await flush();
 		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
 	});
@@ -156,7 +156,7 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'ArrowLeft');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
+		expect(tabs()[3]?.getAttribute('aria-selected')).toBe('true');
 	});
 
 	it('jumps to first tab with Home', async () => {
@@ -172,7 +172,7 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'End');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
+		expect(tabs()[3]?.getAttribute('aria-selected')).toBe('true');
 	});
 
 	it('ignores keys other than arrows / Home / End', async () => {

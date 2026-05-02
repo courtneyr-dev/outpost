@@ -7,6 +7,28 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C5c — Note + Article merge with Quote variant + categories/tags autocomplete)
+
+#### Tab merge
+- **Article tab merged into Note** as a fifth variant. The composer tab strip drops from 5 to 4 (Note · Reply · Photo · Doing) — each tab gains ~25% touch surface on mobile. Internally consistent with the Reply tab (6 variants) and Doing tab (5 variants) — every multi-shape post-kind in Outpost now lives under a single tab.
+- **Five Note variants**: Note (default — auto-infer format) · Status (`mp-post-format=status`) · Aside (`mp-post-format=aside`) · Article (title + body, `mp-post-format=standard`) · Quote (`mp-post-format=quote`).
+- The Article variant reveals a Title input (required) and bumps the textarea to 12 rows / 18 rem min-height for long-form writing. The other four variants stay at 4-5 rows.
+- Submit button label and heading both adapt per variant ("Post note" / "Post status" / "Post aside" / "Post article" / "Post quote").
+- `pwa/src/components/modes/article-mode.tsx` deleted — its title-field logic moved into note-mode.tsx.
+
+#### Categories & tags autocomplete
+- **Composer-config endpoint** extended with `existingCategories` and `existingTags` — both arrays of `{slug, name}` pairs from `get_terms()`. Capped at 200 entries each, sorted by usage count (most-used first), `hide_empty => true` so only terms the user has actually applied to posts surface as suggestions.
+- **MorePanel** Categories field replaced with **two** autocomplete fields: Categories and Tags. Both use HTML5 `<datalist>` for native zero-JS autocomplete (works with screen readers, browser-managed keyboard navigation). User types comma-separated values; existing terms are suggested; new ones can be typed and create-on-the-fly.
+- **Tags** send via Micropub's standard `category[]` property — David Shanske's Micropub plugin already maps that to `post_tag` taxonomy by default.
+- **Categories** send via Outpost-specific `mp-categories[]` property; `Outpost_Micropub_Bridges::apply_categories()` looks up each name (then slug) in the `category` taxonomy, reuses existing terms, and creates new ones via `wp_insert_term`. Append-mode preserves any categories the Micropub plugin already assigned. Runs unconditionally — `category` is core WordPress, no companion gating needed.
+
+### Changed (Session C5c)
+- `OUTPOST_VERSION` bumped to `0.1.19` per A2 #16.
+- `composer-tabs.tsx`: ModeId union drops 'article'; ArticleMode import removed; modes array drops to 4 entries.
+- `composer-tabs.test.tsx`: tab-list assertion updated to 4 labels; wrap-around tests target index 3 instead of 4.
+- `pwa/src/lib/micropub.ts`: `HEntryProperties.mp-categories?: string[]` added.
+- `tests/unit/MicropubBridgesTest.php` adds 4 tests for the apply_categories handler covering no-op paths, existing-term reuse, and new-term creation.
+
 ### Added (Session C5b — Note Status/Aside variants + Listen XFN wiring)
 - **Note mode variant picker.** Three radios at the top of the Note tab: Note (default — auto-infer), Status (forces `mp-post-format=status`), Aside (forces `mp-post-format=aside`). Status and Aside are the two most-common short-post styles for mobile composing; the variant picker brings them one tap away instead of buried in the More pull-out's Post Format dropdown. Each variant updates the heading, the submit-button label, and (when the bridge applies) the WordPress Post Format on the resulting post. The More pull-out's explicit Post Format selector still wins precedence — variants set the default, the More panel overrides.
 - **XFN picker on every URL input.** The Doing tab (Listen / Watch / Read / Play / Checkin) now passes its target URL through to MorePanel as `xfnTargetUrl`, so when Link Extension for XFN is active the relationship picker appears for those URLs too. Reply mode already had this in C5; Listen was the missing surface. Photo and Article modes don't take URL inputs, so XFN doesn't apply.

@@ -11,7 +11,6 @@ import { NoteMode } from './modes/note-mode';
 import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
-import { ArticleMode } from './modes/article-mode';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -42,7 +41,7 @@ import { ArticleMode } from './modes/article-mode';
  * ModeId union and the modes array would extend then.
  */
 
-type ModeId = 'note' | 'reply' | 'photo' | 'listen' | 'article';
+type ModeId = 'note' | 'reply' | 'photo' | 'listen';
 
 interface ModeDefinition {
 	id: ModeId;
@@ -129,17 +128,6 @@ export function ComposerTabs({
 			label: 'Doing',
 			render: () => (
 				<ListenMode
-					token={token}
-					{...(micropubEnv ? { micropubEnv } : {})}
-					{...(composer_config ? { composerConfig: composer_config } : {})}
-				/>
-			),
-		},
-		{
-			id: 'article',
-			label: 'Article',
-			render: () => (
-				<ArticleMode
 					token={token}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}

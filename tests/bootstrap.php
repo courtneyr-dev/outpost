@@ -147,6 +147,50 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	}
 }
 
+// Minimal WP_Term stub for unit tests. Real WP supplies the full class; bridge
+// + composer-config tests only need a constructable object whose properties
+// round-trip through `instanceof WP_Term` checks.
+if ( ! class_exists( 'WP_Term' ) ) {
+	class WP_Term {
+		public int $term_id   = 0;
+		public string $name   = '';
+		public string $slug   = '';
+		public int $count     = 0;
+		public string $taxonomy = '';
+
+		public function __construct( array $fields = array() ) {
+			foreach ( $fields as $key => $value ) {
+				if ( property_exists( $this, $key ) ) {
+					$this->$key = $value;
+				}
+			}
+		}
+	}
+}
+
+// Minimal WP_REST_Response stub. The real class extends WP_HTTP_Response with
+// status code, headers, and data accessors; tests only need round-trip of data
+// + status.
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		private mixed $data;
+		private int $status;
+
+		public function __construct( $data = null, $status = 200 ) {
+			$this->data   = $data;
+			$this->status = (int) $status;
+		}
+
+		public function get_data() {
+			return $this->data;
+		}
+
+		public function get_status(): int {
+			return $this->status;
+		}
+	}
+}
+
 // Load the bootstrap. This pulls in the constant block, the detector class,
 // the companion-base class, and every procedural helper outpost.php defines.
 require_once dirname( __DIR__ ) . '/outpost.php';

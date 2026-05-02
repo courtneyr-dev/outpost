@@ -30,6 +30,8 @@ const valid_config: ComposerConfig = {
 	},
 	postFormats: null,
 	xfnRels: ['friend', 'met'],
+	existingCategories: [{ slug: 'tech', name: 'Tech' }],
+	existingTags: [{ slug: 'indieweb', name: 'IndieWeb' }],
 };
 
 describe('fetch_composer_config', () => {

@@ -21,10 +21,17 @@ export type CompanionId =
 	| 'activitypub'
 	| 'accessibility-checker';
 
+export interface TermSuggestion {
+	slug: string;
+	name: string;
+}
+
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
 	postFormats: string[] | null;
 	xfnRels: string[];
+	existingCategories: TermSuggestion[];
+	existingTags: TermSuggestion[];
 }
 
 export interface ComposerConfigEnvironment {
@@ -116,5 +123,7 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!v.companions || typeof v.companions !== 'object') return false;
 	if (v.postFormats !== null && !Array.isArray(v.postFormats)) return false;
 	if (!Array.isArray(v.xfnRels)) return false;
+	if (!Array.isArray(v.existingCategories)) return false;
+	if (!Array.isArray(v.existingTags)) return false;
 	return true;
 }

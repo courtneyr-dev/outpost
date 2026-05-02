@@ -88,6 +88,8 @@ export interface HEntryProperties {
 	'mp-xfn'?: string[];
 	/** Outpost-specific: target URL for the XFN rels. */
 	'mp-xfn-target'?: string;
+	/** Outpost-specific: WP category names (auto-create new ones via the bridge). */
+	'mp-categories'?: string[];
 }
 
 export interface SyndicationTarget {

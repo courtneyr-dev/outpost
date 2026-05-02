@@ -37,8 +37,10 @@ import type { StoredToken } from '../lib/token-store';
  */
 
 export interface MorePanelValues {
-	/** Trimmed, non-empty category strings (split from the free-text input). */
+	/** WP post_category terms — autocompleted from existing, or freshly typed. */
 	categories: string[];
+	/** WP post_tag terms — autocompleted from existing, or freshly typed. */
+	tags: string[];
 	/** Trimmed slug (or null if empty). */
 	slug: string | null;
 	/** Selected post format slug, or null when not chosen / unavailable. */
@@ -53,6 +55,7 @@ export interface MorePanelValues {
 
 export const empty_more_values = (): MorePanelValues => ({
 	categories: [],
+	tags: [],
 	slug: null,
 	postFormat: null,
 	yoastFocusKw: null,
@@ -127,12 +130,18 @@ export function MorePanel(props: MorePanelProps) {
 		};
 	}, [micropubEndpoint, syndication_status, token.accessToken, micropubEnv]);
 
-	const handle_categories = (raw: string): void => {
-		const list = raw
+	const split_csv = (raw: string): string[] =>
+		raw
 			.split(',')
 			.map((s) => s.trim())
 			.filter((s) => s.length > 0);
-		onChange({ ...values, categories: list });
+
+	const handle_categories = (raw: string): void => {
+		onChange({ ...values, categories: split_csv(raw) });
+	};
+
+	const handle_tags = (raw: string): void => {
+		onChange({ ...values, tags: split_csv(raw) });
 	};
 
 	const handle_slug = (raw: string): void => {
@@ -164,6 +173,7 @@ export function MorePanel(props: MorePanelProps) {
 	};
 
 	const categories_display = values.categories.join(', ');
+	const tags_display = values.tags.join(', ');
 	const slug_display = values.slug ?? '';
 	const post_format_display = values.postFormat ?? '';
 	const focuskw_display = values.yoastFocusKw ?? '';
@@ -183,9 +193,34 @@ export function MorePanel(props: MorePanelProps) {
 					onInput={(e): void =>
 						handle_categories((e.target as HTMLInputElement).value)
 					}
-					placeholder="comma, separated, list"
+					list={`${idPrefix}-categories-list`}
+					placeholder="Existing or new — comma separated"
 					disabled={disabled}
 				/>
+				<datalist id={`${idPrefix}-categories-list`}>
+					{composerConfig.existingCategories.map((cat) => (
+						<option key={cat.slug} value={cat.name} />
+					))}
+				</datalist>
+
+				<label class="outpost-label" for={`${idPrefix}-tags`}>
+					Tags
+				</label>
+				<input
+					id={`${idPrefix}-tags`}
+					class="outpost-input"
+					type="text"
+					value={tags_display}
+					onInput={(e): void => handle_tags((e.target as HTMLInputElement).value)}
+					list={`${idPrefix}-tags-list`}
+					placeholder="Existing or new — comma separated"
+					disabled={disabled}
+				/>
+				<datalist id={`${idPrefix}-tags-list`}>
+					{composerConfig.existingTags.map((tag) => (
+						<option key={tag.slug} value={tag.name} />
+					))}
+				</datalist>
 
 				<label class="outpost-label" for={`${idPrefix}-slug`}>
 					Slug
@@ -303,8 +338,16 @@ export function merge_more_values<T>(
 	xfnTargetUrl?: string | null,
 ): T {
 	const merged: Record<string, unknown> = { ...(properties as Record<string, unknown>) };
+	// Tags use Micropub's standard `category[]` property — David Shanske's
+	// Micropub plugin defaults to mapping that to post_tag taxonomy.
+	if (values.tags.length > 0) {
+		merged['category'] = values.tags;
+	}
+	// Outpost-specific `mp-categories[]` — the bridge calls
+	// wp_set_post_categories() with auto-create so users can type new
+	// category names from the composer.
 	if (values.categories.length > 0) {
-		merged['category'] = values.categories;
+		merged['mp-categories'] = values.categories;
 	}
 	if (values.slug) {
 		merged['mp-slug'] = values.slug;

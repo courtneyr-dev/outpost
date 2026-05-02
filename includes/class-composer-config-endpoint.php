@@ -21,7 +21,9 @@
  *       "accessibility-checker": "active" | "inactive" | "absent"
  *     },
  *     "postFormats": ["aside", "gallery", "image", ...] | null,
- *     "xfnRels": ["friend", "met", "colleague", ...]
+ *     "xfnRels": ["friend", "met", "colleague", ...],
+ *     "existingCategories": [{"slug": "tech", "name": "Tech"}, ...],
+ *     "existingTags": [{"slug": "indieweb", "name": "IndieWeb"}, ...]
  *   }
  *
  * `postFormats` is null when Post Formats for Block Themes is absent —
@@ -149,12 +151,57 @@ final class Outpost_Composer_Config_Endpoint {
 
 		return new WP_REST_Response(
 			array(
-				'companions'  => $companions,
-				'postFormats' => $post_formats,
-				'xfnRels'     => self::XFN_RELS,
+				'companions'         => $companions,
+				'postFormats'        => $post_formats,
+				'xfnRels'            => self::XFN_RELS,
+				'existingCategories' => self::list_terms( 'category' ),
+				'existingTags'       => self::list_terms( 'post_tag' ),
 			),
 			200
 		);
+	}
+
+	/**
+	 * Read existing terms for a taxonomy as a flat list of {slug, name}.
+	 *
+	 * Capped at 200 entries. Excludes empty terms (count = 0) — for the
+	 * autocomplete UI on mobile, only suggesting terms the user has
+	 * actually used keeps the dropdown short. Users can still type new
+	 * values; the list is suggestions, not a constraint.
+	 *
+	 * Returns the empty array when the taxonomy isn't registered or the
+	 * lookup errors — callers treat that as "no suggestions" rather than
+	 * a failure mode.
+	 *
+	 * @param string $taxonomy 'category' or 'post_tag'.
+	 * @return array<int, array{slug: string, name: string}>
+	 */
+	private static function list_terms( string $taxonomy ): array {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return array();
+		}
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => true,
+				'number'     => 200,
+				'orderby'    => 'count',
+				'order'      => 'DESC',
+			)
+		);
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $terms as $term ) {
+			if ( $term instanceof \WP_Term ) {
+				$out[] = array(
+					'slug' => (string) $term->slug,
+					'name' => (string) $term->name,
+				);
+			}
+		}
+		return $out;
 	}
 
 	/**

@@ -11,6 +11,12 @@
  *   - `mp-yoast-focuskw`      → postmeta `_yoast_wpseo_focuskw` (Yoast SEO)
  *   - `mp-xfn`                → postmeta `_outpost_xfn` (Link Extension for XFN can read this)
  *   - `mp-xfn-target`         → companion key indicating which URL the rels apply to
+ *   - `mp-categories[]`       → wp_set_post_categories() with auto-create
+ *
+ * The standard Micropub `category[]` property gets handled by the Micropub
+ * plugin itself (assigns to post_tag taxonomy by default). Outpost adds
+ * `mp-categories[]` so users can explicitly assign WordPress categories
+ * (different taxonomy) via the More pull-out's autocomplete field.
  *
  * The Micropub plugin (David Shanske) emits the `after_micropub` action
  * after creating the post; that's our hook. We read the original $input
@@ -103,6 +109,56 @@ final class Outpost_Micropub_Bridges {
 		self::apply_post_format( $post_id, $properties );
 		self::apply_yoast_focuskw( $post_id, $properties );
 		self::apply_xfn( $post_id, $properties );
+		self::apply_categories( $post_id, $properties );
+	}
+
+	/**
+	 * Bridge: `mp-categories[]` → wp_set_post_categories(), with auto-create.
+	 *
+	 * Each value is looked up by name, then by slug, in the `category`
+	 * taxonomy. Existing terms are reused; new terms are created on the
+	 * fly via wp_insert_term. Append-mode is used so any categories the
+	 * Micropub plugin already assigned (from the `category[]` lookup)
+	 * stay in place.
+	 *
+	 * Runs unconditionally — `category` is a core WordPress taxonomy on
+	 * every site, no companion-plugin gating needed.
+	 *
+	 * @param int                  $post_id    Post ID.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_categories( int $post_id, array $properties ): void {
+		$raw = $properties['mp-categories'] ?? null;
+		if ( null === $raw ) {
+			return;
+		}
+		$names = is_array( $raw ) ? $raw : array( $raw );
+		$ids   = array();
+		foreach ( $names as $candidate ) {
+			if ( ! is_string( $candidate ) ) {
+				continue;
+			}
+			$clean = sanitize_text_field( $candidate );
+			if ( '' === $clean ) {
+				continue;
+			}
+			$term = get_term_by( 'name', $clean, 'category' );
+			if ( ! $term instanceof \WP_Term ) {
+				$term = get_term_by( 'slug', sanitize_title( $clean ), 'category' );
+			}
+			if ( $term instanceof \WP_Term ) {
+				$ids[] = (int) $term->term_id;
+				continue;
+			}
+			$created = wp_insert_term( $clean, 'category' );
+			if ( ! is_wp_error( $created ) && isset( $created['term_id'] ) ) {
+				$ids[] = (int) $created['term_id'];
+			}
+		}
+		if ( empty( $ids ) ) {
+			return;
+		}
+		wp_set_post_categories( $post_id, $ids, true );
 	}
 
 	/**
