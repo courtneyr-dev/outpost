@@ -143,6 +143,61 @@
 	min-height: 18rem;
 }
 
+/*
+ * Textarea row — pairs a label and an inline action (Voice button) on
+ * the same line, with the textarea below.
+ */
+.outpost-textarea-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+/*
+ * Voice input button — Web Speech API mic. Visible only when the
+ * browser supports SpeechRecognition (component returns null otherwise).
+ * Recording state pulses to give visible feedback that audio is being
+ * captured. Padding sized for finger tap on mobile.
+ */
+.outpost-voice-button {
+	font: inherit;
+	width: 2.5rem;
+	height: 2.5rem;
+	padding: 0;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: 50%;
+	background: var(--outpost-input-bg, transparent);
+	color: var(--outpost-input-fg, inherit);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.outpost-voice-button:focus-visible {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-voice-button--recording {
+	background: var(--outpost-error-bg, transparent);
+	color: var(--outpost-error-border, currentColor);
+	border-color: var(--outpost-error-border, currentColor);
+	animation: outpost-voice-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes outpost-voice-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.outpost-voice-button--recording {
+		animation: none;
+	}
+}
+
 .outpost-help {
 	margin: 0;
 	font-size: 0.85rem;

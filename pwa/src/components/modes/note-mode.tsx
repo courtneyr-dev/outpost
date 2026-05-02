@@ -10,6 +10,7 @@ import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../..
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { VoiceButton } from '../voice-button';
 import {
 	MorePanel,
 	empty_more_values,
@@ -276,9 +277,19 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					</>
 				)}
 
-				<label class="outpost-label" for="outpost-note-content">
-					{config.contentLabel}
-				</label>
+				<div class="outpost-textarea-row">
+					<label class="outpost-label" for="outpost-note-content">
+						{config.contentLabel}
+					</label>
+					<VoiceButton
+						onTranscript={(text): void =>
+							setContent((c) =>
+								c.length > 0 && !/\s$/.test(c) ? c + ' ' + text : c + text,
+							)
+						}
+						disabled={submitting}
+					/>
+				</div>
 				<textarea
 					id="outpost-note-content"
 					class={textarea_class}

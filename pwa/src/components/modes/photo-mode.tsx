@@ -12,6 +12,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { VoiceButton } from '../voice-button';
 import {
 	MorePanel,
 	empty_more_values,
@@ -246,9 +247,19 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					required
 				/>
 
-				<label class="outpost-label" for="outpost-photo-content">
-					Caption (optional)
-				</label>
+				<div class="outpost-textarea-row">
+					<label class="outpost-label" for="outpost-photo-content">
+						Caption (optional)
+					</label>
+					<VoiceButton
+						onTranscript={(text): void =>
+							setContent((c) =>
+								c.length > 0 && !/\s$/.test(c) ? c + ' ' + text : c + text,
+							)
+						}
+						disabled={submitting}
+					/>
+				</div>
 				<textarea
 					id="outpost-photo-content"
 					class="outpost-textarea"

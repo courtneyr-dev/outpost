@@ -7,6 +7,14 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session D4 — voice input on every textarea)
+- **`pwa/src/components/voice-button.tsx`** — round mic button that drops next to every content textarea (Post body, Reply content, Doing content, Photo caption). Tap to start dictation, tap again to stop. While recording, the button switches to a stop icon and pulses (respects `prefers-reduced-motion`) so the user has visible feedback that audio is being captured. Uses the standard Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`).
+- **Per-textarea integration**: each mode's content textarea sits below a `.outpost-textarea-row` flex container that pairs the label with the mic button. Transcripts append to existing content with a leading space when the existing content doesn't already end in whitespace, so successive dictations don't run together.
+- **No punctuation post-processing.** Web Speech engines vary on how they emit commas, periods, and capitalization; we keep what the engine returns. Per the C5e design-defaults conversation.
+- **Browser-support feature-detect**: the button hides entirely when neither `SpeechRecognition` nor `webkitSpeechRecognition` is on `window`. Firefox doesn't ship Web Speech; iOS Safari 16.4+, Chrome, Edge, Samsung Internet do.
+- **Language**: uses `navigator.language` (falls back to `en-US`). User's system locale is the right default for first-tap.
+- New CSS surfaces: `.outpost-textarea-row`, `.outpost-voice-button`, `.outpost-voice-button--recording`. The pulse animation is a `@keyframes outpost-voice-pulse` with a `prefers-reduced-motion: reduce` override.
+
 ### Added (Session D3 — Add-to-Home-Screen install prompt)
 - **`pwa/src/components/install-prompt.tsx`** — small banner above the composer that surfaces the A2HS prompt once the user has shown intent (one successful post). Two flows:
   - **Android Chrome / Edge / Samsung Internet**: listens for `beforeinstallprompt`, prevents the default mini-infobar, captures the deferred event, and surfaces an "Install" button that calls `prompt()` on tap.

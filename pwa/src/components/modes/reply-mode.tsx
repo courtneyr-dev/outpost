@@ -12,6 +12,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { VoiceButton } from '../voice-button';
 import {
 	MorePanel,
 	empty_more_values,
@@ -340,9 +341,19 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					</aside>
 				)}
 
-				<label class="outpost-label" for="outpost-reply-content">
-					{config.contentLabel}
-				</label>
+				<div class="outpost-textarea-row">
+					<label class="outpost-label" for="outpost-reply-content">
+						{config.contentLabel}
+					</label>
+					<VoiceButton
+						onTranscript={(text): void =>
+							setContent((c) =>
+								c.length > 0 && !/\s$/.test(c) ? c + ' ' + text : c + text,
+							)
+						}
+						disabled={submitting || fetching_preview}
+					/>
+				</div>
 				<textarea
 					id="outpost-reply-content"
 					class="outpost-textarea"
