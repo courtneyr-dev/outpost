@@ -7,6 +7,9 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (D1 hotfix — Yoast keyphrase field needs a visible border)
+- Wrapped the Yoast focus keyphrase label + input in a `<fieldset class="outpost-field-group">` so the field has an unambiguous border around the whole group, matching the visual weight of the XFN and Syndication picker fieldsets that sit beside it. New `.outpost-field-group` class is generic — future single-control bordered groups can reuse it.
+
 ### Added (Session D1 — offline queue + queue banner + auto-flush)
 - **`pwa/src/lib/offline-queue.ts`** — IndexedDB-backed FIFO queue for posts that fail because the network is down. Public API: `enqueue`, `list`, `remove`, `flush`, `is_network_error`. Schema: a single auto-keyed `outpost_queue` object store of `QueueEntry` records (`source`, `properties`, `accessToken`, `micropubEndpoint`, `createdAt`, `attempts`, `lastError?`). Same B0a-locked injectable env pattern as the other clients.
 - **`pwa/src/components/queue-banner.tsx`** — surfaces queued posts above the tab strip. Shows entry count + "Retry now" button + per-entry source + excerpt + last-error tooltip + per-entry "Dismiss". Only renders when the queue is non-empty (invisible during normal use). Auto-flushes on the browser's `online` event and on first mount.

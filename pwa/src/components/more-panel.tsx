@@ -280,10 +280,8 @@ export function MorePanel(props: MorePanelProps) {
 				)}
 
 				{yoast_active && (
-					<>
-						<label class="outpost-label" for={`${idPrefix}-focuskw`}>
-							Focus keyphrase (Yoast SEO)
-						</label>
+					<fieldset class="outpost-field-group">
+						<legend class="outpost-label">Focus keyphrase (Yoast SEO)</legend>
 						<input
 							id={`${idPrefix}-focuskw`}
 							class="outpost-input"
@@ -294,8 +292,9 @@ export function MorePanel(props: MorePanelProps) {
 							}
 							maxLength={191}
 							disabled={disabled}
+							aria-label="Focus keyphrase"
 						/>
-					</>
+					</fieldset>
 				)}
 
 				{xfn_active && xfnTargetUrl && (
