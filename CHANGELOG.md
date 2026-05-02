@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Session C5b — Note Status/Aside variants + Listen XFN wiring)
+- **Note mode variant picker.** Three radios at the top of the Note tab: Note (default — auto-infer), Status (forces `mp-post-format=status`), Aside (forces `mp-post-format=aside`). Status and Aside are the two most-common short-post styles for mobile composing; the variant picker brings them one tap away instead of buried in the More pull-out's Post Format dropdown. Each variant updates the heading, the submit-button label, and (when the bridge applies) the WordPress Post Format on the resulting post. The More pull-out's explicit Post Format selector still wins precedence — variants set the default, the More panel overrides.
+- **XFN picker on every URL input.** The Doing tab (Listen / Watch / Read / Play / Checkin) now passes its target URL through to MorePanel as `xfnTargetUrl`, so when Link Extension for XFN is active the relationship picker appears for those URLs too. Reply mode already had this in C5; Listen was the missing surface. Photo and Article modes don't take URL inputs, so XFN doesn't apply.
+
+### Changed (Session C5b)
+- `OUTPOST_VERSION` bumped to `0.1.18` per A2 #16.
+- `note-mode.tsx` adds a `Variant` type (`'note' | 'status' | 'aside'`) and `VARIANTS` table mirroring the Reply-mode pattern. Submit handler conditionally adds `mp-post-format` to the base h-entry properties before merge_more_values runs.
+- `listen-mode.tsx` passes `xfnTargetUrl={trimmed_target_url || null}` to MorePanel and threads the URL into merge_more_values for the bridge.
+
 ### Added (Session C5 — More pull-out + companion bridges)
 - **Composer-config REST endpoint** at `/wp-json/outpost/v1/composer-config` (`Outpost_Composer_Config_Endpoint`, `final`, static-only). GET-only. Returns the active/inactive/absent status of every optional companion plugin Outpost knows about (Post Kinds, Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast SEO, ActivityPub, Accessibility Checker), the resolved Post Format list (theme-declared subset or full spec list, null when Post Formats is absent), and the canonical XFN value list per gmpg.org/xfn/11. `show_in_index => false` per the AI Engine CVE-2025-11749 vulnerability class.
 - **Micropub bridges** (`Outpost_Micropub_Bridges`, `final`, static-only). Hooks `after_micropub` at priority 20 to map three Outpost-namespaced properties to companion-plugin storage:

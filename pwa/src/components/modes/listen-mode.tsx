@@ -113,6 +113,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
+	const trimmed_target_url_for_xfn = target_url.trim();
 
 	const handle_submit = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -138,7 +139,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'checkin' && trimmed_name ? { name: trimmed_name } : {}),
 			};
-			const properties = merge_more_values(base, more_values);
+			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
 			const result = await post_h_entry(
@@ -281,6 +282,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 						onChange={setMoreValues}
 						micropubEndpoint={endpoint}
 						{...(micropubEnv ? { micropubEnv } : {})}
+						xfnTargetUrl={trimmed_target_url_for_xfn || null}
 						disabled={submitting}
 						idPrefix="outpost-listen"
 					/>
