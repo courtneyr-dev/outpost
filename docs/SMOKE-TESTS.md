@@ -413,6 +413,148 @@ Tap each variant in turn. **Expected after each tap:**
 3. Switch back to Reply.
 4. **Expected:** Bookmark is still selected, URL is still filled, content is still "later". The eager-render-with-hidden pattern preserves all of mode state.
 
+## C1c — RSVP + Follow variants
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.12`. To check from the terminal:
+
+```bash
+git -C ~/projects/staging-courtneyr-dev/plugins/outpost log --oneline -1
+```
+
+The line should show `0.1.12` or later in the message.
+
+### C1c-Stage 1 — Two new radios
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`. Tap the **Reply** tab.
+
+You should see **six** radio options now: Reply, Like, Repost, Bookmark, **RSVP**, **Follow**.
+
+### C1c-Stage 2 — RSVP shows the Yes/No/Maybe picker
+
+1. Tap the **RSVP** radio.
+2. A second row of radios should appear: **Yes**, **No**, **Maybe**, **Interested**. Yes is selected by default.
+3. The card heading should now say "RSVP".
+4. The URL label should say "Event URL".
+
+### C1c-Stage 3 — Post an RSVP
+
+1. With RSVP selected, paste an event URL (any IndieWeb event page works).
+2. Leave **Yes** selected.
+3. Tap **Post RSVP**. Same submit sequence as Reply (Finding endpoint → Posting → Posted).
+4. Open the resulting URL. The post should include `rsvp: yes` and `in-reply-to: <event-url>` in its h-entry.
+
+### C1c-Stage 4 — Follow is URL-only
+
+1. Switch to the **Follow** radio.
+2. The Yes/No/Maybe picker should disappear.
+3. Heading should say "Follow"; URL label should say "Person or feed URL".
+4. Paste a profile or feed URL. Leave the textarea empty.
+5. **Post follow** should be tappable (Follow doesn't require text).
+6. Tap it. The resulting post should have `follow-of: <url>` as its h-entry property.
+
+## C2 — Photo posting
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.13`. To check from the terminal:
+
+```bash
+git -C ~/projects/staging-courtneyr-dev/plugins/outpost log --oneline -1
+```
+
+### C2-Stage 1 — Photo tab now has a real form
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`. Tap the **Photo** tab.
+
+You should see:
+- "Photo" label above a file picker (was a placeholder card before).
+- "Alt text (required)" label above an empty textarea.
+- "Caption (optional)" label above a second textarea.
+- **Post photo** button — greyed out until both a photo is picked AND alt text is typed.
+
+### C2-Stage 2 — Pick a photo, see the preview
+
+1. Tap the file picker. iOS Safari shows a sheet with **Photo Library**, **Take Photo**, **Choose Files**.
+2. Pick any photo from your library.
+3. Below the picker you should see a preview image (sized to fit, max ~24rem tall).
+4. The Post button stays greyed out (alt text still empty).
+
+### C2-Stage 3 — Type alt text, button enables
+
+1. Type a description in the alt-text box (e.g. "A cat sleeping on a sunny windowsill").
+2. The **Post photo** button should now be tappable.
+
+### C2-Stage 4 — Post the photo
+
+Tap **Post photo**. Watch the button label cycle through:
+
+1. **Preparing photo…** (the canvas downscale + EXIF strip; brief)
+2. **Finding endpoints…** (first post in the session — discovers media endpoint via `?q=config`)
+3. **Uploading…** (multipart upload to the media endpoint)
+4. **Posting…** (h-entry post with photo URL + alt text)
+5. **Post photo** again, with a status line: "Posted to: …"
+
+Open the posted URL. The post should display the photo with your alt text. On staging WordPress with Post Kinds active it appears as a Photo post type.
+
+### C2-Stage 5 — EXIF privacy check (optional, terminal)
+
+Confirm location/EXIF was stripped from the upload. After posting, find the uploaded media URL on the resulting post page (right-click image → "Copy image address"). Then:
+
+```bash
+curl -sS "<paste-the-image-url>" -o /tmp/uploaded.jpg
+sips -g all /tmp/uploaded.jpg | grep -E "GPS|location" || echo "✓ no GPS metadata in upload"
+rm /tmp/uploaded.jpg
+```
+
+You should see `✓ no GPS metadata in upload`. If GPS lines appear, the canvas round-trip didn't strip — flag immediately.
+
+## A3 — Visual polish
+
+**Build under test:** `OUTPOST_VERSION` ≥ `0.1.14`.
+
+### A3-Stage 1 — Brand colors visible
+
+Open `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`.
+
+Buttons should now look **purple** (russian-violet `#241c4a`) with white text, not the user-agent default grey. Form input borders should be a **soft blue** (glaucous `#647baf`). Focus rings should be **dark teal** (cerulean `#126782`).
+
+### A3-Stage 2 — App icon
+
+1. On iPhone Safari, tap **Share → Add to Home Screen**.
+2. Look at the icon preview in the dialog. It should be a **purple rounded square with an orange ring + center dot** (your brand icon), not a Safari screenshot of the page.
+3. Confirm. Find the icon on your home screen — it should match.
+
+If you'd already added the page to Home Screen before A3, iOS may have cached the old icon. Long-press the icon → **Remove App → Remove from Home Screen** to delete, then re-add.
+
+### A3-Stage 3 — Status bar in standalone mode
+
+1. Open the home-screen icon (not Safari).
+2. The PWA opens without Safari chrome. The iOS status bar (time, battery) should appear over the page content with a translucent feel — `apple-mobile-web-app-status-bar-style: black-translucent` is on.
+3. The page content shouldn't be hidden behind the status bar — there's a `padding-top: env(safe-area-inset-top)` on the body that reserves room.
+
+### A3-Stage 4 — Theme color tint (Chrome / Edge)
+
+If you have Android Chrome or desktop Chrome handy:
+
+```bash
+# Open the staging URL in default browser
+open "https://qkf.b0d.myftpupload.com/post/?_cb=$(date +%s)"
+```
+
+The browser's URL bar should pick up the theme color (russian-violet tint) from the `<meta name="theme-color">` tag. Safari doesn't honor theme-color, so this only shows on Chrome/Edge/Firefox.
+
+### A3-Stage 5 — Verify token CSS loads (optional, terminal)
+
+```bash
+curl -sI "https://qkf.b0d.myftpupload.com/wp-content/plugins/outpost/styles/outpost-tokens.css" | head -3
+```
+
+Expect `HTTP/2 200`. Then:
+
+```bash
+curl -sS "https://qkf.b0d.myftpupload.com/wp-content/plugins/outpost/styles/outpost-tokens.css" | grep -c "outpost-primary-bg"
+```
+
+Expect `1` (the file should contain one `--outpost-primary-bg` declaration).
+
 ## Reporting
 
 After running, reply with one of:
