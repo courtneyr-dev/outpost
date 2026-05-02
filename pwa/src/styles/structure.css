@@ -197,3 +197,21 @@
 [role="tabpanel"][hidden] {
 	display: none;
 }
+
+/*
+ * Citation card — Reply mode preview output. Shows the target URL and its
+ * page title before the user posts. Border + padding are structural; paint
+ * goes through theme tokens with neutral fallbacks per the Hard Contract.
+ */
+.outpost-citation {
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
+	padding: 0.75rem 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.outpost-citation p {
+	margin: 0;
+}

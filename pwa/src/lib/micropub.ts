@@ -50,6 +50,32 @@ export interface PostNoteParams {
 	micropubEndpoint: string;
 }
 
+/**
+ * Form-encodable h-entry properties. Add fields here as composer modes
+ * need them; everything is optional so each mode populates only what it
+ * needs.
+ *
+ * Per the Micropub spec, array-valued properties (like `category`) get
+ * encoded with `[]` suffix in the form body; scalars are plain key=value.
+ */
+export interface HEntryProperties {
+	content?: string;
+	name?: string;
+	summary?: string;
+	'in-reply-to'?: string;
+	'like-of'?: string;
+	'repost-of'?: string;
+	'bookmark-of'?: string;
+	category?: string[];
+	'mp-syndicate-to'?: string[];
+}
+
+export interface PostHEntryParams {
+	properties: HEntryProperties;
+	accessToken: string;
+	micropubEndpoint: string;
+}
+
 export interface PostNoteResult {
 	location: string;
 }
@@ -105,21 +131,36 @@ export async function discover_micropub_endpoint(
 }
 
 /**
- * Post an h-entry note to the micropub endpoint.
+ * Post an h-entry to the micropub endpoint with arbitrary properties.
  *
- * Body shape: `h=entry&content=<text>` (form-encoded). The server responds
- * with 201 Created (post created and ready) or 202 Accepted (post queued
- * for async creation). Both are success per the Micropub spec; both
+ * Body shape: form-encoded. `h=entry` is added automatically. Each property
+ * value becomes a key in the form body; arrays get `[]` suffix per the
+ * Micropub spec (`category[]=tag1&category[]=tag2`).
+ *
+ * The server responds with 201 Created or 202 Accepted (both success); both
  * return a Location header pointing at the new post.
+ *
+ * Used by Note (content only), Reply (content + in-reply-to), and future
+ * modes that build richer h-entry shapes (Like, Repost, Bookmark, RSVP,
+ * Follow, Article).
  */
-export async function post_note(
-	params: PostNoteParams,
+export async function post_h_entry(
+	params: PostHEntryParams,
 	env: MicropubEnvironment = default_env,
 ): Promise<PostNoteResult> {
-	const body = new URLSearchParams({
-		h: 'entry',
-		content: params.content,
-	});
+	const body = new URLSearchParams();
+	body.append('h', 'entry');
+
+	for (const [key, value] of Object.entries(params.properties)) {
+		if (value === undefined || value === null) continue;
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				body.append(key + '[]', item);
+			}
+		} else {
+			body.append(key, value);
+		}
+	}
 
 	let response: Response;
 	try {
@@ -134,7 +175,7 @@ export async function post_note(
 		});
 	} catch (err) {
 		throw new MicropubError(
-			'post_note: fetch threw — ' +
+			'post_h_entry: fetch threw — ' +
 				(err instanceof Error ? err.message : String(err)),
 			'post_failed',
 		);
@@ -143,7 +184,7 @@ export async function post_note(
 	if (response.status !== 201 && response.status !== 202) {
 		const error_text = await safe_read_text(response);
 		throw new MicropubError(
-			'post_note: micropub endpoint returned ' +
+			'post_h_entry: micropub endpoint returned ' +
 				String(response.status) +
 				(error_text ? ' — ' + error_text : ''),
 			'post_failed',
@@ -153,7 +194,7 @@ export async function post_note(
 	const location = response.headers.get('location') ?? response.headers.get('Location');
 	if (!location) {
 		throw new MicropubError(
-			'post_note: micropub response is missing the Location header',
+			'post_h_entry: micropub response is missing the Location header',
 			'no_location',
 		);
 	}
@@ -163,12 +204,30 @@ export async function post_note(
 	// render as a clickable <a href>. Validate the scheme before surfacing.
 	if (!is_safe_http_url(location)) {
 		throw new MicropubError(
-			'post_note: micropub returned an unsafe Location URL: ' + location,
+			'post_h_entry: micropub returned an unsafe Location URL: ' + location,
 			'invalid_location',
 		);
 	}
 
 	return { location };
+}
+
+/**
+ * Post a note (h-entry with content only). Thin wrapper around
+ * `post_h_entry` for backward compatibility with B1 callers.
+ */
+export async function post_note(
+	params: PostNoteParams,
+	env: MicropubEnvironment = default_env,
+): Promise<PostNoteResult> {
+	return post_h_entry(
+		{
+			properties: { content: params.content },
+			accessToken: params.accessToken,
+			micropubEndpoint: params.micropubEndpoint,
+		},
+		env,
+	);
 }
 
 async function safe_read_text(response: Response): Promise<string> {

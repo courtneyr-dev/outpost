@@ -84,6 +84,68 @@ if ( ! function_exists( 'get_locale' ) ) {
 		return 'en_US';
 	}
 }
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	function wp_parse_url( string $url, int $component = -1 ) {
+		// WordPress's wp_parse_url is a thin wrapper around parse_url with
+		// edge-case handling we don't exercise in unit tests; parse_url is
+		// enough for the validate_url path.
+		return parse_url( $url, $component );
+	}
+}
+
+// Minimal WP_Error stub for unit tests. Real WP supplies the full class via
+// wp-includes/class-wp-error.php; here we just need code/message/data round-trip.
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private array $errors     = array();
+		private array $error_data = array();
+
+		public function __construct( $code = '', $message = '', $data = '' ) {
+			if ( '' !== $code ) {
+				$this->errors[ $code ][] = $message;
+				if ( '' !== $data ) {
+					$this->error_data[ $code ] = $data;
+				}
+			}
+		}
+
+		public function get_error_code(): string {
+			$codes = array_keys( $this->errors );
+			return (string) ( $codes[0] ?? '' );
+		}
+
+		public function get_error_message( $code = '' ): string {
+			if ( '' === $code ) {
+				$code = $this->get_error_code();
+			}
+			$messages = $this->errors[ $code ] ?? array();
+			return (string) ( $messages[0] ?? '' );
+		}
+
+		public function get_error_data( $code = '' ) {
+			if ( '' === $code ) {
+				$code = $this->get_error_code();
+			}
+			return $this->error_data[ $code ] ?? null;
+		}
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
+}
+
+// Minimal WP_REST_Request stub so PHPUnit's mock machinery (createMock) has a
+// class to reflect against.
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		public function get_param( $key ) {
+			return null;
+		}
+	}
+}
 
 // Load the bootstrap. This pulls in the constant block, the detector class,
 // the companion-base class, and every procedural helper outpost.php defines.

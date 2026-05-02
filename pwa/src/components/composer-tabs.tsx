@@ -69,7 +69,13 @@ export function ComposerTabs({ token, tokenStore, micropubEnv }: ComposerTabsPro
 				/>
 			),
 		},
-		{ id: 'reply', label: 'Reply', render: () => <ReplyMode /> },
+		{
+			id: 'reply',
+			label: 'Reply',
+			render: () => (
+				<ReplyMode token={token} {...(micropubEnv ? { micropubEnv } : {})} />
+			),
+		},
 		{ id: 'photo', label: 'Photo', render: () => <PhotoMode /> },
 		{ id: 'listen', label: 'Listen', render: () => <ListenMode /> },
 		{ id: 'article', label: 'Article', render: () => <ArticleMode /> },
