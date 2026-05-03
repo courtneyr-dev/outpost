@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
 	discover_media_endpoint,
@@ -13,6 +13,8 @@ import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { VoiceButton } from '../voice-button';
+import { GeocodePicker } from '../geocode-picker';
+import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -82,6 +84,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 	const [entries, setEntries] = useState<PhotoEntry[]>([]);
 	const [name, setName] = useState('');
 	const [content, setContent] = useState('');
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
@@ -90,14 +93,20 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
-	// Revoke blob URLs on unmount or when entries change.
+	// Revoke blob URLs on unmount. The previous cleanup captured `entries`
+	// at mount (empty array) due to the empty deps array, so unmount
+	// cleanup did nothing — ~4 MB of File-backed blob URL leaked per
+	// picked photo until the page was unloaded. Tracking entries via a
+	// ref lets the cleanup see the current list at unmount time without
+	// re-running the effect on every keystroke.
+	const entries_ref = useRef(entries);
+	entries_ref.current = entries;
 	useEffect(() => {
 		return (): void => {
-			for (const entry of entries) {
+			for (const entry of entries_ref.current) {
 				URL.revokeObjectURL(entry.preview_url);
 			}
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-time unmount cleanup
 	}, []);
 
 	const handle_file_change = (event: Event): void => {
@@ -223,6 +232,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				'mp-photo-alt': alt_value,
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
+				...(picked_location
+					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					: {}),
 			};
 			const properties = merge_more_values(base, more_values);
 			try {
@@ -259,6 +271,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			setName('');
 			setContent('');
 			setMoreValues(empty_more_values());
+			setPickedLocation(null);
 		} catch (err) {
 			let message: string;
 			if (err instanceof PhotoError) {
@@ -307,7 +320,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<label class="outpost-label" for="outpost-photo-file">
 					{entries.length === 0 ? 'Photo' : 'Add more photos'}
 				</label>
@@ -439,15 +452,32 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					disabled={submitting}
 				/>
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				<GeocodePicker
+					idPrefix="outpost-photo"
+					accessToken={token.accessToken}
+					picked={picked_location}
+					onPick={setPickedLocation}
+					onClear={(): void => setPickedLocation(null)}
+					disabled={submitting}
+				/>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
+
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -456,7 +486,11 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 								{a11y_active && (
 									<>
 										{' · '}
-										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+										<a
+											href={`${status.location}?edac_view=1`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
 											View accessibility report
 										</a>
 									</>
@@ -464,15 +498,13 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 							</>
 						) : (
 							'Posted successfully.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer

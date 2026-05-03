@@ -68,6 +68,15 @@ export function VoiceButton({ onTranscript, disabled, label }: VoiceButtonProps)
 	const [supported, setSupported] = useState(false);
 	const [recording, setRecording] = useState(false);
 	const recognition_ref = useRef<SpeechRecognitionLike | null>(null);
+	// Stash the live `onTranscript` reference. Callers pass inline arrow
+	// functions (`onTranscript={(t) => setContent(...)}`), so the prop
+	// identity changes every parent render. With `[onTranscript]` as the
+	// effect dependency, every keystroke during dictation tore down and
+	// rebuilt the SpeechRecognition instance — cutting off the audio
+	// session mid-utterance and burning battery. The ref pattern keeps
+	// the recognition instance stable for the component's lifetime.
+	const on_transcript_ref = useRef(onTranscript);
+	on_transcript_ref.current = onTranscript;
 
 	useEffect(() => {
 		const Ctor = get_speech_recognition_ctor();
@@ -89,7 +98,7 @@ export function VoiceButton({ onTranscript, disabled, label }: VoiceButtonProps)
 				}
 			}
 			if (final) {
-				onTranscript(final);
+				on_transcript_ref.current(final);
 			}
 		};
 		r.onend = (): void => {
@@ -108,7 +117,7 @@ export function VoiceButton({ onTranscript, disabled, label }: VoiceButtonProps)
 			}
 			recognition_ref.current = null;
 		};
-	}, [onTranscript]);
+	}, []);
 
 	if (!supported) return null;
 

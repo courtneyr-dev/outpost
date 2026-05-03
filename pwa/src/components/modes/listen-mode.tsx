@@ -12,6 +12,7 @@ import {
 	GeocodeError,
 	type GeocodeResult,
 } from '../../lib/geocode';
+import { GeocodePicker } from '../geocode-picker';
 import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
@@ -255,6 +256,12 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [geo_searching, setGeoSearching] = useState(false);
 	const [geo_error, setGeoError] = useState<string | null>(null);
 	const [geo_attribution, setGeoAttribution] = useState('');
+	// Optional location picker for the non-hasGeocode variants (listen,
+	// watch, read, play, game, jam). hasGeocode variants drive location
+	// through the inline target_url + person_name flow above; the
+	// "everywhere else" pattern matches the picker used in Note / Reply /
+	// Photo / Life / Recipe.
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 
 	// Stale geocode results from a previous variant would otherwise re-render
 	// when the user comes back to a hasGeocode variant. Clear on switch.
@@ -408,6 +415,12 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			if (config.hasRating && trimmed_rating !== '') {
 				base.rating = trimmed_rating;
 			}
+			// Picker-driven location for non-hasGeocode variants. hasGeocode
+			// variants already wrote `location` (or eat-of/drink-of) above
+			// from the inline UI; don't double-write.
+			if (!config.hasGeocode && picked_location) {
+				base.location = geo_uri(picked_location.lat, picked_location.lon);
+			}
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
@@ -432,6 +445,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				setRating('');
 				setContent('');
 				setMoreValues(empty_more_values());
+				setPickedLocation(null);
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -493,7 +507,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<fieldset class="outpost-variant-picker">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
@@ -557,6 +571,12 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					<>
 						<label class="outpost-label" for="outpost-listen-person">
 							{config.personLabel}
+							{!config.targetRequired && (
+								<>
+									{' '}
+									<span class="outpost-required">(required)</span>
+								</>
+							)}
 						</label>
 						<input
 							id="outpost-listen-person"
@@ -567,6 +587,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								setPersonName((event.target as HTMLInputElement).value)
 							}
 							disabled={submitting}
+							required={!config.targetRequired}
 						/>
 					</>
 				)}
@@ -731,6 +752,17 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					}
 					disabled={submitting}
 				/>
+
+				{!config.hasGeocode && (
+					<GeocodePicker
+						idPrefix="outpost-listen"
+						accessToken={token.accessToken}
+						picked={picked_location}
+						onPick={setPickedLocation}
+						onClear={(): void => setPickedLocation(null)}
+						disabled={submitting}
+					/>
+				)}
 
 				{/* Live regions are rendered unconditionally so iOS VoiceOver
 				    reliably picks up announcements; previously these mounted

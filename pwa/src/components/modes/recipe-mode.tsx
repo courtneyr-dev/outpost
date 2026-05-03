@@ -10,6 +10,8 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { GeocodePicker } from '../geocode-picker';
+import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -84,6 +86,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -140,6 +143,9 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				...(trimmed_yield ? { yield: trimmed_yield } : {}),
 				...(iso_duration ? { duration: iso_duration } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
+				...(picked_location
+					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					: {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -165,6 +171,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setDurationMinutes('');
 				setContent('');
 				setMoreValues(empty_more_values());
+				setPickedLocation(null);
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -213,7 +220,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<label class="outpost-label" for="outpost-recipe-name">
 					Recipe title <span class="outpost-required">(required)</span>
 				</label>
@@ -302,6 +309,15 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					onInput={(event): void =>
 						setContent((event.target as HTMLTextAreaElement).value)
 					}
+					disabled={submitting}
+				/>
+
+				<GeocodePicker
+					idPrefix="outpost-recipe"
+					accessToken={token.accessToken}
+					picked={picked_location}
+					onPick={setPickedLocation}
+					onClear={(): void => setPickedLocation(null)}
 					disabled={submitting}
 				/>
 

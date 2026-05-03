@@ -143,4 +143,5 @@
 	--outpost-primary-border: var(--outpost-button-primary-border);
 	--outpost-chip-active-bg: var(--outpost-chip-bg-pressed);
 	--outpost-chip-active-fg: var(--outpost-chip-fg-pressed);
+	--outpost-scrim: rgba(0, 0, 0, 0.5);
 }

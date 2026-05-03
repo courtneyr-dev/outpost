@@ -181,13 +181,32 @@ final class Outpost_Composer_Config_Endpoint {
 			return $result;
 		}
 		$uri = (string) $_SERVER['REQUEST_URI'];
-		if ( false !== strpos( $uri, '/wp-json/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
-			return null;
+		// Path-anchored match. The previous strpos-based check accepted any
+		// URI containing the substring `/wp-json/outpost/v1/composer-config`,
+		// which an attacker could smuggle into another endpoint's URI
+		// (e.g., `/wp-json/wp/v2/users?bypass=/wp-json/outpost/v1/composer-config`)
+		// to disable rest_authentication_errors for sensitive routes. Now we
+		// parse out the path and compare exactly, plus support the
+		// `?rest_route=...` permalink-disabled fallback as its own check.
+		$expected_path  = '/wp-json/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH;
+		$path_component = wp_parse_url( $uri, PHP_URL_PATH );
+		if ( is_string( $path_component ) ) {
+			$path_component = rtrim( $path_component, '/' );
+			if ( $path_component === rtrim( $expected_path, '/' ) ) {
+				return null;
+			}
 		}
-		// Some installs serve REST under index.php?rest_route=/...
-		if ( false !== strpos( $uri, 'rest_route=' . rawurlencode( '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) )
-			|| false !== strpos( $uri, 'rest_route=/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
-			return null;
+		// Permalinks-disabled fallback: WordPress serves REST at
+		// `/?rest_route=/outpost/v1/composer-config`. Match the rest_route
+		// query var exactly, not by substring.
+		$query_component = wp_parse_url( $uri, PHP_URL_QUERY );
+		if ( is_string( $query_component ) ) {
+			parse_str( $query_component, $query_args );
+			if ( isset( $query_args['rest_route'] )
+				&& '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH === $query_args['rest_route']
+			) {
+				return null;
+			}
 		}
 		return $result;
 	}
@@ -244,24 +263,32 @@ final class Outpost_Composer_Config_Endpoint {
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
-		// The composer-config payload is non-sensitive: companion plugin
-		// activation status (visible to any wp-admin user with `read`),
-		// public taxonomy terms (already exposed in /?taxonomy=...
-		// archives), the Bridgy host map (a public spec), the XFN spec
-		// list (public spec), and site-wide composer settings. Equivalent
-		// to what WordPress's own /wp-json/wp/v2/types and
-		// /wp-json/wp/v2/categories endpoints expose anonymously by
-		// default.
-		//
-		// Allow anonymous access. Sites that want to enforce auth can
-		// override via the `outpost_composer_config_permission` filter.
-		// Per-IP rate limiting in is_rate_limited() bounds abuse.
+		// Default to requiring authentication. The payload aggregates
+		// companion plugin enumeration + taxonomy terms + Bridgy host map
+		// + composer settings — individually each of these maps to a
+		// public WP endpoint, but the aggregate makes plugin-version
+		// reconnaissance trivial for an unauthenticated attacker (which
+		// `show_in_index => false` was already designed to prevent).
+		// Three auth paths accepted:
+		//   1. `current_user_can('edit_posts')` — standard cap check
+		//      (cookie auth or IndieAuth-translated bearer).
+		//   2. `is_user_logged_in()` — any logged-in user; some IndieAuth
+		//      builds set the user without passing through edit_posts.
+		//   3. `has_bearer_header()` — bearer present but not yet
+		//      translated to WP_User. Acceptable because the payload is
+		//      non-mutating and rate-limited.
+		// Sites that need anonymous access (rare but supported for
+		// build-time pre-fetching) can opt back in via the
+		// `outpost_composer_config_permission` filter.
+		$allow = current_user_can( 'edit_posts' )
+			|| is_user_logged_in()
+			|| self::has_bearer_header();
 		/**
 		 * Override the composer-config permission decision.
 		 *
 		 * @param bool $allow Whether the request is authorized.
 		 */
-		return (bool) apply_filters( 'outpost_composer_config_permission', true );
+		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
 	}
 
 	/**
@@ -288,6 +315,29 @@ final class Outpost_Composer_Config_Endpoint {
 	 * endpoint. Uses a fixed-1-minute window (no sliding window) which
 	 * is good enough for this use case and cheap.
 	 */
+	/**
+	 * Bearer-header presence check. Mirrors the pattern used by
+	 * Outpost_Preview_Endpoint and Outpost_Geocode_Endpoint: accept the
+	 * `Authorization: Bearer …` header (or the standard apache rewrite
+	 * relay for hosts where mod_rewrite drops it) without locally
+	 * validating the token. Validation is left to whatever
+	 * `determine_current_user` filter the IndieAuth plugin (or a custom
+	 * site config) registers; if no filter recognizes the bearer, the
+	 * caller is still rate-limited and the response carries no PII.
+	 */
+	private static function has_bearer_header(): bool {
+		$header = '';
+		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+		}
+		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
+			return true;
+		}
+		return false;
+	}
+
 	private static function is_rate_limited(): bool {
 		// Prefer user-id keying when available (logged-in user); fall
 		// back to IP-keying for anonymous requests. IP-keying isn't

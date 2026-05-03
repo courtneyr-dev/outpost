@@ -15,6 +15,8 @@ import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { CharCounter } from '../char-counter';
+import { GeocodePicker } from '../geocode-picker';
+import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -237,6 +239,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -290,6 +293,9 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'rsvp' ? { rsvp: rsvp_value } : {}),
+				...(picked_location
+					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					: {}),
 			};
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
@@ -310,6 +316,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				mark_posted_once();
 				setContent('');
 				setTargetUrl('');
+				setPickedLocation(null);
 				setPreview(null);
 				setMoreValues(empty_more_values());
 				return;
@@ -365,7 +372,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<fieldset class="outpost-variant-picker">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
@@ -463,15 +470,32 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						: {})}
 				/>
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				<GeocodePicker
+					idPrefix="outpost-reply"
+					accessToken={token.accessToken}
+					picked={picked_location}
+					onPick={setPickedLocation}
+					onClear={(): void => setPickedLocation(null)}
+					disabled={submitting}
+				/>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
+
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -480,7 +504,11 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 								{a11y_active && (
 									<>
 										{' · '}
-										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+										<a
+											href={`${status.location}?edac_view=1`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
 											View accessibility report
 										</a>
 									</>
@@ -488,15 +516,13 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 							</>
 						) : (
 							'Posted successfully.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer

@@ -124,11 +124,46 @@ export async function begin_login(
 export class AuthFlowError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'state_mismatch' | 'missing_state' | 'exchange_failed' | 'no_code',
+		public readonly code:
+			| 'state_mismatch'
+			| 'missing_state'
+			| 'exchange_failed'
+			| 'no_code'
+			| 'me_mismatch',
 	) {
 		super(message);
 		this.name = 'AuthFlowError';
 	}
+}
+
+/**
+ * Compare two `me` URLs for "same principal" identity.
+ *
+ * The IndieAuth spec requires the client to verify that the authorization
+ * server's returned `me` resolves to the same principal as the user-input
+ * `me` — without this check, a malicious authorization endpoint could
+ * issue a token claiming to be for `https://victim.example/` while
+ * actually attesting `https://attacker.example/`, and the client would
+ * persist it as the authoritative identity.
+ *
+ * For Outpost's purposes "same principal" is "same origin" plus a
+ * normalized trailing-slash treatment of the path. A server can return a
+ * canonicalized `me` (e.g., promoting `http://victim.example` to
+ * `https://victim.example/`), which is allowed; an origin swap is not.
+ */
+function me_origins_match(input_me: string, response_me: string): boolean {
+	let a: URL;
+	let b: URL;
+	try {
+		a = new URL(input_me);
+		b = new URL(response_me);
+	} catch {
+		return false;
+	}
+	// Origin includes scheme + host + port. Differing ports on the same
+	// host (someone publishing on :8080 vs :443) are different principals
+	// for our purposes.
+	return a.origin === b.origin;
 }
 
 export interface CallbackQuery {
@@ -161,6 +196,7 @@ export async function handle_callback(
 	const expected_state = env.sessionStorage.getItem(SESSION_KEY_STATE);
 	const verifier = env.sessionStorage.getItem(SESSION_KEY_VERIFIER);
 	const token_endpoint = env.sessionStorage.getItem(SESSION_KEY_TOKEN_ENDPOINT);
+	const original_me = env.sessionStorage.getItem(SESSION_KEY_ME);
 
 	try {
 		if (query.error) {
@@ -200,6 +236,22 @@ export async function handle_callback(
 			},
 			env.indieauth,
 		);
+
+		// IndieAuth spec — verify the authorization-server-attested `me`
+		// resolves to the same origin as the user-input `me`. Without this
+		// check a hostile auth endpoint could issue a valid token claiming
+		// authority over a different identity, which the client would then
+		// persist. See AuthFlowError 'me_mismatch'.
+		if (original_me && !me_origins_match(original_me, response.me)) {
+			throw new AuthFlowError(
+				'Authorization server returned a different identity (' +
+					response.me +
+					') than the one you signed in with (' +
+					original_me +
+					'). Refusing to store the token.',
+				'me_mismatch',
+			);
+		}
 
 		await write_token(
 			{

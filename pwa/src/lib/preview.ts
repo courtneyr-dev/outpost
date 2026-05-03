@@ -77,20 +77,17 @@ export async function fetch_preview(
 
 	let response: Response;
 	try {
-		// Belt-and-suspenders bearer + cache-bust:
-		//   - `_o_token` carries the bearer when managed-WP hosts strip
-		//     the Authorization header.
-		//   - `_t=<timestamp>` defeats Cloudflare's URL-keyed cache.
-		//     Critical for staging mirrors that share Cloudflare with
-		//     production (GoDaddy's setup) where the staging edge cache
-		//     can't be purged independently.
-		const url_with_token =
-			PREVIEW_ENDPOINT +
-			'?_o_token=' +
-			encodeURIComponent(params.accessToken) +
-			'&_t=' +
-			String(Date.now());
-		response = await env.fetch(url_with_token, {
+		// Cache-bust query parameter only — `_t=<timestamp>` defeats Cloudflare's
+		// URL-keyed cache (critical for staging mirrors that share Cloudflare with
+		// production where the staging edge cache can't be purged independently).
+		// The bearer was previously also in the query string for managed-WP hosts
+		// that strip the Authorization header (GoDaddy's Apache config dropping
+		// HTTP_AUTHORIZATION). That created a token-leak path through web-server
+		// access logs, browser history, and Cloudflare cache keys. Token now lives
+		// in the body's `access_token` field (Micropub spec compliant) so the same
+		// stripping fallback works without leaking through URLs.
+		const url_with_cache_bust = PREVIEW_ENDPOINT + '?_t=' + String(Date.now());
+		response = await env.fetch(url_with_cache_bust, {
 			method: 'POST',
 			credentials: 'include',
 			headers: {
@@ -98,7 +95,10 @@ export async function fetch_preview(
 				'Content-Type': 'application/json',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({ url: params.url }),
+			body: JSON.stringify({
+				url: params.url,
+				access_token: params.accessToken,
+			}),
 		});
 	} catch (err) {
 		throw new PreviewError(

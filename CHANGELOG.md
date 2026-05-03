@@ -7,6 +7,58 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (OpenStreetMap location picker on every post kind)
+
+Mobile composing wants to attach a location to any post kind, not just Checkin/Eat/Drink. Extracted the geocode UI into `pwa/src/components/geocode-picker.tsx` (a reusable collapsible `<details>` widget) and dropped it into Note, Reply, Photo, Listen-mode (the 6 non-`hasGeocode` variants), Life, and Recipe. The Doing tab's Checkin/Eat/Drink variants keep their bespoke inline UI because location is the post's primary property there.
+
+- Picker is always optional and starts collapsed. When the user picks a result, the search UI replaces itself with a compact "📍 Tagged at: <name>" summary and a Clear button.
+- On submit, picked location adds `location: geo:lat,lon` (RFC 5870) to the h-entry. Empty when no pick.
+- Per-mode: state cleared on successful post + on offline-queue enqueue.
+
+### Fixed (deep audit remediation: security / a11y / perf / WP.org compliance)
+
+After the user merged v0.1.58, six review agents ran in parallel (security pen-test, full WCAG 2.1 AA audit, performance, WP.org compliance, test coverage gap, architecture). All criticals fixed in this patch.
+
+**Security — Critical fixes:**
+- **Bearer-token-in-URL leak** — `pwa/src/lib/preview.ts` no longer puts the access token in the URL query string. Token now lives in the JSON body (Micropub spec compliant). Same managed-WP-host stripping fallback works without leaking tokens through web-server access logs, browser history, and Cloudflare cache keys. Server reads `access_token` from the request body. (CWE-598 / CWE-532.)
+- **Composer-config substring-match smuggle** — `Outpost_Composer_Config_Endpoint::allow_anonymous_for_self()` now path-anchored. Previously an attacker could craft a URI like `/wp-json/wp/v2/users?bypass=/wp-json/outpost/v1/composer-config` to disable `rest_authentication_errors` for sensitive routes. Path is now parsed and compared exactly.
+- **Composer-config anonymous-by-default → require auth** — payload aggregates plugin enumeration + taxonomy + Bridgy host map; default-open made plugin-version recon trivial. Now requires `current_user_can('edit_posts') || is_user_logged_in() || has_bearer_header()`. The `outpost_composer_config_permission` filter still allows opt-in anonymous access for build-time pre-fetch.
+- **`outpost_geocode_user_agent` filter CRLF injection** — return value now validated (≤256 chars, no `\r\n\0`); falls back to default if hostile. (CWE-93.)
+- **`outpost_companion_adapters` arbitrary class instantiation** — restricted to class names matching `Outpost_*_Adapter` regex. Belt-and-suspenders with the existing `is_subclass_of('Outpost_Companion_Base')` check; closes class-name allowlist sidestep through a hostile filter. (CWE-470.)
+- **`outpost_csp` baseline preservation** — filter can no longer drop or weaken `default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`, or `base-uri 'self'`. If a filter drops a required directive, the safe default is re-appended. (CWE-693.)
+- **Geocode rate-limit secondary counter** — primary counter uses filterable `client_ip()`, but a hostile `outpost_geocode_client_ip` filter returning `uniqid()` per call would defeat throttling. New secondary counter keyed on raw `REMOTE_ADDR` that no filter can touch, with a higher cap to allow legitimate NAT traffic. (CWE-307.)
+- **`OUTPOST_TRUST_FORWARDED_HEADERS` opt-in** — geocode + composer-config endpoints now default to `REMOTE_ADDR` for IP keying. CDN headers (`CF-Connecting-IP`, `X-Forwarded-For`) honored only when the constant is defined in `wp-config.php`. Without opt-in, attackers on non-CDN deployments can't spoof per-request to dodge the rate limit.
+- **`me`-mismatch in IndieAuth callback** — `pwa/src/lib/auth-flow.ts` now verifies the authorization-server-attested `me` resolves to the same origin as the user-input `me`. New `AuthFlowError` code `me_mismatch`. Without this check, a hostile auth endpoint could issue a token claiming authority over a different identity. (CWE-287.)
+- **Service worker honors `Cache-Control: no-store`** — `network_first()` now skips caching responses with `no-store`. Previously the auth-callback URL with consumed `code` could enter the SW cache and replay on back-button. (CWE-525.)
+- **`is_safe_location_value` regex tightened** — no longer accepts `geo:lat,lon;param=value` parameter syntax. `geo_uri()` only emits the bare form, so the parameter branch was a future-renderer XSS sink with no current caller.
+
+**Accessibility — Critical/Major fixes:**
+- **Drawer focus trap** — `pwa/src/components/drawer.tsx` now traps Tab/Shift-Tab inside the modal. Without it, keyboard users tabbing forward from the last interactive element inside the drawer reached content underneath the scrim and silently exited the modal.
+- **Live regions persistent in note/reply/photo modes** — same fix v0.1.58 applied to listen/life/recipe; previously the older modes still conditionally mounted their `role="alert"` and `aria-live="polite"` containers, which iOS VoiceOver misses. Now persistent containers with `hidden` toggling.
+- **Drawer `aria-labelledby` ID collision** — title ID derived from drawer title text so multiple drawers (More options + Queue) can coexist without `id` duplication breaking AT label resolution.
+- **Eat/Drink primary input required signaling** — visible `(required)` marker + `required` attribute on the food/drink-name input when `targetRequired: false`. AT and sighted users now know which field is required.
+- **Article title (required) marker** — visible `(required)` span added; previously sighted users had no visual cue that `<input required>` was required since the browser tooltip is suppressed by mobile virtual keyboards.
+- **`novalidate` on all 6 mode forms** — prevents iOS Safari's native validation bubbles from competing with Outpost's persistent live-region error display.
+- **Removed `opacity` reductions on functional informational text** (`.outpost-card__lede`, `.outpost-char-counter`, `.outpost-term-picker__count`, `.outpost-new-chip span`, `.outpost-queue-inspector__source`, `.outpost-queue-banner__error`, `.outpost-geocode-result__coords`, `.outpost-geocode-attribution`, `.outpost-required`). Opacity reduction lowers contrast against unknown theme backgrounds below WCAG 1.4.3 4.5:1; visual de-emphasis now via `font-size` only.
+- **Geocode result focus indicator** — explicit `outline: 2px solid` so focus stays visible even when the theme doesn't define `--outpost-result-bg-hover`. (WCAG 2.4.7 / 1.4.11.)
+- **Manifest `orientation: "portrait"` → `"any"`** — locking installed PWAs to portrait violates WCAG 1.3.4.
+
+**Performance — Critical/Major fixes:**
+- **Photo blob URL leak** — `pwa/src/components/modes/photo-mode.tsx` cleanup useEffect captured `entries` at mount (empty array). 5 picked photos × abandon-and-tab-switch leaked ~20 MB of File-backed blob URL until page unload. Now tracked via `useRef` so cleanup sees the current list at unmount.
+- **VoiceButton tear-down storm** — `pwa/src/components/voice-button.tsx` rebuilt the SpeechRecognition instance on every parent render because the effect dependency was `[onTranscript]` and callers passed inline arrows. Mid-utterance dictation cut off on iOS audio-session restart. Now the callback lives in a ref and the effect runs once per component lifetime.
+- **Drop redundant `?ver=` on hashed bundle URLs** — Vite content-hashes JS+CSS filenames already; the version query was forcing re-fetch on every plugin version bump (and Outpost has shipped 60+ versions in active development). Token CSS still uses `?ver=` because it has a stable filename.
+
+**WP.org compliance — Submission blockers:**
+- **`readme.txt` Stable tag** — was 0.1.0 vs actual 0.1.58. Now matches.
+- **`readme.txt` Tags** — 7 tags (cap is 5); trimmed to `indieweb, micropub, posse, pwa, syndication`.
+
+**Architecture — Hard Contract:**
+- **Drawer scrim color tokenized** — `pwa/src/styles/structure.css:.outpost-drawer-scrim` now uses `var(--outpost-scrim, rgba(0,0,0,0.5))`. Previous hardcoded `rgba(2, 48, 71, 0.5)` violated the Hard Contract by forcing a brand-violet scrim regardless of theme. New `--outpost-scrim` token added to both `pwa/src/styles/tokens.css` and `styles/outpost-tokens.css` (token parity check passes).
+
+**Stale geocode results across variant switch** — `listen-mode.tsx` clears the geocode picker state when the variant changes; previously switching from Checkin to Listen and back showed the old result list.
+
+OUTPOST_VERSION: 0.1.58 → 0.1.59.
+
 ### Fixed (multi-dimensional review remediation across security / a11y / perf)
 
 Ran a four-agent parallel review of the v0.1.57 Post Kinds expansion (security, performance, accessibility, code quality). Several intersecting findings — particularly the Eat/Drink "submit always disabled" bug — were caught by both code-review and accessibility audits from different angles. All criticals and majors fixed in this patch.

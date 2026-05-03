@@ -57,14 +57,14 @@ final class Outpost_PWA_Shell {
 		$css_urls  = Outpost_PWA_Assets::entry_css_urls();
 		// Append `?ver=OUTPOST_VERSION` to bundle CSS + JS URLs as a
 		// cache-bust against Cloudflare/managed-WP edge caches that may
-		// hold a corrupted or truncated version of the previous build's
-		// asset. Vite content-hashes filenames already, but the version
-		// query adds a second invalidation axis (full URL uniqueness)
-		// that defeats edge caches that may serve a stale cache entry
-		// for the current hashed URL.
-		$entry_url_versioned = null !== $entry_url
-			? add_query_arg( 'ver', OUTPOST_VERSION, $entry_url )
-			: null;
+		// Vite content-hashes the JS + CSS filenames already, so each build
+		// gets a unique URL the browser/CDN can cache forever. The previous
+		// `?ver=OUTPOST_VERSION` query was redundant — and worse, every
+		// version bump (Outpost has shipped 58+ in active development) was
+		// re-fetching the same content. Drop the version query for hashed
+		// bundle assets. The token-css link below still uses ?ver= because
+		// `outpost-tokens.css` is server-rendered with a stable filename.
+		$entry_url_versioned = $entry_url;
 		// Outpost shell IS the entire HTML document, not an enrichment of WP's
 		// page template — template_redirect priority 1 + self::halt() bypasses
 		// wp_head/wp_footer entirely. wp_enqueue_style/script can't reach this
@@ -99,10 +99,11 @@ final class Outpost_PWA_Shell {
 	</style>
 	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css?ver=' . OUTPOST_VERSION ); ?>">
 		<?php
+		// CSS files are content-hashed by Vite — no version-query
+		// needed. See $entry_url_versioned comment above.
 		foreach ( $css_urls as $css_url ) :
-			$css_url_versioned = add_query_arg( 'ver', OUTPOST_VERSION, $css_url );
 			?>
-	<link rel="stylesheet" href="<?php echo esc_url( $css_url_versioned ); ?>">
+	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 		<?php endforeach; ?>
 </head>
 <body class="outpost-composer-shell">
@@ -315,7 +316,10 @@ final class Outpost_PWA_Shell {
 			'scope'            => '/post/',
 			'start_url'        => '/post/',
 			'display'          => 'standalone',
-			'orientation'      => 'portrait',
+			// 'any' (not 'portrait') — locking installed PWAs to portrait
+			// violates WCAG 1.3.4 (Orientation) by preventing landscape use
+			// on mounted phones / tablets / accessibility-rotated devices.
+			'orientation'      => 'any',
 			'background_color' => '#ffffff',
 			'theme_color'      => '#241c4a',
 			'icons'            => array(
@@ -505,9 +509,17 @@ async function network_first(request, cache_key) {
 	try {
 		const response = await fetch(request);
 		if (response && response.ok) {
-			const copy = response.clone();
-			const cache = await caches.open(CACHE_NAME);
-			await cache.put(cache_key, copy);
+			// Honor Cache-Control: no-store. The shell HTML and
+			// auth-callback page set no-store specifically so install-
+			// prompt-for-user-A doesn't leak to user-B on shared
+			// devices, and so an auth-callback URL with a consumed
+			// `code` doesn't replay on back-button navigation.
+			const cache_control = response.headers.get('cache-control') || '';
+			if (!/no-store/i.test(cache_control)) {
+				const copy = response.clone();
+				const cache = await caches.open(CACHE_NAME);
+				await cache.put(cache_key, copy);
+			}
 		}
 		return response;
 	} catch (_err) {
@@ -611,12 +623,56 @@ async function cache_first(request) {
 		/**
 		 * Filter the Content-Security-Policy directive list for the
 		 * Outpost composer shell. Filter callers can append (or replace)
-		 * directives.
+		 * directives. **The baseline directives below are enforced even
+		 * if a filter omits them** — losing `default-src 'self'`,
+		 * `frame-ancestors 'none'`, `object-src 'none'`, or
+		 * `base-uri 'self'` would open clickjacking + plugin-injection
+		 * vectors that no Outpost feature legitimately needs.
 		 *
 		 * @param string[] $csp Default directive list.
 		 */
 		$csp = apply_filters( 'outpost_csp', $csp );
-		return is_array( $csp ) ? implode( '; ', $csp ) : '';
+		if ( ! is_array( $csp ) ) {
+			$csp = array();
+		}
+
+		// Enforce a security baseline. Each required prefix represents
+		// a directive we won't allow filters to drop or weaken to a
+		// permissive value. If a filter dropped one, re-add the safe
+		// default; if a filter weakened one (e.g., `default-src *`),
+		// restoring the safe default takes precedence.
+		$required = array(
+			"default-src 'self'",
+			"frame-ancestors 'none'",
+			"object-src 'none'",
+			"base-uri 'self'",
+		);
+		foreach ( $required as $directive ) {
+			$prefix    = strtok( $directive, ' ' );
+			$has_safe  = false;
+			$rebuilt   = array();
+			foreach ( $csp as $existing ) {
+				if ( ! is_string( $existing ) ) {
+					continue;
+				}
+				if ( 0 === strpos( $existing, $prefix . ' ' ) || $existing === $prefix ) {
+					if ( $existing === $directive ) {
+						$has_safe = true;
+						$rebuilt[] = $existing;
+					}
+					// Drop weakened variants of the required directive;
+					// the safe default gets appended below.
+					continue;
+				}
+				$rebuilt[] = $existing;
+			}
+			if ( ! $has_safe ) {
+				$rebuilt[] = $directive;
+			}
+			$csp = $rebuilt;
+		}
+
+		return implode( '; ', $csp );
 	}
 
 	/**

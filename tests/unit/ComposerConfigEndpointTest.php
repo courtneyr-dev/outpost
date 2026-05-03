@@ -31,22 +31,44 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		return $ref->invoke( null, ...$args );
 	}
 
-	public function test_permission_check_allows_anonymous_by_default(): void {
-		// As of 2026-05 the endpoint allows anonymous reads — payload is
-		// non-sensitive (companion plugin status, public taxonomy terms,
-		// site settings), equivalent to WP's own anonymous REST routes.
-		// Sites that want auth can override via the filter.
+	public function test_permission_check_requires_auth_by_default(): void {
+		// As of v0.1.59 the endpoint requires auth by default — payload
+		// aggregates plugin enumeration + taxonomy + Bridgy host map, which
+		// makes anonymous plugin-version reconnaissance trivial. Mock all
+		// three auth paths to false to simulate an unauthenticated visitor;
+		// the filter then receives `false` and we leave it alone.
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_composer_config_permission' )
+			->with( false )
+			->reply( false );
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+	}
+
+	public function test_permission_check_passes_for_logged_in_user(): void {
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( true );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( true )
 			->reply( true );
 		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
-	public function test_permission_check_filter_can_deny(): void {
+	public function test_permission_check_filter_can_open_anonymous(): void {
+		// A site that wants build-time pre-fetch can opt back into anonymous
+		// access via the filter.
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
-			->with( true )
-			->reply( false );
-		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+			->with( false )
+			->reply( true );
+		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
 	public function test_resolve_post_formats_returns_null_when_absent(): void {

@@ -239,6 +239,32 @@ final class Outpost_Geocode_Endpoint {
 			);
 		}
 		set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
+
+		// Secondary counter keyed on REMOTE_ADDR that no filter can override.
+		// The primary counter above keys on `client_ip()` which respects the
+		// `outpost_geocode_client_ip` filter — a hostile filter returning
+		// `uniqid()` per call would defeat rate limiting entirely. The
+		// secondary counter is the safety net: even if a filter sidesteps
+		// the primary, the actual IP from the TCP layer still rate-limits.
+		$remote_ip          = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
+		$remote_key         = 'outpost_geocode_rl_remote_' . md5( $remote_ip );
+		$remote_count       = (int) get_transient( $remote_key );
+		// Secondary cap is the higher of the two limits times a small
+		// multiplier so it doesn't reject legitimate multi-user-on-NAT
+		// deployments unfairly, only filter-based abuse.
+		$remote_cap = max( self::RATE_LIMIT_PER_MINUTE_AUTHED, self::RATE_LIMIT_PER_MINUTE_UNAUTHED ) * 3;
+		if ( $remote_count >= $remote_cap ) {
+			return new WP_Error(
+				'rate_limited',
+				__( 'Too many geocode requests from this network. Try again in a minute.', 'outpost' ),
+				array(
+					'status'     => 429,
+					'retryAfter' => 60,
+				)
+			);
+		}
+		set_transient( $remote_key, $remote_count + 1, MINUTE_IN_SECONDS );
+
 		return true;
 	}
 
@@ -321,6 +347,16 @@ final class Outpost_Geocode_Endpoint {
 		 * @param string $default_ua The default User-Agent.
 		 */
 		$user_agent = (string) apply_filters( 'outpost_geocode_user_agent', $default_ua );
+		// Defense against header-injection from a hostile filter. CRLF in the
+		// User-Agent value can split into multiple HTTP headers on certain
+		// cURL builds; truncating at 256 chars and rejecting CR/LF closes
+		// that path. If the filter return is unsafe, fall back to default.
+		if ( '' === $user_agent
+			|| strlen( $user_agent ) > 256
+			|| 1 === preg_match( '/[\r\n\0]/', $user_agent )
+		) {
+			$user_agent = $default_ua;
+		}
 
 		$response = wp_safe_remote_get(
 			$url,

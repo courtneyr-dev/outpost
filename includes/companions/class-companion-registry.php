@@ -162,13 +162,32 @@ final class Outpost_Companion_Registry {
 		if ( ! is_array( $classes ) ) {
 			$classes = self::DEFAULT_ADAPTERS;
 		}
-		// Validate each is a string class name pointing at a
-		// Outpost_Companion_Base subclass; drop ones that aren't.
+		// Validate each entry is a string class name pointing at a real
+		// Outpost_Companion_Base subclass AND matches the naming
+		// convention `Outpost_*_Adapter`. The naming convention is the
+		// belt-and-suspenders defense: even if a hostile filter passes
+		// `is_subclass_of()`, the class-name regex blocks adapter classes
+		// from outside the Outpost namespace from being instantiated. The
+		// `class_exists()` check already short-circuits autoloading to
+		// avoid kicking off an arbitrary class's __construct via the SPL
+		// autoloader chain.
 		$valid = array();
 		foreach ( $classes as $candidate_class ) {
-			if ( is_string( $candidate_class ) && class_exists( $candidate_class ) && is_subclass_of( $candidate_class, 'Outpost_Companion_Base' ) ) {
-				$valid[] = $candidate_class;
+			if ( ! is_string( $candidate_class ) ) {
+				continue;
 			}
+			if ( 1 !== preg_match( '/^Outpost_[A-Z][A-Za-z0-9_]*_Adapter$/', $candidate_class ) ) {
+				continue;
+			}
+			if ( ! class_exists( $candidate_class, false )
+				&& ! class_exists( $candidate_class, true )
+			) {
+				continue;
+			}
+			if ( ! is_subclass_of( $candidate_class, 'Outpost_Companion_Base' ) ) {
+				continue;
+			}
+			$valid[] = $candidate_class;
 		}
 		self::$resolved_classes = $valid;
 		return $valid;

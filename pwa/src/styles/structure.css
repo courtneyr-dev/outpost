@@ -46,7 +46,7 @@
 .outpost-card__lede {
 	margin: 0;
 	color: var(--outpost-text-muted, inherit);
-	opacity: 0.85;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 .outpost-form-row {
@@ -172,7 +172,7 @@
 .outpost-char-counter {
 	display: block;
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 	text-align: end;
 }
 
@@ -547,7 +547,7 @@
 .outpost-term-picker__count {
 	font-weight: 400;
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 	margin-inline-start: 0.25rem;
 }
 
@@ -586,7 +586,7 @@
 
 .outpost-new-chip span {
 	font-size: 0.8rem;
-	opacity: 0.7;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 .outpost-new-chip:focus-visible {
@@ -783,7 +783,7 @@
 	font-weight: 600;
 	font-size: 0.85rem;
 	text-transform: uppercase;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 .outpost-queue-inspector__excerpt {
@@ -793,7 +793,7 @@
 .outpost-queue-inspector__error {
 	margin: 0;
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 	color: var(--outpost-error-fg, inherit);
 }
 
@@ -807,7 +807,7 @@
 	position: fixed;
 	inset: 0;
 	z-index: 40;
-	background: rgba(2, 48, 71, 0.5);
+	background: var(--outpost-scrim, rgba(0, 0, 0, 0.5));
 	opacity: 0;
 	pointer-events: none;
 }
@@ -963,7 +963,7 @@
 	font-weight: 600;
 	font-size: 0.85rem;
 	text-transform: uppercase;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 .outpost-queue-banner__excerpt {
@@ -976,7 +976,7 @@
 
 .outpost-queue-banner__error {
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 /*
@@ -1126,12 +1126,12 @@
 
 .outpost-geocode-result__coords {
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
 .outpost-geocode-attribution {
 	font-size: 0.75rem;
-	opacity: 0.65;
+	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 	margin: 0;
 }
 
@@ -1139,4 +1139,42 @@
  * that aren't quite errors but are worth surfacing distinctly. */
 .outpost-status--warn {
 	color: var(--outpost-warn-fg, inherit);
+}
+
+/* Picked-location summary card — replaces the search UI once the user
+ * has chosen a place. Compact two-row layout: place name on top, the
+ * geo: URI + Clear button below. Theme owns paint per Hard Contract. */
+.outpost-geocode-picked {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.25rem);
+	margin-block-start: 0.75rem;
+}
+
+.outpost-geocode-picked__row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: baseline;
+}
+
+.outpost-geocode-picked__label {
+	font-weight: 600;
+}
+
+.outpost-geocode-picked__value {
+	flex: 1 1 auto;
+	min-inline-size: 0;
+	word-break: break-word;
+}
+
+.outpost-geocode-picked__coords {
+	font-family: var(--outpost-font-mono, ui-monospace, monospace);
+	font-size: 0.85rem;
+	flex: 1 1 auto;
+	min-inline-size: 0;
+	word-break: break-all;
 }

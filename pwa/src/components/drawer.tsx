@@ -35,13 +35,40 @@ export interface DrawerProps {
 export function Drawer({ open, onClose, title, children }: DrawerProps) {
 	const drawer_ref = useRef<HTMLDivElement>(null);
 
-	// Esc closes.
+	// Esc closes; Tab/Shift-Tab cycles focus inside the drawer (focus trap).
+	// Without the trap, tabbing forward from the last interactive element
+	// inside the drawer reaches content underneath the scrim — keyboard
+	// users escape the modal without intending to. The drawer is visually
+	// modal (scrim covers the page) but the AT focus model needs explicit
+	// containment.
 	useEffect(() => {
 		if (!open) return;
 		const handler = (event: KeyboardEvent): void => {
 			if (event.key === 'Escape') {
 				event.preventDefault();
 				onClose();
+				return;
+			}
+			if (event.key !== 'Tab') return;
+			const root = drawer_ref.current;
+			if (!root) return;
+			// Standard "interactive" selector. We DON'T include
+			// `[tabindex="-1"]` — programmatically-focusable but
+			// keyboard-skipped elements should stay skipped.
+			const focusable = Array.from(
+				root.querySelectorAll<HTMLElement>(
+					'a[href]:not([disabled]), button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), details:not([disabled]) > summary, [tabindex]:not([tabindex="-1"]):not([disabled])',
+				),
+			).filter((el) => !el.hasAttribute('aria-hidden') && el.offsetParent !== null);
+			if (focusable.length === 0) return;
+			const first = focusable[0]!;
+			const last = focusable[focusable.length - 1]!;
+			if (event.shiftKey && document.activeElement === first) {
+				event.preventDefault();
+				last.focus();
+			} else if (!event.shiftKey && document.activeElement === last) {
+				event.preventDefault();
+				first.focus();
 			}
 		};
 		window.addEventListener('keydown', handler);
@@ -81,6 +108,16 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 		};
 	}, [open]);
 
+	// Derive a per-instance title id so multiple drawers (e.g., More
+	// options + Queue) can coexist without `id` collisions breaking
+	// `aria-labelledby` assignments.
+	const title_id =
+		'outpost-drawer-title-' +
+		title
+			.toLowerCase()
+			.replace(/\s+/g, '-')
+			.replace(/[^a-z0-9-]/g, '');
+
 	return (
 		<>
 			<div
@@ -95,11 +132,11 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 				data-open={open ? 'true' : 'false'}
 				role="dialog"
 				aria-modal="true"
-				aria-labelledby="outpost-drawer-title"
+				aria-labelledby={title_id}
 				tabIndex={-1}
 			>
 				<header class="outpost-drawer__header">
-					<h2 id="outpost-drawer-title" class="outpost-drawer__title">
+					<h2 id={title_id} class="outpost-drawer__title">
 						{title}
 					</h2>
 					<button

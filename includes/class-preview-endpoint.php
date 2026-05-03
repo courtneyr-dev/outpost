@@ -148,9 +148,23 @@ final class Outpost_Preview_Endpoint {
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
 		}
-		// Query-string fallback for managed-WP hosts that strip Authorization.
+		// Spec-compliant body fallback for managed-WP hosts that strip the
+		// Authorization header (GoDaddy's Apache config drops
+		// HTTP_AUTHORIZATION before PHP sees it). The Micropub spec accepts
+		// access_token in the request body. Bodies don't appear in access
+		// logs, browser history, or CDN cache keys, unlike query strings.
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
+		$body_token = isset( $_POST['access_token'] ) ? $_POST['access_token'] : null;
+		if ( null === $body_token ) {
+			$raw = file_get_contents( 'php://input' );
+			if ( false !== $raw && '' !== $raw ) {
+				$decoded = json_decode( $raw, true );
+				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) ) {
+					$body_token = $decoded['access_token'];
+				}
+			}
+		}
+		if ( is_string( $body_token ) && '' !== $body_token ) {
 			return true;
 		}
 		return false;

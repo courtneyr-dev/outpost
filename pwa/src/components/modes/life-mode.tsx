@@ -11,6 +11,8 @@ import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { VoiceButton } from '../voice-button';
+import { GeocodePicker } from '../geocode-picker';
+import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -98,6 +100,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -119,6 +122,9 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			const base: HEntryProperties = {
 				[config.property]: trimmed_primary,
 				...(trimmed_content ? { content: trimmed_content } : {}),
+				...(picked_location
+					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					: {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -140,6 +146,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				setPrimaryValue('');
 				setContent('');
 				setMoreValues(empty_more_values());
+				setPickedLocation(null);
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -190,7 +197,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				Signed in as <code>{token.me || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<fieldset class="outpost-variant-picker">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
@@ -245,6 +252,15 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					onInput={(event): void =>
 						setContent((event.target as HTMLTextAreaElement).value)
 					}
+					disabled={submitting}
+				/>
+
+				<GeocodePicker
+					idPrefix="outpost-life"
+					accessToken={token.accessToken}
+					picked={picked_location}
+					onPick={setPickedLocation}
+					onClear={(): void => setPickedLocation(null)}
 					disabled={submitting}
 				/>
 

@@ -12,6 +12,8 @@ import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
+import { GeocodePicker } from '../geocode-picker';
+import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
 import {
@@ -174,6 +176,9 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	// Optional location attached to the h-entry — populated by the
+	// GeocodePicker. Goes out as `location: geo:lat,lon` per RFC 5870.
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 
 	const [more_open, setMoreOpen] = useState(false);
 	const config = VARIANTS[variant];
@@ -205,6 +210,9 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				content: trimmed_content,
 				...(config.requiresTitle && trimmed_title ? { name: trimmed_title } : {}),
 				...(config.postFormat ? { 'mp-post-format': config.postFormat } : {}),
+				...(picked_location
+					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					: {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -225,6 +233,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				setContent('');
 				setTitle('');
 				setMoreValues(empty_more_values());
+				setPickedLocation(null);
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -279,7 +288,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				Signed in as <code>{token.me || '—'}</code> · scope <code>{token.scope || '—'}</code>
 			</p>
 
-			<form class="outpost-form-row" onSubmit={handle_submit}>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<fieldset class="outpost-variant-picker">
 					<legend class="outpost-label">Style</legend>
 					{VARIANT_ORDER.map((id) => (
@@ -300,7 +309,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				{config.requiresTitle && (
 					<>
 						<label class="outpost-label" for="outpost-note-title">
-							Title
+							Title <span class="outpost-required">(required)</span>
 						</label>
 						<input
 							id="outpost-note-title"
@@ -314,6 +323,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 							spellcheck={true}
 							disabled={submitting}
 							required
+							autoComplete="off"
 						/>
 					</>
 				)}
@@ -355,15 +365,32 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					</p>
 				)}
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				<GeocodePicker
+					idPrefix="outpost-note"
+					accessToken={token.accessToken}
+					picked={picked_location}
+					onPick={setPickedLocation}
+					onClear={(): void => setPickedLocation(null)}
+					disabled={submitting}
+				/>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
+
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -372,7 +399,11 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 								{a11y_active && (
 									<>
 										{' · '}
-										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+										<a
+											href={`${status.location}?edac_view=1`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
 											View accessibility report
 										</a>
 									</>
@@ -380,15 +411,13 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 							</>
 						) : (
 							'Posted successfully.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer
