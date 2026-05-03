@@ -82,6 +82,9 @@ export async function discover_endpoints(
 		method: 'GET',
 		redirect: 'follow',
 		headers: { Accept: 'text/html' },
+		// See micropub.ts: same-origin Outpost fetches must omit cookies so the
+		// wp-admin session cookie doesn't trip rest_cookie_check_errors.
+		credentials: 'omit',
 	});
 	if (!response.ok) {
 		throw new Error('discover_endpoints: fetch failed with status ' + String(response.status));
@@ -237,6 +240,7 @@ export async function exchange_code_for_token(
 			Accept: 'application/json',
 		},
 		body: body.toString(),
+		credentials: 'omit',
 	});
 
 	if (!response.ok) {

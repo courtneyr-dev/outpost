@@ -128,6 +128,11 @@ export async function discover_micropub_endpoint(
 			method: 'GET',
 			redirect: 'follow',
 			headers: { Accept: 'text/html' },
+			// Omit cookies. Outpost's API calls are bearer-authenticated; sending
+			// the wp-admin cookie alongside trips WordPress's REST nonce check
+			// (rest_cookie_check_errors), which silently unsets the bearer-resolved
+			// user and cascades into a Micropub 403.
+			credentials: 'omit',
 		});
 	} catch (err) {
 		throw new MicropubError(
@@ -203,6 +208,7 @@ export async function post_h_entry(
 				Accept: 'application/json',
 			},
 			body: body.toString(),
+			credentials: 'omit',
 		});
 	} catch (err) {
 		throw new MicropubError(
@@ -290,6 +296,7 @@ export async function discover_media_endpoint(
 				Authorization: 'Bearer ' + access_token,
 				Accept: 'application/json',
 			},
+			credentials: 'omit',
 		});
 	} catch (err) {
 		throw new MicropubError(
@@ -343,6 +350,7 @@ export async function discover_syndication_targets(
 				Authorization: 'Bearer ' + access_token,
 				Accept: 'application/json',
 			},
+			credentials: 'omit',
 		});
 	} catch (err) {
 		throw new MicropubError(
@@ -411,6 +419,7 @@ export async function upload_media(
 				Accept: 'application/json',
 			},
 			body: form,
+			credentials: 'omit',
 		});
 	} catch (err) {
 		throw new MicropubError(

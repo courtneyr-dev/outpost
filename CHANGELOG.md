@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Omit cookies on Outpost's bearer-authenticated fetches)
+
+The v0.1.52 scope fix didn't resolve the Micropub 403. Web Inspector capture revealed the actual cause: when the user is logged into wp-admin in the same Safari, every same-origin fetch from `/post/` carries the `wordpress_logged_in_*` cookie alongside the `Authorization: Bearer …` header. WordPress core's `rest_cookie_check_errors` detects the cookie session, requires an `X-WP-Nonce` header (which Outpost doesn't have — bearer auth doesn't use nonces), errors out, and the cookie-path failure cascades into unsetting the bearer-resolved user. By the time the Micropub plugin calls `is_user_logged_in()`, no user is set, and it returns `{"error":"forbidden","error_description":"Unauthorized"}` with status 403.
+
+Quill posts succeeded all along because Quill is at `quill.p3k.io` — cross-origin, so the cookie never tagged along. Same Outpost code, different origin, different result.
+
+- **`pwa/src/lib/micropub.ts`** — added `credentials: 'omit'` to all five fetch calls (`discover_micropub_endpoint`, `post_h_entry`, `discover_media_endpoint`, `discover_syndication_targets`, `upload_media`). Bearer is the only auth signal Outpost needs; cookies were never wanted there.
+- **`pwa/src/lib/indieauth.ts`** — same treatment for `discover_endpoints` and `exchange_code_for_token`. Sign-in already worked for users not currently logged in to wp-admin; the fix prevents a future regression for the dual-auth case.
+- The two intentional `credentials: 'include'` cases stay (`composer-config.ts`, `preview.ts`) — those endpoints accept cookie auth as a deliberate fallback.
+
+OUTPOST_VERSION: 0.1.52 → 0.1.53.
+
 ### Fixed (Add `profile` to the IndieAuth default scope)
 
 After v0.1.51 the bundle loaded cleanly but Micropub still returned 403 on every post attempt. Quill (an independent IndieAuth client) posted successfully against the same staging install at the same time, proving IndieAuth + Micropub plugins were healthy. Comparing tokens revealed the gap: Quill requested `create profile update media` and got a fully-resolved token; Outpost requested `create update media` (no `profile`) and the WordPress IndieAuth plugin couldn't fully resolve the bearer to a `WP_User`, so the Micropub plugin's `mp-author` resolution rejected the request as forbidden.
