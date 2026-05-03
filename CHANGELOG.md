@@ -7,6 +7,14 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Reverted (v0.1.61 readability CSS pass)
+
+User feedback: the v0.1.61 styling pass lost the previous design's button-like aesthetic on the radio variant picker and the comfortable theme-token-driven layout. Reverted `pwa/src/styles/structure.css` to its v0.1.59 baseline. The earlier design — `flex-wrap` variant picker with transparent borders that highlight only when checked, the original spacing, the original heading sizes — is back.
+
+The title-field JSX work from v0.1.61 stays (Note/Reply/Listen-mode/Life all gained title inputs); only the structural CSS reverted.
+
+OUTPOST_VERSION: 0.1.61 → 0.1.62.
+
 ### Improved (form readability + title field on every post kind)
 
 The composer's form layout had compressed spacing that made fields hard to scan: labels jammed against inputs, char counter crashing into the textarea, drawer headings inheriting hero-sized theme defaults, fieldset borders showing browser default styles. Restructured `pwa/src/styles/structure.css`:
