@@ -71,7 +71,7 @@ type Status =
 	| { kind: 'discovering-endpoints' }
 	| { kind: 'uploading-photo'; current: number; total: number }
 	| { kind: 'posting' }
-	| { kind: 'posted'; location: string }
+	| { kind: 'posted'; location?: string }
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
@@ -231,7 +231,10 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					},
 					micropubEnv,
 				);
-				setStatus({ kind: 'posted', location: result.location });
+				setStatus({
+					kind: 'posted',
+					...(result.location ? { location: result.location } : {}),
+				});
 				mark_posted_once();
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -428,17 +431,23 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 				{status.kind === 'posted' && (
 					<p class="outpost-status" aria-live="polite">
-						Posted to{' '}
-						<a href={status.location} target="_blank" rel="noopener noreferrer">
-							{status.location}
-						</a>
-						{a11y_active && (
+						{status.location ? (
 							<>
-								{' · '}
-								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
-									View accessibility report
+								Posted to{' '}
+								<a href={status.location} target="_blank" rel="noopener noreferrer">
+									{status.location}
 								</a>
+								{a11y_active && (
+									<>
+										{' · '}
+										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+											View accessibility report
+										</a>
+									</>
+								)}
 							</>
+						) : (
+							'Posted successfully.'
 						)}
 					</p>
 				)}

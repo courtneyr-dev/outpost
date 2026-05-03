@@ -7,6 +7,17 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Tolerate missing Location header on Micropub success)
+
+After v0.1.54 unblocked posting, smoke-testing the multi-photo gallery surfaced a different bug: the WordPress Micropub plugin returned 201 Created but no `Location` response header for the gallery post. Outpost was throwing `no_location` and rendering a failure banner even though the post was on the server. The Micropub spec says servers MUST return `Location` on success, but the spec violation isn't worth losing a successful post over.
+
+- **`PostNoteResult.location`** — now optional (`location?: string`). When the server returns 201/202 without a `Location` header, `post_h_entry` returns `{}` instead of throwing.
+- **All four mode files** (note, reply, photo, listen) — render "Posted successfully." without a clickable link when `result.location` is missing. Conditional spread on `setStatus({ kind: 'posted', ... })` to satisfy `exactOptionalPropertyTypes`.
+- **`upload_media`** still throws `no_location` on missing Location — uploads MUST return the URL because subsequent `post_h_entry` calls reference it via the `photo` property. There's no graceful fallback for that path.
+- **Test updated** to assert the new `{}` shape on missing Location instead of the old throw. 163 tests still passing.
+
+OUTPOST_VERSION: 0.1.54 → 0.1.55.
+
 ### Fixed (Send access_token in body/query as well as the Authorization header)
 
 After v0.1.53 the cookie was gone from Micropub requests but the 403 persisted. The remaining suspect is the `Authorization` header itself: some managed-WP hosts (GoDaddy among them on certain configurations) don't forward `HTTP_AUTHORIZATION` to PHP via Apache's `mod_rewrite`. When that happens, `$_SERVER['HTTP_AUTHORIZATION']` is empty, the IndieAuth plugin sees no bearer, and Micropub returns the same `forbidden / Unauthorized` shape — indistinguishable from auth failures with other root causes.

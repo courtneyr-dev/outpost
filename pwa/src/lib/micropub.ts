@@ -108,7 +108,16 @@ export interface PostHEntryParams {
 }
 
 export interface PostNoteResult {
-	location: string;
+	/**
+	 * URL of the created post, parsed from the Micropub server's `Location`
+	 * response header. Per the Micropub spec the server MUST return Location
+	 * on success — but some plugin configurations omit it on edge cases
+	 * (multi-photo galleries against David Shanske's WP Micropub plugin
+	 * have surfaced this). Treated as a non-fatal omission: the post still
+	 * succeeded (we got 201/202), so the UI should announce success and
+	 * skip the "view your post" link rather than fail loudly.
+	 */
+	location?: string;
 }
 
 /**
@@ -238,10 +247,10 @@ export async function post_h_entry(
 
 	const location = response.headers.get('location') ?? response.headers.get('Location');
 	if (!location) {
-		throw new MicropubError(
-			'post_h_entry: micropub response is missing the Location header',
-			'no_location',
-		);
+		// Spec violation but the post did succeed (we got 201/202). Soft-fail:
+		// caller renders a generic "posted" success without a link. See
+		// PostNoteResult docblock for context on which servers omit Location.
+		return {};
 	}
 
 	// Defense in depth: a compromised Micropub endpoint or MitM could return

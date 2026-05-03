@@ -67,7 +67,7 @@ type Status =
 	| { kind: 'idle' }
 	| { kind: 'discovering' }
 	| { kind: 'posting' }
-	| { kind: 'posted'; location: string }
+	| { kind: 'posted'; location?: string }
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
@@ -217,7 +217,10 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					},
 					micropubEnv,
 				);
-				setStatus({ kind: 'posted', location: result.location });
+				setStatus({
+					kind: 'posted',
+					...(result.location ? { location: result.location } : {}),
+				});
 				mark_posted_once();
 				setContent('');
 				setTitle('');
@@ -360,17 +363,23 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 
 				{status.kind === 'posted' && (
 					<p class="outpost-status" aria-live="polite">
-						Posted to{' '}
-						<a href={status.location} target="_blank" rel="noopener noreferrer">
-							{status.location}
-						</a>
-						{a11y_active && (
+						{status.location ? (
 							<>
-								{' · '}
-								<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
-									View accessibility report
+								Posted to{' '}
+								<a href={status.location} target="_blank" rel="noopener noreferrer">
+									{status.location}
 								</a>
+								{a11y_active && (
+									<>
+										{' · '}
+										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+											View accessibility report
+										</a>
+									</>
+								)}
 							</>
+						) : (
+							'Posted successfully.'
 						)}
 					</p>
 				)}

@@ -165,20 +165,23 @@ describe('post_note', () => {
 		}
 	});
 
-	it('throws no_location when 201 response has no Location header', async () => {
+	it('returns an empty result when 201 response has no Location header', async () => {
+		// Some Micropub plugin configurations omit Location on edge cases
+		// (multi-photo galleries against the WP plugin have surfaced this).
+		// The post still succeeded server-side, so we soft-fail to a result
+		// without a location field rather than throwing.
 		const env: MicropubEnvironment = {
 			fetch: async () => make_response({ status: 201 }),
 		};
-		await expect(
-			post_note(
-				{
-					content: 'no loc',
-					accessToken: 'abc',
-					micropubEndpoint: 'https://example.test/mp',
-				},
-				env,
-			),
-		).rejects.toMatchObject({ code: 'no_location' });
+		const result = await post_note(
+			{
+				content: 'no loc',
+				accessToken: 'abc',
+				micropubEndpoint: 'https://example.test/mp',
+			},
+			env,
+		);
+		expect(result).toEqual({});
 	});
 
 	it('throws post_failed when fetch rejects', async () => {
