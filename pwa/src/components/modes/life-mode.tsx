@@ -22,17 +22,20 @@ import {
 } from '../more-panel';
 
 /**
- * Life mode — content-only post kinds: Mood, Weather, Exercise.
+ * Life mode — content-only post kinds: Mood, Weather.
  *
  * These post kinds don't reference an external URL; they're personal
- * statements about state of being or activity. Distinct from the Doing tab
- * (which is URL-anchored: listen-of, watch-of, …) and from Note (which is a
+ * statements about state of being. Distinct from the Doing tab (which is
+ * activity-anchored, including Exercise) and from Note (which is a
  * generic thought-of-the-moment without a typed property).
  *
  * Per Post Kinds:
  *   - Mood     → h-entry `mood` property = textual emotional state.
  *   - Weather  → h-entry `weather` property = textual conditions.
- *   - Exercise → h-entry `exercise` property = textual activity description.
+ *
+ * Exercise used to live here but moved to the Doing tab (v0.1.63) — its
+ * primary axis is activity-as-event with optional venue, so it shares
+ * shape with Eat/Drink rather than Mood/Weather.
  *
  * Each variant has a primary text input that becomes the property value, plus
  * an optional `content` body for additional context. No URL field.
@@ -44,11 +47,11 @@ export interface LifeModeProps {
 	composerConfig?: ComposerConfig;
 }
 
-type Variant = 'mood' | 'weather' | 'exercise';
+type Variant = 'mood' | 'weather';
 
 interface VariantConfig {
 	label: string;
-	property: 'mood' | 'weather' | 'exercise';
+	property: 'mood' | 'weather';
 	primaryLabel: string;
 	primaryPlaceholder: string;
 	contentLabel: string;
@@ -72,17 +75,9 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post weather',
 	},
-	exercise: {
-		label: 'Exercise',
-		property: 'exercise',
-		primaryLabel: 'What activity?',
-		primaryPlaceholder: 'e.g., 30-minute walk, 2-mile run',
-		contentLabel: 'How did it feel? (optional)',
-		submitLabel: 'Post exercise',
-	},
 };
 
-const VARIANT_ORDER: Variant[] = ['mood', 'weather', 'exercise'];
+const VARIANT_ORDER: Variant[] = ['mood', 'weather'];
 
 type Status =
 	| { kind: 'idle' }
@@ -199,7 +194,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-life-mode-title">
 			<h2 id="outpost-life-mode-title" class="outpost-card__title">
-				{config.label}
+				Life
 			</h2>
 			<p class="outpost-card__lede">
 				Signed in as <code>{token.me || '—'}</code>

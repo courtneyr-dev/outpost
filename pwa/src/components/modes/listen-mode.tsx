@@ -63,7 +63,8 @@ type Variant =
 	| 'jam'
 	| 'checkin'
 	| 'eat'
-	| 'drink';
+	| 'drink'
+	| 'exercise';
 
 type VariantProperty =
 	| 'listen-of'
@@ -72,7 +73,8 @@ type VariantProperty =
 	| 'play-of'
 	| 'location'
 	| 'eat-of'
-	| 'drink-of';
+	| 'drink-of'
+	| 'exercise';
 
 /**
  * Per-variant feature flags drive conditional rendering and submit-payload
@@ -215,6 +217,21 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personProperty: 'name',
 		hasGeocode: true,
 	},
+	exercise: {
+		// Exercise lives in Doing (not Life) because its primary axis is
+		// activity-as-event, with optional location/venue much like a
+		// Checkin. The activity name maps to the `exercise` h-entry
+		// property; the optional location URL/geo URI maps to `location`.
+		label: 'Exercise',
+		property: 'exercise',
+		targetLabel: 'Venue URL or geo:lat,lon (optional)',
+		contentLabel: 'How did it feel? (optional)',
+		submitLabel: 'Post exercise',
+		targetRequired: false,
+		personLabel: 'What activity?',
+		personProperty: 'name', // routed to `exercise` via the eat/drink-shaped branch below
+		hasGeocode: true,
+	},
 };
 
 const VARIANT_ORDER: Variant[] = [
@@ -227,6 +244,7 @@ const VARIANT_ORDER: Variant[] = [
 	'checkin',
 	'eat',
 	'drink',
+	'exercise',
 ];
 
 type Status =
@@ -348,7 +366,11 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		// Checkin and Eat/Drink accept geo:lat,lon URIs (from OSM lookup) as
 		// well as http(s); the other variants are URL-only.
 		if (trimmed_url) {
-			const accepts_geo = variant === 'checkin' || variant === 'eat' || variant === 'drink';
+			const accepts_geo =
+				variant === 'checkin' ||
+				variant === 'eat' ||
+				variant === 'drink' ||
+				variant === 'exercise';
 			const url_ok = accepts_geo
 				? is_safe_location_value(trimmed_url)
 				: is_safe_http_url(trimmed_url);
@@ -389,7 +411,11 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			//     (optional venue).
 			const base: HEntryProperties = {};
 
-			if (variant === 'eat' || variant === 'drink') {
+			if (variant === 'eat' || variant === 'drink' || variant === 'exercise') {
+				// Body-shaped variants: the personLabel input is the post's primary
+				// content (food / drink / activity), routed to config.property
+				// (`eat-of` / `drink-of` / `exercise`). Optional target_url goes
+				// to `location` as the venue/place where it happened.
 				if (trimmed_person) {
 					base[config.property] = trimmed_person;
 				}
@@ -516,7 +542,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-listen-mode-title">
 			<h2 id="outpost-listen-mode-title" class="outpost-card__title">
-				{config.label}
+				Doing
 			</h2>
 			<p class="outpost-card__lede">
 				Signed in as <code>{token.me || '—'}</code>
@@ -546,13 +572,15 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				<input
 					id="outpost-listen-target"
 					class="outpost-input"
-					// Checkin accepts geo: URIs which browsers don't recognize as
-					// valid `type=url` values; degrade to plain text there.
-					type={variant === 'checkin' ? 'text' : 'url'}
+					// Variants whose target field can carry a `geo:` URI need
+					// type="text" — browsers reject `geo:` for `type="url"`.
+					// All hasGeocode variants accept geo (Checkin / Eat / Drink /
+					// Exercise); URL-anchored variants stay type="url".
+					type={config.hasGeocode ? 'text' : 'url'}
 					value={target_url}
 					onInput={(event): void => setTargetUrl((event.target as HTMLInputElement).value)}
 					placeholder={
-						variant === 'checkin'
+						config.hasGeocode
 							? 'https://example.com/place/ or geo:29.12,-103.24'
 							: 'https://example.com/…'
 					}
