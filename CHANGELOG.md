@@ -7,6 +7,19 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Send access_token in body/query as well as the Authorization header)
+
+After v0.1.53 the cookie was gone from Micropub requests but the 403 persisted. The remaining suspect is the `Authorization` header itself: some managed-WP hosts (GoDaddy among them on certain configurations) don't forward `HTTP_AUTHORIZATION` to PHP via Apache's `mod_rewrite`. When that happens, `$_SERVER['HTTP_AUTHORIZATION']` is empty, the IndieAuth plugin sees no bearer, and Micropub returns the same `forbidden / Unauthorized` shape — indistinguishable from auth failures with other root causes.
+
+The Micropub spec explicitly allows the bearer in either the `Authorization` header OR an `access_token` form/query parameter. Sending both is belt-and-suspenders; servers that get both prefer the header (per spec) and ignore the body copy.
+
+- **`post_h_entry`** — `access_token` appended to the URL-encoded body.
+- **`upload_media`** — `access_token` appended to the multipart `FormData`.
+- **`discover_media_endpoint`, `discover_syndication_targets`** — `access_token` query parameter alongside the `q=` parameter.
+- The `Authorization: Bearer …` header still rides along on every request, so the fix is non-destructive: header-stripping hosts get the body; non-stripping hosts ignore the body copy.
+
+OUTPOST_VERSION: 0.1.53 → 0.1.54.
+
 ### Fixed (Omit cookies on Outpost's bearer-authenticated fetches)
 
 The v0.1.52 scope fix didn't resolve the Micropub 403. Web Inspector capture revealed the actual cause: when the user is logged into wp-admin in the same Safari, every same-origin fetch from `/post/` carries the `wordpress_logged_in_*` cookie alongside the `Authorization: Bearer …` header. WordPress core's `rest_cookie_check_errors` detects the cookie session, requires an `X-WP-Nonce` header (which Outpost doesn't have — bearer auth doesn't use nonces), errors out, and the cookie-path failure cascades into unsetting the bearer-resolved user. By the time the Micropub plugin calls `is_user_logged_in()`, no user is set, and it returns `{"error":"forbidden","error_description":"Unauthorized"}` with status 403.

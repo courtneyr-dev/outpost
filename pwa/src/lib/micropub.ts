@@ -198,6 +198,14 @@ export async function post_h_entry(
 		}
 	}
 
+	// Belt-and-suspenders: per the Micropub spec the access_token can be sent
+	// either in the Authorization header OR in an access_token form parameter.
+	// Some hosts (Apache without HTTP_AUTHORIZATION forwarding, certain WAFs)
+	// strip the Authorization header before WP sees it; sending both means the
+	// body parameter is a fallback if the header is dropped. Servers that
+	// receive both prefer the header (per spec) and ignore the body copy.
+	body.append('access_token', params.accessToken);
+
 	let response: Response;
 	try {
 		response = await env.fetch(params.micropubEndpoint, {
@@ -287,7 +295,15 @@ export async function discover_media_endpoint(
 	access_token: string,
 	env: MicropubEnvironment = default_env,
 ): Promise<string> {
-	const url = micropub_endpoint + (micropub_endpoint.includes('?') ? '&' : '?') + 'q=config';
+	const separator = micropub_endpoint.includes('?') ? '&' : '?';
+	// Per the Micropub spec, GET queries can carry the bearer in `access_token`.
+	// Header is still preferred (and sent below) but the query param is a
+	// fallback for hosts that strip Authorization.
+	const url =
+		micropub_endpoint +
+		separator +
+		'q=config&access_token=' +
+		encodeURIComponent(access_token);
 	let response: Response;
 	try {
 		response = await env.fetch(url, {
@@ -340,8 +356,12 @@ export async function discover_syndication_targets(
 	access_token: string,
 	env: MicropubEnvironment = default_env,
 ): Promise<SyndicationTarget[]> {
+	const separator = micropub_endpoint.includes('?') ? '&' : '?';
 	const url =
-		micropub_endpoint + (micropub_endpoint.includes('?') ? '&' : '?') + 'q=syndicate-to';
+		micropub_endpoint +
+		separator +
+		'q=syndicate-to&access_token=' +
+		encodeURIComponent(access_token);
 	let response: Response;
 	try {
 		response = await env.fetch(url, {
@@ -409,6 +429,9 @@ export async function upload_media(
 ): Promise<UploadMediaResult> {
 	const form = new FormData();
 	form.append('file', params.blob, params.filename);
+	// Same belt-and-suspenders auth as post_h_entry — body fallback in case
+	// the Authorization header is being stripped by the host's web server.
+	form.append('access_token', params.accessToken);
 
 	let response: Response;
 	try {
