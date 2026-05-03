@@ -37,12 +37,20 @@ final class Outpost_Geocode_Endpoint {
 	/** Nominatim search endpoint. */
 	private const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
-	/** Per-user rate limit (requests per minute). Tighter than preview because
-	 * Nominatim's own usage policy is "1 req/sec per IP, cache aggressively." */
-	private const RATE_LIMIT_PER_MINUTE = 20;
+	/** Rate limit for authenticated users (requests per minute). Tighter than
+	 * preview because Nominatim's own usage policy is "1 req/sec per IP, cache
+	 * aggressively." */
+	private const RATE_LIMIT_PER_MINUTE_AUTHED = 20;
 
-	/** HTTP request timeout in seconds. */
-	private const HTTP_TIMEOUT = 5;
+	/** Rate limit for the bearer-presence-only path (no validated cap). Lower
+	 * than the authed limit because the bearer is unverified; this throttles
+	 * abuse if the endpoint URL leaks. Auth-marathon trade-off acknowledged. */
+	private const RATE_LIMIT_PER_MINUTE_UNAUTHED = 5;
+
+	/** HTTP request timeout in seconds. Matches the preview-endpoint default;
+	 * Nominatim's p99 is well under 2s, so 3s gives a fast failure on the
+	 * user side without sacrificing realistic responses. */
+	private const HTTP_TIMEOUT = 3;
 
 	/** Cap on result count returned to the client. */
 	private const MAX_RESULTS = 5;
@@ -198,17 +206,29 @@ final class Outpost_Geocode_Endpoint {
 	}
 
 	/**
-	 * Per-user rate limit. Keys on user_id when logged in, IP otherwise.
+	 * Per-caller rate limit.
+	 *
+	 * Authenticated callers (cookie or validated session) get the higher
+	 * `RATE_LIMIT_PER_MINUTE_AUTHED`. Bearer-only callers (the auth-marathon
+	 * trade-off accepted in `has_bearer_header`) get the lower
+	 * `RATE_LIMIT_PER_MINUTE_UNAUTHED` — they can call but not at scale.
+	 * Anonymous callers (no cap, no bearer present at all) shouldn't reach
+	 * here because `check_permission` rejects them, but defensively we
+	 * apply the unauthed rate too.
 	 *
 	 * @return true|WP_Error true on success; WP_Error 429 when exceeded.
 	 */
 	private static function check_rate_limit() {
-		$key = is_user_logged_in()
+		$is_authed_user = is_user_logged_in();
+		$key            = $is_authed_user
 			? 'outpost_geocode_rl_u_' . get_current_user_id()
 			: 'outpost_geocode_rl_ip_' . md5( self::client_ip() );
+		$limit          = $is_authed_user
+			? self::RATE_LIMIT_PER_MINUTE_AUTHED
+			: self::RATE_LIMIT_PER_MINUTE_UNAUTHED;
 
 		$count = (int) get_transient( $key );
-		if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
+		if ( $count >= $limit ) {
 			return new WP_Error(
 				'rate_limited',
 				__( 'Too many geocode requests. Try again in a minute.', 'outpost' ),
@@ -223,24 +243,45 @@ final class Outpost_Geocode_Endpoint {
 	}
 
 	/**
-	 * Resolve the client IP address. Honors Cloudflare's CF-Connecting-IP
-	 * (production setup) before falling back to X-Forwarded-For chain
-	 * left-most entry, then REMOTE_ADDR.
+	 * Resolve the client IP address.
+	 *
+	 * Defaults to `REMOTE_ADDR` because that's the only header the web server
+	 * sets and an attacker can't forge. Sites behind Cloudflare or another
+	 * trusted proxy that rewrites the source IP can opt in to honoring
+	 * `CF-Connecting-IP` / `X-Forwarded-For` by defining
+	 * `OUTPOST_TRUST_FORWARDED_HEADERS` in wp-config.php — without that opt-
+	 * in, accepting those headers lets an attacker spoof their source IP and
+	 * sidestep the rate limit (every spoofed IP gets its own counter).
+	 *
+	 * Filterable via `outpost_geocode_client_ip` for sites that need a
+	 * different resolution path (e.g., a custom Varnish setup).
 	 */
 	private static function client_ip(): string {
-		// phpcs:disable WordPress.Security.ValidatedSanitizedInput
-		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			return (string) $_SERVER['HTTP_CF_CONNECTING_IP'];
-		}
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$chain = (string) $_SERVER['HTTP_X_FORWARDED_FOR'];
-			$first = trim( explode( ',', $chain )[0] );
-			if ( '' !== $first ) {
-				return $first;
+		$default = (string) ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+
+		$trust_proxy = defined( 'OUTPOST_TRUST_FORWARDED_HEADERS' )
+			&& OUTPOST_TRUST_FORWARDED_HEADERS;
+
+		if ( $trust_proxy ) {
+			// phpcs:disable WordPress.Security.ValidatedSanitizedInput
+			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+				$default = (string) $_SERVER['HTTP_CF_CONNECTING_IP'];
+			} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+				$chain = (string) $_SERVER['HTTP_X_FORWARDED_FOR'];
+				$first = trim( explode( ',', $chain )[0] );
+				if ( '' !== $first ) {
+					$default = $first;
+				}
 			}
+			// phpcs:enable WordPress.Security.ValidatedSanitizedInput
 		}
-		return (string) ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
-		// phpcs:enable WordPress.Security.ValidatedSanitizedInput
+
+		/**
+		 * Override the resolved client IP for rate-limit keying.
+		 *
+		 * @param string $ip The resolved IP address.
+		 */
+		return (string) apply_filters( 'outpost_geocode_client_ip', $default );
 	}
 
 	/**

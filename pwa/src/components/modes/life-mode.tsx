@@ -248,15 +248,23 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					disabled={submitting}
 				/>
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -277,15 +285,13 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 							</>
 						) : (
 							'Posted successfully.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer

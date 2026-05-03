@@ -282,7 +282,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					class="outpost-input"
 					type="number"
 					min={0}
-					step={5}
+					step={1}
 					inputMode="numeric"
 					value={duration_minutes}
 					onInput={(event): void =>
@@ -305,15 +305,23 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					disabled={submitting}
 				/>
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -334,15 +342,13 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 							</>
 						) : (
 							'Recipe posted.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer

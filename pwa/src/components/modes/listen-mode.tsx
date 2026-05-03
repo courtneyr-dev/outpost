@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
 	post_h_entry,
@@ -248,12 +248,21 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
 
-	// Checkin-only state: geocode search.
+	// Geocode-search state, used by checkin / eat / drink (any variant whose
+	// config has `hasGeocode: true`).
 	const [geo_query, setGeoQuery] = useState('');
 	const [geo_results, setGeoResults] = useState<GeocodeResult[]>([]);
 	const [geo_searching, setGeoSearching] = useState(false);
 	const [geo_error, setGeoError] = useState<string | null>(null);
 	const [geo_attribution, setGeoAttribution] = useState('');
+
+	// Stale geocode results from a previous variant would otherwise re-render
+	// when the user comes back to a hasGeocode variant. Clear on switch.
+	useEffect(() => {
+		setGeoQuery('');
+		setGeoResults([]);
+		setGeoError(null);
+	}, [variant]);
 
 	const handle_geocode_search = async (event?: Event): Promise<void> => {
 		event?.preventDefault();
@@ -466,7 +475,14 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			: status.kind === 'posting'
 				? 'Posting…'
 				: config.submitLabel;
-	const can_submit = !!target_url.trim();
+	// Variant-aware enable: URL-anchored kinds (listen/watch/etc.) need a URL;
+	// content-shaped kinds (eat/drink) need their primary text input. Without
+	// this branch, eat/drink users with a food name typed in but no venue URL
+	// see a permanently-disabled submit and a `required` browser-validation
+	// block — caught by both the code review and a11y audit.
+	const can_submit = config.targetRequired
+		? !!target_url.trim()
+		: !!person_name.trim();
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-listen-mode-title">
@@ -515,7 +531,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					autoComplete="url"
 					autoCapitalize="none"
 					spellcheck={false}
-					required
+					required={config.targetRequired}
 				/>
 
 				{config.hasTitle && (
@@ -716,15 +732,26 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					disabled={submitting}
 				/>
 
-				{status.kind === 'error' && (
-					<div class="outpost-error" role="alert">
-						{status.message}
-					</div>
-				)}
+				{/* Live regions are rendered unconditionally so iOS VoiceOver
+				    reliably picks up announcements; previously these mounted
+				    only on state change, which the iOS AT misses. The empty
+				    string content stays in the DOM as the no-op state. */}
+				<div
+					class="outpost-error"
+					role="alert"
+					aria-live="assertive"
+					hidden={status.kind !== 'error'}
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
 
-				{status.kind === 'posted' && (
-					<p class="outpost-status" aria-live="polite">
-						{status.location ? (
+				<p
+					class="outpost-status"
+					aria-live="polite"
+					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
 							<>
 								Posted to{' '}
 								<a href={status.location} target="_blank" rel="noopener noreferrer">
@@ -733,7 +760,11 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								{a11y_active && (
 									<>
 										{' · '}
-										<a href={`${status.location}?edac_view=1`} target="_blank" rel="noopener noreferrer">
+										<a
+											href={`${status.location}?edac_view=1`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
 											View accessibility report
 										</a>
 									</>
@@ -741,15 +772,13 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 							</>
 						) : (
 							'Posted successfully.'
-						)}
-					</p>
-				)}
-
-				{status.kind === 'queued' && (
-					<p class="outpost-status" aria-live="polite">
-						Saved for later. Outpost will post this when you&apos;re back online.
-					</p>
-				)}
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				{composerConfig && (
 					<Drawer

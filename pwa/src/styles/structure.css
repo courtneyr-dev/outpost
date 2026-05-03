@@ -271,10 +271,23 @@
 
 .outpost-tablist {
 	display: flex;
-	flex-wrap: wrap;
+	/* Single-row horizontal scroll on narrow screens. With 7 tabs
+	 * (Post / Reply / Photo / Doing / Life / Recipe / About) the previous
+	 * `flex-wrap: wrap` produced 2 rows on a 360 px phone, breaking the
+	 * visual "tab merges into panel below" treatment. Scroll-snap keeps
+	 * each tab tappable without clipping. */
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	scroll-snap-type: x proximity;
+	-webkit-overflow-scrolling: touch;
 	gap: 0.25rem;
 	padding: 0.75rem 1.25rem 0;
 	border-block-end: 1px solid var(--outpost-border, currentColor);
+}
+
+.outpost-tab {
+	scroll-snap-align: start;
+	flex: 0 0 auto;
 }
 
 .outpost-tab {
@@ -1023,7 +1036,9 @@
 .outpost-required {
 	font-weight: 400;
 	font-size: 0.85rem;
-	opacity: 0.75;
+	/* No opacity reduction — that would lower the contrast ratio of an
+	 * informational indicator below the WCAG 1.4.3 4.5:1 threshold against
+	 * an unknown theme background. Use font-size for visual de-emphasis. */
 }
 
 /* Collapsible sections — used by the OpenStreetMap lookup in Checkin and any
@@ -1094,6 +1109,15 @@
 .outpost-geocode-result:focus-visible {
 	background: var(--outpost-result-bg-hover, var(--outpost-chip-active-bg, transparent));
 	color: var(--outpost-result-fg-hover, var(--outpost-chip-active-fg, inherit));
+}
+
+/* Explicit focus ring — matches the rest of Outpost's interactive controls.
+ * Without this, focus visibility depends on whether the theme defined the
+ * `--outpost-result-bg-hover` token; a missing token leaves focus invisible.
+ * WCAG 2.4.7 / 1.4.11. */
+.outpost-geocode-result:focus-visible {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
 }
 
 .outpost-geocode-result__name {

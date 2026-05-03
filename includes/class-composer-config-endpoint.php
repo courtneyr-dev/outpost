@@ -310,13 +310,27 @@ final class Outpost_Composer_Config_Endpoint {
 	/**
 	 * Best-effort client IP for rate-limiting anonymous requests.
 	 *
-	 * REMOTE_ADDR is the canonical truth at the PHP layer. CDNs (Cloudflare,
-	 * Akamai) inject the real client IP into CF-Connecting-IP /
-	 * X-Forwarded-For — we honor those when present, but the fallback is
-	 * REMOTE_ADDR so spoofed headers can't bypass the limit on direct
-	 * connections.
+	 * REMOTE_ADDR is the canonical truth at the PHP layer because the web
+	 * server sets it from the actual TCP connection. CDN-injected headers
+	 * (CF-Connecting-IP, X-Forwarded-For) are user-controllable on any host
+	 * not actually behind the CDN — accepting them by default would let an
+	 * attacker spoof a different source IP per request and sidestep the
+	 * rate limiter.
+	 *
+	 * Sites legitimately behind Cloudflare or a trusted proxy can opt in by
+	 * defining `OUTPOST_TRUST_FORWARDED_HEADERS` in wp-config.php.
 	 */
 	private static function client_ip(): string {
+		$default = isset( $_SERVER['REMOTE_ADDR'] )
+			? (string) $_SERVER['REMOTE_ADDR']
+			: 'unknown';
+
+		$trust_proxy = defined( 'OUTPOST_TRUST_FORWARDED_HEADERS' )
+			&& OUTPOST_TRUST_FORWARDED_HEADERS;
+		if ( ! $trust_proxy ) {
+			return $default;
+		}
+
 		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
 			return (string) $_SERVER['HTTP_CF_CONNECTING_IP'];
 		}
@@ -327,7 +341,7 @@ final class Outpost_Composer_Config_Endpoint {
 				return $first;
 			}
 		}
-		return isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+		return $default;
 	}
 
 	/**

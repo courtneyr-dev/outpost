@@ -49,9 +49,10 @@ export function is_safe_http_url(value: string): boolean {
  */
 export function is_safe_location_value(value: string): boolean {
 	if (is_safe_http_url(value)) return true;
-	// geo:lat,lon[,alt][;u=accuracy][;crs=...]
-	// Lat/lon can be signed decimals; we don't enforce ranges here (Nominatim
-	// returns valid coordinates and the Micropub server will reject obvious
-	// nonsense before storing).
-	return /^geo:-?\d+(\.\d+)?,-?\d+(\.\d+)?(,-?\d+(\.\d+)?)?(;[a-zA-Z][\w-]*=[^;]+)*$/.test(value);
+	// geo:lat,lon[,alt] — RFC 5870 form. Outpost's `geo_uri()` only ever
+	// emits this shape (no parameters), so we deliberately don't accept the
+	// `;param=value` extensions. Stricter regex closes the smuggling vector
+	// where a parameter value could carry hostile characters into a future
+	// renderer that doesn't escape carefully.
+	return /^geo:-?\d+(\.\d+)?,-?\d+(\.\d+)?(,-?\d+(\.\d+)?)?$/.test(value);
 }

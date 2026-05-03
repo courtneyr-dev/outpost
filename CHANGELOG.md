@@ -7,6 +7,56 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (multi-dimensional review remediation across security / a11y / perf)
+
+Ran a four-agent parallel review of the v0.1.57 Post Kinds expansion (security, performance, accessibility, code quality). Several intersecting findings — particularly the Eat/Drink "submit always disabled" bug — were caught by both code-review and accessibility audits from different angles. All criticals and majors fixed in this patch.
+
+**Critical** — Eat/Drink submit was unreachable:
+- `pwa/src/components/modes/listen-mode.tsx` — `can_submit` was hardcoded to `!!target_url.trim()` and the URL `<input>` had a static `required` attribute. For variants where `targetRequired: false` (Eat / Drink), the food/drink name field is the required signal. Both gates now consult `config.targetRequired`. Without this fix, every Eat or Drink post was silently blocked at the browser-validation layer; AT users got no announcement of why.
+
+**Major** — iOS VoiceOver missed live-region announcements:
+- `listen-mode.tsx`, `life-mode.tsx`, `recipe-mode.tsx` — the `<div role="alert">` and `<p aria-live="polite">` were conditionally mounted only when status changed. iOS VoiceOver doesn't reliably announce content injected into a region that didn't pre-exist. Now rendered as persistent containers with `hidden` toggling visibility; announcements fire reliably across AT pairings.
+
+**Major** — Geocode endpoint security hardening:
+- `includes/class-geocode-endpoint.php` — IP rate limit split into authed (20/min) and unauthed (5/min). Bearer-presence-only callers can't burn the higher quota even if they spoof headers.
+- `client_ip()` no longer trusts `CF-Connecting-IP` / `X-Forwarded-For` by default. New `OUTPOST_TRUST_FORWARDED_HEADERS` constant in wp-config.php opts in for sites legitimately behind a CDN. Without the opt-in, attackers on non-CDN deployments can't spoof per-request to dodge the rate limiter.
+- Same hardening mirrored to `class-composer-config-endpoint.php`'s `client_ip()`.
+- Filterable via new `outpost_geocode_client_ip` for custom proxy setups.
+- HTTP timeout 5 s → 3 s, matching `class-preview-endpoint.php`. Faster failure on slow networks.
+
+**Major** — Required-field signaling no longer reduces contrast:
+- `pwa/src/styles/structure.css` — `.outpost-required` no longer applies `opacity: 0.75`. Opacity reduction was at risk of dropping informational text below WCAG 1.4.3 4.5:1 against arbitrary theme backgrounds. Visual de-emphasis now done via `font-size` only.
+
+**Minor** — Geo URI regex tightened:
+- `pwa/src/lib/url-validation.ts` — `is_safe_location_value` no longer accepts `geo:lat,lon;param=value` parameter syntax. Outpost's `geo_uri()` only emits the bare `geo:lat,lon` form, so the parameter branch was a future-renderer XSS sink with no current caller. Closed.
+
+**Minor** — Recipe duration step:
+- `recipe-mode.tsx` — duration `<input type="number">` step changed from 5 to 1. The 5-minute increment broke users who wanted to enter 7 minutes via the stepper widget and confused screen readers ("step 5"). Submit handler still rounds via `Math.round`.
+
+**Minor** — Geocode result focus indicator:
+- `structure.css` — explicit `outline: 2px solid var(--outpost-focus, currentColor)` on `.outpost-geocode-result:focus-visible`. Previously focus visibility depended on the theme defining `--outpost-result-bg-hover`; missing token meant invisible focus. WCAG 2.4.7 / 1.4.11.
+
+**Minor** — Tab list horizontal scroll:
+- `structure.css` — 7 tabs were wrapping to two rows on 360 px phones, breaking the visual tab→panel connection. Now `flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity`. Single horizontal-scroll row, snap-aligned per tab.
+
+**Minor** — Stale geocode results across variant switch:
+- `listen-mode.tsx` — `useEffect` clears `geo_query` / `geo_results` / `geo_error` on variant change. Previously, switching from Checkin to Listen and back showed the old result list.
+
+### Added (test coverage for `minutes_to_iso8601_duration`)
+
+- `pwa/src/components/modes/recipe-mode.test.tsx` — 9 vitest cases covering zero, negative, NaN, Infinity, sub-hour, exactly-one-hour, whole hours, mixed hours+minutes, fractional rounding. The function is small but the branches are easy to break in a refactor.
+
+### Outstanding (deferred to next session)
+
+The reviews surfaced larger refactors not done tonight:
+- **Hook extraction (`usePostSubmitter`)** — life/recipe/listen/reply/note all reproduce ~40 lines of submit-handler boilerplate. Not done because the extraction is non-trivial and the current code works. ~200 duplicated lines across 5 files.
+- **`HEntryProperties` discrimination** — currently a 30-field flat bag with no shape constraints. Worth typing as `HEntryBase & (NoteShape | ReplyShape | RecipeShape | …)` once Phase F companion adapters start touching properties.
+- **Component tests for `LifeMode` and `RecipeMode`** — the duration helper is now tested but the form components themselves aren't. The reply-mode test pattern is the template.
+- **Eat/Drink `location` collision sanity check** — the eat post puts food name in `eat-of` and venue URL in `location`. Confirm with one staging post per kind that Post Kinds renders this without conflict against existing checkin patterns.
+- **`personLabel` / `personProperty` rename** — the metaphor stretches at Eat/Drink ("What did you eat?"). A discriminated union for the primary input shape (`{ kind: 'author'|'place'|'subject', label }`) would read more honestly.
+
+OUTPOST_VERSION: 0.1.57 → 0.1.58.
+
 ### Added (12 Post Kinds parity additions across 3 tabs + 2 new tabs)
 
 Outpost now covers the full breadth of the Post Kinds plugin's vocabulary. Every kind that maps cleanly to a single h-entry shape has a UI; the structural ones (Recipe) get their own form.
