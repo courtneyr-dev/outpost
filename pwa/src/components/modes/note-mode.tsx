@@ -215,7 +215,11 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				content: trimmed_content,
-				...(config.requiresTitle && trimmed_title ? { name: trimmed_title } : {}),
+				// h-entry name (post_title) is now sent for ALL variants
+				// when filled, not just Article. Lets WordPress admin lists,
+				// search, and RSS treat the post as fully-titled even when
+				// the theme renders the variant without a heading.
+				...(trimmed_title ? { name: trimmed_title } : {}),
 				...(config.postFormat ? { 'mp-post-format': config.postFormat } : {}),
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
@@ -315,27 +319,32 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					))}
 				</fieldset>
 
-				{config.requiresTitle && (
-					<>
-						<label class="outpost-label" for="outpost-note-title">
-							Title <span class="outpost-required">(required)</span>
-						</label>
-						<input
-							id="outpost-note-title"
-							class="outpost-input"
-							type="text"
-							value={title}
-							onInput={(event): void =>
-								setTitle((event.target as HTMLInputElement).value)
-							}
-							autoCapitalize="sentences"
-							spellcheck={true}
-							disabled={submitting}
-							required
-							autoComplete="off"
-						/>
-					</>
-				)}
+				{/* Title is always shown — Outpost stores a `name` (post_title)
+				 *   on every post even when the front-end theme wouldn't
+				 *   render it. WordPress relies on post_title for the
+				 *   admin list, search, RSS, and many third-party plugins,
+				 *   so empty titles are second-class data. Article variant
+				 *   keeps `required`; the others mark the field optional. */}
+				<label class="outpost-label" for="outpost-note-title">
+					Title{' '}
+					<span class="outpost-required">
+						{config.requiresTitle ? '(required)' : '(optional)'}
+					</span>
+				</label>
+				<input
+					id="outpost-note-title"
+					class="outpost-input"
+					type="text"
+					value={title}
+					onInput={(event): void =>
+						setTitle((event.target as HTMLInputElement).value)
+					}
+					autoCapitalize="sentences"
+					spellcheck={true}
+					disabled={submitting}
+					required={config.requiresTitle}
+					autoComplete="off"
+				/>
 
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-note-content">

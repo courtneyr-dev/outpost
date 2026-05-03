@@ -33,13 +33,18 @@
 	padding: 1.5rem 1.25rem;
 	display: flex;
 	flex-direction: column;
-	gap: 1rem;
+	gap: 1.25rem;
 }
 
-.outpost-card__title {
+/* Heading override is intentionally specific (`.outpost-card .outpost-card__title`)
+ * so theme-set `h2` rules with single-class specificity can't enlarge it back.
+ * Moderate scale plays well against the dense form below. The font-family
+ * still defers to the theme via the token. */
+.outpost-card .outpost-card__title {
 	margin: 0;
-	font-size: 1.5rem;
-	line-height: 1.2;
+	font-size: 1.25rem;
+	font-weight: 600;
+	line-height: 1.25;
 	font-family: var(--outpost-font-heading, inherit);
 }
 
@@ -49,15 +54,24 @@
 	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 }
 
+/* Form row stacks each field group vertically with generous breathing
+ * room. The wider gap (0.875rem) reads as separator between fields;
+ * inside each pair, the label-to-input gap is tighter (controlled by
+ * label margin below) so the pair reads as a unit. */
 .outpost-form-row {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: 0.875rem;
 }
 
 .outpost-label {
+	display: block;
 	font-weight: 600;
 	font-size: 0.9rem;
+	/* Tight bottom margin on labels so the input below feels paired with
+	 * the label above, not floating loose. The form-row gap separates
+	 * one label-input pair from the next. */
+	margin-block-end: 0.25rem;
 }
 
 .outpost-input {
@@ -172,8 +186,13 @@
 .outpost-char-counter {
 	display: block;
 	font-size: 0.85rem;
-	/* opacity removed — see WCAG 1.4.3: opacity reduction lowers contrast against unknown theme backgrounds. font-size de-emphasis is the safe alternative. */
 	text-align: end;
+	color: var(--outpost-text-muted, inherit);
+	/* Negative top margin tucks the counter under its textarea (which sits
+	 * directly above) so the digit doesn't crash into the textarea bottom
+	 * border, and a small bottom margin pads it from the next form row. */
+	margin: -0.25rem 0 0.25rem;
+	min-height: 1.1em;
 }
 
 .outpost-char-counter--over {
@@ -182,11 +201,22 @@
 	font-weight: 600;
 }
 
+/* Textarea row pairs the body label with the inline voice-input mic
+ * button. align-items: end keeps the mic visually anchored to the
+ * label baseline so it reads as part of the same line, even on
+ * touch-target heights. The label inside this row keeps its weight
+ * but should NOT carry margin-block-end (the textarea below sits in
+ * its own grid cell, not flow). */
 .outpost-textarea-row {
 	display: flex;
-	align-items: center;
+	align-items: end;
 	justify-content: space-between;
 	gap: 0.5rem;
+	margin-block-end: 0.25rem;
+}
+
+.outpost-textarea-row .outpost-label {
+	margin-block-end: 0;
 }
 
 /*
@@ -234,8 +264,12 @@
 }
 
 .outpost-help {
-	margin: 0;
+	/* Negative top margin so help text sits tighter to the input it
+	 * describes (the form-row gap of 0.875rem is too loose for in-context
+	 * help). Bottom margin zero so the next field row inherits the gap. */
+	margin: -0.5rem 0 0;
 	font-size: 0.85rem;
+	line-height: 1.4;
 	color: var(--outpost-text-muted, inherit);
 }
 
@@ -345,32 +379,44 @@
  * between radios in the same `name` group. Touch-target generous via
  * padding so each option is easily tappable on mobile.
  */
+/* Variant picker — fieldset reset + visible borders on every option.
+ *
+ * Browsers render the default `<fieldset>` with an inset legend floating
+ * in a border; that visual reads as un-styled and the legend ends up
+ * crowded against the first radio. We zero the fieldset's defaults and
+ * give the legend its own line by `display: block`, then let the
+ * radios wrap as a flowing row below. The legend acts as the ::before
+ * of the picker visually.
+ *
+ * `display: block` on the fieldset (instead of flex) keeps `<legend>`
+ * working — flex/grid containers misbehave with legend across browsers. */
 .outpost-variant-picker {
 	border: none;
 	padding: 0;
 	margin: 0;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-	align-items: center;
+	display: block;
 }
 
 .outpost-variant-picker legend {
+	display: block;
 	font-weight: 600;
 	font-size: 0.9rem;
-	margin-inline-end: 0.25rem;
 	padding: 0;
+	margin: 0 0 0.5rem;
+	float: none;
 }
 
 .outpost-radio {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.375rem;
-	padding: 0.375rem 0.625rem;
-	border: 1px solid transparent;
+	gap: 0.5rem;
+	margin: 0 0.375rem 0.375rem 0;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--outpost-border, currentColor);
 	border-radius: var(--outpost-radius, 0.375rem);
 	cursor: pointer;
 	user-select: none;
+	min-height: 2.25rem;
 }
 
 .outpost-radio:has(input:checked) {
@@ -874,10 +920,16 @@
 	border-block-end: 1px solid var(--outpost-card-border, currentColor);
 }
 
-.outpost-drawer__title {
+/* Specificity-bumped via `.outpost-drawer .outpost-drawer__title` so theme
+ * `h2` rules with single-class specificity can't enlarge the drawer title
+ * back to a hero size. The "More options" header should read as a
+ * subordinate panel, not a page-level heading. */
+.outpost-drawer .outpost-drawer__title {
 	margin: 0;
 	font-size: 1.125rem;
+	line-height: 1.3;
 	font-weight: var(--outpost-font-weight-strong, 600);
+	font-family: var(--outpost-font-heading, inherit);
 }
 
 .outpost-drawer__body {

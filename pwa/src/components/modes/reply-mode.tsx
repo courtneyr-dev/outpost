@@ -208,14 +208,16 @@ type Status =
 
 function consume_share_target_for_reply(): {
 	url?: string;
+	title?: string;
 	content?: string;
 	variant?: Variant;
 } | null {
 	const data = peek_share_target();
 	if (!data || data.tab !== 'reply') return null;
 	consume_share_target();
-	const out: { url?: string; content?: string; variant?: Variant } = {};
+	const out: { url?: string; title?: string; content?: string; variant?: Variant } = {};
 	if (data.url) out.url = data.url;
+	if (data.title) out.title = data.title;
 	if (data.content) out.content = data.content;
 	if (
 		data.replyVariant &&
@@ -232,6 +234,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const initial_share = consume_share_target_for_reply();
 	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'reply');
 	const [target_url, setTargetUrl] = useState(initial_share?.url ?? '');
+	const [title, setTitle] = useState(initial_share?.title ?? '');
 	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -291,8 +294,10 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			}
 
 			const trimmed_venue = venue_name.trim();
+			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
+				...(trimmed_title ? { name: trimmed_title } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'rsvp' ? { rsvp: rsvp_value } : {}),
 				...(picked_location
@@ -318,6 +323,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				});
 				mark_posted_once();
 				setContent('');
+				setTitle('');
 				setTargetUrl('');
 				setPickedLocation(null);
 				setVenueName('');
@@ -393,6 +399,20 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						</label>
 					))}
 				</fieldset>
+
+				<label class="outpost-label" for="outpost-reply-title">
+					Title <span class="outpost-required">(optional)</span>
+				</label>
+				<input
+					id="outpost-reply-title"
+					class="outpost-input"
+					type="text"
+					value={title}
+					onInput={(event): void => setTitle((event.target as HTMLInputElement).value)}
+					autoCapitalize="sentences"
+					autoComplete="off"
+					disabled={submitting}
+				/>
 
 				<label class="outpost-label" for="outpost-reply-target">
 					{config.targetLabel}

@@ -94,6 +94,7 @@ type Status =
 
 export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) {
 	const [variant, setVariant] = useState<Variant>('mood');
+	const [title, setTitle] = useState('');
 	const [primary_value, setPrimaryValue] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -121,8 +122,10 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			}
 
 			const trimmed_venue = venue_name.trim();
+			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_primary,
+				...(trimmed_title ? { name: trimmed_title } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
@@ -146,6 +149,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					...(result.location ? { location: result.location } : {}),
 				});
 				mark_posted_once();
+				setTitle('');
 				setPrimaryValue('');
 				setContent('');
 				setMoreValues(empty_more_values());
@@ -218,6 +222,20 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						</label>
 					))}
 				</fieldset>
+
+				<label class="outpost-label" for="outpost-life-title">
+					Title <span class="outpost-required">(optional)</span>
+				</label>
+				<input
+					id="outpost-life-title"
+					class="outpost-input"
+					type="text"
+					value={title}
+					onInput={(event): void => setTitle((event.target as HTMLInputElement).value)}
+					autoCapitalize="sentences"
+					autoComplete="off"
+					disabled={submitting}
+				/>
 
 				<label class="outpost-label" for="outpost-life-primary">
 					{config.primaryLabel}

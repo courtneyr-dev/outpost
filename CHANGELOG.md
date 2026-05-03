@@ -7,6 +7,31 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Improved (form readability + title field on every post kind)
+
+The composer's form layout had compressed spacing that made fields hard to scan: labels jammed against inputs, char counter crashing into the textarea, drawer headings inheriting hero-sized theme defaults, fieldset borders showing browser default styles. Restructured `pwa/src/styles/structure.css`:
+
+- **Form-row gap** widened from 0.5rem to 0.875rem so each label/input pair has visible separator space from the next.
+- **Labels** now `display: block` with a `0.25rem` bottom margin — pairs them visually with the input below while the wider form-row gap separates pairs from each other.
+- **Card title** specificity bumped (`.outpost-card .outpost-card__title`) so theme `h2` rules with single-class specificity can't enlarge it back to a hero size. Same fix for `.outpost-drawer .outpost-drawer__title`.
+- **Variant picker** rebuilt with `display: block` on the fieldset (flex/grid containers misbehave with `<legend>` across browsers); legend gets its own line above radios. Each radio gets a visible border so the group reads as a button bar instead of inline text.
+- **Char counter** repositioned with negative top margin so the digit doesn't crash into the textarea bottom edge; small bottom margin pads it from the next form row.
+- **Help text** got a negative top margin so it sits tighter to the input it describes (the form-row gap was too loose for in-context help).
+
+### Added (title field on every post kind)
+
+Per user directive: "All posts from Outpost should have a field for a title, even if that doesn't display on the front of site." Every Outpost post kind now sends an h-entry `name` (which becomes WordPress `post_title`) when the user fills the field. Empty titles still allowed; this just makes the field exist everywhere it didn't before.
+
+- **Note tab** — title input now visible for all 5 variants (Note / Status / Aside / Article / Quote), not just Article. Article keeps `required`; the others mark `(optional)`.
+- **Reply tab** — new optional title input above the URL field for all 9 variants.
+- **Listen-mode** — `hasTitle: true` extended to Listen / Read / Play / Game / Jam (Watch already had it). Checkin / Eat / Drink unchanged: those have a primary input (place name / food / drink) that already serves as the post's identity, so a separate title would be redundant.
+- **Life-mode** — new optional title input above the primary value for all 3 variants (Mood / Weather / Exercise).
+- **Photo / Recipe** — already had title fields; unchanged.
+
+WordPress relies on `post_title` for the admin list, search, RSS, and many third-party plugins. Posts without titles render as "(no title)" in those surfaces. Outpost now emits a title whenever the user provides one, regardless of post kind. The theme's rendering of post_title on the front-end is the theme's call.
+
+OUTPOST_VERSION: 0.1.60 → 0.1.61.
+
 ### Added (Venue name field paired with OSM coordinates on every post kind)
 
 Per user request — extending v0.1.59's "OSM picker on every kind" so every option also has an always-visible venue name input. The two halves of a location are now collected separately:
