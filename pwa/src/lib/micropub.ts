@@ -94,6 +94,42 @@ export interface HEntryProperties {
 	'mp-xfn-target'?: string;
 	/** Outpost-specific: WP category names (auto-create new ones via the bridge). */
 	'mp-categories'?: string[];
+	/** Read kinds (Post Kinds): to-read | reading | finished. */
+	'read-status'?: 'to-read' | 'reading' | 'finished';
+	/**
+	 * Author / artist / director / etc. h-card name. Shipped as a flat string
+	 * and Post Kinds normalizes it server-side. For richer authorship (URL,
+	 * photo), Post Kinds also reads the target URL's mf2.
+	 */
+	author?: string;
+	/** 1–5 rating for Read / Watch / Listen / Play. Some IndieWeb sites use
+	 *  1–10; Outpost defaults to 1–5 because it matches more downstream
+	 *  rendering plugins out of the box. */
+	rating?: string;
+	/** Mood: textual description of the author's mood at posting time. */
+	mood?: string;
+	/** Weather: textual description of weather conditions. */
+	weather?: string;
+	/** Exercise: textual description of activity. */
+	exercise?: string;
+	/** Eat: name/description of food (Post Kinds: `eat-of`). */
+	'eat-of'?: string;
+	/** Drink: name/description of beverage (Post Kinds: `drink-of`). */
+	'drink-of'?: string;
+	/** Wishlist target URL (Post Kinds: `wishlist-of`). */
+	'wishlist-of'?: string;
+	/** Tag target URL (Post Kinds: `tag-of`). */
+	'tag-of'?: string;
+	/** Issue target URL (Post Kinds: `issue-of`). */
+	'issue-of'?: string;
+	/** Recipe: list of ingredients (Schema.org / h-recipe `ingredient`). */
+	ingredient?: string[];
+	/** Recipe: list of instruction steps. */
+	instructions?: string[];
+	/** Recipe: serving yield (e.g. "4 servings"). */
+	yield?: string;
+	/** Recipe: total cooking time in ISO 8601 duration (e.g. "PT45M"). */
+	duration?: string;
 }
 
 export interface SyndicationTarget {

@@ -36,7 +36,7 @@ export interface QueueEntry {
 	/** Auto-assigned IDB key. */
 	id: number;
 	/** Where this entry came from — purely for the queue UI's labeling. */
-	source: 'note' | 'reply' | 'photo' | 'listen' | 'article';
+	source: 'note' | 'reply' | 'photo' | 'listen' | 'article' | 'life' | 'recipe';
 	properties: HEntryProperties;
 	accessToken: string;
 	micropubEndpoint: string;

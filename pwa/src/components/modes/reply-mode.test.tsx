@@ -66,10 +66,20 @@ function rsvp_radios(): HTMLInputElement[] {
 }
 
 describe('ReplyMode variant picker', () => {
-	it('renders 6 variant radios in order', () => {
+	it('renders 9 variant radios in order', () => {
 		mount();
 		const values = variant_radios().map((r) => r.value);
-		expect(values).toEqual(['reply', 'like', 'repost', 'bookmark', 'rsvp', 'follow']);
+		expect(values).toEqual([
+			'reply',
+			'like',
+			'repost',
+			'bookmark',
+			'rsvp',
+			'follow',
+			'wishlist',
+			'tag',
+			'issue',
+		]);
 	});
 
 	it('Reply is selected by default', () => {

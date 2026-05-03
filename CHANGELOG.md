@@ -7,6 +7,43 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (12 Post Kinds parity additions across 3 tabs + 2 new tabs)
+
+Outpost now covers the full breadth of the Post Kinds plugin's vocabulary. Every kind that maps cleanly to a single h-entry shape has a UI; the structural ones (Recipe) get their own form.
+
+**Doing tab — extended from 5 variants to 9:**
+- New: **Game** (sibling of Play, distinct post-kind label).
+- New: **Jam** (sibling of Listen, distinct post-kind label).
+- New: **Eat** — Post Kinds `eat-of` (food name); optional venue URL or `geo:lat,lon`.
+- New: **Drink** — Post Kinds `drink-of` (drink name); same optional location shape.
+- Existing variants gained per-kind fields: **Listen / Jam → Artist**, **Watch → Director**, **Read → Author + Reading status (To read / Currently reading / Finished) + Rating**, **Play / Game → Rating**, **Listen / Watch / Read / Jam → Rating** (1–5 numeric).
+
+**Reply tab — extended from 6 variants to 9:**
+- New: **Wishlist** — `wishlist-of` (item URL).
+- New: **Tag** — `tag-of` (URL being tagged); pairs with categories.
+- New: **Issue** — `issue-of` (project URL); content required.
+
+**New "Life" tab — content-only post kinds:**
+- **Mood** → h-entry `mood`.
+- **Weather** → h-entry `weather`.
+- **Exercise** → h-entry `exercise`.
+
+Each variant takes a primary text field (the property value) plus an optional `content` body. No URL; these are personal-state posts. Tab uses the same WAI-ARIA tabs / radio-variant pattern as Doing.
+
+**New "Recipe" tab — structured h-recipe form:**
+- Title (required), Ingredients (required, one per line → array), Instructions (required, one per line → array), Yield, Total time (entered as minutes, posted as ISO 8601 duration `PT45M`), Notes/story.
+- `minutes_to_iso8601_duration` helper handles minute → ISO conversion client-side because Post Kinds + h-recipe themes expect ISO format.
+
+**Composer-tabs structure:** 5 tabs → 7 tabs (added Life and Recipe before About). All keyboard navigation, roving tabindex, wrap-around still work; tests updated to assert the seven-tab order. `ModeId` union extended; `QueueEntry.source` extended with `'life'` and `'recipe'` so offline-queue replays survive a tab restart.
+
+**HEntryProperties additions:** `read-status`, `author`, `rating`, `mood`, `weather`, `exercise`, `eat-of`, `drink-of`, `wishlist-of`, `tag-of`, `issue-of`, `ingredient` (string array), `instructions` (string array), `yield`, `duration`. All optional; existing posts unaffected.
+
+**Listen-mode VariantConfig refactored** to a feature-flag table (`hasReadStatus`, `hasRating`, `hasTitle`, `hasGeocode`, `personLabel`, `personProperty`, `targetRequired`). Adding a future variant is now a single VARIANTS row plus a one-line VARIANT_ORDER append; the form renderer is uniform.
+
+**Bundle impact:** 90.66 KB → 103.09 KB JS; 26.99 KB → 29.43 KB gzipped. +2.4 KB gzipped for two new mode components plus the variant-config expansions. Within the 40 KB Phase C budget.
+
+OUTPOST_VERSION: 0.1.56 → 0.1.57.
+
 ### Added (Photo title + body, Watch title + body, Checkin OSM lookup)
 
 Three field-level enhancements to the Photo, Watch, and Checkin post kinds based on Post Kinds plugin parity. The h-entry properties Outpost was sending didn't include `name` (title) for these kinds, even though most actual posts on the IndieWeb want one.

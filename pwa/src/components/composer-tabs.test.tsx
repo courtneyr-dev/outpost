@@ -74,10 +74,10 @@ async function flush(): Promise<void> {
 }
 
 describe('ComposerTabs', () => {
-	it('renders five tabs with the expected labels', () => {
+	it('renders seven tabs with the expected labels', () => {
 		mount();
 		const labels = tabs().map((t) => t.textContent);
-		expect(labels).toEqual(['Post', 'Reply', 'Photo', 'Doing', 'About']);
+		expect(labels).toEqual(['Post', 'Reply', 'Photo', 'Doing', 'Life', 'Recipe', 'About']);
 	});
 
 	it('selects Note by default', () => {
@@ -146,8 +146,9 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'End');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
-		press_key(tabs()[4]!, 'ArrowRight');
+		const last = tabs().length - 1;
+		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
+		press_key(tabs()[last]!, 'ArrowRight');
 		await flush();
 		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
 	});
@@ -156,7 +157,8 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'ArrowLeft');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
+		const last = tabs().length - 1;
+		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
 	});
 
 	it('jumps to first tab with Home', async () => {
@@ -172,7 +174,8 @@ describe('ComposerTabs', () => {
 		mount();
 		press_key(tabs()[0]!, 'End');
 		await flush();
-		expect(tabs()[4]?.getAttribute('aria-selected')).toBe('true');
+		const last = tabs().length - 1;
+		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
 	});
 
 	it('ignores keys other than arrows / Home / End', async () => {

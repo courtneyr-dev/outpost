@@ -11,6 +11,8 @@ import { NoteMode } from './modes/note-mode';
 import { ReplyMode } from './modes/reply-mode';
 import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
+import { LifeMode } from './modes/life-mode';
+import { RecipeMode } from './modes/recipe-mode';
 import { AboutTab } from './modes/about-tab';
 import { QueueBadge } from './queue-badge';
 import { InstallPrompt } from './install-prompt';
@@ -46,7 +48,7 @@ import { peek_share_target } from '../lib/share-target';
  * ModeId union and the modes array would extend then.
  */
 
-type ModeId = 'note' | 'reply' | 'photo' | 'listen' | 'about';
+type ModeId = 'note' | 'reply' | 'photo' | 'listen' | 'life' | 'recipe' | 'about';
 
 interface ModeDefinition {
 	id: ModeId;
@@ -149,6 +151,28 @@ export function ComposerTabs({
 			label: 'Doing',
 			render: () => (
 				<ListenMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
+			),
+		},
+		{
+			id: 'life',
+			label: 'Life',
+			render: () => (
+				<LifeMode
+					token={token}
+					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(composer_config ? { composerConfig: composer_config } : {})}
+				/>
+			),
+		},
+		{
+			id: 'recipe',
+			label: 'Recipe',
+			render: () => (
+				<RecipeMode
 					token={token}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}

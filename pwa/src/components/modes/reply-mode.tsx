@@ -52,9 +52,26 @@ export interface ReplyModeProps {
 	composerConfig?: ComposerConfig;
 }
 
-type Variant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
+type Variant =
+	| 'reply'
+	| 'like'
+	| 'repost'
+	| 'bookmark'
+	| 'rsvp'
+	| 'follow'
+	| 'wishlist'
+	| 'tag'
+	| 'issue';
 
-type VariantProperty = 'in-reply-to' | 'like-of' | 'repost-of' | 'bookmark-of' | 'follow-of';
+type VariantProperty =
+	| 'in-reply-to'
+	| 'like-of'
+	| 'repost-of'
+	| 'bookmark-of'
+	| 'follow-of'
+	| 'wishlist-of'
+	| 'tag-of'
+	| 'issue-of';
 
 interface VariantConfig {
 	label: string;
@@ -126,9 +143,53 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		submitLabel: 'Post follow',
 		previewIntro: 'Following:',
 	},
+	wishlist: {
+		// Post Kinds: `wishlist-of` (item URL), with optional commentary.
+		// Same shape as Bookmark — only the post-kind label differs.
+		label: 'Wishlist',
+		property: 'wishlist-of',
+		contentRequired: false,
+		targetLabel: 'Wishlist item URL',
+		contentLabel: 'Why you want it (optional)',
+		submitLabel: 'Post wishlist',
+		previewIntro: 'Wishing for:',
+	},
+	tag: {
+		// Post Kinds: `tag-of` (URL of the page being tagged). Used as a
+		// public bookmark-like signal, often paired with categories so the
+		// post itself surfaces under the tag taxonomy.
+		label: 'Tag',
+		property: 'tag-of',
+		contentRequired: false,
+		targetLabel: 'URL to tag',
+		contentLabel: 'Optional note (use More options → Categories for tags)',
+		submitLabel: 'Post tag',
+		previewIntro: 'Tagging:',
+	},
+	issue: {
+		// Post Kinds: `issue-of` (URL of the project / page the issue is for).
+		// Body holds the issue description.
+		label: 'Issue',
+		property: 'issue-of',
+		contentRequired: true,
+		targetLabel: 'Repository or project URL',
+		contentLabel: 'Issue description',
+		submitLabel: 'Post issue',
+		previewIntro: 'Filing issue against:',
+	},
 };
 
-const VARIANT_ORDER: Variant[] = ['reply', 'like', 'repost', 'bookmark', 'rsvp', 'follow'];
+const VARIANT_ORDER: Variant[] = [
+	'reply',
+	'like',
+	'repost',
+	'bookmark',
+	'rsvp',
+	'follow',
+	'wishlist',
+	'tag',
+	'issue',
+];
 
 type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
 const RSVP_VALUES: RsvpValue[] = ['yes', 'no', 'maybe', 'interested'];

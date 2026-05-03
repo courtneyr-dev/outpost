@@ -53,16 +53,52 @@ export interface ListenModeProps {
 	composerConfig?: ComposerConfig;
 }
 
-type Variant = 'listen' | 'watch' | 'read' | 'play' | 'checkin';
+type Variant =
+	| 'listen'
+	| 'watch'
+	| 'read'
+	| 'play'
+	| 'game'
+	| 'jam'
+	| 'checkin'
+	| 'eat'
+	| 'drink';
 
-type VariantProperty = 'listen-of' | 'watch-of' | 'read-of' | 'play-of' | 'location';
+type VariantProperty =
+	| 'listen-of'
+	| 'watch-of'
+	| 'read-of'
+	| 'play-of'
+	| 'location'
+	| 'eat-of'
+	| 'drink-of';
 
+/**
+ * Per-variant feature flags drive conditional rendering and submit-payload
+ * shape. Adding a feature is a row-level edit on VARIANTS rather than another
+ * `variant === 'x'` branch in JSX — keeps the form rendering uniform.
+ */
 interface VariantConfig {
 	label: string;
 	property: VariantProperty;
 	targetLabel: string;
 	contentLabel: string;
 	submitLabel: string;
+	/** Whether the target URL is required. Eat/Drink may be context-free. */
+	targetRequired: boolean;
+	/** Show the per-kind primary input (artist for listen/jam, director for
+	 *  watch, author for read, food/drink for eat/drink, place for checkin). */
+	personLabel?: string;
+	/** Property the personLabel maps to in the Micropub payload. */
+	personProperty?: 'author' | 'name';
+	/** Show the read-status dropdown (Read kind only). */
+	hasReadStatus?: boolean;
+	/** Show the rating input (media-consumption kinds). */
+	hasRating?: boolean;
+	/** Show the title input (Watch primarily). */
+	hasTitle?: boolean;
+	/** Show the OpenStreetMap geocode lookup (Checkin and Eat/Drink). */
+	hasGeocode?: boolean;
 }
 
 const VARIANTS: Record<Variant, VariantConfig> = {
@@ -72,6 +108,10 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Track or album URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post listen',
+		targetRequired: true,
+		personLabel: 'Artist',
+		personProperty: 'author',
+		hasRating: true,
 	},
 	watch: {
 		label: 'Watch',
@@ -79,6 +119,11 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Movie or show URL',
 		contentLabel: 'Body (optional)',
 		submitLabel: 'Post watch',
+		targetRequired: true,
+		hasTitle: true,
+		personLabel: 'Director (optional)',
+		personProperty: 'author',
+		hasRating: true,
 	},
 	read: {
 		label: 'Read',
@@ -86,6 +131,11 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Book URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post read',
+		targetRequired: true,
+		personLabel: 'Author',
+		personProperty: 'author',
+		hasReadStatus: true,
+		hasRating: true,
 	},
 	play: {
 		label: 'Play',
@@ -93,6 +143,34 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Game URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post play',
+		targetRequired: true,
+		hasRating: true,
+	},
+	game: {
+		label: 'Game',
+		// Per Post Kinds, Game and Play share the play-of property — they
+		// render with different post-kind labels but the underlying h-entry
+		// shape is identical.
+		property: 'play-of',
+		targetLabel: 'Game URL',
+		contentLabel: 'Optional comment',
+		submitLabel: 'Post game',
+		targetRequired: true,
+		hasRating: true,
+	},
+	jam: {
+		// Same overlap as Game: Jam and Listen share listen-of, but the post
+		// kind label is "Jam" — used when sharing a single track you're
+		// currently into rather than logging an album you finished.
+		label: 'Jam',
+		property: 'listen-of',
+		targetLabel: 'Track URL',
+		contentLabel: 'Why this track?',
+		submitLabel: 'Post jam',
+		targetRequired: true,
+		personLabel: 'Artist',
+		personProperty: 'author',
+		hasRating: true,
 	},
 	checkin: {
 		label: 'Checkin',
@@ -100,10 +178,50 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Location URL or geo:lat,lon',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post checkin',
+		targetRequired: true,
+		personLabel: 'Place name (optional)',
+		personProperty: 'name',
+		hasGeocode: true,
+	},
+	eat: {
+		// Post Kinds maps Eat to `eat-of` (food name string), with optional
+		// location URL/coords as a sibling property. The "target URL" here is
+		// the optional venue — the food-name input is the post's primary
+		// content.
+		label: 'Eat',
+		property: 'eat-of',
+		targetLabel: 'Venue URL or geo:lat,lon (optional)',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post meal',
+		targetRequired: false,
+		personLabel: 'What did you eat?',
+		personProperty: 'name', // posted as eat-of via property mapping below
+		hasGeocode: true,
+	},
+	drink: {
+		label: 'Drink',
+		property: 'drink-of',
+		targetLabel: 'Venue URL or geo:lat,lon (optional)',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post drink',
+		targetRequired: false,
+		personLabel: 'What did you drink?',
+		personProperty: 'name',
+		hasGeocode: true,
 	},
 };
 
-const VARIANT_ORDER: Variant[] = ['listen', 'watch', 'read', 'play', 'checkin'];
+const VARIANT_ORDER: Variant[] = [
+	'listen',
+	'watch',
+	'read',
+	'play',
+	'game',
+	'jam',
+	'checkin',
+	'eat',
+	'drink',
+];
 
 type Status =
 	| { kind: 'idle' }
@@ -116,8 +234,14 @@ type Status =
 export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
 	const [variant, setVariant] = useState<Variant>('listen');
 	const [target_url, setTargetUrl] = useState('');
-	const [place_name, setPlaceName] = useState('');
+	// Unified per-variant primary input. The `personLabel` config decides
+	// what the user sees ("Artist" / "Director" / "Author" / "Place name" /
+	// "What did you eat?"). The submit handler below routes the value to
+	// the appropriate h-entry property based on `personProperty`.
+	const [person_name, setPersonName] = useState('');
 	const [watch_title, setWatchTitle] = useState('');
+	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>('');
+	const [rating, setRating] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
@@ -164,10 +288,14 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	};
 
 	const handle_geocode_pick = (result: GeocodeResult): void => {
-		// Fill the URL field with a geo: URI (RFC 5870) and the place name with
-		// the OSM display name. User can edit either before submitting.
+		// Fill the URL field with a geo: URI (RFC 5870). For Checkin we also
+		// fill the place name from the OSM display name; for Eat/Drink we
+		// leave the food/drink name alone (the user's already typed what
+		// they're eating; the location is contextual).
 		setTargetUrl(geo_uri(result.lat, result.lon));
-		setPlaceName(result.displayName);
+		if (variant === 'checkin') {
+			setPersonName(result.displayName);
+		}
 		setGeoResults([]);
 		setGeoQuery('');
 	};
@@ -180,22 +308,44 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		event.preventDefault();
 		const trimmed_content = content.trim();
 		const trimmed_url = target_url.trim();
-		const trimmed_name = place_name.trim();
+		const trimmed_person = person_name.trim();
 		const trimmed_watch_title = watch_title.trim();
-		if (!trimmed_url) return;
-		// Checkin can carry a `geo:lat,lon` URI from the OSM lookup; the other
-		// variants are URL-only (movie, album, book, game pages).
-		const url_ok =
-			variant === 'checkin'
+		const trimmed_rating = rating.trim();
+
+		// Eat/Drink can be context-free (just a food/drink name with no URL).
+		// Checkin and the URL-anchored kinds still require something in the
+		// target field. For Eat/Drink the food/drink input is the required
+		// signal; for everything else the URL is.
+		if (config.targetRequired) {
+			if (!trimmed_url) return;
+		} else if (!trimmed_person) {
+			return; // Eat/Drink needs at least the food/drink name.
+		}
+
+		// URL validation only applies when a URL was actually entered.
+		// Checkin and Eat/Drink accept geo:lat,lon URIs (from OSM lookup) as
+		// well as http(s); the other variants are URL-only.
+		if (trimmed_url) {
+			const accepts_geo = variant === 'checkin' || variant === 'eat' || variant === 'drink';
+			const url_ok = accepts_geo
 				? is_safe_location_value(trimmed_url)
 				: is_safe_http_url(trimmed_url);
-		if (!url_ok) {
-			const message =
-				variant === 'checkin'
+			if (!url_ok) {
+				const message = accepts_geo
 					? 'Location must be http://, https://, or a geo:lat,lon URI.'
 					: 'URL must be http:// or https://.';
-			setStatus({ kind: 'error', message });
-			return;
+				setStatus({ kind: 'error', message });
+				return;
+			}
+		}
+
+		// Rating sanity: numeric, 1-5 inclusive. Empty is valid (no rating).
+		if (trimmed_rating !== '') {
+			const r = Number(trimmed_rating);
+			if (!Number.isFinite(r) || r < 1 || r > 5) {
+				setStatus({ kind: 'error', message: 'Rating must be a number between 1 and 5.' });
+				return;
+			}
 		}
 
 		try {
@@ -206,22 +356,49 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				setEndpoint(micropub_endpoint);
 			}
 
-			// `name` (h-entry title) is set from variant-specific inputs:
-			//   - watch:   the title field (e.g., "The Bear S2E3")
-			//   - checkin: the place name field (e.g., "Big Bend National Park")
-			//   - others:  no title; consumers can pull a title from the
-			//              target URL's microformat or oEmbed downstream.
-			const variant_name =
-				variant === 'watch'
-					? trimmed_watch_title
-					: variant === 'checkin'
-						? trimmed_name
-						: '';
-			const base: HEntryProperties = {
-				[config.property]: trimmed_url,
-				...(trimmed_content ? { content: trimmed_content } : {}),
-				...(variant_name ? { name: variant_name } : {}),
-			};
+			// Build the h-entry properties. Routing is variant-aware:
+			//
+			//   - URL-anchored (listen, watch, read, play, game, jam):
+			//     target URL → config.property; person → personProperty
+			//     (artist/director/author).
+			//   - checkin: target URL → location; person → name (place).
+			//   - eat / drink: person → eat-of/drink-of (the food/drink IS
+			//     the post kind's primary property); target URL → location
+			//     (optional venue).
+			const base: HEntryProperties = {};
+
+			if (variant === 'eat' || variant === 'drink') {
+				if (trimmed_person) {
+					base[config.property] = trimmed_person;
+				}
+				if (trimmed_url) {
+					base.location = trimmed_url;
+				}
+			} else {
+				base[config.property] = trimmed_url;
+				// Watch's standalone title input maps to h-entry name.
+				if (config.hasTitle && trimmed_watch_title) {
+					base.name = trimmed_watch_title;
+				}
+				// Person input — checkin uses h-entry name, others use author.
+				if (config.personProperty && trimmed_person) {
+					if (config.personProperty === 'name' && !base.name) {
+						base.name = trimmed_person;
+					} else if (config.personProperty === 'author') {
+						base.author = trimmed_person;
+					}
+				}
+			}
+
+			if (trimmed_content) {
+				base.content = trimmed_content;
+			}
+			if (config.hasReadStatus && read_status !== '') {
+				base['read-status'] = read_status;
+			}
+			if (config.hasRating && trimmed_rating !== '') {
+				base.rating = trimmed_rating;
+			}
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
@@ -240,8 +417,10 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				});
 				mark_posted_once();
 				setTargetUrl('');
-				setPlaceName('');
+				setPersonName('');
 				setWatchTitle('');
+				setReadStatus('');
+				setRating('');
 				setContent('');
 				setMoreValues(empty_more_values());
 				return;
@@ -256,7 +435,10 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 						});
 						setStatus({ kind: 'queued' });
 						setTargetUrl('');
-						setPlaceName('');
+						setPersonName('');
+						setWatchTitle('');
+						setReadStatus('');
+						setRating('');
 						setContent('');
 						setMoreValues(empty_more_values());
 						return;
@@ -336,7 +518,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					required
 				/>
 
-				{variant === 'watch' && (
+				{config.hasTitle && (
 					<>
 						<label class="outpost-label" for="outpost-listen-watch-title">
 							Title (optional)
@@ -355,22 +537,73 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					</>
 				)}
 
-				{variant === 'checkin' && (
+				{config.personLabel && (
 					<>
-						<label class="outpost-label" for="outpost-listen-place-name">
-							Place name (optional)
+						<label class="outpost-label" for="outpost-listen-person">
+							{config.personLabel}
 						</label>
 						<input
-							id="outpost-listen-place-name"
+							id="outpost-listen-person"
 							class="outpost-input"
 							type="text"
-							value={place_name}
+							value={person_name}
 							onInput={(event): void =>
-								setPlaceName((event.target as HTMLInputElement).value)
+								setPersonName((event.target as HTMLInputElement).value)
 							}
 							disabled={submitting}
 						/>
+					</>
+				)}
 
+				{config.hasReadStatus && (
+					<>
+						<label class="outpost-label" for="outpost-listen-read-status">
+							Reading status
+						</label>
+						<select
+							id="outpost-listen-read-status"
+							class="outpost-input"
+							value={read_status}
+							onChange={(event): void =>
+								setReadStatus(
+									(event.target as HTMLSelectElement)
+										.value as typeof read_status,
+								)
+							}
+							disabled={submitting}
+						>
+							<option value="">Not specified</option>
+							<option value="to-read">To read</option>
+							<option value="reading">Currently reading</option>
+							<option value="finished">Finished</option>
+						</select>
+					</>
+				)}
+
+				{config.hasRating && (
+					<>
+						<label class="outpost-label" for="outpost-listen-rating">
+							Rating (1–5, optional)
+						</label>
+						<input
+							id="outpost-listen-rating"
+							class="outpost-input"
+							type="number"
+							min={1}
+							max={5}
+							step={1}
+							inputMode="numeric"
+							value={rating}
+							onInput={(event): void =>
+								setRating((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+					</>
+				)}
+
+				{config.hasGeocode && (
+					<>
 						<details class="outpost-collapsible">
 							<summary class="outpost-collapsible__summary">
 								Look up on OpenStreetMap
