@@ -351,4 +351,46 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		);
 		$this->assertEquals( 2, $call_count );
 	}
+
+	// --- Place name bridge (mp-place-name → _outpost_place_name post meta) ---
+
+	public function test_apply_place_name_writes_post_meta(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->with( 'Big Bend National Park' )
+			->andReturn( 'Big Bend National Park' );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 42, '_outpost_place_name', 'Big Bend National Park' )
+			->andReturn( true );
+		$this->invoke_private(
+			'apply_place_name',
+			array( 42, array( 'mp-place-name' => 'Big Bend National Park' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_place_name_deletes_when_empty(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->with( '' )
+			->andReturn( '' );
+		WP_Mock::userFunction( 'delete_post_meta' )
+			->once()
+			->with( 42, '_outpost_place_name' )
+			->andReturn( true );
+		$this->invoke_private(
+			'apply_place_name',
+			array( 42, array( 'mp-place-name' => '' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_place_name_noop_when_property_absent(): void {
+		// Property entirely absent — no meta read or write should fire.
+		// `sanitize_text_field` is not mocked because it shouldn't be called.
+		$this->invoke_private(
+			'apply_place_name',
+			array( 42, array() )
+		);
+		$this->assertTrue( true );
+	}
 }

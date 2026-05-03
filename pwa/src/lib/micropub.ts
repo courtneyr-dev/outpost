@@ -130,6 +130,18 @@ export interface HEntryProperties {
 	yield?: string;
 	/** Recipe: total cooking time in ISO 8601 duration (e.g. "PT45M"). */
 	duration?: string;
+	/**
+	 * Venue / place name paired with `location`. Outpost-controlled
+	 * extension property (`mp-` namespace per the Micropub spec). The
+	 * Outpost Micropub bridge persists this as `_outpost_place_name`
+	 * post meta so themes can render "📍 at <venue>" alongside any
+	 * post — note, reply, photo, mood, recipe, etc.
+	 *
+	 * For Doing-tab Checkin posts, the venue name continues to map to
+	 * h-entry `name` (the post's primary identity) rather than this
+	 * sibling property — see listen-mode.tsx for the routing.
+	 */
+	'mp-place-name'?: string;
 }
 
 export interface SyndicationTarget {

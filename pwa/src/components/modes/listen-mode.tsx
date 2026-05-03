@@ -260,8 +260,9 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	// watch, read, play, game, jam). hasGeocode variants drive location
 	// through the inline target_url + person_name flow above; the
 	// "everywhere else" pattern matches the picker used in Note / Reply /
-	// Photo / Life / Recipe.
+	// Photo / Life / Recipe — venue name + optional OSM coordinates.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 
 	// Stale geocode results from a previous variant would otherwise re-render
 	// when the user comes back to a hasGeocode variant. Clear on switch.
@@ -421,6 +422,14 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			if (!config.hasGeocode && picked_location) {
 				base.location = geo_uri(picked_location.lat, picked_location.lon);
 			}
+			// Venue name (from picker) on non-hasGeocode variants. For
+			// hasGeocode variants the venue lives in person_name (mapped
+			// to h-entry `name` for checkin or `eat-of`/`drink-of` for
+			// eat/drink), so don't double-write.
+			const trimmed_venue_name = venue_name.trim();
+			if (!config.hasGeocode && trimmed_venue_name) {
+				base['mp-place-name'] = trimmed_venue_name;
+			}
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
 			setStatus({ kind: 'posting' });
@@ -446,6 +455,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				setContent('');
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
+				setVenueName('');
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -760,6 +770,8 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 						picked={picked_location}
 						onPick={setPickedLocation}
 						onClear={(): void => setPickedLocation(null)}
+						venueName={venue_name}
+						onVenueChange={setVenueName}
 						disabled={submitting}
 					/>
 				)}

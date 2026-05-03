@@ -87,6 +87,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -136,6 +137,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setEndpoint(micropub_endpoint);
 			}
 
+			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				name: trimmed_name,
 				ingredient: ingredients,
@@ -146,6 +148,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
+				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -172,6 +175,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setContent('');
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
+				setVenueName('');
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -318,6 +322,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					picked={picked_location}
 					onPick={setPickedLocation}
 					onClear={(): void => setPickedLocation(null)}
+					venueName={venue_name}
+					onVenueChange={setVenueName}
 					disabled={submitting}
 				/>
 

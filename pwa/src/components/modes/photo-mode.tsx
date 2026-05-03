@@ -85,6 +85,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 	const [name, setName] = useState('');
 	const [content, setContent] = useState('');
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
@@ -227,6 +228,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			const alt_value = alt_array.length === 1 ? alt_array[0]! : alt_array;
 			const trimmed_content = content.trim();
 			const trimmed_name = name.trim();
+			const trimmed_venue = venue_name.trim();
 			const base = {
 				photo: photo_value,
 				'mp-photo-alt': alt_value,
@@ -235,6 +237,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
+				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
 			try {
@@ -272,6 +275,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			setContent('');
 			setMoreValues(empty_more_values());
 			setPickedLocation(null);
+			setVenueName('');
 		} catch (err) {
 			let message: string;
 			if (err instanceof PhotoError) {
@@ -458,6 +462,8 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					picked={picked_location}
 					onPick={setPickedLocation}
 					onClear={(): void => setPickedLocation(null)}
+					venueName={venue_name}
+					onVenueChange={setVenueName}
 					disabled={submitting}
 				/>
 

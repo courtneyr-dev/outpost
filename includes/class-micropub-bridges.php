@@ -12,6 +12,7 @@
  *   - `mp-xfn`                → postmeta `_outpost_xfn` (Link Extension for XFN can read this)
  *   - `mp-xfn-target`         → companion key indicating which URL the rels apply to
  *   - `mp-categories[]`       → wp_set_post_categories() with auto-create
+ *   - `mp-place-name`         → postmeta `_outpost_place_name` (free-text venue name paired with the standard `location` property)
  *
  * The standard Micropub `category[]` property gets handled by the Micropub
  * plugin itself (assigns to post_tag taxonomy by default). Outpost adds
@@ -110,6 +111,41 @@ final class Outpost_Micropub_Bridges {
 		self::apply_yoast_focuskw( $post_id, $properties );
 		self::apply_xfn( $post_id, $properties );
 		self::apply_categories( $post_id, $properties );
+		self::apply_place_name( $post_id, $properties );
+	}
+
+	/**
+	 * Bridge: `mp-place-name` → `_outpost_place_name` post meta.
+	 *
+	 * Outpost-controlled custom property paired with the standard `location`
+	 * h-entry property. The PWA composer's GeocodePicker collects two halves
+	 * of a location:
+	 *
+	 *   - `location: geo:lat,lon` — RFC 5870 geo URI from OpenStreetMap.
+	 *     Stored by the Micropub plugin in its standard `geo_*` post meta.
+	 *   - `mp-place-name` — free-text venue name, optionally auto-filled
+	 *     from the OSM `display_name` but always editable. Stored here as
+	 *     `_outpost_place_name` so themes can render "📍 at <venue>".
+	 *
+	 * Runs unconditionally — every Outpost-originated post can carry a
+	 * place name regardless of post kind. Deletes the meta key when the
+	 * incoming property is empty so a venue tag can be removed by a
+	 * subsequent edit.
+	 *
+	 * @param int                  $post_id    Post ID.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_place_name( int $post_id, array $properties ): void {
+		$raw = self::scalar( $properties, 'mp-place-name' );
+		if ( null === $raw ) {
+			return;
+		}
+		$clean = sanitize_text_field( $raw );
+		if ( '' === $clean ) {
+			delete_post_meta( $post_id, '_outpost_place_name' );
+			return;
+		}
+		update_post_meta( $post_id, '_outpost_place_name', $clean );
 	}
 
 	/**

@@ -1141,9 +1141,21 @@
 	color: var(--outpost-warn-fg, inherit);
 }
 
-/* Picked-location summary card — replaces the search UI once the user
- * has chosen a place. Compact two-row layout: place name on top, the
- * geo: URI + Clear button below. Theme owns paint per Hard Contract. */
+/* Location picker container — wraps the always-visible venue-name input
+ * and the collapsible OSM coordinate disclosure. Stacks vertically with
+ * a small gap so the venue label and input read as one unit and the
+ * coordinate disclosure reads as a secondary affordance. */
+.outpost-location-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-block-start: 0.75rem;
+}
+
+/* Picked-coordinates summary card — replaces the OSM disclosure once the
+ * user has chosen coordinates. Compact one-row layout: emoji label + the
+ * geo: URI + Clear button. Venue name remains in its own input above so
+ * the user can edit it independently. Theme owns paint per Hard Contract. */
 .outpost-geocode-picked {
 	display: flex;
 	flex-direction: column;

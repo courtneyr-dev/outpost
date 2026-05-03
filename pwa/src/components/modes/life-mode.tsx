@@ -101,6 +101,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -119,12 +120,14 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				setEndpoint(micropub_endpoint);
 			}
 
+			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_primary,
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
+				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -147,6 +150,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				setContent('');
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
+				setVenueName('');
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -261,6 +265,8 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					picked={picked_location}
 					onPick={setPickedLocation}
 					onClear={(): void => setPickedLocation(null)}
+					venueName={venue_name}
+					onVenueChange={setVenueName}
 					disabled={submitting}
 				/>
 

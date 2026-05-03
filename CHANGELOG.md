@@ -7,6 +7,27 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Venue name field paired with OSM coordinates on every post kind)
+
+Per user request — extending v0.1.59's "OSM picker on every kind" so every option also has an always-visible venue name input. The two halves of a location are now collected separately:
+
+- **Venue name** (always visible) — free-text input. User types whatever the venue is called: "the gym", "my kitchen", "Big Bend National Park". No OSM lookup required to use it.
+- **OSM coordinates** (collapsed, optional) — same disclosure-driven OSM Nominatim lookup as before. When the user picks a result, the venue name input auto-fills with the OSM `display_name` (still editable, e.g., to shorten "Big Bend National Park, Brewster County, Texas, USA" to just "Big Bend").
+
+These two fields are independent: a user can add just a venue name (no coordinates), just coordinates (no venue), or both. Both reset on successful post.
+
+**Wire format:**
+- Coordinates → `location: geo:lat,lon` (RFC 5870, unchanged from v0.1.59).
+- Venue name → new `mp-place-name` Outpost-controlled custom property (`mp-` namespace per Micropub spec extension convention).
+
+**Server-side persistence:** `Outpost_Micropub_Bridges::apply_place_name()` writes `_outpost_place_name` post meta on `after_micropub`. Themes can read this directly to render "📍 at <venue>" alongside any post — note, reply, photo, mood, recipe, etc. The corresponding meta is deleted when the property arrives empty so a venue tag can be removed by a subsequent edit.
+
+**Doing-tab Checkin/Eat/Drink unchanged** — those variants continue to use h-entry `name` (Checkin) and `eat-of`/`drink-of` (Eat/Drink) as their primary location-bearing properties because location IS the post's identity there, not a metadata tag. Listen-mode's other 6 variants (listen/watch/read/play/game/jam) plus all of Note / Reply / Photo / Life / Recipe use the new venue + mp-place-name pattern.
+
+3 new PHPUnit cases for the bridge (write meta, delete meta on empty, no-op when property absent). 128 PHP tests / 172 vitest tests pass.
+
+OUTPOST_VERSION: 0.1.59 → 0.1.60.
+
 ### Added (OpenStreetMap location picker on every post kind)
 
 Mobile composing wants to attach a location to any post kind, not just Checkin/Eat/Drink. Extracted the geocode UI into `pwa/src/components/geocode-picker.tsx` (a reusable collapsible `<details>` widget) and dropped it into Note, Reply, Photo, Listen-mode (the 6 non-`hasGeocode` variants), Life, and Recipe. The Doing tab's Checkin/Eat/Drink variants keep their bespoke inline UI because location is the post's primary property there.

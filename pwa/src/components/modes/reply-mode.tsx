@@ -240,6 +240,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -289,6 +290,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				setEndpoint(micropub_endpoint);
 			}
 
+			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
@@ -296,6 +298,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
+				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
@@ -317,6 +320,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				setContent('');
 				setTargetUrl('');
 				setPickedLocation(null);
+				setVenueName('');
 				setPreview(null);
 				setMoreValues(empty_more_values());
 				return;
@@ -476,6 +480,8 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					picked={picked_location}
 					onPick={setPickedLocation}
 					onClear={(): void => setPickedLocation(null)}
+					venueName={venue_name}
+					onVenueChange={setVenueName}
 					disabled={submitting}
 				/>
 

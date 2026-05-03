@@ -177,8 +177,14 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	// Optional location attached to the h-entry — populated by the
-	// GeocodePicker. Goes out as `location: geo:lat,lon` per RFC 5870.
+	// GeocodePicker. Two parts:
+	//   - venue_name: free-text venue label, sent as `mp-place-name`.
+	//   - picked_location: optional OSM coordinates, sent as
+	//     `location: geo:lat,lon` per RFC 5870.
+	// Either can be set independently. User can attach just a venue name
+	// ("the gym"), just coordinates, or both.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [venue_name, setVenueName] = useState('');
 
 	const [more_open, setMoreOpen] = useState(false);
 	const config = VARIANTS[variant];
@@ -206,6 +212,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 			}
 
 			setStatus({ kind: 'posting' });
+			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				content: trimmed_content,
 				...(config.requiresTitle && trimmed_title ? { name: trimmed_title } : {}),
@@ -213,6 +220,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				...(picked_location
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
+				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -234,6 +242,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				setTitle('');
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
+				setVenueName('');
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -371,6 +380,8 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 					picked={picked_location}
 					onPick={setPickedLocation}
 					onClear={(): void => setPickedLocation(null)}
+					venueName={venue_name}
+					onVenueChange={setVenueName}
 					disabled={submitting}
 				/>
 
