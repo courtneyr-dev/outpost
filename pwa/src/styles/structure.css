@@ -1025,3 +1025,94 @@
 	font-size: 0.85rem;
 	opacity: 0.75;
 }
+
+/* Collapsible sections — used by the OpenStreetMap lookup in Checkin and any
+ * future "expandable advanced" affordances. Native <details>/<summary>
+ * pattern, no JS required. Plain block summary so the disclosure triangle
+ * stays visible (display:flex on summary drops ::marker in WebKit). */
+.outpost-collapsible {
+	margin-block-start: 0.75rem;
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.25rem);
+	padding: 0.5rem 0.75rem;
+}
+
+.outpost-collapsible__summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 0.25rem 0;
+}
+
+.outpost-collapsible__body {
+	margin-block-start: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+/* Inline form rows — input + button on the same line on roomy screens,
+ * stacked on narrow ones. Used by the geocode search row. */
+.outpost-form-inline {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: stretch;
+}
+
+.outpost-form-inline > input {
+	flex: 1 1 12rem;
+	min-inline-size: 0;
+}
+
+/* Geocode result list — rendered after a successful OpenStreetMap lookup.
+ * Each result is a button so keyboard + screen-reader users can pick one
+ * via the standard list-of-actions pattern. */
+.outpost-geocode-results {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.outpost-geocode-result {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	inline-size: 100%;
+	text-align: start;
+	padding: 0.5rem 0.75rem;
+	background: var(--outpost-result-bg, transparent);
+	color: var(--outpost-result-fg, inherit);
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.25rem);
+	cursor: pointer;
+}
+
+.outpost-geocode-result:hover,
+.outpost-geocode-result:focus-visible {
+	background: var(--outpost-result-bg-hover, var(--outpost-chip-active-bg, transparent));
+	color: var(--outpost-result-fg-hover, var(--outpost-chip-active-fg, inherit));
+}
+
+.outpost-geocode-result__name {
+	font-weight: 600;
+}
+
+.outpost-geocode-result__coords {
+	font-size: 0.85rem;
+	opacity: 0.75;
+}
+
+.outpost-geocode-attribution {
+	font-size: 0.75rem;
+	opacity: 0.65;
+	margin: 0;
+}
+
+/* Soft warning variant of .outpost-status — used for "no results" messages
+ * that aren't quite errors but are worth surfacing distinctly. */
+.outpost-status--warn {
+	color: var(--outpost-warn-fg, inherit);
+}

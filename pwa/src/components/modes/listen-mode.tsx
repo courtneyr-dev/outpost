@@ -6,7 +6,13 @@ import {
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
-import { is_safe_http_url } from '../../lib/url-validation';
+import {
+	geocode,
+	geo_uri,
+	GeocodeError,
+	type GeocodeResult,
+} from '../../lib/geocode';
+import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
@@ -71,7 +77,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Watch',
 		property: 'watch-of',
 		targetLabel: 'Movie or show URL',
-		contentLabel: 'Optional comment',
+		contentLabel: 'Body (optional)',
 		submitLabel: 'Post watch',
 	},
 	read: {
@@ -91,7 +97,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	checkin: {
 		label: 'Checkin',
 		property: 'location',
-		targetLabel: 'Place URL',
+		targetLabel: 'Location URL or geo:lat,lon',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post checkin',
 	},
@@ -111,11 +117,60 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [variant, setVariant] = useState<Variant>('listen');
 	const [target_url, setTargetUrl] = useState('');
 	const [place_name, setPlaceName] = useState('');
+	const [watch_title, setWatchTitle] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useState(false);
+
+	// Checkin-only state: geocode search.
+	const [geo_query, setGeoQuery] = useState('');
+	const [geo_results, setGeoResults] = useState<GeocodeResult[]>([]);
+	const [geo_searching, setGeoSearching] = useState(false);
+	const [geo_error, setGeoError] = useState<string | null>(null);
+	const [geo_attribution, setGeoAttribution] = useState('');
+
+	const handle_geocode_search = async (event?: Event): Promise<void> => {
+		event?.preventDefault();
+		const q = geo_query.trim();
+		if (q.length < 2) return;
+		setGeoSearching(true);
+		setGeoError(null);
+		setGeoResults([]);
+		try {
+			const response = await geocode({
+				query: q,
+				accessToken: token.accessToken,
+			});
+			setGeoResults(response.results);
+			setGeoAttribution(response.attribution);
+			if (response.results.length === 0) {
+				setGeoError('No matches. Try a different search.');
+			}
+		} catch (err) {
+			const message =
+				err instanceof GeocodeError
+					? err.code === 'rate_limited'
+						? `Too many lookups — try again in ${String(err.retryAfter ?? 60)}s.`
+						: err.message
+					: err instanceof Error
+						? err.message
+						: 'Search failed';
+			setGeoError(message);
+		} finally {
+			setGeoSearching(false);
+		}
+	};
+
+	const handle_geocode_pick = (result: GeocodeResult): void => {
+		// Fill the URL field with a geo: URI (RFC 5870) and the place name with
+		// the OSM display name. User can edit either before submitting.
+		setTargetUrl(geo_uri(result.lat, result.lon));
+		setPlaceName(result.displayName);
+		setGeoResults([]);
+		setGeoQuery('');
+	};
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -126,9 +181,20 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		const trimmed_content = content.trim();
 		const trimmed_url = target_url.trim();
 		const trimmed_name = place_name.trim();
+		const trimmed_watch_title = watch_title.trim();
 		if (!trimmed_url) return;
-		if (!is_safe_http_url(trimmed_url)) {
-			setStatus({ kind: 'error', message: 'URL must be http:// or https://.' });
+		// Checkin can carry a `geo:lat,lon` URI from the OSM lookup; the other
+		// variants are URL-only (movie, album, book, game pages).
+		const url_ok =
+			variant === 'checkin'
+				? is_safe_location_value(trimmed_url)
+				: is_safe_http_url(trimmed_url);
+		if (!url_ok) {
+			const message =
+				variant === 'checkin'
+					? 'Location must be http://, https://, or a geo:lat,lon URI.'
+					: 'URL must be http:// or https://.';
+			setStatus({ kind: 'error', message });
 			return;
 		}
 
@@ -140,10 +206,21 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				setEndpoint(micropub_endpoint);
 			}
 
+			// `name` (h-entry title) is set from variant-specific inputs:
+			//   - watch:   the title field (e.g., "The Bear S2E3")
+			//   - checkin: the place name field (e.g., "Big Bend National Park")
+			//   - others:  no title; consumers can pull a title from the
+			//              target URL's microformat or oEmbed downstream.
+			const variant_name =
+				variant === 'watch'
+					? trimmed_watch_title
+					: variant === 'checkin'
+						? trimmed_name
+						: '';
 			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
 				...(trimmed_content ? { content: trimmed_content } : {}),
-				...(variant === 'checkin' && trimmed_name ? { name: trimmed_name } : {}),
+				...(variant_name ? { name: variant_name } : {}),
 			};
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
@@ -164,6 +241,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				mark_posted_once();
 				setTargetUrl('');
 				setPlaceName('');
+				setWatchTitle('');
 				setContent('');
 				setMoreValues(empty_more_values());
 				return;
@@ -241,16 +319,41 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				<input
 					id="outpost-listen-target"
 					class="outpost-input"
-					type="url"
+					// Checkin accepts geo: URIs which browsers don't recognize as
+					// valid `type=url` values; degrade to plain text there.
+					type={variant === 'checkin' ? 'text' : 'url'}
 					value={target_url}
 					onInput={(event): void => setTargetUrl((event.target as HTMLInputElement).value)}
-					placeholder="https://example.com/…"
+					placeholder={
+						variant === 'checkin'
+							? 'https://example.com/place/ or geo:29.12,-103.24'
+							: 'https://example.com/…'
+					}
 					inputMode="url"
 					autoComplete="url"
 					autoCapitalize="none"
 					spellcheck={false}
 					required
 				/>
+
+				{variant === 'watch' && (
+					<>
+						<label class="outpost-label" for="outpost-listen-watch-title">
+							Title (optional)
+						</label>
+						<input
+							id="outpost-listen-watch-title"
+							class="outpost-input"
+							type="text"
+							value={watch_title}
+							onInput={(event): void =>
+								setWatchTitle((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+							placeholder="e.g., The Bear S2E3"
+						/>
+					</>
+				)}
 
 				{variant === 'checkin' && (
 					<>
@@ -267,6 +370,92 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 							}
 							disabled={submitting}
 						/>
+
+						<details class="outpost-collapsible">
+							<summary class="outpost-collapsible__summary">
+								Look up on OpenStreetMap
+							</summary>
+							<div class="outpost-collapsible__body">
+								<label
+									class="outpost-label"
+									for="outpost-listen-geocode-query"
+								>
+									Search a place
+								</label>
+								<div class="outpost-form-inline">
+									<input
+										id="outpost-listen-geocode-query"
+										class="outpost-input"
+										type="search"
+										value={geo_query}
+										onInput={(event): void =>
+											setGeoQuery((event.target as HTMLInputElement).value)
+										}
+										onKeyDown={(event): void => {
+											if (event.key === 'Enter') {
+												event.preventDefault();
+												void handle_geocode_search();
+											}
+										}}
+										placeholder="e.g. Big Bend National Park"
+										disabled={submitting || geo_searching}
+									/>
+									<button
+										type="button"
+										class="outpost-button outpost-button--secondary"
+										onClick={(): void => {
+											void handle_geocode_search();
+										}}
+										disabled={
+											submitting ||
+											geo_searching ||
+											geo_query.trim().length < 2
+										}
+									>
+										{geo_searching ? 'Searching…' : 'Search'}
+									</button>
+								</div>
+
+								{geo_error && (
+									<p class="outpost-status outpost-status--warn" role="alert">
+										{geo_error}
+									</p>
+								)}
+
+								{geo_results.length > 0 && (
+									<>
+										<ul class="outpost-geocode-results">
+											{geo_results.map((result) => (
+												<li
+													key={`${String(result.lat)},${String(result.lon)}`}
+												>
+													<button
+														type="button"
+														class="outpost-geocode-result"
+														onClick={(): void => handle_geocode_pick(result)}
+														disabled={submitting}
+													>
+														<span class="outpost-geocode-result__name">
+															{result.displayName}
+														</span>
+														<span class="outpost-geocode-result__coords">
+															{result.lat.toFixed(4)},{' '}
+															{result.lon.toFixed(4)}
+															{result.type ? ` · ${result.type}` : ''}
+														</span>
+													</button>
+												</li>
+											))}
+										</ul>
+										{geo_attribution && (
+											<p class="outpost-geocode-attribution">
+												{geo_attribution}
+											</p>
+										)}
+									</>
+								)}
+							</div>
+						</details>
 					</>
 				)}
 

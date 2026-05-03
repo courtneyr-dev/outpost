@@ -80,6 +80,7 @@ const make_id = (): string => `photo-${String(next_id++)}`;
 
 export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps) {
 	const [entries, setEntries] = useState<PhotoEntry[]>([]);
+	const [name, setName] = useState('');
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
@@ -216,9 +217,11 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			const alt_array = entries.map((e) => (e.decorative ? '' : e.alt.trim()));
 			const alt_value = alt_array.length === 1 ? alt_array[0]! : alt_array;
 			const trimmed_content = content.trim();
+			const trimmed_name = name.trim();
 			const base = {
 				photo: photo_value,
 				'mp-photo-alt': alt_value,
+				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
@@ -253,6 +256,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			// Reset for next post.
 			for (const entry of entries) URL.revokeObjectURL(entry.preview_url);
 			setEntries([]);
+			setName('');
 			setContent('');
 			setMoreValues(empty_more_values());
 		} catch (err) {
@@ -401,9 +405,21 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					</ul>
 				)}
 
+				<label class="outpost-label" for="outpost-photo-name">
+					Title (optional)
+				</label>
+				<input
+					id="outpost-photo-name"
+					class="outpost-input"
+					type="text"
+					value={name}
+					onInput={(event): void => setName((event.target as HTMLInputElement).value)}
+					disabled={submitting}
+				/>
+
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-photo-content">
-						{entries.length > 1 ? 'Caption (optional)' : 'Caption (optional)'}
+						Body (optional)
 					</label>
 					<VoiceButton
 						onTranscript={(text): void =>

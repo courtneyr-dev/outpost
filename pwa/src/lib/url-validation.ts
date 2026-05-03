@@ -33,3 +33,25 @@ export function is_safe_http_url(value: string): boolean {
 	}
 	return parsed.protocol === 'http:' || parsed.protocol === 'https:';
 }
+
+/**
+ * Returns true when `value` is acceptable as an h-entry `location` property
+ * value: either an http(s) URL or a `geo:lat,lon` URI per RFC 5870.
+ *
+ * Used by Checkin in Listen mode where the user can either point at a place
+ * URL (Foursquare, OSM way page, etc.) OR drop in raw coordinates from the
+ * geocode lookup. Both are spec-valid IndieWeb checkin location values.
+ *
+ * The `geo:` regex deliberately validates the structure tightly — `geo:1,1`
+ * is fine, `geo:1` or `geo:javascript:alert(1)` are not. URL.protocol can't
+ * be used for `geo:` because URL parses opaque URIs without slashes
+ * inconsistently across engines.
+ */
+export function is_safe_location_value(value: string): boolean {
+	if (is_safe_http_url(value)) return true;
+	// geo:lat,lon[,alt][;u=accuracy][;crs=...]
+	// Lat/lon can be signed decimals; we don't enforce ranges here (Nominatim
+	// returns valid coordinates and the Micropub server will reject obvious
+	// nonsense before storing).
+	return /^geo:-?\d+(\.\d+)?,-?\d+(\.\d+)?(,-?\d+(\.\d+)?)?(;[a-zA-Z][\w-]*=[^;]+)*$/.test(value);
+}

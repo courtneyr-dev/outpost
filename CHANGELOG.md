@@ -7,6 +7,31 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Photo title + body, Watch title + body, Checkin OSM lookup)
+
+Three field-level enhancements to the Photo, Watch, and Checkin post kinds based on Post Kinds plugin parity. The h-entry properties Outpost was sending didn't include `name` (title) for these kinds, even though most actual posts on the IndieWeb want one.
+
+- **Photo and gallery posts** — new "Title" input above the existing caption field. Maps to h-entry `name`. Caption field's label changed from "Caption" to "Body" since it's the longer narrative text now that there's a title above it.
+- **Watch variant in the Listen-group tab** — new "Title" input below the URL field (e.g., "The Bear S2E3"). Maps to h-entry `name`. Body label updated for consistency.
+- **Checkin variant — OpenStreetMap Nominatim lookup.** New `<details>` panel under the place name field with a search input. Type a query (e.g., "big bend national park"), tap Search, pick a result. The URL field auto-fills with a `geo:lat,lon` URI per RFC 5870, the place name fills with the OSM display name. Both editable before posting.
+
+### Added (`/wp-json/outpost/v1/geocode` REST endpoint)
+
+Server-side proxy to Nominatim that handles the parts a browser can't:
+
+- Sets a descriptive `User-Agent` per Nominatim usage policy (browsers can't customize this; the policy effectively requires server-side proxying).
+- Caches results in transients keyed by query, 24-hour TTL (Nominatim asks for aggressive client caching).
+- Per-user / per-IP rate limit at 20 req/min — tighter than `/preview` because Nominatim's own policy is 1 req/sec.
+- `User-Agent` is filterable via `outpost_geocode_user_agent` so site admins can add a contact email.
+- Permission shape mirrors `/preview`: bearer-or-cookie auth with `outpost_geocode_permission` filter override.
+- Response shape: `{ results: [{ lat, lon, displayName, type }], cached: bool, attribution: string }`. Attribution string ("Data © OpenStreetMap contributors") is rendered in the result list per OSM licensing.
+
+### Added (`is_safe_location_value` URL validator + `geo_uri` helper)
+
+The Checkin variant accepts both http(s) URLs and `geo:lat,lon` URIs. New `is_safe_location_value` in `pwa/src/lib/url-validation.ts` wraps the existing http check and adds an RFC 5870 regex match. New `geo_uri(lat, lon)` helper in `pwa/src/lib/geocode.ts` produces 5-decimal-place URIs (~1.1 m precision).
+
+OUTPOST_VERSION: 0.1.55 → 0.1.56.
+
 ### Fixed (Tolerate missing Location header on Micropub success)
 
 After v0.1.54 unblocked posting, smoke-testing the multi-photo gallery surfaced a different bug: the WordPress Micropub plugin returned 201 Created but no `Location` response header for the gallery post. Outpost was throwing `no_location` and rendering a failure banner even though the post was on the server. The Micropub spec says servers MUST return `Location` on success, but the spec violation isn't worth losing a successful post over.
