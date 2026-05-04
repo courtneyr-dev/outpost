@@ -124,9 +124,18 @@ final class Outpost_Micropub_Bridges {
 	 * and a direct `register_syndicate_chips()` test call run).
 	 *
 	 * Companion adapters declare their chip in the richer
-	 * `Outpost_Companion_Base::syndicate_chip()` shape (id / label /
-	 * accepts / detected); this merger projects that down to the
-	 * `[ uid, name ]` shape the Micropub plugin's filter consumes.
+	 * `Outpost_Companion_Base::capabilities()` shape (id / label / detected
+	 * / accepts_modes / accepts_media / max_attachments / alt_passthrough
+	 * / char_limit / caveats / requires_auth); this merger projects that
+	 * down to the `[ uid, name ]` shape the Micropub plugin's filter
+	 * consumes.
+	 *
+	 * No mode filtering happens here — the Shanske `micropub_syndicate-to`
+	 * filter contract has no mode parameter, so this merger always
+	 * exposes every detected chip. Per-mode filtering for the composer
+	 * lives at `Outpost_Companion_Registry::chips_for_mode()` and is
+	 * surfaced via the Outpost-owned
+	 * `/wp-json/outpost/v1/syndicate-targets` endpoint.
 	 *
 	 * @param mixed $targets Existing chip list. The Shanske plugin
 	 *                       guarantees `array<int, array{uid: string, name:
@@ -142,9 +151,8 @@ final class Outpost_Micropub_Bridges {
 				$seen_uids[ $existing['uid'] ] = true;
 			}
 		}
-		foreach ( Outpost_Companion_Registry::active() as $adapter ) {
-			$chip = $adapter->syndicate_chip();
-			if ( ! is_array( $chip ) || empty( $chip['id'] ) || empty( $chip['label'] ) ) {
+		foreach ( Outpost_Companion_Registry::chips_for_mode( null ) as $chip ) {
+			if ( empty( $chip['id'] ) || empty( $chip['label'] ) ) {
 				continue;
 			}
 			$uid = (string) $chip['id'];

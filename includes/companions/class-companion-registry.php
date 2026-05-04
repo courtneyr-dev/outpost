@@ -94,21 +94,123 @@ final class Outpost_Companion_Registry {
 	}
 
 	/**
-	 * Aggregate capability slugs from every active adapter. The
-	 * canonical answer to "what can this site do right now?".
+	 * Aggregate composer feature slugs from every active adapter. The
+	 * canonical answer to "what composer-level features does this site
+	 * support right now?".
+	 *
+	 * Renamed from `all_active_capabilities()` in F2. The old name is
+	 * gone — F2 reclaims `capabilities()` for the richer chip shape (see
+	 * {@see Outpost_Companion_Base::capabilities()}). Slug aggregation
+	 * is now spelt `all_active_feature_slugs()` in lockstep.
 	 *
 	 * @return string[] De-duplicated, alphabetically sorted.
 	 */
-	public static function all_active_capabilities(): array {
-		$caps = array();
+	public static function all_active_feature_slugs(): array {
+		$slugs = array();
 		foreach ( self::active() as $adapter ) {
-			foreach ( $adapter->capabilities() as $cap ) {
-				$caps[ $cap ] = true;
+			foreach ( $adapter->feature_slugs() as $slug ) {
+				$slugs[ $slug ] = true;
 			}
 		}
-		$keys = array_keys( $caps );
+		$keys = array_keys( $slugs );
 		sort( $keys );
 		return $keys;
+	}
+
+	/**
+	 * Syndicate-to chips registered companions contribute, optionally
+	 * filtered by composer mode.
+	 *
+	 * Iterates active companions, calls each `capabilities()`, and
+	 * returns those where `detected === true` and the requested mode
+	 * appears in `accepts_modes` (when a mode is provided). The shape
+	 * returned matches the companion's `capabilities()` shape — no
+	 * projection here. Callers that need the Micropub plugin's
+	 * `[uid, name]` shape (the {@see Outpost_Micropub_Bridges::merge_syndicate_chips}
+	 * filter callback) project at the call site.
+	 *
+	 * Mode validation is fail-OPEN: an unrecognized mode returns every
+	 * detected chip rather than zero. The Outpost composer always sends
+	 * a known mode; defensive callers (third-party Micropub clients
+	 * passing unknown modes through future filter extensions) get the
+	 * full set so a typo doesn't silently hide all destinations.
+	 *
+	 * @param string|null $mode Optional composer mode to filter by
+	 *                          ('note', 'photo', 'reply', etc.). Pass
+	 *                          null or omit to get every detected chip.
+	 *                          Unknown values fail-open (return all).
+	 * @return array<int, array<string, mixed>> List of chip shapes per the `capabilities()` contract.
+	 */
+	public static function chips_for_mode( ?string $mode = null ): array {
+		$chips = array();
+		foreach ( self::active() as $adapter ) {
+			$caps = $adapter->capabilities();
+			if ( ! is_array( $caps ) ) {
+				continue;
+			}
+			if ( true !== ( $caps['detected'] ?? false ) ) {
+				continue;
+			}
+			if ( null === $mode || ! self::is_known_mode( $mode ) ) {
+				$chips[] = $caps;
+				continue;
+			}
+			$accepted = isset( $caps['accepts_modes'] ) && is_array( $caps['accepts_modes'] )
+				? $caps['accepts_modes']
+				: array();
+			if ( in_array( $mode, $accepted, true ) ) {
+				$chips[] = $caps;
+			}
+		}
+		return $chips;
+	}
+
+	/**
+	 * Composer modes Outpost ships. Used by the `chips_for_mode()`
+	 * fail-open check — values outside this set are treated as unknown
+	 * and bypass per-mode filtering. Filterable so future modes
+	 * (Phase C extensions, Phase F adapters that need a new mode like
+	 * `mood` or `acquisition`) extend the recognized set without core
+	 * edits.
+	 *
+	 * @return string[]
+	 */
+	public static function known_modes(): array {
+		$modes = array(
+			'note',
+			'photo',
+			'gallery',
+			'article',
+			'listen',
+			'watch',
+			'read',
+			'play',
+			'checkin',
+			'reply',
+			'like',
+			'repost',
+			'bookmark',
+		);
+		/**
+		 * Filter the list of composer modes Outpost recognizes for
+		 * per-mode chip filtering. Adding a mode here makes
+		 * `chips_for_mode()` honor that mode's `accepts_modes`
+		 * intersection; values outside this set fail-open.
+		 *
+		 * @param string[] $modes Default mode list.
+		 */
+		$filtered = apply_filters( 'outpost_known_composer_modes', $modes );
+		return is_array( $filtered ) ? array_values( array_filter( $filtered, 'is_string' ) ) : $modes;
+	}
+
+	/**
+	 * Whether a string is a recognized composer mode.
+	 *
+	 * @param string $mode Mode slug to check.
+	 * @return bool True if recognized; false otherwise.
+	 */
+	private static function is_known_mode( string $mode ): bool {
+		return in_array( $mode, self::known_modes(), true );
 	}
 
 	/**
