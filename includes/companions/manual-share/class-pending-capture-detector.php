@@ -175,7 +175,8 @@ final class Outpost_Manual_Share_Pending_Capture_Detector {
 
 	/**
 	 * Filter the audit log entries for a single post down to the ones
-	 * still pending capture within the grace + retention windows.
+	 * still pending capture within the grace + retention windows AND
+	 * not currently snoozed/abandoned (F13 visibility filter).
 	 *
 	 * @return array<int, array<string,mixed>>
 	 */
@@ -202,7 +203,13 @@ final class Outpost_Manual_Share_Pending_Capture_Detector {
 				continue;
 			}
 			if ( $fired_ts < $retention_cut ) {
-				// Past retention window — abandoned.
+				// Past retention window.
+				continue;
+			}
+			// F13: drop entries the user has snoozed or marked abandoned.
+			// Detail view still shows them; this filter governs the
+			// prompt UX only.
+			if ( Outpost_Manual_Share_Reminder_Manager::is_snoozed( $entry ) ) {
 				continue;
 			}
 			$out[] = $entry;
