@@ -59,10 +59,13 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-syndication-links-a
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-yoast-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-activitypub-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-accessibility-checker-adapter.php';
-// Phase F9 manual-share umbrella + supporting value objects.
+// Phase F9 manual-share umbrella + supporting value objects;
+// F10 adds the audit log + intent payload builder.
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-invalid-config-exception.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-config.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-registry.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-audit-log.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-intent-payload-builder.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-manual-share-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 // Inbound source-adapter contract (Phase F5). Mirrors Companion_* with

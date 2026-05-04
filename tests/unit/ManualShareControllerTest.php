@@ -30,6 +30,11 @@ use WP_Error;
 
 final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 
+	private bool $user_can_edit_post = true;
+
+	/** @var array<int, mixed> Shared meta-store for tests that need round-trip. */
+	private array $meta_store = array();
+
 	public function setUp(): void {
 		WP_Mock::setUp();
 		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
@@ -39,12 +44,56 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
+
+		// F10: per-post edit-permission check. Default: allow. Tests
+		// that exercise the cross-user-rejection path flip
+		// `$this->user_can_edit_post` to false.
+		$this->user_can_edit_post = true;
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing(
+			function ( string $cap, int $post_id = 0 ): bool {
+				return $this->user_can_edit_post;
+			}
+		);
+
+		// F10 builder writes audit log entries on Android-UA requests;
+		// stub the persistence helpers + WP utilities the builder calls.
+		WP_Mock::userFunction( 'wp_generate_uuid4' )->andReturnUsing(
+			static fn (): string => 'uuid-' . bin2hex( random_bytes( 4 ) )
+		);
+		WP_Mock::userFunction( 'esc_url_raw' )->andReturnUsing( static fn ( string $u ): string => $u );
+		WP_Mock::userFunction( 'wp_strip_all_tags' )->andReturnUsing( static fn ( string $s ): string => strip_tags( $s ) );
+		$this->meta_store = array();
+		WP_Mock::userFunction( 'get_post_meta' )->andReturnUsing(
+			function ( int $post_id, string $key, bool $single ) {
+				return $this->meta_store[ $post_id ] ?? '';
+			}
+		);
+		WP_Mock::userFunction( 'update_post_meta' )->andReturnUsing(
+			function ( int $post_id, string $key, $value ): bool {
+				$this->meta_store[ $post_id ] = $value;
+				return true;
+			}
+		);
+		WP_Mock::userFunction( 'get_post' )->andReturnUsing( static function ( int $post_id ) {
+			return new \WP_Post( array(
+				'ID'           => $post_id,
+				'post_title'   => 'Sample post',
+				'post_content' => '',
+			) );
+		} );
+		WP_Mock::userFunction( 'get_permalink' )->andReturnUsing(
+			static fn ( int $post_id ): string => 'https://example.com/posts/' . $post_id
+		);
+		WP_Mock::userFunction( 'get_attached_media' )->andReturn( array() );
+		WP_Mock::userFunction( 'wp_get_attachment_url' )->andReturn( '' );
+		WP_Mock::userFunction( 'get_post_mime_type' )->andReturn( 'image/jpeg' );
 	}
 
 	public function tearDown(): void {
 		WP_Mock::tearDown();
 		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
 		Outpost_Companion_Registry::reset_for_tests();
+		unset( $_SERVER['HTTP_USER_AGENT'] );
 	}
 
 	/**
@@ -82,7 +131,9 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 	// Intent endpoint (POST /manual-share/intent) — F9 stub
 	// =====================================================================
 
-	public function test_intent_returns_stub_response_for_known_platform(): void {
+	public function test_intent_returns_stub_response_for_non_android_ua(): void {
+		// No User-Agent → desktop bucket → F9 stub. F11 will route iOS;
+		// desktop manual-share is a future concern.
 		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
 			->withAnyArgs()
 			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
@@ -97,7 +148,176 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'instagram-feed', $payload['platform_id'] );
 		$this->assertSame( 42, $payload['post_id'] );
 		$this->assertStringContainsString( 'instagram-feed', $payload['message'] );
-		$this->assertStringContainsString( 'F10', $payload['message'] );
+	}
+
+	// =====================================================================
+	// F10: Android UA returns real intent payload
+	// =====================================================================
+
+	public function test_intent_returns_android_payload_for_android_ua(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36';
+
+		$response = Outpost_Manual_Share_Controller::handle_request(
+			$this->make_intent_request( 42, 'instagram-feed' )
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$payload = $response->get_data();
+		$this->assertSame( 'instagram-feed', $payload['platform'] );
+		$this->assertSame( 'Instagram', $payload['platform_label'] );
+		$this->assertArrayHasKey( 'audit_log_id', $payload );
+		$this->assertArrayHasKey( 'fallback_url', $payload );
+		$this->assertArrayHasKey( 'clipboard_text', $payload );
+		$this->assertArrayHasKey( 'intent_strategy', $payload );
+		$this->assertSame( 'navigator_share', $payload['intent_strategy'] );
+		$this->assertArrayNotHasKey( 'status', $payload );
+	}
+
+	public function test_intent_returns_stub_for_iphone_ua(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+
+		$response = Outpost_Manual_Share_Controller::handle_request(
+			$this->make_intent_request( 42, 'instagram-feed' )
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$payload = $response->get_data();
+		$this->assertSame( 'stub', $payload['status'] );
+	}
+
+	public function test_intent_returns_stub_for_ipad_ua(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)';
+
+		$response = Outpost_Manual_Share_Controller::handle_request(
+			$this->make_intent_request( 42, 'instagram-feed' )
+		);
+
+		$payload = $response->get_data();
+		$this->assertSame( 'stub', $payload['status'] );
+	}
+
+	public function test_intent_returns_403_when_user_cannot_edit_post(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$this->user_can_edit_post = false;
+
+		$result = Outpost_Manual_Share_Controller::handle_request(
+			$this->make_intent_request( 42, 'instagram-feed' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'rest_forbidden_post', $result->get_error_code() );
+		$data = $result->get_error_data();
+		$this->assertSame( 403, $data['status'] );
+	}
+
+	// =====================================================================
+	// F10: detect_platform helper
+	// =====================================================================
+
+	public function test_detect_platform_classifies_user_agents(): void {
+		$cases = array(
+			'Mozilla/5.0 (Linux; Android 14; Pixel 8)'                            => 'android',
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'              => 'ios',
+			'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)'                       => 'ios',
+			'Mozilla/5.0 (iPod touch; CPU iPhone OS 16_0 like Mac OS X)'          => 'ios',
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'        => 'desktop',
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1'   => 'desktop',
+			''                                                                    => 'desktop',
+		);
+
+		foreach ( $cases as $ua => $expected ) {
+			$this->assertSame(
+				$expected,
+				Outpost_Manual_Share_Controller::detect_platform( $ua ),
+				sprintf( 'UA %s should classify as %s', $ua, $expected )
+			);
+		}
+	}
+
+	// =====================================================================
+	// F10: Telemetry endpoint (POST /manual-share/intent/log)
+	// =====================================================================
+
+	public function test_telemetry_records_outcome_for_existing_audit_entry(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
+
+		// Step 1 — fire intent to get an audit log ID. setUp's
+		// shared meta_store mock persists the audit entry between
+		// the intent and telemetry calls.
+		$intent_response = Outpost_Manual_Share_Controller::handle_request(
+			$this->make_intent_request( 42, 'instagram-feed' )
+		);
+		$payload         = $intent_response->get_data();
+		$audit_log_id    = $payload['audit_log_id'];
+
+		// Step 2 — POST telemetry referring to the same id.
+		$telemetry_request = $this->createMock( WP_REST_Request::class );
+		$telemetry_request->method( 'get_param' )->willReturnCallback(
+			static function ( string $key ) use ( $audit_log_id ) {
+				return array(
+					'post_id'      => 42,
+					'audit_log_id' => $audit_log_id,
+					'outcome'      => 'fired',
+				)[ $key ] ?? null;
+			}
+		);
+		$telemetry_response = Outpost_Manual_Share_Controller::handle_log_request( $telemetry_request );
+
+		$this->assertSame( 200, $telemetry_response->get_status() );
+		$telemetry_payload = $telemetry_response->get_data();
+		$this->assertSame( 'recorded', $telemetry_payload['status'] );
+		$this->assertSame( $audit_log_id, $telemetry_payload['audit_log_id'] );
+		$this->assertSame( 'fired', $telemetry_payload['outcome'] );
+	}
+
+	public function test_telemetry_returns_404_for_unknown_audit_log_id(): void {
+		$request = $this->createMock( WP_REST_Request::class );
+		$request->method( 'get_param' )->willReturnCallback(
+			static function ( string $key ) {
+				return array(
+					'post_id'      => 42,
+					'audit_log_id' => 'totally-fake-id',
+					'outcome'      => 'fired',
+				)[ $key ] ?? null;
+			}
+		);
+
+		$result = Outpost_Manual_Share_Controller::handle_log_request( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'audit_log_entry_not_found', $result->get_error_code() );
+	}
+
+	public function test_telemetry_rejects_invalid_post_id(): void {
+		$request = $this->createMock( WP_REST_Request::class );
+		$request->method( 'get_param' )->willReturnCallback(
+			static function ( string $key ) {
+				return array(
+					'post_id'      => 0,
+					'audit_log_id' => 'whatever',
+					'outcome'      => 'fired',
+				)[ $key ] ?? null;
+			}
+		);
+
+		$result = Outpost_Manual_Share_Controller::handle_log_request( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'invalid_post_id', $result->get_error_code() );
 	}
 
 	public function test_intent_rejects_zero_post_id_with_400(): void {
