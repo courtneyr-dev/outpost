@@ -19,6 +19,7 @@
  */
 
 import { useState } from 'preact/hooks';
+import { IosBookmarkletGuide } from './ios-bookmarklet-guide';
 
 interface VariantConfig {
 	variant: string;
@@ -106,8 +107,9 @@ function BookmarkletCard({ config, bookmarklet }: BookmarkletCardProps): preact.
 					class="outpost-button outpost-bookmarklet__link"
 					draggable
 					onClick={(event) => event.preventDefault()}
+					aria-label={`${config.label} bookmarklet — drag to bookmarks bar on desktop, or tap Copy source on mobile`}
 				>
-					Drag or long-press: {config.label}
+					Outpost: {config.label}
 				</a>
 				<button
 					type="button"
@@ -140,6 +142,17 @@ export function BookmarkletList(): preact.JSX.Element {
 				reading.
 			</p>
 
+			<aside class="outpost-bookmarklet-tip" role="note">
+				<strong>On iPhone, the share sheet is the better path.</strong> iOS
+				Safari intentionally blocks adding <code>javascript:</code> URLs as
+				bookmarks via long-press — it&apos;s been that way since iOS 12. Install
+				Outpost as a Home Screen app first (Share → <strong>Add to Home
+				Screen</strong>), then the system Share sheet on any page lets you tap
+				Share → Outpost. That&apos;s one tap from any app, not just Safari.
+				Bookmarklets below are still useful on desktop and as a last resort
+				on iOS via the multi-step workaround.
+			</aside>
+
 			<div class="outpost-bookmarklets" role="list">
 				{VARIANTS.map((config) => (
 					<BookmarkletCard
@@ -150,40 +163,30 @@ export function BookmarkletList(): preact.JSX.Element {
 				))}
 			</div>
 
-			<h4>How to install on your device</h4>
+			<IosBookmarkletGuide />
+
+			<h4>Other devices</h4>
 			<dl class="outpost-spec-list">
-				<dt>iPhone Safari</dt>
-				<dd>
-					Long-press the colored button and choose <strong>Add Bookmark</strong>.
-					Later, when you&apos;re reading a page, tap the bookmarks icon at the
-					bottom of Safari, find the saved bookmark, and tap it. The composer
-					opens with that page&apos;s details.
-				</dd>
-				<dt>Android Chrome</dt>
-				<dd>
-					Long-press the button, tap <strong>Copy link address</strong>, then
-					open a new tab, paste, and bookmark the resulting page. Tapping the
-					saved bookmark on any page runs the bookmarklet.
-				</dd>
 				<dt>Desktop browsers</dt>
 				<dd>
 					Drag the colored button straight to your bookmarks bar. Click it from
-					any page. (If your browser hides the bookmarks bar, enable it under
-					View → Bookmarks.)
+					any page. If your browser hides the bookmarks bar, enable it under
+					View → Bookmarks.
 				</dd>
-				<dt>Any device</dt>
+				<dt>Android Chrome</dt>
 				<dd>
-					Use the <strong>Copy source</strong> button to put the bookmarklet on
-					your clipboard, then paste it wherever your device manages bookmarks.
+					Long-press the button → <strong>Copy link address</strong>. Open the
+					⋮ menu → <strong>Bookmarks</strong> → <strong>Add</strong>, then paste
+					the copied URL into the bookmark&apos;s URL field. Save. Tap the
+					bookmark from any page to run.
+				</dd>
+				<dt>Any device — clipboard fallback</dt>
+				<dd>
+					The <strong>Copy source</strong> button puts the bookmarklet on your
+					clipboard so you can paste it into whatever bookmark editor your
+					browser provides.
 				</dd>
 			</dl>
-
-			<p>
-				<strong>Even simpler on mobile:</strong> install Outpost as a Home
-				Screen app (Share → Add to Home Screen on iPhone, ⋮ → Install app on
-				Android). Once installed, Outpost shows up in the system Share sheet —
-				tap Share on any page, choose Outpost, done. No bookmarklets needed.
-			</p>
 		</>
 	);
 }
