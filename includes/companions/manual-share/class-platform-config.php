@@ -149,7 +149,7 @@ final class Outpost_Manual_Share_Platform_Config {
 				'icon'           => $this->config['icon'],
 				'caption_via'    => $this->config['caption_via'],
 				'ios_strategy'   => $this->config['ios_strategy'],
-				'ios_url'        => $this->config['ios_url'],
+				'app_url_scheme' => $this->config['app_url_scheme'],
 				'android_action' => $this->config['android_action'],
 				'android_pkg'    => $this->config['android_pkg'],
 				'android_mime'   => $this->config['android_mime'],
@@ -248,15 +248,33 @@ final class Outpost_Manual_Share_Platform_Config {
 		}
 
 		// Optional fields with sane defaults.
-		$accepts_media  = isset( $config['accepts_media'] ) && is_array( $config['accepts_media'] )
+		$accepts_media = isset( $config['accepts_media'] ) && is_array( $config['accepts_media'] )
 			? array_values( array_filter( $config['accepts_media'], 'is_string' ) )
 			: array();
-		$ios_strategy   = isset( $config['ios_strategy'] ) && is_string( $config['ios_strategy'] )
-			? $config['ios_strategy']
-			: '';
-		$ios_url        = isset( $config['ios_url'] ) && is_string( $config['ios_url'] )
-			? $config['ios_url']
+
+		// F11: ios_strategy normalized to an array of strategy names.
+		// Accepts string (legacy F9 shape) or array; either coerces to
+		// a clean array of strings the StrategyRunner walks. Empty
+		// array signals "no iOS chain — defer to F9 stub" which is
+		// what desktop and unset-platform paths receive.
+		$ios_strategy_raw = $config['ios_strategy'] ?? array();
+		if ( is_string( $ios_strategy_raw ) ) {
+			$ios_strategy = '' === $ios_strategy_raw ? array() : array( $ios_strategy_raw );
+		} elseif ( is_array( $ios_strategy_raw ) ) {
+			$ios_strategy = array_values( array_filter( $ios_strategy_raw, 'is_string' ) );
+		} else {
+			$ios_strategy = array();
+		}
+
+		// F11: app_url_scheme is the iOS URL-scheme for app launching
+		// (e.g. 'instagram://library?AssetPath='). Renamed from F9's
+		// `ios_url`; configs that still pass `ios_url` get migrated
+		// silently for backward compatibility.
+		$app_url_scheme_raw = $config['app_url_scheme'] ?? ( $config['ios_url'] ?? null );
+		$app_url_scheme     = is_string( $app_url_scheme_raw ) && '' !== $app_url_scheme_raw
+			? $app_url_scheme_raw
 			: null;
+
 		$android_action = isset( $config['android_action'] ) && is_string( $config['android_action'] )
 			? $config['android_action']
 			: '';
@@ -285,7 +303,7 @@ final class Outpost_Manual_Share_Platform_Config {
 			'accepts_media'  => $accepts_media,
 			'caption_via'    => $caption_via,
 			'ios_strategy'   => $ios_strategy,
-			'ios_url'        => $ios_url,
+			'app_url_scheme' => $app_url_scheme,
 			'android_action' => $android_action,
 			'android_pkg'    => $android_pkg,
 			'android_mime'   => $android_mime,

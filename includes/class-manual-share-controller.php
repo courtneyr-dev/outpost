@@ -94,6 +94,10 @@ final class Outpost_Manual_Share_Controller {
 						'required' => true,
 						'type'     => 'string',
 					),
+					'in_pwa_mode' => array(
+						'required' => false,
+						'type'     => 'boolean',
+					),
 				),
 			)
 		);
@@ -271,7 +275,20 @@ final class Outpost_Manual_Share_Controller {
 			return new WP_REST_Response( $payload, 200 );
 		}
 
-		// iOS and desktop continue to receive the F9 stub until F11 lands.
+		if ( self::PLATFORM_IOS === $platform ) {
+			$in_pwa_mode_raw = $request->get_param( 'in_pwa_mode' );
+			$in_pwa_mode     = filter_var( $in_pwa_mode_raw, FILTER_VALIDATE_BOOLEAN );
+			$payload         = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+				$platform_config,
+				$post_id,
+				$in_pwa_mode
+			);
+			return new WP_REST_Response( $payload, 200 );
+		}
+
+		// Desktop falls through to the F9 stub. A future session may add
+		// desktop-specific handling (likely web-intent-only). F11 keeps
+		// scope to the mobile branches.
 		$stub = Outpost_Manual_Share_Intent_Payload_Builder::build_stub_response(
 			$platform_id,
 			$post_id

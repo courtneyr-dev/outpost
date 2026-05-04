@@ -41,6 +41,56 @@ export function default_environment(): PlatformEnvironment {
 }
 
 /**
+ * Whether the page is running as an installed PWA on iOS. iOS Safari
+ * 16.4+ supports `navigator.share({ files })` only inside an installed
+ * PWA — the regular browser tab silently drops the `files` parameter.
+ *
+ * Two signals:
+ *
+ *   - `matchMedia('(display-mode: standalone)').matches` — modern,
+ *     supported in iOS Safari and Chrome.
+ *   - `(navigator as any).standalone === true` — legacy Apple flag,
+ *     present on older iOS versions before display-mode landed.
+ *
+ * F11 reads this client-side and POSTs `in_pwa_mode` to the intent
+ * endpoint so the server can shape the strategy chain accordingly
+ * (though current configs don't branch — the runner just skips
+ * `navigator_share_files` when not in PWA mode).
+ */
+export function is_pwa_installed_on_ios(
+	env: PlatformEnvironment = default_environment(),
+): boolean {
+	if ( detect_platform( env ) !== 'ios' ) {
+		return false;
+	}
+	return is_pwa_installed_now();
+}
+
+/**
+ * Test-friendly wrapper around the standalone-mode + Apple-standalone
+ * checks. Returns true when EITHER signal indicates PWA install.
+ *
+ * Pulled out of {@see is_pwa_installed_on_ios} so non-iOS desktop tests
+ * can directly stub the global checks without going through the
+ * platform detector.
+ */
+export function is_pwa_installed_now(): boolean {
+	if ( typeof window !== 'undefined' && typeof window.matchMedia === 'function' ) {
+		if ( window.matchMedia( '(display-mode: standalone)' ).matches ) {
+			return true;
+		}
+	}
+	if ( typeof navigator !== 'undefined' ) {
+		// Apple-only legacy property; types lack it.
+		const apple_standalone = ( navigator as unknown as { standalone?: boolean } ).standalone;
+		if ( true === apple_standalone ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Classify the platform. iOS detection uses UA first, then the
  * touch-points + pointer-coarse fallback for iPadOS 13+ which
  * defaults to a Mac-shaped UA on Safari.

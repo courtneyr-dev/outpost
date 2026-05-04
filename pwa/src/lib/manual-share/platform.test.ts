@@ -7,8 +7,8 @@
  * `window.matchMedia`.
  */
 
-import { describe, expect, it } from 'vitest';
-import { detect_platform } from './platform';
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
+import { detect_platform, is_pwa_installed_on_ios } from './platform';
 
 describe( 'detect_platform', () => {
 	it( 'classifies Android user agents', () => {
@@ -86,5 +86,71 @@ describe( 'detect_platform', () => {
 			max_touch_points: 0,
 			matches_pointer_coarse: false,
 		} ) ).toBe( 'desktop' );
+	} );
+} );
+
+describe( 'is_pwa_installed_on_ios', () => {
+	let original_match_media: typeof window.matchMedia;
+	let original_standalone: unknown;
+
+	beforeEach( () => {
+		original_match_media = window.matchMedia;
+		original_standalone  = ( navigator as unknown as { standalone?: boolean } ).standalone;
+	} );
+
+	afterEach( () => {
+		window.matchMedia = original_match_media;
+		// Restore via conditional spread to satisfy
+		// `exactOptionalPropertyTypes` (CLAUDE.md B0a #4 / F10 follow-up).
+		const nav = navigator as unknown as { standalone?: boolean };
+		if ( typeof original_standalone === 'boolean' ) {
+			nav.standalone = original_standalone;
+		} else {
+			delete nav.standalone;
+		}
+	} );
+
+	it( 'returns false on non-iOS platforms', () => {
+		const env = {
+			user_agent: 'Mozilla/5.0 (Linux; Android 14)',
+			max_touch_points: 5,
+			matches_pointer_coarse: true,
+		};
+		expect( is_pwa_installed_on_ios( env ) ).toBe( false );
+	} );
+
+	it( 'returns true on iOS when display-mode standalone matches', () => {
+		const env = {
+			user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+			max_touch_points: 5,
+			matches_pointer_coarse: true,
+		};
+		window.matchMedia = vi.fn().mockReturnValue( { matches: true } ) as unknown as typeof window.matchMedia;
+
+		expect( is_pwa_installed_on_ios( env ) ).toBe( true );
+	} );
+
+	it( 'returns true on iOS when navigator.standalone is true (legacy Apple)', () => {
+		const env = {
+			user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+			max_touch_points: 5,
+			matches_pointer_coarse: true,
+		};
+		window.matchMedia = vi.fn().mockReturnValue( { matches: false } ) as unknown as typeof window.matchMedia;
+		( navigator as unknown as { standalone?: boolean } ).standalone = true;
+
+		expect( is_pwa_installed_on_ios( env ) ).toBe( true );
+	} );
+
+	it( 'returns false on iOS when neither signal indicates standalone', () => {
+		const env = {
+			user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+			max_touch_points: 5,
+			matches_pointer_coarse: true,
+		};
+		window.matchMedia = vi.fn().mockReturnValue( { matches: false } ) as unknown as typeof window.matchMedia;
+		( navigator as unknown as { standalone?: boolean } ).standalone = false;
+
+		expect( is_pwa_installed_on_ios( env ) ).toBe( false );
 	} );
 } );
