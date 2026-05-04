@@ -1,0 +1,32 @@
+# Section 5 audit — forbidden case-study handle tokens (B1).
+#
+# One ERE-compatible regex per line. Comments and blank lines ignored.
+#
+# Source: identifiers from `concepts/posse-outbound-may-2026.md` and
+# `concepts/capture-inbound-may-2026.md` that name a specific user's
+# accounts. The plugin is published to WordPress.org and serves any
+# IndieWeb user — these tokens MUST NOT appear in source code.
+#
+# Suppression: comments that explicitly cite the research doc by
+# filename are exempt. Format:
+#     // see concepts/posse-outbound-may-2026.md §X.Y
+# The lint post-filters lines matching that citation pattern.
+#
+# Naming intent vs. raw token: `courtneyr` (bare) intentionally NOT
+# listed because the GitHub repo's organization is `courtneyr-dev`,
+# which legitimately appears in package metadata + the About-tab
+# bookmarklet source link. Tokens below match case-study-specific
+# patterns that cannot appear in legitimate project metadata.
+#
+# When adding tokens, document the addition in the F-session log
+# entry that introduces them.
+
+courtneyr\.dev
+m\.courtneyr
+courtneyr_dev
+courtneyengle
+courane
+streamlining
+2768384
+1T5OKLMTA0MZQ
+UC1tidWhCHiaARk3_YHJwZLw

@@ -64,12 +64,13 @@ npm run dev             # Vite dev server for PWA frontend
 npm run build           # Production PWA build to /build/pwa/
 composer test           # PHPUnit
 composer lint           # PHPCS (WordPress-Extra)
+composer lint:section5  # §5 audit (case-study leak / credential / instance / i18n)
 composer analyze        # PHPStan
 npm run lint            # ESLint
 npm run test:e2e        # Playwright
 ```
 
-See `CLAUDE.md` for the development conventions and session-based build plan.
+See `CLAUDE.md` for the development conventions and session-based build plan, and `CONTRIBUTING.md` for the §5 audit lint that runs in CI on every PR.
 
 ## Status & roadmap
 

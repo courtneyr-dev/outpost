@@ -1,0 +1,34 @@
+# Section 5 audit — allowed canonical fediverse / silo instance hostnames (B3).
+#
+# Hostnames hardcoded outside this allowlist trigger a B3 lint failure
+# on the assumption they're case-study leaks. Rationale:
+#
+#   - example.* and *.example are RFC 2606 reserved test domains —
+#     guaranteed to never resolve to a real instance.
+#   - mastodon.social and bsky.social are protocol-spec reference
+#     pointers (Mastodon's flagship instance, Bluesky's PDS bootstrap),
+#     not endorsements. They appear in canonical IndieWeb docs and
+#     Bridgy Fed integration tests where the reference is unavoidable.
+#
+# Adding a new entry: must come with a doc-citation comment in the
+# referencing source file pointing at the spec / canonical reference
+# that justifies the hardcoded hostname.
+
+example.com
+example.org
+example.net
+example.social
+example.test
+mastodon.example
+pleroma.example
+pixelfed.example
+bsky.example
+pdsexample.com
+mastodon.social
+bsky.social
+
+# Bridgy / Bridgy Fed bridge endpoints (Ryan Barrett). Used by Outpost
+# as Web Share Target / publish proxy URLs. Not user-specific
+# instances — bridges between protocols.
+brid.gy
+bsky.brid.gy

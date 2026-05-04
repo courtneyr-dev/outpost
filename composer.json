@@ -36,6 +36,11 @@
   "scripts": {
     "lint": "phpcs",
     "lint:fix": "phpcbf",
+    "lint:section5": "bash bin/lint/section-5-audit.sh",
+    "lint:all": [
+      "@lint",
+      "@lint:section5"
+    ],
     "analyze": "phpstan analyse --memory-limit=2G",
     "analyze:baseline": "phpstan analyse --generate-baseline",
     "test": "phpunit",
@@ -47,6 +52,7 @@
     "i18n:make-pot": "wp i18n make-pot . languages/outpost.pot --domain=outpost",
     "check": [
       "@lint",
+      "@lint:section5",
       "@analyze",
       "@test"
     ],
