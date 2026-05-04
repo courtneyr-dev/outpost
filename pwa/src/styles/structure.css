@@ -1079,6 +1079,33 @@
 	justify-content: center;
 }
 
+/*
+ * Callout for the "share sheet > bookmarklets on iOS" tip. Visually
+ * distinct so iPhone users notice it before they fight the bookmark UI.
+ * Paint stays inherited via existing card tokens.
+ */
+.outpost-bookmarklet-tip {
+	margin-block: 1rem 0.5rem;
+	padding: 0.875rem 1rem;
+	border-inline-start: 4px solid var(--outpost-button-primary-bg, currentColor);
+	border-radius: 0.25rem;
+	background: var(--outpost-card-bg, transparent);
+	font-size: 0.95rem;
+}
+
+/*
+ * Stepwise iOS workaround inside the install-help dd. Indented so the
+ * numbered list reads as a sub-procedure of the dd's parent term.
+ */
+.outpost-spec-list dd ol {
+	margin-block: 0.375rem 0.25rem;
+	padding-inline-start: 1.25rem;
+}
+
+.outpost-spec-list dd ol li + li {
+	margin-block-start: 0.25rem;
+}
+
 @media (min-width: 40rem) {
 	.outpost-spec-list dd {
 		padding-inline-start: 0;
