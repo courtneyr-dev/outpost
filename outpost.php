@@ -60,12 +60,15 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-yoast-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-activitypub-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-accessibility-checker-adapter.php';
 // Phase F9 manual-share umbrella + supporting value objects;
-// F10 adds the audit log + intent payload builder.
+// F10 adds the audit log + intent payload builder; F12 adds the
+// phase-2 capture detector + syndication writeback.
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-invalid-config-exception.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-config.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-audit-log.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-intent-payload-builder.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-pending-capture-detector.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-syndication-writeback.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-manual-share-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 // Inbound source-adapter contract (Phase F5). Mirrors Companion_* with
@@ -96,6 +99,10 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-geocode-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndicate-targets-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-controller.php';
+// Phase F12 phase-2 capture surfaces.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-capture-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-links-renderer.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-pending-syndication-notice.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -133,6 +140,39 @@ add_action(
 		Outpost_Syndicate_Targets_Endpoint::register();
 		// Register the /wp-json/outpost/v1/manual-share-* REST routes (Phase F9).
 		Outpost_Manual_Share_Controller::register();
+		// Phase F12 phase-2 capture flow + syndication-link rendering.
+		Outpost_Syndication_Capture_Controller::register();
+		Outpost_Syndication_Links_Renderer::register();
+		Outpost_Pending_Syndication_Notice::register();
+		// Expose outpost_syndication_links via WP REST so other tools
+		// can read syndication state programmatically. Uses
+		// register_post_meta with show_in_rest = full schema.
+		register_post_meta(
+			'',
+			'outpost_syndication_links',
+			array(
+				'type'          => 'array',
+				'description'   => 'Outpost manual-share syndication links (Phase F12).',
+				'single'        => true,
+				'show_in_rest'  => array(
+					'schema' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'platform_id' => array( 'type' => 'string' ),
+								'url'         => array( 'type' => 'string' ),
+								'added_at'    => array( 'type' => 'string' ),
+								'source'      => array( 'type' => 'string' ),
+							),
+						),
+					),
+				),
+				'auth_callback' => static function () {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
 		// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
 		Outpost_Micropub_Bridges::register();
 		// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).

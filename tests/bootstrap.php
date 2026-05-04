@@ -21,6 +21,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/stubs/wordpress/' );
 }
 
+// WordPress time constants used by Phase F detectors.
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
+}
+
 // Suppress the post-render `exit` in Outpost_PWA_Shell::halt() so unit tests
 // can capture render output via ob_start without aborting PHPUnit.
 if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
