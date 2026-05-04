@@ -266,6 +266,11 @@ async function report_telemetry(
  * Default environment built from globals. Browsers without
  * navigator.share leave that field undefined; the handler then
  * routes to fallback automatically.
+ *
+ * Implementation note (CLAUDE.md B0a #4): `exactOptionalPropertyTypes`
+ * forbids explicit `undefined` assignment to `?:` fields. We build
+ * the env via conditional spreads so absent capabilities map to
+ * "key omitted" rather than "key set to undefined".
  */
 export function default_environment(): AndroidShareEnvironment {
 	const nav: Navigator | undefined = typeof navigator === 'undefined' ? undefined : navigator;
@@ -273,17 +278,13 @@ export function default_environment(): AndroidShareEnvironment {
 	const has_can_share = !! ( nav && typeof nav.canShare === 'function' );
 	const has_clipboard = !! ( nav && nav.clipboard && typeof nav.clipboard.writeText === 'function' );
 
-	return {
-		navigator_share:      has_share && nav ? ( data ) => nav.share( data ) : undefined,
-		navigator_can_share:  has_can_share && nav ? ( data ) => nav.canShare( data ) : undefined,
-		clipboard_write_text: has_clipboard && nav ? ( t ) => nav.clipboard.writeText( t ) : undefined,
-		fetch:                typeof fetch === 'undefined' ? undefined : fetch,
-		navigate:             ( url: string ) => {
+	const env: AndroidShareEnvironment = {
+		navigate: ( url: string ) => {
 			if ( typeof window !== 'undefined' ) {
 				window.location.href = url;
 			}
 		},
-		post_telemetry:       async ( telemetry ) => {
+		post_telemetry: async ( telemetry ) => {
 			if ( typeof fetch === 'undefined' ) {
 				return;
 			}
@@ -294,4 +295,17 @@ export function default_environment(): AndroidShareEnvironment {
 			} );
 		},
 	};
+	if ( has_share && nav ) {
+		env.navigator_share = ( data: ShareData ) => nav.share( data );
+	}
+	if ( has_can_share && nav ) {
+		env.navigator_can_share = ( data: ShareData ) => nav.canShare( data );
+	}
+	if ( has_clipboard && nav ) {
+		env.clipboard_write_text = ( t: string ) => nav.clipboard.writeText( t );
+	}
+	if ( typeof fetch !== 'undefined' ) {
+		env.fetch = fetch;
+	}
+	return env;
 }

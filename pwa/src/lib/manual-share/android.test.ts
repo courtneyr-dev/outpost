@@ -89,9 +89,10 @@ describe( 'execute_android_share — happy path (navigator.share with files)', (
 describe( 'execute_android_share — fallbacks', () => {
 	it( 'falls back to fallback_url when navigator.share is unavailable', async () => {
 		const navigate_calls: string[] = [];
+		// `navigator_share` deliberately omitted (not set to `undefined`)
+		// to satisfy `exactOptionalPropertyTypes: true`.
 		const env: AndroidShareEnvironment = {
 			clipboard_write_text: async () => {},
-			navigator_share:     undefined,
 			navigate:            ( url ) => {
 				navigate_calls.push( url );
 			},
@@ -175,9 +176,10 @@ describe( 'execute_android_share — fallbacks', () => {
 	} );
 
 	it( 'returns aborted two_tap_fallback when no fallback URL and share fails', async () => {
+		// `navigator_share` deliberately omitted to exercise the
+		// "no native share available" branch.
 		const env: AndroidShareEnvironment = {
 			clipboard_write_text: async () => {},
-			navigator_share:     undefined,
 			navigate:            vi.fn(),
 			post_telemetry:      async () => {},
 		};
