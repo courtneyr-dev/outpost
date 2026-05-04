@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.63
+ * Version:           0.1.64
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.63' );
+define( 'OUTPOST_VERSION', '0.1.64' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -70,18 +70,44 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
 
-// Register the /wp-json/outpost/v1/preview REST route (Phase B2).
-Outpost_Preview_Endpoint::register();
-// Register the /wp-json/outpost/v1/composer-config REST route (Phase C5).
-Outpost_Composer_Config_Endpoint::register();
-// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
-Outpost_Geocode_Endpoint::register();
-// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
-Outpost_Micropub_Bridges::register();
-// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).
-Outpost_Admin_Page::register();
-// Register Settings API options (Phase H).
-Outpost_Settings::register();
+/**
+ * Wire up Outpost's component registrations at `init` priority 0.
+ *
+ * Each `::register()` method below only calls `add_action`/`add_filter` —
+ * it doesn't translate or otherwise touch i18n. So calling them at file
+ * scope works today. But WordPress 6.7 added `_load_textdomain_just_in_time`
+ * which emits a `_doing_it_wrong` notice for any `__()` call before `init`.
+ * The notice flushes the output buffer, which breaks login (cookies can't
+ * set if headers were already sent). Post Kinds for IndieWeb hit exactly
+ * this trap during PR #31's CI green-up (2026-05-04) — translation-touching
+ * component constructors fired at `plugins_loaded`, login broke on staging.
+ *
+ * Deferring to `init` priority 0 is purely defensive: if a future
+ * `register()` ever starts touching translated strings (a settings field
+ * label, a CPT register call, etc.), it lands AT `init` instead of before
+ * it, and the JIT trap never fires.
+ *
+ * Priority 0 keeps these registrations ahead of any priority-10
+ * `init` callbacks they might be a prerequisite for.
+ */
+add_action(
+	'init',
+	static function () {
+		// Register the /wp-json/outpost/v1/preview REST route (Phase B2).
+		Outpost_Preview_Endpoint::register();
+		// Register the /wp-json/outpost/v1/composer-config REST route (Phase C5).
+		Outpost_Composer_Config_Endpoint::register();
+		// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
+		Outpost_Geocode_Endpoint::register();
+		// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
+		Outpost_Micropub_Bridges::register();
+		// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).
+		Outpost_Admin_Page::register();
+		// Register Settings API options (Phase H).
+		Outpost_Settings::register();
+	},
+	0
+);
 
 /**
  * Check whether the host environment meets the plugin's minimum requirements.
