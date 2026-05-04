@@ -101,10 +101,16 @@ final class Outpost_Manual_Share_Adapter extends Outpost_Companion_Base {
 	 * @return array<int, array<string,mixed>>
 	 */
 	public function platform_chips(): array {
-		$defer_to_bridgy = self::should_defer_to_bridgy();
-		$out             = array();
+		$defer_globally = self::should_defer_to_bridgy();
+		$out            = array();
 		foreach ( Outpost_Manual_Share_Platform_Registry::all_platforms() as $platform ) {
-			if ( $defer_to_bridgy && $platform->prefers_bridgy() ) {
+			if ( ! $platform->prefers_bridgy() ) {
+				$out[] = $platform->to_chip();
+				continue;
+			}
+			// F14: per-platform deferral — if the matching Bridgy
+			// silo chip is enabled in settings, hide this manual chip.
+			if ( $defer_globally || self::bridgy_chip_enabled_for_platform( $platform->id() ) ) {
 				continue;
 			}
 			$out[] = $platform->to_chip();
@@ -113,14 +119,31 @@ final class Outpost_Manual_Share_Adapter extends Outpost_Companion_Base {
 	}
 
 	/**
-	 * Whether F14's Companion_BridgyPublish reports Bridgy is configured.
-	 * Static so tests can override via the `outpost_manual_share_defer_to_bridgy`
-	 * filter; F14 replaces this with real detection.
-	 *
-	 * Defaults to false — until F14 lands, no Bridgy detection exists,
-	 * so manual chips for Reddit and Flickr remain visible. Once F14
-	 * ships, the helper consults Companion_BridgyPublish::is_configured()
-	 * and the prefers_bridgy chips drop automatically.
+	 * F14: per-platform deferral. Maps a F9 platform id (e.g.
+	 * 'reddit-manual') to the corresponding Bridgy silo id ('reddit')
+	 * and asks the Bridgy companion whether that silo is enabled in
+	 * settings. When yes, the manual chip suppresses so the user
+	 * doesn't see two chips for the same destination.
+	 */
+	private static function bridgy_chip_enabled_for_platform( string $platform_id ): bool {
+		if ( ! class_exists( 'Outpost_Bridgy_Publish_Adapter' ) ) {
+			return false;
+		}
+		$map = array(
+			'reddit-manual' => 'reddit',
+			'flickr-manual' => 'flickr',
+		);
+		if ( ! isset( $map[ $platform_id ] ) ) {
+			return false;
+		}
+		return Outpost_Bridgy_Publish_Adapter::is_silo_enabled_by_silo_id( $map[ $platform_id ] );
+	}
+
+	/**
+	 * Site-wide override: whether to defer ALL prefers_bridgy
+	 * platforms to Bridgy regardless of per-silo settings. Static so
+	 * tests can drive it via the `outpost_manual_share_defer_to_bridgy`
+	 * filter without touching options.
 	 */
 	public static function should_defer_to_bridgy(): bool {
 		/**

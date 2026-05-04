@@ -43,6 +43,10 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
+		// F14: chips_for_mode now iterates Bridgy_Publish_Adapter which
+		// reads Bridgy settings via get_option. Default to "no Bridgy
+		// configured" so these tests see only the F1+F2 chip surfaces.
+		WP_Mock::userFunction( 'get_option' )->andReturn( array() );
 	}
 
 	public function tearDown(): void {
@@ -50,11 +54,11 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Companion_Registry::reset_for_tests();
 	}
 
-	public function test_all_returns_eight_default_adapters(): void {
-		// F9 added the manual-share umbrella, taking the default adapter
-		// count from 7 (F1) to 8.
+	public function test_all_returns_nine_default_adapters(): void {
+		// F9 added the manual-share umbrella → 8.
+		// F14 added the bridgy-publish umbrella → 9.
 		$adapters = Outpost_Companion_Registry::all();
-		$this->assertCount( 8, $adapters );
+		$this->assertCount( 9, $adapters );
 		foreach ( $adapters as $adapter ) {
 			$this->assertInstanceOf( Outpost_Companion_Base::class, $adapter );
 		}
