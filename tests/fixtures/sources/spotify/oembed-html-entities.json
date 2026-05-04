@@ -1,0 +1,14 @@
+{
+    "version": "1.0",
+    "type": "rich",
+    "provider_name": "Spotify",
+    "provider_url": "https://spotify.com",
+    "title": "Rock &amp; Roll &#39;n&#39; Soul &quot;Best Of&quot;",
+    "thumbnail_url": "https://i.scdn.co/image/example-cover-art-thumb",
+    "thumbnail_width": 300,
+    "thumbnail_height": 300,
+    "html": "<iframe src=\"https://open.spotify.com/embed/track/EXAMPLE\" width=\"456\" height=\"152\" allowtransparency=\"true\" allow=\"encrypted-media\" frameborder=\"0\"></iframe>",
+    "width": 456,
+    "height": 152,
+    "iframe_url": "https://open.spotify.com/embed/track/EXAMPLE"
+}

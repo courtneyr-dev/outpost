@@ -38,8 +38,47 @@ Every non-trivial change needs tests:
 - **Unit tests:** WP_Mock for PHP, Vitest for TypeScript.
 - **Integration tests:** WP_UnitTestCase for PHP (touch the database).
 - **End-to-end tests:** Playwright for the PWA happy paths.
+- **Live tests:** PHP-native HTTP against real third-party APIs (e.g. Spotify oEmbed). Tagged `@group live`, excluded from the default suite, run quarterly via `composer test:live`.
 
-Run `composer test && npm test && npm run test:e2e` before opening a PR.
+Run `composer test && npm test && npm run test:e2e` before opening a PR. CI does NOT run live tests; failures there indicate the upstream API contract drifted and the relevant `Source_*` adapter or extractor needs updating.
+
+### Source_* fixture pattern (Phase F)
+
+Every `Source_*` adapter ships offline fixtures plus optional live tests. The pattern is locked at:
+
+```
+tests/fixtures/sources/{source_id}/{scenario}.{ext}
+tests/fixtures/sources/{source_id}/README.md
+```
+
+Each source's `README.md` documents capture date, source URL, sanitization applied, and last-verified-live date. Copy `tests/fixtures/sources/_TEMPLATE_README.md` when adding a new source's directory.
+
+Tests load fixtures via `Outpost\Tests\Helpers\SourceFixtureLoader`:
+
+```php
+use Outpost\Tests\Helpers\SourceFixtureLoader;
+$decoded = SourceFixtureLoader::load_oembed_fixture( 'spotify', 'oembed-track-success' );
+```
+
+Tests that exercise HTTP-fetching code paths use `Outpost\Tests\Helpers\MockHttpClient` to register URL → fixture mappings; unmatched URLs throw so tests cannot silently pass against unexpected requests.
+
+### Fixture sanitization checklist
+
+Before committing any fixture under `tests/fixtures/sources/{id}/`:
+
+- [ ] No personal handles, account names, or user IDs
+- [ ] No API keys, tokens, or session identifiers
+- [ ] No tracking parameters in URLs unless the test scenario explicitly exercises tracking-parameter handling
+- [ ] Public durable content (a major artist's hit) OR entirely synthetic (made-up titles using example-data conventions)
+- [ ] `composer lint:section5` clean against fixture content
+
+### When to add a new fixture
+
+Pair fixtures with tests. Adding a fixture without a test that consumes it leaves an orphan that rots. Reusing an existing fixture for a scenario it wasn't captured for couples the test to unrelated fixture details. **New scenario → new fixture.**
+
+### Live test cadence
+
+Run `composer test:live` quarterly to catch upstream contract drift. A live test failure means the third-party API changed something Outpost depends on; the relevant `Source_*` adapter (or its extractor) needs updating. Live tests accept an `OUTPOST_TEST_*_URL` env var per source so the maintainer can swap the durable target URL when needed without editing test source.
 
 ## Forbidden vocabulary
 

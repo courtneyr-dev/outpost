@@ -1,0 +1,14 @@
+{
+    "version": "1.0",
+    "type": "rich",
+    "provider_name": "Spotify",
+    "provider_url": "https://spotify.com",
+    "title": "Sample Podcast Show Title",
+    "thumbnail_url": "https://i.scdn.co/image/example-show-art-thumb",
+    "thumbnail_width": 300,
+    "thumbnail_height": 300,
+    "html": "<iframe src=\"https://open.spotify.com/embed/show/EXAMPLE\" width=\"456\" height=\"232\" allowtransparency=\"true\" allow=\"encrypted-media\" frameborder=\"0\"></iframe>",
+    "width": 456,
+    "height": 232,
+    "iframe_url": "https://open.spotify.com/embed/show/EXAMPLE"
+}
