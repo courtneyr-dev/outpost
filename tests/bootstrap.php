@@ -178,6 +178,29 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	}
 }
 
+// Minimal WP_Post stub for unit tests. Real WP supplies the full class; F10
+// IntentPayloadBuilder + future post-meta tests need a constructable object
+// whose properties round-trip through `instanceof WP_Post` checks.
+if ( ! class_exists( 'WP_Post' ) ) {
+	class WP_Post {
+		public int $ID                = 0;
+		public string $post_title     = '';
+		public string $post_content   = '';
+		public string $post_status    = '';
+		public string $post_type      = '';
+		public int $post_parent       = 0;
+		public string $post_mime_type = '';
+
+		public function __construct( array $fields = array() ) {
+			foreach ( $fields as $key => $value ) {
+				if ( property_exists( $this, $key ) ) {
+					$this->$key = $value;
+				}
+			}
+		}
+	}
+}
+
 // Minimal WP_Term stub for unit tests. Real WP supplies the full class; bridge
 // + composer-config tests only need a constructable object whose properties
 // round-trip through `instanceof WP_Term` checks.
