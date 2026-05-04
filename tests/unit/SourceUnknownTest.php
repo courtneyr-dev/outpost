@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace Outpost\Tests\Unit;
 
 use Outpost_Source_Unknown;
+use Outpost_Source_Extractor_Og_Tags;
+use Outpost\Tests\Helpers\SourceFixtureLoader;
 use WP_Mock;
 
 final class SourceUnknownTest extends \WP_Mock\Tools\TestCase {
@@ -100,8 +102,10 @@ final class SourceUnknownTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function test_map_extracted_handles_og_field_shape(): void {
-		// Even though the og_tags parser is stubbed, the source's
-		// mapping logic itself is exercisable with a fake raw shape.
+		// F16 made the og_tags parser concrete; this test still
+		// exercises the mapping logic in isolation against a synthetic
+		// extractor-output shape (the parser→mapping integration test
+		// is below).
 		$source = new Outpost_Source_Unknown();
 		$out    = $source->map_extracted(
 			array(
@@ -120,5 +124,26 @@ final class SourceUnknownTest extends \WP_Mock\Tools\TestCase {
 			),
 			$out
 		);
+	}
+
+	public function test_end_to_end_parser_plus_mapping_with_concrete_og_extractor(): void {
+		// F5 #6 mitigation lifts: with F16's concrete Extractor_Og_Tags,
+		// Source_Unknown is end-to-end functional. Any URL with OG tags
+		// gets best-effort metadata.
+		$source     = new Outpost_Source_Unknown();
+		$ext        = new Outpost_Source_Extractor_Og_Tags();
+		$body       = SourceFixtureLoader::load_raw_fixture( 'snipd', 'og-snip-success', 'html' );
+		$source_url = 'https://example.com/arbitrary-page';
+
+		$decoded = $ext->parse( $body, array() );
+		$mapped  = $source->map_extracted( $decoded, $source_url );
+
+		// Source_Unknown's mapping captures og:title, og:description,
+		// og:image. The fixture happens to come from Snipd; that
+		// doesn't matter — Source_Unknown extracts whatever OG tags
+		// the page emits, regardless of which site emitted them.
+		$this->assertSame( 'Sample Snip Title — A Highlighted Moment', $mapped['p-name'] );
+		$this->assertStringContainsString( 'auto-generated summary', $mapped['p-summary'] );
+		$this->assertSame( 'https://share-static.snipd.com/snip/example/cover.jpg', $mapped['u-photo'] );
 	}
 }

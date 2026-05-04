@@ -105,6 +105,15 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-shortcut-controller.ph
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-spotify.php';
 // Phase F15 second concrete inbound source.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-youtube.php';
+// Phase F16 og_tags-based bulk-coverage sources.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-snipd.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-twitch.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-goodreads.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-lastfm.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-readwise.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-amazon.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-pinterest.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-tiktok.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -222,6 +231,15 @@ add_action(
 	static function () {
 		Outpost_Source_Registry::register( new Outpost_Source_Spotify() );
 		Outpost_Source_Registry::register( new Outpost_Source_YouTube() );
+		// F16 OG-tags-based bulk-coverage sources.
+		Outpost_Source_Registry::register( new Outpost_Source_Snipd() );
+		Outpost_Source_Registry::register( new Outpost_Source_Twitch() );
+		Outpost_Source_Registry::register( new Outpost_Source_Goodreads() );
+		Outpost_Source_Registry::register( new Outpost_Source_LastFm() );
+		Outpost_Source_Registry::register( new Outpost_Source_Readwise() );
+		Outpost_Source_Registry::register( new Outpost_Source_Amazon() );
+		Outpost_Source_Registry::register( new Outpost_Source_Pinterest() );
+		Outpost_Source_Registry::register( new Outpost_Source_TikTok() );
 	}
 );
 
