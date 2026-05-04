@@ -192,7 +192,7 @@ final class Outpost_Composer_Config_Endpoint {
 		$path_component = wp_parse_url( $uri, PHP_URL_PATH );
 		if ( is_string( $path_component ) ) {
 			$path_component = rtrim( $path_component, '/' );
-			if ( $path_component === rtrim( $expected_path, '/' ) ) {
+			if ( rtrim( $expected_path, '/' ) === $path_component ) {
 				return null;
 			}
 		}
