@@ -83,7 +83,7 @@ final class Outpost_Admin_Page {
 		$composer_url = home_url( '/post/' );
 		$share_target = home_url( '/post/share-target' );
 		?>
-		<div class="wrap">
+		<div class="wrap outpost-admin">
 			<h1><?php echo esc_html__( 'Outpost', 'outpost' ); ?></h1>
 			<p>
 				<?php
@@ -95,73 +95,214 @@ final class Outpost_Admin_Page {
 				?>
 			</p>
 
+			<h2><?php echo esc_html__( 'On your phone (recommended)', 'outpost' ); ?></h2>
+			<p>
+				<?php
+				echo esc_html__(
+					'On mobile the share sheet beats bookmarklets. Install Outpost once, then any app with a Share button can send pages straight to the composer.',
+					'outpost'
+				);
+				?>
+			</p>
+			<ol class="outpost-admin__steps">
+				<li>
+					<?php
+					printf(
+						/* translators: %s: composer URL link */
+						esc_html__( 'Open %s in Safari (iPhone) or Chrome (Android).', 'outpost' ),
+						'<a href="' . esc_url( $composer_url ) . '">' . esc_html( $composer_url ) . '</a>'
+					);
+					?>
+				</li>
+				<li>
+					<strong><?php echo esc_html__( 'iPhone:', 'outpost' ); ?></strong>
+					<?php
+					echo esc_html__(
+						'tap the Share button, scroll, tap "Add to Home Screen." Outpost appears as an app icon.',
+						'outpost'
+					);
+					?>
+				</li>
+				<li>
+					<strong><?php echo esc_html__( 'Android:', 'outpost' ); ?></strong>
+					<?php
+					echo esc_html__(
+						'tap the menu (⋮), then "Install app" or "Add to Home screen."',
+						'outpost'
+					);
+					?>
+				</li>
+				<li>
+					<?php
+					echo esc_html__(
+						'On any web page, tap Share → Outpost. The composer opens with the page URL and title pre-filled.',
+						'outpost'
+					);
+					?>
+				</li>
+			</ol>
+
 			<h2><?php echo esc_html__( 'Bookmarklets', 'outpost' ); ?></h2>
 			<p>
 				<?php
 				echo esc_html__(
-					'Drag any link below to your bookmarks bar. When you click the bookmark on any web page, the current page URL, title, and selected text get sent to Outpost with the chosen Reply variant pre-selected.',
+					'Pick a Reply variant. On desktop, drag the button to your bookmarks bar. On mobile, long-press the button and choose "Add Bookmark." Tap the saved bookmark from any page to compose a reply against that page.',
 					'outpost'
 				);
 				?>
 			</p>
 
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th><?php echo esc_html__( 'Bookmarklet', 'outpost' ); ?></th>
-						<th><?php echo esc_html__( 'What it does', 'outpost' ); ?></th>
-						<th><?php echo esc_html__( 'Source code', 'outpost' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( self::REPLY_VARIANTS as $variant => $config ) : ?>
-						<?php
-						$label       = $config['label'];
-						$bookmarklet = self::build_bookmarklet( $share_target, $variant );
-						?>
-						<tr>
-							<td>
-								<a
-									href="<?php echo esc_attr( $bookmarklet ); ?>"
-									class="button button-secondary"
-								>
-									<?php
-									/* translators: %s: variant label, e.g. "Reply" */
-									echo esc_html( sprintf( __( 'Outpost: %s', 'outpost' ), $label ) );
-									?>
-								</a>
-							</td>
-							<td><?php echo esc_html( $config['description'] ); ?></td>
-							<td>
+			<div class="outpost-admin__bookmarklets" role="list">
+				<?php foreach ( self::REPLY_VARIANTS as $variant => $config ) : ?>
+					<?php
+					$label       = $config['label'];
+					$bookmarklet = self::build_bookmarklet( $share_target, $variant );
+					$source_id   = 'outpost-bookmarklet-source-' . $variant;
+					?>
+					<section
+						class="outpost-admin__bookmarklet card"
+						role="listitem"
+						aria-labelledby="outpost-bookmarklet-heading-<?php echo esc_attr( $variant ); ?>"
+					>
+						<h3 id="outpost-bookmarklet-heading-<?php echo esc_attr( $variant ); ?>" class="outpost-admin__bookmarklet-title">
+							<?php
+							/* translators: %s: variant label, e.g. "Reply" */
+							echo esc_html( sprintf( __( 'Outpost: %s', 'outpost' ), $label ) );
+							?>
+						</h3>
+						<p class="outpost-admin__bookmarklet-desc">
+							<?php echo esc_html( $config['description'] ); ?>
+						</p>
+						<p class="outpost-admin__bookmarklet-actions">
+							<a
+								href="<?php echo esc_attr( $bookmarklet ); ?>"
+								class="button button-primary outpost-admin__drag-handle"
+								draggable="true"
+							>
+								<?php
+								/* translators: %s: variant label, e.g. "Reply" */
+								echo esc_html( sprintf( __( 'Drag or long-press: %s', 'outpost' ), $label ) );
+								?>
+							</a>
+							<button
+								type="button"
+								class="button"
+								data-outpost-copy-source="<?php echo esc_attr( $source_id ); ?>"
+							>
+								<?php echo esc_html__( 'Copy source', 'outpost' ); ?>
+							</button>
+							<details class="outpost-admin__bookmarklet-details">
+								<summary><?php echo esc_html__( 'Show source', 'outpost' ); ?></summary>
 								<textarea
 									readonly
 									rows="3"
 									class="large-text code"
+									id="<?php echo esc_attr( $source_id ); ?>"
 									onclick="this.select();"
 								><?php echo esc_textarea( $bookmarklet ); ?></textarea>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+							</details>
+						</p>
+					</section>
+				<?php endforeach; ?>
+			</div>
 
 			<h3><?php echo esc_html__( 'How it works', 'outpost' ); ?></h3>
-			<ol>
-				<li><?php echo esc_html__( 'Drag the button to your bookmarks bar.', 'outpost' ); ?></li>
-				<li><?php echo esc_html__( 'On any web page, click the saved bookmark.', 'outpost' ); ?></li>
-				<li><?php echo esc_html__( 'A new tab opens with the Outpost composer pre-filled with the page URL, title, and any text you had selected.', 'outpost' ); ?></li>
-				<li><?php echo esc_html__( 'Edit if you want, then post.', 'outpost' ); ?></li>
-			</ol>
+			<ul class="outpost-admin__platform-list">
+				<li>
+					<strong><?php echo esc_html__( 'Desktop:', 'outpost' ); ?></strong>
+					<?php echo esc_html__( 'drag the colored button to your bookmarks bar. Click it from any page.', 'outpost' ); ?>
+				</li>
+				<li>
+					<strong><?php echo esc_html__( 'iPhone Safari:', 'outpost' ); ?></strong>
+					<?php echo esc_html__( 'long-press the button, choose "Add Bookmark." Later, tap the bookmarks icon, find the saved bookmark, tap to run on the current page.', 'outpost' ); ?>
+				</li>
+				<li>
+					<strong><?php echo esc_html__( 'Android Chrome:', 'outpost' ); ?></strong>
+					<?php echo esc_html__( 'long-press the button, choose "Copy link," then save it as a bookmark from the menu.', 'outpost' ); ?>
+				</li>
+				<li>
+					<?php echo esc_html__( 'Either way, the page URL, title, and any text you had selected get sent to Outpost with the right variant pre-selected.', 'outpost' ); ?>
+				</li>
+			</ul>
 
-			<h3><?php echo esc_html__( 'iOS Shortcut alternative', 'outpost' ); ?></h3>
-			<p>
-				<?php
-				echo esc_html__(
-					'On iOS, drag-to-bookmarks-bar isn\'t how Mobile Safari works. Instead, install Outpost as a Home Screen app (the composer prompts for this after your first post), and use the system Share sheet from any app — Outpost will show up as a destination.',
-					'outpost'
-				);
-				?>
-			</p>
+			<style>
+				.outpost-admin__steps,
+				.outpost-admin__platform-list {
+					max-width: 60em;
+					line-height: 1.6;
+				}
+				.outpost-admin__bookmarklets {
+					display: grid;
+					grid-template-columns: repeat(auto-fill, minmax(min(100%, 22em), 1fr));
+					gap: 1rem;
+					margin: 1rem 0 1.5rem;
+				}
+				.outpost-admin__bookmarklet {
+					padding: 1rem;
+				}
+				.outpost-admin__bookmarklet-title {
+					margin: 0 0 0.5rem;
+					font-size: 1.05rem;
+				}
+				.outpost-admin__bookmarklet-desc {
+					margin: 0 0 0.75rem;
+				}
+				.outpost-admin__bookmarklet-actions {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 0.5rem;
+					align-items: center;
+					margin: 0;
+				}
+				.outpost-admin__drag-handle {
+					min-height: 44px;
+					display: inline-flex;
+					align-items: center;
+				}
+				.outpost-admin__bookmarklet-details {
+					flex-basis: 100%;
+				}
+				.outpost-admin__bookmarklet-details summary {
+					cursor: pointer;
+					padding: 0.5rem 0;
+				}
+				@media (max-width: 600px) {
+					.outpost-admin__bookmarklet-actions .button {
+						width: 100%;
+					}
+				}
+			</style>
+			<script>
+				( function () {
+					document.addEventListener( 'click', function ( event ) {
+						var trigger = event.target && event.target.closest && event.target.closest( '[data-outpost-copy-source]' );
+						if ( ! trigger ) return;
+						var sourceId = trigger.getAttribute( 'data-outpost-copy-source' );
+						var source = document.getElementById( sourceId );
+						if ( ! source ) return;
+						event.preventDefault();
+						var text = source.value;
+						var done = function () {
+							var original = trigger.textContent;
+							trigger.textContent = '<?php echo esc_js( __( 'Copied!', 'outpost' ) ); ?>';
+							setTimeout( function () {
+								trigger.textContent = original;
+							}, 1500 );
+						};
+						if ( navigator.clipboard && navigator.clipboard.writeText ) {
+							navigator.clipboard.writeText( text ).then( done, function () {
+								source.select();
+								document.execCommand( 'copy' );
+								done();
+							} );
+						} else {
+							source.select();
+							document.execCommand( 'copy' );
+							done();
+						}
+					} );
+				} )();
+			</script>
 
 			<hr style="margin: 2rem 0;" />
 
