@@ -103,6 +103,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-share-target-controlle
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-shortcut-controller.php';
 // Phase F7 first concrete inbound source.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-spotify.php';
+// Phase F15 second concrete inbound source.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-youtube.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -219,6 +221,7 @@ add_action(
 	'outpost_sources_init',
 	static function () {
 		Outpost_Source_Registry::register( new Outpost_Source_Spotify() );
+		Outpost_Source_Registry::register( new Outpost_Source_YouTube() );
 	}
 );
 
