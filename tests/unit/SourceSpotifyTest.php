@@ -22,6 +22,7 @@ namespace Outpost\Tests\Unit;
 use Outpost_Source_Spotify;
 use Outpost_Source_Registry;
 use Outpost_Source_Extractor_Oembed;
+use Outpost\Tests\Helpers\SourceFixtureLoader;
 use WP_Mock;
 
 final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
@@ -39,16 +40,6 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 	public function tearDown(): void {
 		WP_Mock::tearDown();
 		Outpost_Source_Registry::reset_for_tests();
-	}
-
-	private function fixture_path( string $name ): string {
-		return dirname( __DIR__ ) . '/fixtures/' . $name;
-	}
-
-	private function load_fixture( string $name ): string {
-		$body = file_get_contents( $this->fixture_path( $name ) );
-		$this->assertNotFalse( $body, 'Fixture must exist: ' . $name );
-		return $body;
 	}
 
 	// --- capabilities shape -----------------------------------------------
@@ -195,8 +186,7 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 
 	public function test_mapping_produces_h_entry_properties_from_track_response(): void {
 		$source     = new Outpost_Source_Spotify();
-		$body       = $this->load_fixture( 'spotify-oembed-track-success.json' );
-		$decoded    = json_decode( $body, true );
+		$decoded    = SourceFixtureLoader::load_oembed_fixture( 'spotify', 'oembed-track-success' );
 		$source_url = 'https://open.spotify.com/track/0000000000000000000000';
 
 		$mapped = $source->map_extracted( $decoded, $source_url );
@@ -209,8 +199,7 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 
 	public function test_mapping_album_response(): void {
 		$source     = new Outpost_Source_Spotify();
-		$body       = $this->load_fixture( 'spotify-oembed-album-success.json' );
-		$decoded    = json_decode( $body, true );
+		$decoded    = SourceFixtureLoader::load_oembed_fixture( 'spotify', 'oembed-album-success' );
 		$source_url = 'https://open.spotify.com/album/0000000000000000000000';
 
 		$mapped = $source->map_extracted( $decoded, $source_url );
@@ -222,8 +211,7 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 
 	public function test_mapping_episode_response(): void {
 		$source     = new Outpost_Source_Spotify();
-		$body       = $this->load_fixture( 'spotify-oembed-episode-success.json' );
-		$decoded    = json_decode( $body, true );
+		$decoded    = SourceFixtureLoader::load_oembed_fixture( 'spotify', 'oembed-episode-success' );
 		$source_url = 'https://open.spotify.com/episode/0000000000000000000000';
 
 		$mapped = $source->map_extracted( $decoded, $source_url );
@@ -239,7 +227,7 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 		// rejects with RuntimeException; preview-endpoint catches and
 		// surfaces 502 to the composer.
 		$ext  = new Outpost_Source_Extractor_Oembed();
-		$body = $this->load_fixture( 'spotify-oembed-malformed.json' );
+		$body = SourceFixtureLoader::load_raw_fixture( 'spotify', 'oembed-malformed', 'json' );
 
 		$this->expectException( \RuntimeException::class );
 		$this->expectExceptionMessage( 'JSON' );
@@ -255,8 +243,7 @@ final class SourceSpotifyTest extends \WP_Mock\Tools\TestCase {
 		// mapping produces an empty result because the title /
 		// thumbnail_url / provider_name keys are absent.
 		$source     = new Outpost_Source_Spotify();
-		$body       = $this->load_fixture( 'spotify-oembed-404.json' );
-		$decoded    = json_decode( $body, true );
+		$decoded    = SourceFixtureLoader::load_oembed_fixture( 'spotify', 'oembed-404' );
 		$source_url = 'https://open.spotify.com/track/0000000000000000000000';
 
 		$mapped = $source->map_extracted( $decoded, $source_url );

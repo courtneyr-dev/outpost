@@ -22,6 +22,11 @@
 			<directory>tests/integration</directory>
 		</testsuite>
 	</testsuites>
+	<groups>
+		<exclude>
+			<group>live</group>
+		</exclude>
+	</groups>
 	<coverage>
 		<include>
 			<directory suffix=".php">includes</directory>

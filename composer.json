@@ -30,7 +30,8 @@
   "autoload-dev": {
     "psr-4": {
       "Outpost\\Tests\\Unit\\": "tests/unit/",
-      "Outpost\\Tests\\Integration\\": "tests/integration/"
+      "Outpost\\Tests\\Integration\\": "tests/integration/",
+      "Outpost\\Tests\\Helpers\\": "tests/helpers/"
     }
   },
   "scripts": {
@@ -46,6 +47,7 @@
     "test": "phpunit",
     "test:unit": "phpunit --testsuite=unit",
     "test:integration": "phpunit --bootstrap=tests/integration/bootstrap.php --testsuite=integration",
+    "test:live": "WP_TESTS_LIVE=1 phpunit --group=live",
     "test:coverage": "phpunit --coverage-html coverage/php",
     "audit": "composer audit",
     "security": "@audit",
