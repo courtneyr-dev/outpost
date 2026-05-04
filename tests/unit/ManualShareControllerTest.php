@@ -176,7 +176,9 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertArrayNotHasKey( 'status', $payload );
 	}
 
-	public function test_intent_returns_stub_for_iphone_ua(): void {
+	public function test_intent_returns_ios_payload_for_iphone_ua(): void {
+		// F11: iPhone UA returns the iOS-flavored payload (was F9 stub
+		// in F10).
 		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
 			->withAnyArgs()
 			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
@@ -188,10 +190,19 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$payload = $response->get_data();
-		$this->assertSame( 'stub', $payload['status'] );
+		$this->assertSame( 'instagram-feed', $payload['platform'] );
+		$this->assertArrayHasKey( 'ios_strategy', $payload );
+		$this->assertSame(
+			array( 'navigator_share_files', 'app_url_scheme', 'manual' ),
+			$payload['ios_strategy']
+		);
+		$this->assertArrayHasKey( 'app_url_scheme', $payload );
+		$this->assertArrayHasKey( 'in_pwa_mode', $payload );
+		$this->assertFalse( $payload['in_pwa_mode'] ); // default when not provided
+		$this->assertArrayNotHasKey( 'status', $payload );
 	}
 
-	public function test_intent_returns_stub_for_ipad_ua(): void {
+	public function test_intent_returns_ios_payload_for_ipad_ua(): void {
 		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
 			->withAnyArgs()
 			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
@@ -202,7 +213,30 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		);
 
 		$payload = $response->get_data();
-		$this->assertSame( 'stub', $payload['status'] );
+		$this->assertArrayHasKey( 'ios_strategy', $payload );
+		$this->assertNotEmpty( $payload['ios_strategy'] );
+	}
+
+	public function test_intent_propagates_in_pwa_mode_hint_for_ios(): void {
+		WP_Mock::onFilter( 'outpost_manual_share_platforms' )
+			->withAnyArgs()
+			->reply( Outpost_Manual_Share_Platform_Registry::default_configs() );
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+
+		$request = $this->createMock( WP_REST_Request::class );
+		$request->method( 'get_param' )->willReturnCallback(
+			static function ( string $key ) {
+				return array(
+					'post_id'     => 42,
+					'platform_id' => 'instagram-feed',
+					'in_pwa_mode' => true,
+				)[ $key ] ?? null;
+			}
+		);
+
+		$response = Outpost_Manual_Share_Controller::handle_request( $request );
+		$payload  = $response->get_data();
+		$this->assertTrue( $payload['in_pwa_mode'] );
 	}
 
 	public function test_intent_returns_403_when_user_cannot_edit_post(): void {

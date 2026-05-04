@@ -93,8 +93,8 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 	}
 
 	/**
-	 * Build the F9 stub response for non-Android platforms (iOS, desktop).
-	 * F11 replaces the iOS path; desktop manual-share is a future concern.
+	 * Build the F9 stub response for desktop platforms. iOS routes
+	 * through {@see self::build_for_ios()} since F11.
 	 *
 	 * @param string $platform_id Platform id.
 	 * @param int    $post_id     Post id.
@@ -105,12 +105,120 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 			'status'      => 'stub',
 			'message'     => sprintf(
 				/* translators: %s: platform id (e.g. "instagram-feed"). */
-				__( 'Manual share intent firing is not yet implemented for this platform (F11 iOS / desktop). Will fire intent for platform: %s', 'outpost' ),
+				__( 'Manual share intent firing is not yet implemented for this platform (desktop). Will fire intent for platform: %s', 'outpost' ),
 				$platform_id
 			),
 			'platform_id' => $platform_id,
 			'post_id'     => $post_id,
 		);
+	}
+
+	/**
+	 * Build the iOS intent payload for a published post + platform.
+	 * Records an audit log entry and embeds its id in the response.
+	 *
+	 * Differences from {@see self::build_for_android()}:
+	 *
+	 *   - Returns `ios_strategy` as the per-platform fallback chain
+	 *     (e.g. `['navigator_share_files', 'app_url_scheme', 'manual']`).
+	 *     The PWA's StrategyRunner walks the chain.
+	 *   - Returns `app_url_scheme` (filled with @caption_encoded /
+	 *     @source_url substitutions) for platforms that declare one.
+	 *   - Returns `web_intent_url` (substituted) for platforms that
+	 *     have one. The PWA picks based on the strategy in play.
+	 *   - Returns `in_pwa_mode` = passed-through hint from the PWA's
+	 *     own platform detector. Defaults to false; the PWA may
+	 *     hoist `is_pwa_installed_on_ios` and POST it as a request
+	 *     parameter.
+	 *
+	 * The audit log entry's `strategy` field is initialised to the
+	 * FIRST entry in the chain — but the actual strategy that fires
+	 * is reported back via the telemetry endpoint (POST
+	 * /manual-share/intent/log). F11's runner picks the first viable
+	 * strategy at runtime; if it falls through to the second entry,
+	 * the telemetry update reflects that.
+	 *
+	 * @param Outpost_Manual_Share_Platform_Config $platform    Platform config.
+	 * @param int                                  $post_id     Post id.
+	 * @param bool                                 $in_pwa_mode PWA-installed hint from client.
+	 * @return array<string,mixed> Intent payload for the PWA.
+	 */
+	public static function build_for_ios(
+		Outpost_Manual_Share_Platform_Config $platform,
+		int $post_id,
+		bool $in_pwa_mode
+	): array {
+		$config         = $platform->to_array();
+		$caption        = self::extract_caption( $post_id );
+		$files          = self::collect_post_files( $post_id );
+		$clipboard_text = self::build_clipboard_text( $caption, $files );
+		$source_url     = self::extract_source_url( $post_id );
+		$caption_short  = self::truncate( $caption, self::CAPTION_MAX_LENGTH );
+
+		$ios_strategy = is_array( $config['ios_strategy'] ) && ! empty( $config['ios_strategy'] )
+			? $config['ios_strategy']
+			: array( 'manual' );
+
+		$first_image_url = self::first_image_url( $files );
+		$replacements    = array(
+			'@caption_encoded' => rawurlencode( $caption_short ),
+			'@source_url'      => rawurlencode( $source_url ),
+			'@image_url'       => rawurlencode( $first_image_url ),
+		);
+
+		$app_url_scheme_raw = $config['app_url_scheme'] ?? null;
+		$app_url_scheme     = is_string( $app_url_scheme_raw ) && '' !== $app_url_scheme_raw
+			? strtr( $app_url_scheme_raw, $replacements )
+			: null;
+
+		$web_intent_url_raw = $config['web_intent_url'] ?? null;
+		$web_intent_url     = is_string( $web_intent_url_raw ) && '' !== $web_intent_url_raw
+			? strtr( $web_intent_url_raw, $replacements )
+			: null;
+
+		$initial_strategy = (string) $ios_strategy[0];
+		$audit_entry      = Outpost_Manual_Share_Audit_Log::add_entry(
+			$post_id,
+			$platform->id(),
+			self::map_strategy_to_audit_label( $initial_strategy )
+		);
+
+		return array(
+			'platform'       => $platform->id(),
+			'platform_label' => $platform->label(),
+			'files'          => $files,
+			'caption'        => $caption_short,
+			'clipboard_text' => $clipboard_text,
+			'ios_strategy'   => array_values( array_filter( $ios_strategy, 'is_string' ) ),
+			'app_url_scheme' => $app_url_scheme,
+			'web_intent_url' => $web_intent_url,
+			'in_pwa_mode'    => $in_pwa_mode,
+			'after_share'    => $config['after_share'],
+			'audit_log_id'   => $audit_entry['id'],
+			'source_url'     => $source_url,
+		);
+	}
+
+	/**
+	 * Map a strategy chain entry to the audit-log-allowed label.
+	 *
+	 * The audit log accepts `navigator_share`, `intent_url`,
+	 * `two_tap_fallback`. The iOS chain entries (`navigator_share_files`,
+	 * `app_url_scheme`, `web_intent`, `manual`) project onto these
+	 * coarser labels for storage. The PWA's telemetry POST overrides
+	 * with the actual fired strategy at completion time.
+	 */
+	private static function map_strategy_to_audit_label( string $chain_entry ): string {
+		switch ( $chain_entry ) {
+			case 'navigator_share_files':
+				return Outpost_Manual_Share_Audit_Log::STRATEGY_NAVIGATOR_SHARE;
+			case 'app_url_scheme':
+			case 'web_intent':
+				return Outpost_Manual_Share_Audit_Log::STRATEGY_INTENT_URL;
+			case 'manual':
+			default:
+				return Outpost_Manual_Share_Audit_Log::STRATEGY_TWO_TAP;
+		}
 	}
 
 	/**

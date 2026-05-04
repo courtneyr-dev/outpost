@@ -55,8 +55,10 @@ final class PlatformConfigTest extends \WP_Mock\Tools\TestCase {
 		$arr    = $config->to_array();
 
 		$this->assertSame( array(), $arr['accepts_media'] );
-		$this->assertSame( '', $arr['ios_strategy'] );
-		$this->assertNull( $arr['ios_url'] );
+		// F11: ios_strategy normalized to an array (was string in F9);
+		// app_url_scheme replaced ios_url (renamed for clarity).
+		$this->assertSame( array(), $arr['ios_strategy'] );
+		$this->assertNull( $arr['app_url_scheme'] );
 		$this->assertSame( '', $arr['android_action'] );
 		$this->assertSame( '', $arr['android_pkg'] );
 		$this->assertSame( '', $arr['android_mime'] );
@@ -207,8 +209,8 @@ final class PlatformConfigTest extends \WP_Mock\Tools\TestCase {
 			'accepts_modes'  => array( 'photo' ),
 			'accepts_media'  => array( 'image' ),
 			'caption_via'    => 'web_intent',
-			'ios_strategy'   => 'web_intent',
-			'ios_url'        => 'https://fancy.example/share?caption=@caption_encoded',
+			'ios_strategy'   => array( 'navigator_share_files', 'web_intent', 'manual' ),
+			'app_url_scheme' => 'fancy://',
 			'android_action' => 'android.intent.action.SEND',
 			'android_pkg'    => 'com.fancy.app',
 			'android_mime'   => 'image/*',
@@ -222,7 +224,66 @@ final class PlatformConfigTest extends \WP_Mock\Tools\TestCase {
 
 		$arr = $instance->to_array();
 		$this->assertSame( 'web_intent', $arr['caption_via'] );
-		$this->assertSame( 'https://fancy.example/share?caption=@caption_encoded', $arr['ios_url'] );
+		$this->assertSame(
+			array( 'navigator_share_files', 'web_intent', 'manual' ),
+			$arr['ios_strategy']
+		);
+		$this->assertSame( 'fancy://', $arr['app_url_scheme'] );
 		$this->assertSame( 'com.fancy.app', $arr['android_pkg'] );
+	}
+
+	// =====================================================================
+	// F11: ios_strategy normalization (string ↔ array, ios_url backward-compat)
+	// =====================================================================
+
+	public function test_legacy_string_ios_strategy_is_coerced_to_single_element_array(): void {
+		// Backward-compat: F9 configs that still pass `ios_strategy` as a
+		// string get coerced to a single-element array. Site owners
+		// adopting F11 don't have to migrate immediately.
+		$config                  = $this->valid_config();
+		$config['ios_strategy']  = 'navigator_share_files';
+		$instance                = new Outpost_Manual_Share_Platform_Config( $config );
+
+		$this->assertSame(
+			array( 'navigator_share_files' ),
+			$instance->to_array()['ios_strategy']
+		);
+	}
+
+	public function test_array_ios_strategy_filters_non_string_entries(): void {
+		$config                 = $this->valid_config();
+		$config['ios_strategy'] = array( 'navigator_share_files', 42, 'manual', null );
+		$instance               = new Outpost_Manual_Share_Platform_Config( $config );
+
+		$this->assertSame(
+			array( 'navigator_share_files', 'manual' ),
+			$instance->to_array()['ios_strategy']
+		);
+	}
+
+	public function test_legacy_ios_url_field_migrates_to_app_url_scheme(): void {
+		// F9 configs may still pass `ios_url`; F11 silently maps it to
+		// `app_url_scheme` so existing third-party-registered platforms
+		// keep working until they migrate.
+		$config            = $this->valid_config();
+		$config['ios_url'] = 'legacy-scheme://share';
+		$instance          = new Outpost_Manual_Share_Platform_Config( $config );
+
+		$this->assertSame(
+			'legacy-scheme://share',
+			$instance->to_array()['app_url_scheme']
+		);
+	}
+
+	public function test_app_url_scheme_takes_precedence_over_ios_url(): void {
+		$config                   = $this->valid_config();
+		$config['ios_url']        = 'old-scheme://share';
+		$config['app_url_scheme'] = 'new-scheme://share';
+		$instance                 = new Outpost_Manual_Share_Platform_Config( $config );
+
+		$this->assertSame(
+			'new-scheme://share',
+			$instance->to_array()['app_url_scheme']
+		);
 	}
 }

@@ -114,7 +114,10 @@ final class IntentPayloadBuilderTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'stub', $stub['status'] );
 		$this->assertSame( 'instagram-feed', $stub['platform_id'] );
 		$this->assertSame( 42, $stub['post_id'] );
-		$this->assertStringContainsString( 'F11', $stub['message'] );
+		// F11: the message was updated since iOS no longer returns the
+		// stub (only desktop does); assert the platform id is in the
+		// message rather than a specific session number.
+		$this->assertStringContainsString( 'instagram-feed', $stub['message'] );
 	}
 
 	// =====================================================================
@@ -313,5 +316,103 @@ final class IntentPayloadBuilderTest extends \WP_Mock\Tools\TestCase {
 		);
 
 		$this->assertSame( array(), $payload['files'] );
+	}
+
+	// =====================================================================
+	// F11: iOS payload (build_for_ios)
+	// =====================================================================
+
+	public function test_ios_payload_includes_strategy_chain_app_url_scheme_and_pwa_hint(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'instagram-feed' ),
+			42,
+			false
+		);
+
+		$this->assertSame( 'instagram-feed', $payload['platform'] );
+		$this->assertSame(
+			array( 'navigator_share_files', 'app_url_scheme', 'manual' ),
+			$payload['ios_strategy']
+		);
+		$this->assertStringStartsWith( 'instagram://', $payload['app_url_scheme'] );
+		$this->assertNull( $payload['web_intent_url'] );
+		$this->assertFalse( $payload['in_pwa_mode'] );
+		$this->assertNotEmpty( $payload['audit_log_id'] );
+	}
+
+	public function test_ios_payload_for_threads_substitutes_caption_in_web_intent_url(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'threads' ),
+			42,
+			true
+		);
+
+		$this->assertSame(
+			array( 'navigator_share_files', 'web_intent', 'manual' ),
+			$payload['ios_strategy']
+		);
+		$this->assertNull( $payload['app_url_scheme'] );
+		$this->assertStringContainsString( 'threads.net/intent/post', $payload['web_intent_url'] );
+		$this->assertStringContainsString( 'My%20evening%20view', $payload['web_intent_url'] );
+		$this->assertTrue( $payload['in_pwa_mode'] );
+	}
+
+	public function test_ios_payload_for_facebook_uses_sharer_php_web_intent(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'facebook' ),
+			42,
+			false
+		);
+
+		$this->assertNull( $payload['app_url_scheme'] );
+		$this->assertStringContainsString(
+			'facebook.com/sharer.php',
+			$payload['web_intent_url']
+		);
+		$this->assertStringContainsString(
+			'u=https%3A%2F%2Fexample.com%2Fposts%2F42',
+			$payload['web_intent_url']
+		);
+	}
+
+	public function test_ios_payload_for_tiktok_uses_app_url_scheme_only(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'tiktok' ),
+			42,
+			false
+		);
+
+		$this->assertSame(
+			array( 'navigator_share_files', 'app_url_scheme', 'manual' ),
+			$payload['ios_strategy']
+		);
+		$this->assertSame( 'tiktok://', $payload['app_url_scheme'] );
+		$this->assertNull( $payload['web_intent_url'] );
+	}
+
+	public function test_ios_payload_writes_audit_log_with_navigator_share_strategy(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'instagram-feed' ),
+			42,
+			true
+		);
+
+		$entries = \Outpost_Manual_Share_Audit_Log::get_entries( 42 );
+		$this->assertCount( 1, $entries );
+		$this->assertSame( $payload['audit_log_id'], $entries[0]['id'] );
+		// First strategy in chain is navigator_share_files which maps
+		// to the audit-log-coarse `navigator_share` label.
+		$this->assertSame( 'navigator_share', $entries[0]['strategy'] );
+	}
+
+	public function test_ios_payload_pinterest_chain_routes_via_web_intent(): void {
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios(
+			$this->platform_config_for( 'pinterest' ),
+			42,
+			false
+		);
+
+		$this->assertContains( 'web_intent', $payload['ios_strategy'] );
+		$this->assertStringContainsString( 'pinterest.com/pin/create', $payload['web_intent_url'] );
 	}
 }

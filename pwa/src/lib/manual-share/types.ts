@@ -37,7 +37,7 @@ export interface IntentPayloadAndroid {
 	source_url: string;
 }
 
-/** F9 stub response shape (returned for iOS / desktop until F11). */
+/** F9 stub response shape (returned for desktop until a future session). */
 export interface IntentStubResponse {
 	status: 'stub';
 	message: string;
@@ -45,12 +45,48 @@ export interface IntentStubResponse {
 	post_id: number;
 }
 
-/** Discriminated union of the two response shapes the controller returns. */
-export type IntentResponse = IntentPayloadAndroid | IntentStubResponse;
+/**
+ * Strategy entries that can appear in `IntentPayloadIos.ios_strategy`.
+ * F11's StrategyRunner dispatches on these.
+ */
+export type IosStrategyKind =
+	| 'navigator_share_files'
+	| 'app_url_scheme'
+	| 'web_intent'
+	| 'manual';
 
-/** Type guard: is this an Android intent payload (not a stub)? */
+/**
+ * Full iOS intent payload returned from POST /manual-share/intent on iOS.
+ * F11 evolution of the F10 stub.
+ */
+export interface IntentPayloadIos {
+	platform: string;
+	platform_label: string;
+	files: SharedFile[];
+	caption: string;
+	clipboard_text: string;
+	ios_strategy: IosStrategyKind[];
+	app_url_scheme: string | null;
+	web_intent_url: string | null;
+	in_pwa_mode: boolean;
+	after_share: AfterShareBehavior;
+	audit_log_id: string;
+	source_url: string;
+}
+
+/** Discriminated union of the response shapes the controller returns. */
+export type IntentResponse = IntentPayloadAndroid | IntentPayloadIos | IntentStubResponse;
+
+/** Type guard: Android payload (not iOS, not stub). */
 export function is_android_payload( resp: IntentResponse ): resp is IntentPayloadAndroid {
-	return ( resp as IntentStubResponse ).status !== 'stub';
+	return ( resp as IntentStubResponse ).status !== 'stub'
+		&& ( resp as IntentPayloadAndroid ).intent_strategy !== undefined;
+}
+
+/** Type guard: iOS payload. */
+export function is_ios_payload( resp: IntentResponse ): resp is IntentPayloadIos {
+	return ( resp as IntentStubResponse ).status !== 'stub'
+		&& ( resp as IntentPayloadIos ).ios_strategy !== undefined;
 }
 
 /** Outcome reported back to /manual-share/intent/log telemetry endpoint. */
