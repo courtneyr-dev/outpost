@@ -62,12 +62,27 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 }
 if ( ! function_exists( 'add_query_arg' ) ) {
 	function add_query_arg( ...$args ): string {
-		// Test stub matching WP's two-arg form: add_query_arg($key, $value, $url).
-		// Real WP supports many shapes; we only need the simple shape Outpost calls.
+		// Test stub. Real WP supports multiple call shapes; cover the
+		// two Outpost actually uses:
+		//   add_query_arg( string $key, string $value, string $url )
+		//   add_query_arg( array $params, string $url )
+		if ( count( $args ) >= 1 && is_array( $args[0] ) ) {
+			$params = $args[0];
+			$url    = isset( $args[1] ) ? (string) $args[1] : '';
+			if ( '' === $url ) {
+				return '';
+			}
+			$pairs = array();
+			foreach ( $params as $k => $v ) {
+				$pairs[] = rawurlencode( (string) $k ) . '=' . rawurlencode( (string) $v );
+			}
+			$separator = ( false === strpos( $url, '?' ) ) ? '?' : '&';
+			return $url . $separator . implode( '&', $pairs );
+		}
 		if ( count( $args ) >= 3 ) {
-			$key   = (string) $args[0];
-			$value = (string) $args[1];
-			$url   = (string) $args[2];
+			$key       = (string) $args[0];
+			$value     = (string) $args[1];
+			$url       = (string) $args[2];
 			$separator = ( false === strpos( $url, '?' ) ) ? '?' : '&';
 			return $url . $separator . $key . '=' . rawurlencode( $value );
 		}

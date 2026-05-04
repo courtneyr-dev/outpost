@@ -31,7 +31,9 @@
     "psr-4": {
       "Outpost\\Tests\\Unit\\": "tests/unit/",
       "Outpost\\Tests\\Integration\\": "tests/integration/",
-      "Outpost\\Tests\\Helpers\\": "tests/helpers/"
+      "Outpost\\Tests\\Helpers\\": "tests/helpers/",
+      "Outpost\\Tests\\Auth\\": "tests/auth/",
+      "Outpost\\Tests\\Admin\\": "tests/admin/"
     }
   },
   "scripts": {

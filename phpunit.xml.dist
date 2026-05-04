@@ -17,6 +17,8 @@
 	<testsuites>
 		<testsuite name="unit">
 			<directory>tests/unit</directory>
+			<directory>tests/auth</directory>
+			<directory>tests/admin</directory>
 		</testsuite>
 		<testsuite name="integration">
 			<directory>tests/integration</directory>
