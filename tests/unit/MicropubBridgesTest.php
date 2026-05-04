@@ -488,4 +488,236 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertIsArray( $result );
 		$this->assertSame( array(), $result );
 	}
+
+	// --- F3: photo alt-text bridge ----------------------------------------
+	//
+	// Investigation findings (F3, see also CLAUDE.md F3 entry):
+	//
+	// 1. Outpost is a Micropub CLIENT. The image upload write path is
+	//    owned by the Shanske Micropub plugin
+	//    (indieweb/wordpress-micropub) — Outpost has no PHP photo upload
+	//    handler.
+	//
+	// 2. The Shanske Micropub plugin recognizes structured photo entries
+	//    of the form { value: <url>, alt: <alt> } per the Micropub spec
+	//    JSON syntax, but passes the alt through to
+	//    media_sideload_url($url, $post_id, $title) where the third arg
+	//    becomes attachment post_title — NOT _wp_attachment_image_alt.
+	//
+	// 3. The Shanske Micropub plugin does NOT honor the parallel-array
+	//    convention (`photo[]=...&mp-photo-alt[]=...`). Outpost client
+	//    requests using that shape silently lose the alt text.
+	//
+	// 4. The ActivityPub plugin's Post transformer reads
+	//    `_wp_attachment_image_alt` to populate AP attachment[].name. The
+	//    field is the canonical WP alt-text storage location.
+	//
+	// 5. So without an Outpost-side bridge, every Outpost-originated
+	//    Photo post syndicates to the fediverse with empty image alt
+	//    text — accessibility regression.
+	//
+	// The apply_photo_alt_text bridge below fixes the chain end-to-end
+	// without modifying the upstream Micropub plugin.
+
+	public function test_apply_photo_alt_writes_meta_for_structured_shape(): void {
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/wp-content/uploads/2026/05/photo1.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->with( 'A red apple on a wooden table' )
+			->andReturn( 'A red apple on a wooden table' );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 101, '_wp_attachment_image_alt', 'A red apple on a wooden table' )
+			->andReturn( true );
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value' => 'https://example.test/wp-content/uploads/2026/05/photo1.jpg',
+					'alt'   => 'A red apple on a wooden table',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_writes_meta_for_parallel_array_shape(): void {
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/photo1.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/photo2.jpg' )
+			->andReturn( 102 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 102 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 101, '_wp_attachment_image_alt', 'first alt' )
+			->andReturn( true );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 102, '_wp_attachment_image_alt', 'second alt' )
+			->andReturn( true );
+
+		$properties = array(
+			'photo'         => array(
+				'https://example.test/photo1.jpg',
+				'https://example.test/photo2.jpg',
+			),
+			'mp-photo-alt' => array( 'first alt', 'second alt' ),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_persists_empty_string_when_alt_missing(): void {
+		// Empty alt is preserved (not skipped) so the AP attachment.name
+		// has an explicit empty value rather than missing field.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/photo.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->with( '' )
+			->andReturn( '' );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 101, '_wp_attachment_image_alt', '' )
+			->andReturn( true );
+
+		$properties = array(
+			'photo' => 'https://example.test/photo.jpg',
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_skips_attachments_belonging_to_other_posts(): void {
+		// If attachment_url_to_postid resolves to an attachment whose
+		// post_parent is some OTHER post, the bridge must not touch it.
+		// Defensive — keeps the bridge from clobbering alt text on
+		// shared media.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/shared.jpg' )
+			->andReturn( 99 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 99 )
+			->andReturn( 7 );
+		// update_post_meta must NOT be called.
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value' => 'https://example.test/shared.jpg',
+					'alt'   => 'should not write',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_skips_unresolvable_urls(): void {
+		// External URLs (not in our media library) return 0 from
+		// attachment_url_to_postid. Bridge skips them silently.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://other-site.example/their-photo.jpg' )
+			->andReturn( 0 );
+		// update_post_meta must NOT be called.
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value' => 'https://other-site.example/their-photo.jpg',
+					'alt'   => 'someone else has this',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_noop_when_no_photo_property(): void {
+		// No photo, no calls. Reply / Like / Note posts run through this
+		// bridge alongside Photo posts; the noop path matters.
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, array() ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_attachments_with_zero_parent_are_accepted(): void {
+		// Some attachments are created with post_parent=0 (orphan). The
+		// upstream Micropub plugin re-parents them, but during early
+		// processing the parent may still be 0. Treat 0 as "OK to write"
+		// — the bridge's job is to honor the alt-text intent, not enforce
+		// parent linkage.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/orphan.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 0 );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 101, '_wp_attachment_image_alt', 'orphan alt' )
+			->andReturn( true );
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value' => 'https://example.test/orphan.jpg',
+					'alt'   => 'orphan alt',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_collect_photo_alt_pairs_normalizes_both_shapes(): void {
+		// Direct test of the private resolver — verifies structured
+		// entries beat parallel-array entries when both are present.
+		$result = $this->invoke_private(
+			'collect_photo_alt_pairs',
+			array(
+				array(
+					'photo' => array(
+						array(
+							'value' => 'https://example.test/struct.jpg',
+							'alt'   => 'structured alt',
+						),
+						'https://example.test/plain.jpg',
+					),
+					'mp-photo-alt' => array( 'parallel alt 1', 'parallel alt 2' ),
+				),
+			)
+		);
+		$this->assertSame(
+			array(
+				array(
+					'url' => 'https://example.test/struct.jpg',
+					'alt' => 'structured alt',
+				),
+				array(
+					'url' => 'https://example.test/plain.jpg',
+					'alt' => 'parallel alt 2',
+				),
+			),
+			$result
+		);
+	}
 }

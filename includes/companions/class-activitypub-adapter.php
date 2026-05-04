@@ -142,6 +142,7 @@ final class Outpost_ActivityPub_Adapter extends Outpost_Companion_Base {
 			'char_limit'      => null,
 			'caveats'         => array(
 				__( 'Bluesky reach via Bridgy Fed has stricter limits than other fediverse networks (about 10 MB per image, 1000 pixels maximum dimension, 300 graphemes per post).', 'outpost' ),
+				__( 'Photo alt text federates correctly only when Outpost is active alongside the ActivityPub plugin. Outpost\'s Micropub bridge writes alt text to the attachment image-alt meta key; without it, upstream Micropub plugins lose the alt text before federation reaches it.', 'outpost' ),
 			),
 			'requires_auth'   => false,
 		);

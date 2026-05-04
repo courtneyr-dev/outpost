@@ -13,6 +13,12 @@
  *   - `mp-xfn-target`         → companion key indicating which URL the rels apply to
  *   - `mp-categories[]`       → wp_set_post_categories() with auto-create
  *   - `mp-place-name`         → postmeta `_outpost_place_name` (free-text venue name paired with the standard `location` property)
+ *   - photo alt text          → postmeta `_wp_attachment_image_alt` on each
+ *                              attached image (F3). Reads the standard
+ *                              Micropub structured-photo shape
+ *                              `{ value, alt }` AND the parallel
+ *                              `mp-photo-alt` array. Fixes an upstream
+ *                              Micropub-plugin gap that loses alt text.
  *
  * The standard Micropub `category[]` property gets handled by the Micropub
  * plugin itself (assigns to post_tag taxonomy by default). Outpost adds
@@ -189,6 +195,131 @@ final class Outpost_Micropub_Bridges {
 		self::apply_xfn( $post_id, $properties );
 		self::apply_categories( $post_id, $properties );
 		self::apply_place_name( $post_id, $properties );
+		self::apply_photo_alt_text( $post_id, $properties );
+	}
+
+	/**
+	 * Bridge: photo alt text → `_wp_attachment_image_alt` on each
+	 * attachment post (F3).
+	 *
+	 * Investigation finding (F3): the upstream Micropub plugin
+	 * (indieweb/wordpress-micropub) does NOT write alt text to
+	 * `_wp_attachment_image_alt`. Two failure modes:
+	 *
+	 *   1. The plugin recognizes structured photo entries in the form
+	 *      `{ "value": "<url>", "alt": "<alt text>" }` but passes the
+	 *      `alt` to `media_sideload_url($url, $post_id, $title)` which
+	 *      stores it as the attachment's `post_title`, not as
+	 *      `_wp_attachment_image_alt`.
+	 *   2. The plugin doesn't recognize the `mp-photo-alt` parallel
+	 *      array convention at all. Outpost client requests using that
+	 *      shape silently lose alt text.
+	 *
+	 * Downstream consumers (the ActivityPub plugin's transformer in
+	 * particular — verified F3) read `_wp_attachment_image_alt` to
+	 * populate the AP `attachment[].name` field. Without the bridge,
+	 * every Outpost-originated Photo or Gallery post syndicates to the
+	 * fediverse with empty image alt text — accessibility regression
+	 * for every user.
+	 *
+	 * The bridge fixes the chain end-to-end without requiring an
+	 * upstream Micropub plugin change. It supports both shapes
+	 * Outpost may emit:
+	 *
+	 *   - Structured: `properties.photo = [ { value: <url>, alt: <alt> } ]`
+	 *     (Micropub spec JSON form, supported by `media_sideload_url`'s
+	 *     plugin path).
+	 *   - Parallel arrays: `properties.photo = [<url1>, <url2>]` plus
+	 *     `properties.mp-photo-alt = [<alt1>, <alt2>]` (Outpost client
+	 *     legacy + some other Micropub clients).
+	 *
+	 * For each photo URL with alt text, the bridge resolves the URL
+	 * back to its attachment ID via `attachment_url_to_postid()` and
+	 * writes the alt text to `_wp_attachment_image_alt`. URLs that
+	 * resolve to attachments not parented by `$post_id` are skipped
+	 * defensively — the bridge never updates someone else's
+	 * attachments.
+	 *
+	 * Empty alt strings are persisted (not skipped) because the AP
+	 * spec is fine with empty `attachment[].name` and an explicit
+	 * empty value beats a missing field for downstream consumers.
+	 *
+	 * @param int                  $post_id    Post ID.
+	 * @param array<string, mixed> $properties Flat properties map from `extract_properties()`.
+	 */
+	private static function apply_photo_alt_text( int $post_id, array $properties ): void {
+		$pairs = self::collect_photo_alt_pairs( $properties );
+		if ( empty( $pairs ) ) {
+			return;
+		}
+		foreach ( $pairs as $pair ) {
+			$url = $pair['url'];
+			$alt = $pair['alt'];
+			if ( '' === $url ) {
+				continue;
+			}
+			$attachment_id = (int) attachment_url_to_postid( $url );
+			if ( $attachment_id <= 0 ) {
+				continue;
+			}
+			$parent_id = (int) wp_get_post_parent_id( $attachment_id );
+			if ( 0 !== $parent_id && $parent_id !== $post_id ) {
+				continue;
+			}
+			update_post_meta(
+				$attachment_id,
+				'_wp_attachment_image_alt',
+				sanitize_text_field( $alt )
+			);
+		}
+	}
+
+	/**
+	 * Resolve photo + alt-text pairs from either the structured or
+	 * parallel-array shape. Returns a list of `{url, alt}` arrays.
+	 *
+	 * Order matters: structured shape wins per-entry (each photo entry
+	 * carries its own alt), and the parallel `mp-photo-alt` array fills
+	 * in for plain-string photo entries by index.
+	 *
+	 * @param array<string, mixed> $properties Flat properties map.
+	 * @return array<int, array{url: string, alt: string}>
+	 */
+	private static function collect_photo_alt_pairs( array $properties ): array {
+		$photo = $properties['photo'] ?? null;
+		if ( null === $photo ) {
+			return array();
+		}
+		// Normalize to array.
+		$entries = is_array( $photo ) ? array_values( $photo ) : array( $photo );
+
+		$alt_array = array();
+		$mp_alt    = $properties['mp-photo-alt'] ?? null;
+		if ( is_array( $mp_alt ) ) {
+			$alt_array = array_values( $mp_alt );
+		} elseif ( is_string( $mp_alt ) ) {
+			$alt_array = array( $mp_alt );
+		}
+
+		$pairs = array();
+		foreach ( $entries as $index => $entry ) {
+			if ( is_array( $entry ) && isset( $entry['value'] ) ) {
+				$url = is_string( $entry['value'] ) ? $entry['value'] : '';
+				$alt = isset( $entry['alt'] ) && is_string( $entry['alt'] ) ? $entry['alt'] : '';
+			} elseif ( is_string( $entry ) ) {
+				$url = $entry;
+				$alt = isset( $alt_array[ $index ] ) && is_string( $alt_array[ $index ] )
+					? $alt_array[ $index ]
+					: '';
+			} else {
+				continue;
+			}
+			$pairs[] = array(
+				'url' => $url,
+				'alt' => $alt,
+			);
+		}
+		return $pairs;
 	}
 
 	/**
