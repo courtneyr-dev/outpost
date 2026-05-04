@@ -69,6 +69,9 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-audit-
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-intent-payload-builder.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-pending-capture-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-syndication-writeback.php';
+// Phase F13 audit-log surfacing helpers.
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-status-computer.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-reminder-manager.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-manual-share-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 // Inbound source-adapter contract (Phase F5). Mirrors Companion_* with
@@ -103,6 +106,9 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-capture-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-links-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pending-syndication-notice.php';
+// Phase F13 audit-log surfacing.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-admin-column.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -144,6 +150,9 @@ add_action(
 		Outpost_Syndication_Capture_Controller::register();
 		Outpost_Syndication_Links_Renderer::register();
 		Outpost_Pending_Syndication_Notice::register();
+		// Phase F13 audit-log surfacing — status controller + admin column.
+		Outpost_Manual_Share_Status_Controller::register();
+		Outpost_Syndication_Admin_Column::register();
 		// Expose outpost_syndication_links via WP REST so other tools
 		// can read syndication state programmatically. Uses
 		// register_post_meta with show_in_rest = full schema.

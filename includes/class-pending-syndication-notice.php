@@ -93,6 +93,9 @@ final class Outpost_Pending_Syndication_Notice {
 		?>
 		<div class="notice notice-info outpost-pending-syndication-notice">
 			<p>
+				<?php
+				echo Outpost_Syndication_Admin_Column::render_badge_html( $post_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				?>
 				<strong>
 					<?php
 					/* translators: %d: number of pending platforms. */
@@ -106,16 +109,22 @@ final class Outpost_Pending_Syndication_Notice {
 					?>
 				</strong>
 			</p>
-			<ul>
+			<ul class="outpost-pending-syndication-notice__list">
 				<?php foreach ( $entries as $entry ) : ?>
 					<li>
 						<?php
 						$platform_id = (string) ( $entry['platform_id'] ?? '' );
 						$fired_at    = (string) ( $entry['fired_at'] ?? '' );
+						$strategy    = (string) ( $entry['strategy'] ?? '' );
 						echo esc_html( self::label_for( $platform_id ) );
 						if ( '' !== $fired_at ) {
 							echo ' — ';
 							echo esc_html( self::human_diff( $fired_at ) );
+						}
+						if ( '' !== $strategy ) {
+							echo ' <span class="outpost-pending-syndication-notice__strategy">(';
+							echo esc_html( $strategy );
+							echo ')</span>';
 						}
 						?>
 					</li>
@@ -123,6 +132,9 @@ final class Outpost_Pending_Syndication_Notice {
 			</ul>
 			<p>
 				<?php esc_html_e( 'Open the Outpost composer to paste the silo URLs and complete syndication.', 'outpost' ); ?>
+				<a href="<?php echo esc_url( home_url( '/post/' ) ); ?>" class="outpost-pending-syndication-notice__detail-link">
+					<?php esc_html_e( 'View detail', 'outpost' ); ?>
+				</a>
 			</p>
 		</div>
 		<?php

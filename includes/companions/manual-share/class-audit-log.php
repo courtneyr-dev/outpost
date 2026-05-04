@@ -46,6 +46,21 @@ final class Outpost_Manual_Share_Audit_Log {
 
 	private const META_KEY      = 'outpost_manual_share_log';
 	private const ENTRY_VERSION = 1;
+	/**
+	 * Version 2 introduced in F13 — adds the optional
+	 * `reminder_dismissed_until` field. Entries without the field
+	 * stay at v1; entries written with the field bump to v2 in
+	 * {@see self::update_entry}.
+	 */
+	private const ENTRY_VERSION_WITH_REMINDER = 2;
+
+	/**
+	 * Far-future timestamp used as the "abandoned" sentinel value
+	 * for `reminder_dismissed_until`. Picking 2200 keeps the entry
+	 * shape parseable by `strtotime` while comfortably outside any
+	 * realistic snooze duration.
+	 */
+	public const ABANDONED_REMINDER_SENTINEL = '2200-01-01T00:00:00+00:00';
 
 	/**
 	 * Allowed strategy values. Mirrors the strategies the PWA reports
@@ -130,6 +145,15 @@ final class Outpost_Manual_Share_Audit_Log {
 				if ( array_key_exists( 'silo_url', $patch ) ) {
 					$entry['silo_url'] = self::sanitize_silo_url( $patch['silo_url'] );
 				}
+				if ( array_key_exists( 'reminder_dismissed_until', $patch ) ) {
+					$entry['reminder_dismissed_until'] = self::sanitize_reminder_until(
+						$patch['reminder_dismissed_until']
+					);
+					// Bump entry to v2 once the field is set so future
+					// readers can rely on its presence to know which
+					// schema applies.
+					$entry['version'] = self::ENTRY_VERSION_WITH_REMINDER;
+				}
 				$found = true;
 				break;
 			}
@@ -158,9 +182,16 @@ final class Outpost_Manual_Share_Audit_Log {
 		}
 		$out = array();
 		foreach ( $raw as $entry ) {
-			if ( is_array( $entry ) && isset( $entry['id'], $entry['version'] ) ) {
-				$out[] = $entry;
+			if ( ! is_array( $entry ) || ! isset( $entry['id'], $entry['version'] ) ) {
+				continue;
 			}
+			// F13: backwards-compatible read — v1 entries don't have
+			// `reminder_dismissed_until`; default to null so callers
+			// can rely on the key always being present.
+			if ( ! array_key_exists( 'reminder_dismissed_until', $entry ) ) {
+				$entry['reminder_dismissed_until'] = null;
+			}
+			$out[] = $entry;
 		}
 		return $out;
 	}
@@ -212,6 +243,34 @@ final class Outpost_Manual_Share_Audit_Log {
 	 * Coerce a silo URL to a sanitized https?:// URL or null.
 	 *
 	 * @param mixed $value
+	 */
+	/**
+	 * Coerce a `reminder_dismissed_until` value to ISO 8601 string,
+	 * the abandoned sentinel, or null. Accepts the literal string
+	 * 'forever' as a convenience for callers (mapped to the
+	 * abandoned sentinel constant).
+	 *
+	 * @param mixed $value
+	 */
+	private static function sanitize_reminder_until( $value ): ?string {
+		if ( null === $value || '' === $value ) {
+			return null;
+		}
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+		if ( 'forever' === strtolower( $value ) ) {
+			return self::ABANDONED_REMINDER_SENTINEL;
+		}
+		$ts = strtotime( $value );
+		if ( false === $ts ) {
+			return null;
+		}
+		return gmdate( 'c', $ts );
+	}
+
+	/**
+	 * @param mixed $value Raw value from patch input.
 	 */
 	private static function sanitize_silo_url( $value ): ?string {
 		if ( null === $value || '' === $value ) {
