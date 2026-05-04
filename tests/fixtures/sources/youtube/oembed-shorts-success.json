@@ -1,0 +1,15 @@
+{
+    "title": "Sample Shorts Video",
+    "author_name": "Shorts Creator",
+    "author_url": "https://www.youtube.com/channel/UCSHORTSCREATOR0000",
+    "type": "video",
+    "height": 113,
+    "width": 200,
+    "version": "1.0",
+    "provider_name": "YouTube",
+    "provider_url": "https://www.youtube.com/",
+    "thumbnail_height": 720,
+    "thumbnail_width": 405,
+    "thumbnail_url": "https://i.ytimg.com/vi/SHORTS_EXAMPLE/hqdefault.jpg",
+    "html": "<iframe width=\"200\" height=\"113\" src=\"https://www.youtube.com/embed/SHORTS_EXAMPLE?feature=oembed\" frameborder=\"0\" allowfullscreen></iframe>"
+}

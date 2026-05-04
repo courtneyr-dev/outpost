@@ -1,0 +1,15 @@
+{
+    "title": "Sample Music Video",
+    "author_name": "Sample Artist - Topic",
+    "author_url": "https://www.youtube.com/channel/UCEXAMPLE",
+    "type": "video",
+    "height": 113,
+    "width": 200,
+    "version": "1.0",
+    "provider_name": "YouTube",
+    "provider_url": "https://www.youtube.com/",
+    "thumbnail_height": 360,
+    "thumbnail_width": 480,
+    "thumbnail_url": "https://i.ytimg.com/vi/MUSIC_EXAMPLE/hqdefault.jpg",
+    "html": "<iframe width=\"200\" height=\"113\" src=\"https://www.youtube.com/embed/MUSIC_EXAMPLE?feature=oembed\" frameborder=\"0\" allowfullscreen></iframe>"
+}
