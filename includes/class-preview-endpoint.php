@@ -84,8 +84,12 @@ final class Outpost_Preview_Endpoint {
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'show_in_index'       => false,
 				'args'                => array(
-					'url' => array(
+					'url'       => array(
 						'required' => true,
+						'type'     => 'string',
+					),
+					'source_id' => array(
+						'required' => false,
 						'type'     => 'string',
 					),
 				),
@@ -175,6 +179,25 @@ final class Outpost_Preview_Endpoint {
 	 * Handle the preview request: validate URL, rate-limit, fetch, sanitize,
 	 * return.
 	 *
+	 * F5 extends this endpoint with optional `source_id` Source_*
+	 * dispatch. Three paths:
+	 *
+	 *   1. `source_id` provided AND a registered source claims that
+	 *      id (other than the unknown fallback): route through that
+	 *      adapter's extractor + recipe + mapping. Returns the new
+	 *      `extracted`/`raw`/`warnings` shape. SSRF defenses run on
+	 *      the extractor's compute_fetch_url() output, not on the
+	 *      raw source URL.
+	 *   2. `source_id` omitted but `find_for_url($url)` matches a
+	 *      concrete (non-Unknown) source: same extractor dispatch
+	 *      as path 1.
+	 *   3. Any other case (unknown source_id, only Source_Unknown
+	 *      matches, no source registered): legacy behavior — fetch
+	 *      the source URL, return `{ html, finalUrl, contentType }`.
+	 *      Reply mode parses the title client-side from the HTML;
+	 *      future F16 og_tags work makes Source_Unknown's path also
+	 *      end-to-end-functional.
+	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -191,6 +214,18 @@ final class Outpost_Preview_Endpoint {
 			return $rate_limit;
 		}
 
+		// F5: resolve a Source_* adapter for this request, if any.
+		$source = self::resolve_source( $request, $url );
+
+		// If we resolved a concrete source (NOT Source_Unknown), dispatch
+		// through its extractor. Source_Unknown's extractor is stubbed
+		// (og_tags ships in F16); falling through to the legacy path
+		// keeps Reply mode working until then.
+		if ( null !== $source && Outpost_Source_Unknown::ID !== self::source_id_of( $source ) ) {
+			return self::handle_via_source( $source, $url );
+		}
+
+		// Legacy path: fetch the source URL directly, return sanitized HTML.
 		$response = wp_safe_remote_get(
 			$url,
 			array(
@@ -253,6 +288,201 @@ final class Outpost_Preview_Endpoint {
 				'contentType' => $content_type,
 			)
 		);
+	}
+
+	/**
+	 * Resolve a Source_Base for this request. Honors explicit
+	 * `source_id` first; falls back to URL-based matching via
+	 * `Outpost_Source_Registry::find_for_url`.
+	 *
+	 * Returns null only when neither path resolves — e.g. the
+	 * registry is empty in a test context. Production boot
+	 * registers Source_Unknown as the universal fallback so the
+	 * URL match always finds at least that.
+	 *
+	 * @param WP_REST_Request $request The incoming REST request.
+	 * @param string          $url     Source URL.
+	 * @return Outpost_Source_Base|null
+	 */
+	private static function resolve_source( WP_REST_Request $request, string $url ): ?Outpost_Source_Base {
+		if ( ! class_exists( 'Outpost_Source_Registry' ) ) {
+			return null;
+		}
+		$source_id = $request->get_param( 'source_id' );
+		if ( is_string( $source_id ) && '' !== $source_id ) {
+			$by_id = Outpost_Source_Registry::get_by_id( $source_id );
+			if ( null !== $by_id ) {
+				return $by_id;
+			}
+		}
+		return Outpost_Source_Registry::find_for_url( $url );
+	}
+
+	/**
+	 * Project a Source_Base to its stable id without re-fetching
+	 * capabilities() unnecessarily.
+	 *
+	 * @param Outpost_Source_Base $source
+	 * @return string
+	 */
+	private static function source_id_of( Outpost_Source_Base $source ): string {
+		$caps = $source->capabilities();
+		return isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : '';
+	}
+
+	/**
+	 * Dispatch the request through the source's declared extractor.
+	 * Runs the same SSRF + size + content-type defenses as the
+	 * legacy path; the only thing that varies is the URL fetched
+	 * (extractor-computed) and the parsing of the response (per
+	 * extractor type).
+	 *
+	 * @param Outpost_Source_Base $source The matched source.
+	 * @param string              $url    Source URL.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private static function handle_via_source( Outpost_Source_Base $source, string $url ) {
+		$caps         = $source->capabilities();
+		$source_id    = isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : '';
+		$extractor_id = isset( $caps['extractor'] ) && is_string( $caps['extractor'] ) ? $caps['extractor'] : '';
+		$extractor    = Outpost_Source_Registry::get_extractor( $extractor_id );
+
+		if ( null === $extractor ) {
+			return new WP_Error(
+				'unknown_extractor',
+				/* translators: %s: extractor type id */
+				sprintf( __( 'Source declares an unrecognized extractor type: %s', 'outpost' ), $extractor_id ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$recipe = $source->recipe_for_url( $url );
+
+		try {
+			$fetch_url = $extractor->compute_fetch_url( $url, $recipe );
+		} catch ( \InvalidArgumentException $e ) {
+			return new WP_Error(
+				'invalid_recipe',
+				__( 'Source recipe is invalid for the requested URL.', 'outpost' ),
+				array(
+					'status' => 500,
+					'detail' => $e->getMessage(),
+				)
+			);
+		}
+
+		// SSRF defense rides on wp_safe_remote_get the same as the
+		// legacy path. The extractor-computed fetch URL goes through
+		// the host-is-external filter chain unchanged.
+		$response = wp_safe_remote_get(
+			$fetch_url,
+			array(
+				'timeout'     => self::HTTP_TIMEOUT,
+				'redirection' => 3,
+				'headers'     => array(
+					'Accept' => implode( ', ', $extractor->expected_content_types() ),
+				),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error(
+				'fetch_failed',
+				__( 'Could not fetch the source URL through the extractor.', 'outpost' ),
+				array(
+					'status' => 502,
+					'detail' => $response->get_error_message(),
+				)
+			);
+		}
+
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( $status < 200 || $status >= 300 ) {
+			return new WP_Error(
+				'fetch_failed',
+				/* translators: %d: HTTP status code */
+				sprintf( __( 'Source URL returned HTTP %d.', 'outpost' ), $status ),
+				array( 'status' => 502 )
+			);
+		}
+
+		$content_type = (string) wp_remote_retrieve_header( $response, 'content-type' );
+		$expected     = $extractor->expected_content_types();
+		if ( ! self::content_type_matches( $content_type, $expected ) ) {
+			return new WP_Error(
+				'unsupported_content_type',
+				__( 'Source response content type is not one of the extractor accepted types.', 'outpost' ),
+				array(
+					'status'      => 415,
+					'contentType' => $content_type,
+					'expected'    => $expected,
+				)
+			);
+		}
+
+		$body = (string) wp_remote_retrieve_body( $response );
+		if ( strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
+			return new WP_Error(
+				'response_too_large',
+				__( 'Source response exceeded the 5 MB cap.', 'outpost' ),
+				array( 'status' => 413 )
+			);
+		}
+
+		try {
+			$raw = $extractor->parse( $body, $recipe );
+		} catch ( Outpost_Source_Extractor_Not_Implemented_Exception $e ) {
+			return new WP_Error(
+				'extractor_not_implemented',
+				/* translators: %s: extractor type id */
+				sprintf( __( 'Extractor "%s" is not yet implemented in this build.', 'outpost' ), $e->extractor_id ),
+				array( 'status' => 501 )
+			);
+		} catch ( \RuntimeException $e ) {
+			return new WP_Error(
+				'extractor_failed',
+				__( 'Extractor failed to parse the source response.', 'outpost' ),
+				array(
+					'status' => 502,
+					'detail' => $e->getMessage(),
+				)
+			);
+		}
+
+		$extracted = $source->map_extracted( $raw, $url );
+
+		return rest_ensure_response(
+			array(
+				'source_url' => $url,
+				'source_id'  => $source_id,
+				'extracted'  => $extracted,
+				'raw'        => $raw,
+				'warnings'   => array(),
+			)
+		);
+	}
+
+	/**
+	 * Whether a Content-Type header value matches any allowed
+	 * prefix in the supplied list. Used by the F5 extractor path
+	 * with extractor-supplied prefixes; equivalent semantics to
+	 * the legacy `content_type_is_allowed()`.
+	 *
+	 * @param string   $content_type     Content-Type header value.
+	 * @param string[] $allowed_prefixes Prefixes the extractor accepts.
+	 * @return bool
+	 */
+	private static function content_type_matches( string $content_type, array $allowed_prefixes ): bool {
+		$lower = strtolower( $content_type );
+		foreach ( $allowed_prefixes as $prefix ) {
+			if ( ! is_string( $prefix ) || '' === $prefix ) {
+				continue;
+			}
+			$prefix_lower = strtolower( $prefix );
+			if ( 0 === strpos( $lower, $prefix_lower ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
