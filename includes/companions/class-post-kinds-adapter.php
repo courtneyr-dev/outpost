@@ -30,7 +30,7 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 	}
 
 	/** @return string[] */
-	public function capabilities(): array {
+	public function feature_slugs(): array {
 		return array(
 			'post-kinds.listen',
 			'post-kinds.watch',

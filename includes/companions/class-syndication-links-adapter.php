@@ -24,7 +24,7 @@ final class Outpost_Syndication_Links_Adapter extends Outpost_Companion_Base {
 	}
 
 	/** @return string[] */
-	public function capabilities(): array {
+	public function feature_slugs(): array {
 		return array( 'syndication.chips' );
 	}
 }

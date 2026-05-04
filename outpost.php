@@ -66,6 +66,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-geocode-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndicate-targets-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -99,6 +100,8 @@ add_action(
 		Outpost_Composer_Config_Endpoint::register();
 		// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
 		Outpost_Geocode_Endpoint::register();
+		// Register the /wp-json/outpost/v1/syndicate-targets REST route (Phase F2).
+		Outpost_Syndicate_Targets_Endpoint::register();
 		// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
 		Outpost_Micropub_Bridges::register();
 		// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).
