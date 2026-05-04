@@ -19,6 +19,7 @@
  */
 
 import { useState } from 'preact/hooks';
+import { IosBookmarkletGuide } from './ios-bookmarklet-guide';
 
 interface VariantConfig {
 	variant: string;
@@ -162,7 +163,9 @@ export function BookmarkletList(): preact.JSX.Element {
 				))}
 			</div>
 
-			<h4>How to install on your device</h4>
+			<IosBookmarkletGuide />
+
+			<h4>Other devices</h4>
 			<dl class="outpost-spec-list">
 				<dt>Desktop browsers</dt>
 				<dd>
@@ -176,31 +179,6 @@ export function BookmarkletList(): preact.JSX.Element {
 					⋮ menu → <strong>Bookmarks</strong> → <strong>Add</strong>, then paste
 					the copied URL into the bookmark&apos;s URL field. Save. Tap the
 					bookmark from any page to run.
-				</dd>
-				<dt>iPhone Safari (workaround)</dt>
-				<dd>
-					iOS Safari won&apos;t let you bookmark a <code>javascript:</code> link
-					directly, so you bookmark a normal page first, then edit its URL:
-					<ol>
-						<li>Tap <strong>Copy source</strong> on the variant you want.</li>
-						<li>
-							Bookmark <em>this</em> page: tap Share →
-							<strong>Add Bookmark</strong> → Save.
-						</li>
-						<li>
-							Tap the bookmarks icon at the bottom of Safari, find the bookmark
-							you just saved, and long-press it → <strong>Edit</strong>.
-						</li>
-						<li>
-							Replace the URL with what you copied (paste from clipboard).
-							Replace the title with something memorable like
-							&ldquo;Outpost: Reply.&rdquo;
-						</li>
-						<li>Tap Done. The bookmark now runs the bookmarklet on any page.</li>
-					</ol>
-					Repeat for each variant you want. <strong>The Home Screen app +
-					Share sheet route is faster</strong> if you only need one or two of
-					these.
 				</dd>
 				<dt>Any device — clipboard fallback</dt>
 				<dd>

@@ -1268,3 +1268,102 @@
 	gap: 0.5rem;
 	margin-block-start: 0.75rem;
 }
+
+/*
+ * iPhone Safari guided bookmarklet install (BookmarkletList partner).
+ * Sits directly under the variant cards. Visually distinct via a thicker
+ * border-inline-start so phone users notice it before they fight the
+ * bookmark UI; structural only — paint inherits theme tokens.
+ */
+.outpost-ios-guide {
+	margin-block: 1rem 1.25rem;
+	padding: 1rem 1.125rem;
+	border: 1px solid var(--outpost-card-border, currentColor);
+	border-inline-start: 4px solid var(--outpost-button-primary-bg, currentColor);
+	border-radius: var(--outpost-card-radius, 0.5rem);
+	background: var(--outpost-card-bg, transparent);
+}
+
+.outpost-ios-guide__title {
+	margin: 0 0 0.375rem;
+	font-size: 1.05rem;
+	font-weight: 600;
+}
+
+.outpost-ios-guide__lede {
+	margin: 0 0 0.875rem;
+	font-size: 0.95rem;
+}
+
+.outpost-ios-guide__steps {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+}
+
+.outpost-ios-guide__step {
+	padding: 0.625rem 0.75rem;
+	border: 1px solid var(--outpost-card-border, currentColor);
+	border-radius: 0.375rem;
+}
+
+.outpost-ios-guide__step--done {
+	opacity: 0.65;
+}
+
+.outpost-ios-guide__step-label {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+	min-block-size: 32px;
+}
+
+.outpost-ios-guide__check {
+	flex-shrink: 0;
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+	cursor: pointer;
+}
+
+.outpost-ios-guide__step-num {
+	font-weight: 600;
+	font-size: 0.85rem;
+	flex-shrink: 0;
+}
+
+.outpost-ios-guide__step-title {
+	font-weight: 600;
+}
+
+.outpost-ios-guide__step--done .outpost-ios-guide__step-title {
+	text-decoration: line-through;
+}
+
+.outpost-ios-guide__step-body {
+	margin: 0.375rem 0 0;
+	padding-inline-start: 1.875rem;
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+.outpost-ios-guide__hint {
+	margin: 0.875rem 0 0;
+	font-size: 0.875rem;
+	font-style: italic;
+}
+
+.outpost-ios-guide__done {
+	margin: 0.875rem 0 0;
+	padding: 0.625rem 0.75rem;
+	border-radius: 0.375rem;
+	background: var(--outpost-card-bg, transparent);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.95rem;
+}
