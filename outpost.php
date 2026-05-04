@@ -59,6 +59,11 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-syndication-links-a
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-yoast-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-activitypub-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-accessibility-checker-adapter.php';
+// Phase F9 manual-share umbrella + supporting value objects.
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-invalid-config-exception.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-config.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-registry.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-manual-share-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 // Inbound source-adapter contract (Phase F5). Mirrors Companion_* with
 // the inbound direction; concrete sources land in F7+.
@@ -87,6 +92,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-geocode-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndicate-targets-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -122,6 +128,8 @@ add_action(
 		Outpost_Geocode_Endpoint::register();
 		// Register the /wp-json/outpost/v1/syndicate-targets REST route (Phase F2).
 		Outpost_Syndicate_Targets_Endpoint::register();
+		// Register the /wp-json/outpost/v1/manual-share-* REST routes (Phase F9).
+		Outpost_Manual_Share_Controller::register();
 		// Hook the Micropub bridges (Yoast focus keyphrase, post format, XFN) (Phase C5).
 		Outpost_Micropub_Bridges::register();
 		// Register the wp-admin Outpost menu + bookmarklet generator page (Phase E1).

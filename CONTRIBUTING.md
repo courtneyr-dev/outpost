@@ -132,6 +132,55 @@ If your test needs a name not on the cryptography allowlist (alice, bob, charlie
 
 `bin/lint/instance-allowlist.txt` lists the canonical hostnames that may be hardcoded — RFC 2606 reserved domains, Mastodon's flagship reference, the Bluesky bootstrap PDS, and Bridgy bridge endpoints. Adding a new hostname requires session-log justification (typically a spec / canonical reference being cited).
 
+## Manual-share platforms — registering your own
+
+Outpost's manual-share companion (Phase F9) registers chips for §5-impossible silos: Instagram, Facebook, X, LinkedIn, Threads, TikTok, Pinterest, Reddit, Flickr. Site owners can register additional platforms (VSCO, Glass.photo, 500px, regional networks, etc.) without forking Outpost via the `outpost_manual_share_platforms` filter.
+
+```php
+add_filter(
+    'outpost_manual_share_platforms',
+    function ( array $platforms ): array {
+        $platforms[] = array(
+            'id'             => 'glass-photo',
+            'label'          => __( 'Glass', 'my-plugin' ),
+            'icon'           => 'glass',
+            'accepts_modes'  => array( 'photo', 'gallery' ),
+            'accepts_media'  => array( 'image' ),
+            'caption_via'    => 'clipboard',
+            'ios_strategy'   => 'navigator_share_files',
+            'android_action' => 'android.intent.action.SEND',
+            'android_pkg'    => 'com.glass.photo',
+            'android_mime'   => 'image/*',
+            'android_extras' => array( 'EXTRA_STREAM' => '@image_uri' ),
+            'after_share'    => 'prompt_for_silo_url',
+            'caveats'        => array(
+                __( 'Caption is copied to clipboard; paste in app.', 'my-plugin' ),
+            ),
+        );
+        return $platforms;
+    }
+);
+```
+
+Required keys: `id` (kebab-case slug, unique), `label` (translated string), `icon` (icon ID), `accepts_modes` (non-empty array of composer modes the platform accepts), `caption_via` (`'intent'`, `'clipboard'`, or `'web_intent'`), `after_share` (`'mark_done'`, `'prompt_for_silo_url'`, or `'silent'`).
+
+Optional keys default to safe values: `accepts_media`, `ios_strategy`, `ios_url`, `android_action`, `android_pkg`, `android_mime`, `android_extras`, `web_intent_url`, `caveats`, `prefers_bridgy`.
+
+The placeholders `@image_uri`, `@caption`, `@caption_encoded`, `@source_url` resolve at intent-fire time (F10 Android, F11 iOS). Set `prefers_bridgy => true` to hide your platform's chip when Bridgy Publish is configured (F14).
+
+Malformed configs throw `Outpost_Manual_Share_Invalid_Config_Exception` at filter resolution time, not at chip-render time — the registration error names the missing or invalid key so misconfiguration is visible at boot.
+
+To remove a default platform, filter the array and drop the entry whose `id` matches:
+
+```php
+add_filter(
+    'outpost_manual_share_platforms',
+    fn ( array $platforms ): array => array_values(
+        array_filter( $platforms, fn ( array $p ) => 'tiktok' !== $p['id'] )
+    )
+);
+```
+
 ## Commit messages
 
 - Imperative mood ("Add Mastodon to Bridgy host map", not "Added").
