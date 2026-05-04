@@ -132,6 +132,11 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
+// FX iOS Shortcut bridge.
+require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token-authenticator.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-ios-shortcut-rest-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-ios-shortcut-settings-page.php';
 
 /**
  * Wire up Outpost's component registrations at `init` priority 0.
@@ -208,6 +213,10 @@ add_action(
 		Outpost_Admin_Page::register();
 		// Register Settings API options (Phase H).
 		Outpost_Settings::register();
+		// FX iOS Shortcut bridge — REST endpoint + auth filter + admin page.
+		Outpost_IOS_Shortcut_Token_Authenticator::register();
+		Outpost_IOS_Shortcut_REST_Controller::register();
+		Outpost_IOS_Shortcut_Settings_Page::register();
 	},
 	0
 );
