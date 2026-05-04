@@ -32,3 +32,13 @@ bsky.social
 # instances — bridges between protocols.
 brid.gy
 bsky.brid.gy
+
+# Canonical platform intent endpoints (F9 Companion_ManualShare). The
+# F9 Threads platform config hardcodes the documented web-intent
+# endpoint at https://www.threads.net/intent/post — that's a brand
+# endpoint, not a user-specific instance. Threads is the only F9
+# platform whose hostname matches B3's fediverse-shaped regex
+# (subdomain.threads.net); the other 9 platforms (twitter.com,
+# pinterest.com, reddit.com, etc.) bypass the regex entirely so don't
+# need allowlisting.
+www.threads.net

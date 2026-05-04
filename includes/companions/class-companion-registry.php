@@ -47,6 +47,7 @@ final class Outpost_Companion_Registry {
 		'Outpost_Yoast_Adapter',
 		'Outpost_ActivityPub_Adapter',
 		'Outpost_Accessibility_Checker_Adapter',
+		'Outpost_Manual_Share_Adapter',
 	);
 
 	/**
@@ -144,22 +145,60 @@ final class Outpost_Companion_Registry {
 	public static function chips_for_mode( ?string $mode = null ): array {
 		$chips = array();
 		foreach ( self::active() as $adapter ) {
-			$caps = $adapter->capabilities();
-			if ( ! is_array( $caps ) ) {
-				continue;
+			foreach ( self::collect_chips_from_adapter( $adapter ) as $chip ) {
+				if ( ! is_array( $chip ) ) {
+					continue;
+				}
+				if ( true !== ( $chip['detected'] ?? false ) ) {
+					continue;
+				}
+				if ( null === $mode || ! self::is_known_mode( $mode ) ) {
+					$chips[] = $chip;
+					continue;
+				}
+				$accepted = isset( $chip['accepts_modes'] ) && is_array( $chip['accepts_modes'] )
+					? $chip['accepts_modes']
+					: array();
+				if ( in_array( $mode, $accepted, true ) ) {
+					$chips[] = $chip;
+				}
 			}
-			if ( true !== ( $caps['detected'] ?? false ) ) {
-				continue;
-			}
-			if ( null === $mode || ! self::is_known_mode( $mode ) ) {
-				$chips[] = $caps;
-				continue;
-			}
-			$accepted = isset( $caps['accepts_modes'] ) && is_array( $caps['accepts_modes'] )
-				? $caps['accepts_modes']
-				: array();
-			if ( in_array( $mode, $accepted, true ) ) {
-				$chips[] = $caps;
+		}
+		return $chips;
+	}
+
+	/**
+	 * Collect every chip an adapter contributes — both the single
+	 * `capabilities()` chip (F2 contract) and the optional
+	 * `platform_chips()` array (F9 umbrella-companion contract).
+	 *
+	 * F1+F2 syndication-target adapters implement only `capabilities()`.
+	 * F9's `Outpost_Manual_Share_Adapter` implements `platform_chips()`
+	 * to surface multiple chips (one per platform: Instagram, Facebook,
+	 * X, etc.) under a single companion umbrella. Future umbrella
+	 * adapters (F14 Bridgy Publish for the multi-network bridge) follow
+	 * the same pattern.
+	 *
+	 * Adapters that implement neither contribute zero chips and are
+	 * filtered out at the per-mode step. Calling `platform_chips()` is
+	 * gated behind `method_exists()` so it stays optional — the abstract
+	 * base does not declare it.
+	 *
+	 * @param Outpost_Companion_Base $adapter Active adapter.
+	 * @return array<int, array<string,mixed>> Chip-shape arrays.
+	 */
+	private static function collect_chips_from_adapter( Outpost_Companion_Base $adapter ): array {
+		$chips = array();
+		$caps  = $adapter->capabilities();
+		if ( is_array( $caps ) ) {
+			$chips[] = $caps;
+		}
+		if ( method_exists( $adapter, 'platform_chips' ) ) {
+			$platform = $adapter->platform_chips();
+			if ( is_array( $platform ) ) {
+				foreach ( $platform as $chip ) {
+					$chips[] = $chip;
+				}
 			}
 		}
 		return $chips;

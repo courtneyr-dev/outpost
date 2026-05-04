@@ -50,9 +50,11 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Companion_Registry::reset_for_tests();
 	}
 
-	public function test_all_returns_seven_default_adapters(): void {
+	public function test_all_returns_eight_default_adapters(): void {
+		// F9 added the manual-share umbrella, taking the default adapter
+		// count from 7 (F1) to 8.
 		$adapters = Outpost_Companion_Registry::all();
-		$this->assertCount( 7, $adapters );
+		$this->assertCount( 8, $adapters );
 		foreach ( $adapters as $adapter ) {
 			$this->assertInstanceOf( Outpost_Companion_Base::class, $adapter );
 		}
@@ -314,9 +316,12 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		$chips = Outpost_Companion_Registry::chips_for_mode( null );
 		$ids   = array_column( $chips, 'id' );
 
-		// Only ActivityPub among the default 7 contributes a chip.
+		// ActivityPub contributes one capabilities() chip; F9 manual-
+		// share umbrella contributes 10 platform_chips() entries — total 11.
 		$this->assertContains( 'activitypub', $ids );
-		$this->assertCount( 1, $chips );
+		$this->assertContains( 'instagram-feed', $ids );
+		$this->assertContains( 'flickr-manual', $ids );
+		$this->assertCount( 11, $chips );
 	}
 
 	public function test_known_modes_returns_thirteen_default_modes(): void {
