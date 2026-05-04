@@ -60,6 +60,20 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-yoast-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-activitypub-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-accessibility-checker-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
+// Inbound source-adapter contract (Phase F5). Mirrors Companion_* with
+// the inbound direction; concrete sources land in F7+.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/exceptions/class-extractor-not-implemented-exception.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-oembed.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-og-tags.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-mf2.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-rss.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-api-json.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-api-xml.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-composite.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-unknown.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
