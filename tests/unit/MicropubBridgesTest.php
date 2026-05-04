@@ -15,6 +15,7 @@ namespace Outpost\Tests\Unit;
 
 use Outpost_Micropub_Bridges;
 use Outpost_Companion_Detector;
+use Outpost_Companion_Registry;
 use WP_Mock;
 use WP_Term;
 
@@ -392,5 +393,99 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			array( 42, array() )
 		);
 		$this->assertTrue( true );
+	}
+
+	// --- F1: ?q=syndicate-to chip merging -------------------------------------
+
+	public function test_merge_syndicate_chips_appends_activitypub_when_plugin_active(): void {
+		// Reset adapter cache so this test owns the registry state.
+		Outpost_Companion_Registry::reset_for_tests();
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+
+		$result = Outpost_Micropub_Bridges::merge_syndicate_chips( array() );
+
+		$uids = array_column( $result, 'uid' );
+		$this->assertContains( 'activitypub', $uids );
+		$activitypub_chip = null;
+		foreach ( $result as $chip ) {
+			if ( 'activitypub' === ( $chip['uid'] ?? null ) ) {
+				$activitypub_chip = $chip;
+				break;
+			}
+		}
+		$this->assertNotNull( $activitypub_chip );
+		$this->assertSame( 'Fediverse (via ActivityPub plugin)', $activitypub_chip['name'] );
+	}
+
+	public function test_merge_syndicate_chips_omits_activitypub_when_plugin_inactive(): void {
+		Outpost_Companion_Registry::reset_for_tests();
+		// Detector falls through to get_plugins() when is_plugin_active is
+		// false, so both must be mocked. Empty get_plugins => 'absent'
+		// status across the board.
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+
+		$result = Outpost_Micropub_Bridges::merge_syndicate_chips( array() );
+
+		$uids = array_column( $result, 'uid' );
+		$this->assertNotContains( 'activitypub', $uids );
+	}
+
+	public function test_merge_syndicate_chips_preserves_existing_targets(): void {
+		Outpost_Companion_Registry::reset_for_tests();
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+
+		// Existing chip from elsewhere (e.g. the Syndication Links plugin
+		// or a manually-configured target) must passthrough unchanged.
+		// Generic example.social handle — never a real instance.
+		$existing = array(
+			array(
+				'uid'  => 'manual-mastodon-example-social',
+				'name' => 'Mastodon (example.social)',
+			),
+		);
+		$result   = Outpost_Micropub_Bridges::merge_syndicate_chips( $existing );
+
+		$uids = array_column( $result, 'uid' );
+		$this->assertContains( 'manual-mastodon-example-social', $uids );
+		$this->assertCount( 1, $result );
+	}
+
+	public function test_merge_syndicate_chips_dedupes_by_uid(): void {
+		Outpost_Companion_Registry::reset_for_tests();
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+
+		// If something else already registered a chip with uid='activitypub'
+		// (a custom integration, a future companion overlap), the merger
+		// must NOT append a duplicate.
+		$existing = array(
+			array(
+				'uid'  => 'activitypub',
+				'name' => 'Pre-existing federation chip',
+			),
+		);
+		$result   = Outpost_Micropub_Bridges::merge_syndicate_chips( $existing );
+
+		$activitypub_chips = array_filter(
+			$result,
+			static fn( $chip ): bool => 'activitypub' === ( $chip['uid'] ?? null )
+		);
+		$this->assertCount( 1, $activitypub_chips );
+		// The pre-existing chip wins — the merger doesn't overwrite.
+		$first = array_values( $activitypub_chips )[0];
+		$this->assertSame( 'Pre-existing federation chip', $first['name'] );
+	}
+
+	public function test_merge_syndicate_chips_handles_non_array_input(): void {
+		Outpost_Companion_Registry::reset_for_tests();
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+
+		// The Shanske Micropub plugin always passes an array, but defensive
+		// callers might pass something else through their own filter chain.
+		$result = Outpost_Micropub_Bridges::merge_syndicate_chips( null );
+		$this->assertIsArray( $result );
+		$this->assertSame( array(), $result );
 	}
 }

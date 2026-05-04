@@ -81,14 +81,83 @@ final class Outpost_Micropub_Bridges {
 	/**
 	 * Hook the bridges into WordPress.
 	 *
-	 * The Micropub plugin fires `after_micropub` once the post is created,
-	 * passing `$input` (the original Micropub request) and `$args` (the
-	 * resolved wp_insert_post args including the new post ID). We hook at
-	 * priority 20 so any earlier filters in the same action have already
-	 * settled the post state.
+	 * Two pipelines:
+	 *
+	 * 1. WRITE: `after_micropub` fires once the Micropub plugin has created
+	 *    a post. We read the `mp-*` Outpost-specific properties out of the
+	 *    request body and persist them through the matching companion-plugin
+	 *    APIs. Priority 20 so any earlier filters have settled the post.
+	 *
+	 * 2. READ: `micropub_syndicate-to` fires whenever a Micropub client
+	 *    issues `?q=syndicate-to`. We append a chip per active companion
+	 *    that contributes one (ActivityPub in F1, Bridgy Publish in F14,
+	 *    ManualShare in F9). Priority 10 so the merged set still feeds any
+	 *    later filter callers.
 	 */
 	public static function register(): void {
 		add_action( 'after_micropub', array( self::class, 'apply_bridges' ), 20, 2 );
+		self::register_syndicate_chips();
+	}
+
+	/**
+	 * Hook the syndicate-to chip merger. Public so tests can assert the
+	 * registration is idempotent and unit-test the filter callback in
+	 * isolation without needing the full `register()` action wiring.
+	 *
+	 * Filter signature is `(array $targets, ?int $user_id) => array`. Each
+	 * `$target` is `[ 'uid' => string, 'name' => string ]` per the
+	 * Shanske Micropub plugin's contract.
+	 */
+	public static function register_syndicate_chips(): void {
+		add_filter(
+			'micropub_syndicate-to',
+			array( self::class, 'merge_syndicate_chips' ),
+			10,
+			1
+		);
+	}
+
+	/**
+	 * Append a `[ 'uid', 'name' ]` chip per active companion that surfaces
+	 * one. De-duplicates by `uid` so the same chip can't accidentally
+	 * register twice (e.g. when both `Outpost_Micropub_Bridges::register()`
+	 * and a direct `register_syndicate_chips()` test call run).
+	 *
+	 * Companion adapters declare their chip in the richer
+	 * `Outpost_Companion_Base::syndicate_chip()` shape (id / label /
+	 * accepts / detected); this merger projects that down to the
+	 * `[ uid, name ]` shape the Micropub plugin's filter consumes.
+	 *
+	 * @param mixed $targets Existing chip list. The Shanske plugin
+	 *                       guarantees `array<int, array{uid: string, name:
+	 *                       string}>` but defensively we re-array unknown
+	 *                       shapes.
+	 * @return array<int, array{uid: string, name: string}>
+	 */
+	public static function merge_syndicate_chips( $targets ): array {
+		$normalized = is_array( $targets ) ? array_values( array_filter( $targets, 'is_array' ) ) : array();
+		$seen_uids  = array();
+		foreach ( $normalized as $existing ) {
+			if ( isset( $existing['uid'] ) && is_string( $existing['uid'] ) ) {
+				$seen_uids[ $existing['uid'] ] = true;
+			}
+		}
+		foreach ( Outpost_Companion_Registry::active() as $adapter ) {
+			$chip = $adapter->syndicate_chip();
+			if ( ! is_array( $chip ) || empty( $chip['id'] ) || empty( $chip['label'] ) ) {
+				continue;
+			}
+			$uid = (string) $chip['id'];
+			if ( isset( $seen_uids[ $uid ] ) ) {
+				continue;
+			}
+			$normalized[]      = array(
+				'uid'  => $uid,
+				'name' => (string) $chip['label'],
+			);
+			$seen_uids[ $uid ] = true;
+		}
+		return $normalized;
 	}
 
 	/**

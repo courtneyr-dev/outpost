@@ -21,6 +21,7 @@ use Outpost_Companion_Base;
 use Outpost_Post_Kinds_Adapter;
 use Outpost_XFN_Adapter;
 use Outpost_Yoast_Adapter;
+use Outpost_ActivityPub_Adapter;
 use WP_Mock;
 
 final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
@@ -86,5 +87,41 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		$this->assertContains( 'xfn.relationships', $caps );
 		$this->assertContains( 'yoast.focus-keyphrase', $caps );
 		$this->assertContains( 'post-kinds.listen', $caps );
+	}
+
+	// --- F1: ActivityPub adapter syndicate-chip shape ---------------------
+
+	public function test_activitypub_adapter_shape(): void {
+		$adapter = new Outpost_ActivityPub_Adapter();
+		$this->assertSame( OUTPOST_ACTIVITYPUB_PLUGIN_FILE, $adapter->file() );
+		$this->assertSame( 'ActivityPub', $adapter->label() );
+		$this->assertSame( array( 'activitypub.federate' ), $adapter->capabilities() );
+	}
+
+	public function test_activitypub_syndicate_chip_when_plugin_active(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+		$adapter = new Outpost_ActivityPub_Adapter();
+		$chip    = $adapter->syndicate_chip();
+		$this->assertIsArray( $chip );
+		$this->assertSame( 'activitypub', $chip['id'] );
+		$this->assertSame( 'Fediverse (via ActivityPub plugin)', $chip['label'] );
+		$this->assertSame( array( 'note', 'photo', 'article' ), $chip['accepts'] );
+		$this->assertTrue( $chip['detected'] );
+	}
+
+	public function test_activitypub_syndicate_chip_returns_null_when_plugin_inactive(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+		$adapter = new Outpost_ActivityPub_Adapter();
+		$this->assertNull( $adapter->syndicate_chip() );
+	}
+
+	public function test_companion_base_default_syndicate_chip_is_null(): void {
+		// Adapters that don't override syndicate_chip() must return null,
+		// not an empty array — distinct nullity matters for the merger's
+		// short-circuit logic.
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+		$xfn = new Outpost_XFN_Adapter();
+		$this->assertNull( $xfn->syndicate_chip() );
 	}
 }
