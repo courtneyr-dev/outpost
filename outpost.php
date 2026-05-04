@@ -78,6 +78,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-share-target-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-shortcut-controller.php';
+// Phase F7 first concrete inbound source.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-spotify.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -128,6 +130,27 @@ add_action(
 		Outpost_Settings::register();
 	},
 	0
+);
+
+/**
+ * Register concrete inbound source adapters at the F5
+ * `outpost_sources_init` action. Concrete sources MUST register
+ * before `Outpost_Source_Registry::ensure_bootstrapped` appends
+ * `Outpost_Source_Unknown` as the trailing fallback — the registry
+ * fires this action from within `ensure_bootstrapped` precisely so
+ * concrete sources land first and exact-host matches win over the
+ * universal `*` fallback.
+ *
+ * F7 ships Source_Spotify. Future Phase F sessions add YouTube
+ * (F15), the og_tags-driven Source_Unknown end-to-end (F16), then
+ * the rest of the inbound shipping queue (concepts/capture-inbound-may-2026.md
+ * §7 / posse-outbound-may-2026.md §7's parallel inbound list).
+ */
+add_action(
+	'outpost_sources_init',
+	static function () {
+		Outpost_Source_Registry::register( new Outpost_Source_Spotify() );
+	}
 );
 
 /**
