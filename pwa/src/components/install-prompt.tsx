@@ -53,7 +53,7 @@ export function InstallPrompt() {
 		const handler = (event: Event): void => {
 			event.preventDefault();
 			setDeferred(event as BeforeInstallPromptEvent);
-			if (has_posted()) {
+			if (has_posted() && !was_install_dismissed()) {
 				setShouldRender(true);
 			}
 		};
@@ -61,8 +61,14 @@ export function InstallPrompt() {
 
 		// Periodic re-check: the user might post after this component
 		// mounts. Cheap polling — once a second is plenty for a UI
-		// trigger that's already mid-second-precision.
+		// trigger that's already mid-second-precision. Bails immediately
+		// once the user has dismissed so the dismissed banner stays gone.
 		const interval = window.setInterval(() => {
+			if (was_install_dismissed()) {
+				window.clearInterval(interval);
+				setShouldRender(false);
+				return;
+			}
 			if (has_posted() && (deferred || is_ios_safari())) {
 				setShouldRender(true);
 			}
