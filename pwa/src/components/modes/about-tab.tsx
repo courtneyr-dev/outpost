@@ -1,3 +1,5 @@
+import { BookmarkletList } from '../bookmarklet-list';
+
 /**
  * About tab — informational content about Outpost.
  *
@@ -347,6 +349,8 @@ export function AboutTab(): preact.JSX.Element {
 					itself runs server-side automatically on save.
 				</dd>
 			</dl>
+
+			<BookmarkletList />
 
 			<h3>Outpost itself</h3>
 			<dl class="outpost-spec-list">
