@@ -45,6 +45,54 @@ Run `composer test && npm test && npm run test:e2e` before opening a PR.
 
 Per [`CLAUDE.md`](CLAUDE.md), don't use *delve*, *leverage*, *synergy*, *robust*, *seamless*, *ecosystem* (non-tech), *stakeholder*, *bandwidth* (non-tech), *pivot*, *agentic AI*, *AI agents* in commits, comments, copy, or docs. Plain language only.
 
+## §5 audit lint (required CI check)
+
+Outpost is published on WordPress.org and serves any IndieWeb user — never just the author. The `bin/lint/section-5-audit.sh` script runs five checks in CI to enforce this:
+
+- **B1** — case-study handle leakage (specific tokens from research docs)
+- **B2** — embedded credential heuristics (API key shapes, AWS keys, GitHub PATs)
+- **B3** — hardcoded fediverse instance URLs outside the canonical allowlist
+- **B4** — untranslated strings in companion `capabilities()` output
+- **B5** — personal data in test fixtures (handles outside the cryptography stock-name allowlist)
+
+### Run locally
+
+```bash
+composer lint:section5
+# or directly:
+bash bin/lint/section-5-audit.sh
+# single check:
+bash bin/lint/section-5-audit.sh --check B3
+```
+
+Runs in under a second. Exits non-zero on any violation, with `file:line:violation` output.
+
+### Configuration files
+
+The lint reads its forbidden patterns and allowlists from sibling config files:
+
+| File | Purpose |
+|---|---|
+| `bin/lint/case-study-tokens.txt` | B1 forbidden tokens (one ERE regex per line) |
+| `bin/lint/credential-patterns.txt` | B2 credential regexes |
+| `bin/lint/instance-allowlist.txt` | B3 allowed canonical hostnames |
+| `bin/lint/fixture-handle-allowlist.txt` | B5 allowed test-fixture handle names |
+
+Adding a new entry to any list requires a session-log entry in `CLAUDE.md` documenting why.
+
+### Suppression markers
+
+- **B1 research-doc citations.** Lines that contain `concepts/posse-outbound-may-2026.md` or `concepts/capture-inbound-may-2026.md` are exempt — research-doc citations may name handles by reference.
+- **B2 fixture credentials.** Tag a line with `/* outpost-lint:fixture-credential */` to exempt it. Use only for test fixtures that intentionally embed fake-but-real-shaped values (AES-GCM key bytes for token-store tests, etc.).
+
+### Adding new fixture-handle names
+
+If your test needs a name not on the cryptography allowlist (alice, bob, charlie, dave, eve, mallory, trent, walter, peggy, victor), prefer one that is. If a domain-appropriate name is genuinely needed, add it to `bin/lint/fixture-handle-allowlist.txt` with a comment explaining why. PRs that add real-looking handles outside the allowlist fail the lint.
+
+### Adding allowed instance hostnames
+
+`bin/lint/instance-allowlist.txt` lists the canonical hostnames that may be hardcoded — RFC 2606 reserved domains, Mastodon's flagship reference, the Bluesky bootstrap PDS, and Bridgy bridge endpoints. Adding a new hostname requires session-log justification (typically a spec / canonical reference being cited).
+
 ## Commit messages
 
 - Imperative mood ("Add Mastodon to Bridgy host map", not "Added").

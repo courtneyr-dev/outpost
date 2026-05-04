@@ -1,0 +1,18 @@
+# Section 5 audit — allowed test-fixture handle names (B5).
+#
+# Test fixtures may use these generic names for users / accounts.
+# Anything else triggers a B5 lint failure on the assumption it leaks
+# a real handle.
+#
+# Sources: cryptography literature stock names (RFC 4949, NIST examples).
+
+alice
+bob
+charlie
+dave
+eve
+mallory
+trent
+walter
+peggy
+victor

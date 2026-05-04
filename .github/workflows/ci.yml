@@ -15,6 +15,19 @@ permissions:
   contents: read
 
 jobs:
+  lint-section5:
+    name: Section 5 Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run §5 audit lint
+        # Five checks: B1 case-study handle leakage, B2 embedded
+        # credential heuristics, B3 hardcoded silo instance URLs,
+        # B4 untranslated capabilities() strings, B5 personal data
+        # in test fixtures. Required check on main per F4.
+        run: bash bin/lint/section-5-audit.sh
+
   lint-php:
     name: PHPCS + PHPStan
     runs-on: ubuntu-latest
