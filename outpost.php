@@ -72,7 +72,16 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-syndic
 // Phase F13 audit-log surfacing helpers.
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-status-computer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-reminder-manager.php';
+// Phase F14 Bridgy Publish companion + supporting classes.
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-invalid-config-exception.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-silo-config.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-silo-registry.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-silo-detector.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-bridgy-settings.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-publish-log.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/bridgy-publish/class-webmention-response-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-manual-share-adapter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-bridgy-publish-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-registry.php';
 // Inbound source-adapter contract (Phase F5). Mirrors Companion_* with
 // the inbound direction; concrete sources land in F7+.

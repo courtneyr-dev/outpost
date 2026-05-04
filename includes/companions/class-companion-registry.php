@@ -48,6 +48,7 @@ final class Outpost_Companion_Registry {
 		'Outpost_ActivityPub_Adapter',
 		'Outpost_Accessibility_Checker_Adapter',
 		'Outpost_Manual_Share_Adapter',
+		'Outpost_Bridgy_Publish_Adapter',
 	);
 
 	/**

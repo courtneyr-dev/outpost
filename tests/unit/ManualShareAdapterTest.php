@@ -35,6 +35,11 @@ final class ManualShareAdapterTest extends \WP_Mock\Tools\TestCase {
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
+		// F14: Bridgy_Publish_Settings reads get_option to decide
+		// per-silo deferral. F9 tests don't care about Bridgy state;
+		// default to "no Bridgy configured" so reddit-manual + flickr-
+		// manual chips appear in their original (pre-F14) shape.
+		WP_Mock::userFunction( 'get_option' )->andReturn( array() );
 	}
 
 	public function tearDown(): void {

@@ -35,6 +35,11 @@ final class CompanionLoaderEdgeCasesTest extends \WP_Mock\Tools\TestCase {
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
+		// F14 wiring: chips_for_mode now iterates Bridgy_Publish_Adapter
+		// which reads Bridgy settings via get_option. Default to "no
+		// Bridgy configured" so these tests see only the F1+F2 chip
+		// surfaces they were written against.
+		WP_Mock::userFunction( 'get_option' )->andReturn( array() );
 	}
 
 	public function tearDown(): void {
