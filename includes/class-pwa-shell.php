@@ -648,16 +648,16 @@ async function cache_first(request) {
 			"base-uri 'self'",
 		);
 		foreach ( $required as $directive ) {
-			$prefix    = strtok( $directive, ' ' );
-			$has_safe  = false;
-			$rebuilt   = array();
+			$prefix   = strtok( $directive, ' ' );
+			$has_safe = false;
+			$rebuilt  = array();
 			foreach ( $csp as $existing ) {
 				if ( ! is_string( $existing ) ) {
 					continue;
 				}
 				if ( 0 === strpos( $existing, $prefix . ' ' ) || $existing === $prefix ) {
 					if ( $existing === $directive ) {
-						$has_safe = true;
+						$has_safe  = true;
 						$rebuilt[] = $existing;
 					}
 					// Drop weakened variants of the required directive;

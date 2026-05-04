@@ -162,8 +162,8 @@ final class Outpost_Geocode_Endpoint {
 		if ( $length < self::QUERY_MIN_LENGTH || $length > self::QUERY_MAX_LENGTH ) {
 			return new WP_Error(
 				'invalid_query',
-				/* translators: 1: minimum length, 2: maximum length */
 				sprintf(
+					/* translators: 1: minimum length, 2: maximum length */
 					__( 'Search query must be between %1$d and %2$d characters.', 'outpost' ),
 					self::QUERY_MIN_LENGTH,
 					self::QUERY_MAX_LENGTH
@@ -182,8 +182,8 @@ final class Outpost_Geocode_Endpoint {
 		if ( false !== $cached && is_array( $cached ) ) {
 			return rest_ensure_response(
 				array(
-					'results'    => $cached,
-					'cached'     => true,
+					'results'     => $cached,
+					'cached'      => true,
 					'attribution' => 'Data © OpenStreetMap contributors',
 				)
 			);
@@ -198,8 +198,8 @@ final class Outpost_Geocode_Endpoint {
 
 		return rest_ensure_response(
 			array(
-				'results'    => $results,
-				'cached'     => false,
+				'results'     => $results,
+				'cached'      => false,
 				'attribution' => 'Data © OpenStreetMap contributors',
 			)
 		);
@@ -246,9 +246,9 @@ final class Outpost_Geocode_Endpoint {
 		// `uniqid()` per call would defeat rate limiting entirely. The
 		// secondary counter is the safety net: even if a filter sidesteps
 		// the primary, the actual IP from the TCP layer still rate-limits.
-		$remote_ip          = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
-		$remote_key         = 'outpost_geocode_rl_remote_' . md5( $remote_ip );
-		$remote_count       = (int) get_transient( $remote_key );
+		$remote_ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
+		$remote_key   = 'outpost_geocode_rl_remote_' . md5( $remote_ip );
+		$remote_count = (int) get_transient( $remote_key );
 		// Secondary cap is the higher of the two limits times a small
 		// multiplier so it doesn't reject legitimate multi-user-on-NAT
 		// deployments unfairly, only filter-based abuse.

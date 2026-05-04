@@ -153,8 +153,9 @@ final class Outpost_Preview_Endpoint {
 		// HTTP_AUTHORIZATION before PHP sees it). The Micropub spec accepts
 		// access_token in the request body. Bodies don't appear in access
 		// logs, browser history, or CDN cache keys, unlike query strings.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$body_token = isset( $_POST['access_token'] ) ? $_POST['access_token'] : null;
+		// Bearer-token auth path; nonces don't apply here.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
+		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
 		if ( null === $body_token ) {
 			$raw = file_get_contents( 'php://input' );
 			if ( false !== $raw && '' !== $raw ) {
