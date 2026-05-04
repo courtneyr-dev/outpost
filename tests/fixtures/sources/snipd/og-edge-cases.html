@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset='utf-8'>
+<title>Edge cases for OG parser</title>
+
+<!-- Attribute order reversed: content before property -->
+<meta content="Reversed-Attribute Title" property="og:title">
+
+<!-- Single-quoted attribute values -->
+<meta property='og:description' content='A summary using &amp; entity for ampersand and &quot;quoted phrase&quot; inside.'>
+
+<!-- name= instead of property= (some sites do this incorrectly) -->
+<meta name="og:image" content="https://example.com/edge-case-image.jpg">
+
+<!-- HTML5 named entity in content -->
+<meta property="og:url" content="https://example.com/path?key=value&amp;other=more">
+
+<!-- Multiple og:image — first should win -->
+<meta property="og:image" content="https://example.com/SECOND-image.jpg">
+
+<!-- Self-closing slash variant (XHTML style) -->
+<meta property="og:site_name" content="Edge Case Suite" />
+
+<!-- Numeric character reference -->
+<meta property="og:type" content="article&#8212;long-form">
+
+<!-- Empty content should be filtered out -->
+<meta property="og:audio" content="">
+
+<!-- Whitespace inside attribute spec -->
+<meta   property = "og:locale"   content = "en_US"  >
+
+</head>
+<body><h1>Edge cases</h1></body>
+</html>

@@ -8,18 +8,17 @@
  * Repost / Bookmark with Bookmark default) when no specific
  * Source_* claims the URL.
  *
- * IMPORTANT — F5 limitation captured in CLAUDE.md F5 #6:
+ * F5 LIMITATION LIFTED (F16):
  *
- *   Source_Unknown declares `extractor => 'og_tags'`, but the
- *   og_tags parser is stubbed in F5 (Outpost_Source_Extractor_Og_Tags
- *   throws Outpost_Source_Extractor_Not_Implemented_Exception until
- *   F16 lands the body). End-to-end fallback works only after F16.
- *   F5's preview endpoint integration catches the exception and
- *   surfaces a clean 501 — the F5 Reply-mode regression that
- *   would result is mitigated by the endpoint preserving its
- *   legacy code path when no concrete (non-Unknown) source claims
- *   the URL. F6's dispatcher must tolerate the throw gracefully
- *   too.
+ *   F5 shipped Source_Unknown with extractor='og_tags' against a
+ *   stubbed Extractor_Og_Tags. F16 lands the concrete parser, so
+ *   Source_Unknown is now end-to-end functional — any URL with
+ *   OG tags gets best-effort metadata extraction (p-name from
+ *   og:title, p-summary from og:description, u-photo from
+ *   og:image). The F5 #6 mitigation (preview endpoint preserving
+ *   the legacy code path on Source_Unknown matches) can retire
+ *   when callers transition to the structured shape; until then
+ *   both paths coexist for backwards compatibility.
  *
  * @package Outpost
  */
