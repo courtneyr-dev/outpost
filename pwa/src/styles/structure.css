@@ -1027,6 +1027,58 @@
 	padding-inline-start: 1rem;
 }
 
+/*
+ * Bookmarklets grid in the About tab. Cards stack on narrow viewports and
+ * become a 2-up grid above ~36rem. Paint stays inherited via the existing
+ * outpost-card-* tokens; only structure here.
+ */
+.outpost-bookmarklets {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.75rem;
+	margin-block: 0.75rem 1rem;
+}
+
+@media (min-width: 36rem) {
+	.outpost-bookmarklets {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+.outpost-bookmarklet {
+	padding: 0.875rem 1rem;
+	border: 1px solid var(--outpost-card-border, currentColor);
+	border-radius: var(--outpost-card-radius, 0.5rem);
+	background: var(--outpost-card-bg, transparent);
+	color: var(--outpost-card-fg, inherit);
+}
+
+.outpost-bookmarklet__title {
+	margin: 0 0 0.25rem;
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+.outpost-bookmarklet__desc {
+	margin: 0 0 0.625rem;
+	font-size: 0.9375rem;
+}
+
+.outpost-bookmarklet__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.outpost-bookmarklet__link {
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	flex: 1 1 auto;
+	justify-content: center;
+}
+
 @media (min-width: 40rem) {
 	.outpost-spec-list dd {
 		padding-inline-start: 0;
