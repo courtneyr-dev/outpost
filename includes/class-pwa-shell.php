@@ -733,9 +733,13 @@ async function cache_first(request) {
 	 * The unit-test bootstrap defines `OUTPOST_TESTING_PWA_SHELL` so test runs
 	 * skip the `exit` and the assertions on captured output still work.
 	 *
+	 * Public so F6's share-target / Shortcut controllers can also halt
+	 * the request cleanly after issuing a 303 redirect — same testing
+	 * seam, same exit semantics.
+	 *
 	 * @codeCoverageIgnore
 	 */
-	private static function halt(): void {
+	public static function halt(): void {
 		if ( defined( 'OUTPOST_TESTING_PWA_SHELL' ) && OUTPOST_TESTING_PWA_SHELL ) {
 			return;
 		}
