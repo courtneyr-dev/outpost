@@ -35,7 +35,7 @@ final class RouteHandlerTest extends TestCase {
 	}
 
 	/** @test */
-	public function rules_table_contains_all_five_routes_in_upstream_first_order(): void {
+	public function rules_table_contains_all_six_routes_in_upstream_first_order(): void {
 		$rules = Outpost_Route_Handler::rules();
 
 		$this->assertSame(
@@ -44,6 +44,7 @@ final class RouteHandlerTest extends TestCase {
 				// SW intentionally has no `.js` extension — see Outpost_Route_Handler::rules() comment.
 				'^post/sw/?$'                  => 'sw',
 				'^post/share-target/?$'        => 'share-target',
+				'^post/shortcut/?$'            => 'shortcut',
 				'^post/auth/callback/?$'       => 'auth-callback',
 				'^post/?$'                     => 'composer',
 			),

@@ -72,6 +72,62 @@ function safe_session_remove(key: string): void {
 }
 
 /**
+ * Parse F6 dispatcher query params landed on the composer route
+ * (/post/?mode=...&picker=...&default=...&source=...&cached_for=...&url=...).
+ *
+ * Returns null when no F6-shaped params are present — caller should
+ * fall through to the legacy `parse_share_target` for the
+ * Web-Share-Target Level 1 GET shape.
+ *
+ * Mapping:
+ *   - `mode=note` (auto)            → tab: note (variant 'note')
+ *   - `mode=reply` (auto)           → tab: reply
+ *   - `picker=reply` + `default=X`  → tab: reply with X as initial variant
+ *
+ * The `cached_for` token is preserved in sessionStorage alongside
+ * the dispatch data so the composer can read the pre-fill transient
+ * once it mounts.
+ */
+export function parse_dispatch_params(search: string): ShareTargetData | null {
+	const params = new URLSearchParams(search);
+	const mode = (params.get('mode') ?? '').trim();
+	const picker = (params.get('picker') ?? '').trim();
+	const default_variant = (params.get('default') ?? '').trim();
+	const url = (params.get('url') ?? '').trim();
+	const text = (params.get('text') ?? '').trim();
+	const title = (params.get('title') ?? '').trim();
+
+	if (!mode && !picker) {
+		return null;
+	}
+
+	if (picker === 'reply' || mode === 'reply') {
+		const reply_variant: ReplyVariant | undefined =
+			REPLY_VARIANT_VALUES.includes(default_variant as ReplyVariant)
+				? (default_variant as ReplyVariant)
+				: undefined;
+		return {
+			tab: 'reply',
+			...(reply_variant ? { replyVariant: reply_variant } : {}),
+			...(text ? { content: text } : {}),
+			...(url ? { url } : {}),
+		};
+	}
+
+	if (mode === 'note') {
+		return {
+			tab: 'note',
+			variant: title && text ? 'article' : 'note',
+			...(title ? { title } : {}),
+			...(text ? { content: text } : {}),
+		};
+	}
+
+	// Unknown mode — fall through to legacy parsing.
+	return null;
+}
+
+/**
  * Parse query params from a share-target URL into a tagged
  * ShareTargetData blob.
  *

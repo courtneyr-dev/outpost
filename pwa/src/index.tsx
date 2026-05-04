@@ -21,7 +21,7 @@ import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
 import { ComposerTabs } from './components/composer-tabs';
 import { read_token, type StoredToken, type TokenStoreEnvironment } from './lib/token-store';
-import { parse_share_target, stash_share_target } from './lib/share-target';
+import { parse_share_target, parse_dispatch_params, stash_share_target } from './lib/share-target';
 
 type OutpostRoute = 'composer' | 'share-target' | 'auth-callback' | 'unknown';
 
@@ -50,6 +50,22 @@ interface AppProps {
 
 function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	const route = detect_route(window.location.pathname);
+
+	// F6: when the share-target dispatcher 303-redirects to the composer
+	// with dispatch params (?mode=, ?picker=, ?source=, ?cached_for=,
+	// ?url=, etc.), parse them into a ShareTargetData stash so the
+	// composer's existing mode-mount logic picks the right tab + variant
+	// + pre-fill. Falls through silently on direct /post/ navigation.
+	if (route === 'composer' && typeof window !== 'undefined') {
+		const dispatch_data = parse_dispatch_params(window.location.search);
+		if (dispatch_data) {
+			stash_share_target(dispatch_data);
+			// Strip query params from the URL bar so a refresh doesn't
+			// re-stash the same dispatch.
+			window.history.replaceState({}, '', composerUrl);
+		}
+	}
+
 	const [tokenState, setTokenState] = useState<
 		{ status: 'loading' } | { status: 'present'; token: StoredToken } | { status: 'absent' }
 	>({ status: 'loading' });
