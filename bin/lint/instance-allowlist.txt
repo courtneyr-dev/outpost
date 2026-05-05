@@ -26,6 +26,23 @@ bsky.example
 pdsexample.com
 mastodon.social
 bsky.social
+# F17 — Bluesky's canonical post URLs use bsky.app, the official web
+# client / protocol entry. Outpost_Source_Bluesky claims this host
+# pattern. Not a user-specific instance — Bluesky's flagship surface.
+bsky.app
+# F17 — Mastodon source-adapter allowlist defaults reference these
+# hostnames in its filter callbacks. Each is a flagship / well-known
+# instance referenced in the Mastodon community as canonical, not
+# a user-specific instance. Site owners override via the
+# outpost_mastodon_allowed_hosts filter for their own preferences.
+mas.to
+hachyderm.io
+fosstodon.org
+indieweb.social
+tech.lgbt
+infosec.exchange
+home.social
+me.dm
 
 # Bridgy / Bridgy Fed bridge endpoints (Ryan Barrett). Used by Outpost
 # as Web Share Target / publish proxy URLs. Not user-specific

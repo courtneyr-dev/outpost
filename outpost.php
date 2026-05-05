@@ -114,6 +114,16 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-readwise.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-amazon.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-pinterest.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-tiktok.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-vimeo.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-soundcloud.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-applemusic.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-applepodcasts.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-bandcamp.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-substack.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-medium.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-reddit.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-mastodon.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-bluesky.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -259,6 +269,17 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_Amazon() );
 		Outpost_Source_Registry::register( new Outpost_Source_Pinterest() );
 		Outpost_Source_Registry::register( new Outpost_Source_TikTok() );
+		// F17 Tier 1 (oEmbed) + Tier 2 (og_tags) bulk-coverage adapters.
+		Outpost_Source_Registry::register( new Outpost_Source_Vimeo() );
+		Outpost_Source_Registry::register( new Outpost_Source_SoundCloud() );
+		Outpost_Source_Registry::register( new Outpost_Source_AppleMusic() );
+		Outpost_Source_Registry::register( new Outpost_Source_ApplePodcasts() );
+		Outpost_Source_Registry::register( new Outpost_Source_Bandcamp() );
+		Outpost_Source_Registry::register( new Outpost_Source_Substack() );
+		Outpost_Source_Registry::register( new Outpost_Source_Medium() );
+		Outpost_Source_Registry::register( new Outpost_Source_Reddit() );
+		Outpost_Source_Registry::register( new Outpost_Source_Mastodon() );
+		Outpost_Source_Registry::register( new Outpost_Source_Bluesky() );
 	}
 );
 
