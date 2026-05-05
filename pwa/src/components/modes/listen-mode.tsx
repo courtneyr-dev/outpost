@@ -20,6 +20,7 @@ import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import type { DoingVariant } from '../../lib/share-target';
+import { fetch_source_preview, PreviewError } from '../../lib/preview';
 import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
 import {
@@ -273,15 +274,50 @@ function consume_share_target_for_doing(): {
 	variant?: DoingVariant;
 	url?: string;
 	content?: string;
+	sourceId?: string;
 } {
 	const data = peek_share_target();
 	if (!data || data.tab !== 'listen') return {};
 	consume_share_target();
-	const out: { variant?: DoingVariant; url?: string; content?: string } = {};
+	const out: { variant?: DoingVariant; url?: string; content?: string; sourceId?: string } = {};
 	if (data.doingVariant) out.variant = data.doingVariant;
 	if (data.url) out.url = data.url;
 	if (data.content) out.content = data.content;
+	if (data.sourceId) out.sourceId = data.sourceId;
 	return out;
+}
+
+/**
+ * Map Doing-tab variant → WordPress post format. Used by
+ * `mp-post-format` so the Post Formats for Block Themes companion (or
+ * vanilla WP post_format taxonomy) classifies the post correctly:
+ *
+ *   - listen / jam       → audio (track, album, podcast episode)
+ *   - watch              → video
+ *   - read               → standard (reading list — no native WP format fits)
+ *   - play / game        → standard
+ *   - checkin            → status (location-based snap)
+ *   - eat / drink        → standard
+ *
+ * Other variants without an obvious format mapping return null; the
+ * composer omits `mp-post-format` in that case so the bridge falls
+ * back to the user's More-panel selection or the site's default
+ * format.
+ */
+function post_format_for_variant(variant: Variant): string | null {
+	switch (variant) {
+		case 'listen':
+		case 'jam':
+			return 'audio';
+		case 'watch':
+			return 'video';
+		case 'checkin':
+			return 'status';
+		case 'exercise':
+			return 'status';
+		default:
+			return null;
+	}
 }
 
 export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
@@ -289,6 +325,15 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 
 	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'listen');
 	const [target_url, setTargetUrl] = useState(initial_share.url ?? '');
+	// Source-id from share-target dispatch — drives the auto-preview
+	// fetch on mount and gets passed through to the submission so
+	// downstream filters (e.g., post-format inference) can see it.
+	const [source_id] = useState(initial_share.sourceId ?? '');
+	// Cover URL + publication populated by the auto-preview fetch.
+	// User-invisible state — they round-trip into the h-entry submission
+	// as `u-photo` and `p-publication` respectively.
+	const [cover_url, setCoverUrl] = useState('');
+	const [publication, setPublication] = useState('');
 	// Unified per-variant primary input. The `personLabel` config decides
 	// what the user sees ("Artist" / "Director" / "Author" / "Place name" /
 	// "What did you eat?"). The submit handler below routes the value to
@@ -325,6 +370,49 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		setGeoResults([]);
 		setGeoError(null);
 	}, [variant]);
+
+	// Auto-fetch source preview when ListenMode mounts via a share-target
+	// dispatch with sourceId set (Spotify/YouTube/etc.). Best-effort:
+	// errors are logged but don't surface to the user — pre-fill is a
+	// nice-to-have and the user can always type fields manually. Only
+	// fires on first mount; subsequent variant switches don't re-fetch.
+	useEffect(() => {
+		if (!source_id || !target_url) return;
+		let cancelled = false;
+		(async (): Promise<void> => {
+			try {
+				const result = await fetch_source_preview({
+					url: target_url,
+					accessToken: token.accessToken,
+					sourceId: source_id,
+				});
+				if (cancelled) return;
+				const e = result.extracted;
+				const name = e['p-name'] ?? e.name ?? '';
+				const author = e['p-author'] ?? e.author ?? '';
+				const photo = e['u-photo'] ?? e.photo ?? '';
+				const pub = e['p-publication'] ?? e.publication ?? '';
+				if (name && !watch_title) setWatchTitle(name);
+				if (author && !person_name) setPersonName(author);
+				if (photo) setCoverUrl(photo);
+				if (pub) setPublication(pub);
+			} catch (err) {
+				if (cancelled) return;
+				if (typeof console !== 'undefined') {
+					const code = err instanceof PreviewError ? err.code : 'unknown';
+					console.warn('Outpost: source preview pre-fill failed (' + code + ')');
+				}
+			}
+		})();
+		return (): void => {
+			cancelled = true;
+		};
+		// Mount-only effect; intentional empty-ish deps to avoid re-firing
+		// on user input. The `source_id` and `target_url` are captured at
+		// mount via consume_share_target_for_doing() and don't change in
+		// this component's lifetime.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const handle_geocode_search = async (event?: Event): Promise<void> => {
 		event?.preventDefault();
@@ -477,6 +565,22 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			}
 			if (config.hasRating && trimmed_rating !== '') {
 				base.rating = trimmed_rating;
+			}
+			// Auto-attached metadata from the source-preview fetch (Spotify
+			// album art, YouTube thumbnail, etc.). User-invisible state in
+			// the form, but rides on the h-entry submission.
+			if (cover_url) {
+				base.photo = cover_url;
+			}
+			if (publication) {
+				base['p-publication'] = publication;
+			}
+			// Variant → WP post format. listen/jam → audio, watch → video,
+			// checkin → status. Other variants leave mp-post-format unset
+			// so the user's More-panel selection (or site default) wins.
+			const auto_format = post_format_for_variant(variant);
+			if (auto_format) {
+				base['mp-post-format'] = auto_format;
 			}
 			// Picker-driven location for non-hasGeocode variants. hasGeocode
 			// variants already wrote `location` (or eat-of/drink-of) above

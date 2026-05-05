@@ -102,6 +102,12 @@ export interface HEntryProperties {
 	 * photo), Post Kinds also reads the target URL's mf2.
 	 */
 	author?: string;
+	/**
+	 * Publication name (mf2 p-publication). Set by source-preview pre-fill
+	 * for Phase F adapters: "Spotify" / "YouTube" / "Goodreads" / etc. Post
+	 * Kinds renders this as the citation source in Listen/Watch/Read templates.
+	 */
+	'p-publication'?: string;
 	/** 1–5 rating for Read / Watch / Listen / Play. Some IndieWeb sites use
 	 *  1–10; Outpost defaults to 1–5 because it matches more downstream
 	 *  rendering plugins out of the box. */
