@@ -103,6 +103,22 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'https://example.com/page', $out );
 	}
 
+	public function test_extract_url_finds_url_inside_url_field_when_field_is_text_blob(): void {
+		// Regression: iOS Kindle/Books/etc. clients bundle quote+title+URL
+		// into the share-sheet text payload. iOS Shortcut authors typically
+		// route Shortcut Input into the `url` field, so a text-blob lands
+		// in `url` instead of `text`. The extractor must regex-extract the
+		// embedded URL from `url` content even when the field isn't a
+		// clean URL on its own.
+		$blob = '"Are we sometimes afraid to let the divine be unsettling?"' . "\n\n"
+			. '— Nerd Faith: 60 Second Sprints of Spiritual Guidance for the Occasionally Uncool by Rachel Kessler' . "\n"
+			. 'https://example.com/075swyn0';
+		$out = Outpost_Source_Detector::extract_url_from_payload(
+			array( 'url' => $blob )
+		);
+		$this->assertSame( 'https://example.com/075swyn0', $out );
+	}
+
 	public function test_extract_url_rejects_javascript_scheme(): void {
 		$out = Outpost_Source_Detector::extract_url_from_payload(
 			array( 'url' => 'javascript:alert(1)' )

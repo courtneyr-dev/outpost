@@ -106,6 +106,19 @@ final class Outpost_Source_Detector {
 		if ( '' !== $url && self::is_http_url( $url ) ) {
 			return $url;
 		}
+		// Some iOS apps (Kindle, Books, podcast clients) bundle the
+		// shared content as a quote + title + URL all in the share-sheet
+		// text payload. iOS Shortcut authors typically wire a single
+		// "Shortcut Input" magic variable into one field — usually the
+		// `url` field — so the entire text blob lands here. Fall through
+		// to URL extraction from the `url` field's content when the
+		// field isn't a clean URL on its own.
+		if ( '' !== $url ) {
+			$found = self::find_url_in_text( $url );
+			if ( null !== $found ) {
+				return $found;
+			}
+		}
 		if ( '' !== $text && self::is_http_url( $text ) ) {
 			return $text;
 		}
