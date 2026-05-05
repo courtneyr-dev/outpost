@@ -142,6 +142,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-contrast.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-theme-json-reader.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-mode-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-appearance-rest-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-appearance-settings-page.php';
 
 /**
  * Wire up Outpost's component registrations at `init` priority 0.
@@ -222,6 +224,9 @@ add_action(
 		Outpost_IOS_Shortcut_Token_Authenticator::register();
 		Outpost_IOS_Shortcut_REST_Controller::register();
 		Outpost_IOS_Shortcut_Settings_Page::register();
+		// FY Theming — REST endpoint + appearance settings sub-menu.
+		Outpost_Appearance_REST_Controller::register();
+		Outpost_Appearance_Settings_Page::register();
 	},
 	0
 );
