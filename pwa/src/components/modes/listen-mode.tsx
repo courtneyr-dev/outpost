@@ -18,6 +18,8 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
+import type { DoingVariant } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
 import {
@@ -255,9 +257,38 @@ type Status =
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
+/**
+ * Drain the share-target stash only when this Doing tab is the
+ * intended target. Mirrors the F6 / Phase E0 pattern used by Note
+ * and Reply modes so the stash isn't drained by an unrelated tab.
+ *
+ * F7 Spotify → variant='listen', F15 YouTube → variant='watch',
+ * F16 Goodreads / Readwise → variant='read', etc. The url+content
+ * are pre-populated from the share payload so the user lands on the
+ * right Doing variant with the URL already in u-listen-of /
+ * u-watch-of / u-read-of (per-variant routing inside ListenMode's
+ * submit handler).
+ */
+function consume_share_target_for_doing(): {
+	variant?: DoingVariant;
+	url?: string;
+	content?: string;
+} {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'listen') return {};
+	consume_share_target();
+	const out: { variant?: DoingVariant; url?: string; content?: string } = {};
+	if (data.doingVariant) out.variant = data.doingVariant;
+	if (data.url) out.url = data.url;
+	if (data.content) out.content = data.content;
+	return out;
+}
+
 export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
-	const [variant, setVariant] = useState<Variant>('listen');
-	const [target_url, setTargetUrl] = useState('');
+	const initial_share = consume_share_target_for_doing();
+
+	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'listen');
+	const [target_url, setTargetUrl] = useState(initial_share.url ?? '');
 	// Unified per-variant primary input. The `personLabel` config decides
 	// what the user sees ("Artist" / "Director" / "Author" / "Place name" /
 	// "What did you eat?"). The submit handler below routes the value to
@@ -266,7 +297,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [watch_title, setWatchTitle] = useState('');
 	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>('');
 	const [rating, setRating] = useState('');
-	const [content, setContent] = useState('');
+	const [content, setContent] = useState(initial_share.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
