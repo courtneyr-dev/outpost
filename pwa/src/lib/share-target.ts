@@ -25,15 +25,33 @@
 
 export type ReplyVariant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
 
+/** Doing-tab variants (the "listen" tab id renders ListenMode which carries 9 variants). */
+export type DoingVariant =
+	| 'listen'
+	| 'watch'
+	| 'read'
+	| 'play'
+	| 'game'
+	| 'jam'
+	| 'checkin'
+	| 'eat'
+	| 'drink';
+
 export interface ShareTargetData {
-	tab: 'note' | 'reply';
+	tab: 'note' | 'reply' | 'photo' | 'listen';
 	/** Note tab variant — one of the 5 Post-tab variants. */
 	variant?: 'note' | 'article' | 'status' | 'aside' | 'quote';
 	/** Reply tab variant — one of the 6 Reply-tab variants. Set by E1 bookmarklets. */
 	replyVariant?: ReplyVariant;
+	/** Doing tab variant — set when the share-target dispatcher routes to Listen/Watch/Read/Play/etc. */
+	doingVariant?: DoingVariant;
 	title?: string;
 	content?: string;
 	url?: string;
+	/** Source adapter id (e.g. 'spotify', 'youtube') — informational, may drive future routing decisions. */
+	sourceId?: string;
+	/** Cached preview transient token from F6 dispatcher; lets the mode component fetch parsed metadata via /preview. */
+	cachedFor?: string;
 }
 
 const REPLY_VARIANT_VALUES: ReplyVariant[] = [
@@ -43,6 +61,18 @@ const REPLY_VARIANT_VALUES: ReplyVariant[] = [
 	'bookmark',
 	'rsvp',
 	'follow',
+];
+
+const DOING_VARIANT_VALUES: DoingVariant[] = [
+	'listen',
+	'watch',
+	'read',
+	'play',
+	'game',
+	'jam',
+	'checkin',
+	'eat',
+	'drink',
 ];
 
 const KEY = 'outpost.share_target';
@@ -96,41 +126,76 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const url = (params.get('url') ?? '').trim();
 	const text = (params.get('text') ?? '').trim();
 	const title = (params.get('title') ?? '').trim();
+	const source_id = (params.get('source') ?? '').trim();
+	const cached_for = (params.get('cached_for') ?? '').trim();
 
 	if (!mode && !picker) {
 		return null;
 	}
 
-	if (picker === 'reply' || mode === 'reply') {
+	// Reply tab: explicit reply mode + sub-modes (like, repost, bookmark, rsvp, follow).
+	if (
+		picker === 'reply' ||
+		mode === 'reply' ||
+		(REPLY_VARIANT_VALUES as string[]).includes(mode)
+	) {
 		const reply_variant: ReplyVariant | undefined =
 			REPLY_VARIANT_VALUES.includes(default_variant as ReplyVariant)
 				? (default_variant as ReplyVariant)
-				: undefined;
+				: REPLY_VARIANT_VALUES.includes(mode as ReplyVariant)
+					? (mode as ReplyVariant)
+					: undefined;
 		return {
 			tab: 'reply',
 			...(reply_variant ? { replyVariant: reply_variant } : {}),
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
-	if (mode === 'note') {
+	// Note tab: note + article variants.
+	if (mode === 'note' || mode === 'article') {
 		return {
 			tab: 'note',
-			variant: title && text ? 'article' : 'note',
+			variant: mode === 'article' || (title && text) ? 'article' : 'note',
 			...(title ? { title } : {}),
 			...(text ? { content: text } : {}),
+			...(url ? { url } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
-	// Phase F modes (listen / watch / read / play / bookmark / photo / etc.)
-	// don't have first-class tab+variant routing in parse_dispatch_params
-	// yet — the proper fix is per-mode plumbing into ComposerTabs +
-	// cached_for transient fetch via /preview. Until that lands, fall
-	// through to the legacy share-target parser when there's a URL/text/
-	// title to share. The legacy parser routes URL-bearing payloads into
-	// the Reply tab with the URL pre-filled — semantically wrong for
-	// listen/watch/read but better than dropping the URL entirely.
+	// Photo tab: photo + gallery (gallery routes through the same component).
+	if (mode === 'photo' || mode === 'gallery') {
+		return {
+			tab: 'photo',
+			...(text ? { content: text } : {}),
+			...(url ? { url } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
+		};
+	}
+
+	// Doing tab (rendered by ListenMode) covers 9 variants:
+	// listen / watch / read / play / game / jam / checkin / eat / drink.
+	// F7 (Spotify) emits mode=listen, F15 (YouTube) emits mode=watch,
+	// F16 (Goodreads / Readwise) emits mode=read, etc.
+	if (DOING_VARIANT_VALUES.includes(mode as DoingVariant)) {
+		return {
+			tab: 'listen',
+			doingVariant: mode as DoingVariant,
+			...(text ? { content: text } : {}),
+			...(url ? { url } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
+		};
+	}
+
+	// Unknown mode — fall through to legacy parser. Better to land in
+	// Reply tab with URL pre-filled than drop it entirely.
 	if (mode || picker) {
 		const fallback = parse_share_target(search);
 		if (fallback) {
