@@ -86,13 +86,31 @@ Per [`CLAUDE.md`](CLAUDE.md), don't use *delve*, *leverage*, *synergy*, *robust*
 
 ## §5 audit lint (required CI check)
 
-Outpost is published on WordPress.org and serves any IndieWeb user — never just the author. The `bin/lint/section-5-audit.sh` script runs five checks in CI to enforce this:
+Outpost is published on WordPress.org and serves any IndieWeb user — never just the author. The `bin/lint/section-5-audit.sh` script runs six checks in CI to enforce this:
 
 - **B1** — case-study handle leakage (specific tokens from research docs)
 - **B2** — embedded credential heuristics (API key shapes, AWS keys, GitHub PATs)
 - **B3** — hardcoded fediverse instance URLs outside the canonical allowlist
 - **B4** — untranslated strings in companion `capabilities()` output
 - **B5** — personal data in test fixtures (handles outside the cryptography stock-name allowlist)
+- **B6** — hex literals in component CSS (Hard Contract: tokens.css is the single source of truth)
+
+#### Why B6 matters
+
+The Hard Contract in `CLAUDE.md` says *plugin owns layout, theme owns paint*. Token files (`pwa/src/styles/tokens.css`, `styles/outpost-tokens.css`) are the single source of truth for paint values. When component CSS uses `var(--outpost-foo, #abc123)`, the fallback hex is still hex code in a non-token block — and it shadows theme overrides whenever the token isn't set (service-worker cache misses, stale builds, or a theme that legitimately wants the token undefined). B6 catches both forms:
+
+```css
+/* ❌ direct hex in component CSS */
+.outpost-button { color: #241c4a; }
+
+/* ❌ fallback hex inside var() — still hex, still shadows theme */
+.outpost-button { color: var(--outpost-button-fg, #241c4a); }
+
+/* ✅ token reference, no fallback — tokens.css is authoritative */
+.outpost-button { color: var(--outpost-button-fg); }
+```
+
+If a token is missing from `tokens.css`, the fix is to add it there — not to inline a fallback hex in the component. B6 only scans `pwa/src/styles/structure.css`; the token files are exempt by design because they ARE the source of truth.
 
 ### Run locally
 
@@ -180,6 +198,32 @@ add_filter(
     )
 );
 ```
+
+## Field Notes treatments — opting out
+
+The composer's Field Notes / Indie Zine treatment layer (washi-tape tabs, hand-drawn radios, underline-only inputs, rubber-stamp buttons, halftone surface, display-serif headings, clipart-stamp voice mic) activates only under one of three mode classes on the root: `.outpost-mode-day`, `.outpost-mode-night`, `.outpost-mode-system`. The mode class is set by `Outpost_Mode_Controller` based on per-user preference; it never appears outside the composer subtree.
+
+If you embed your own block, widget, or callout inside the composer surface and want it to render without Field Notes character — or if your block already has its own visual identity that the treatments would clash with — add a `--plain` modifier class to opt out per-instance. The opt-out is **public API**: site owners and theme authors can rely on it across versions.
+
+| Element | Add this class to opt out |
+|---|---|
+| Tab / sub-tab | `outpost-tab--plain` |
+| Heading (h1, h2) | `outpost-heading--plain` |
+| Text input | `outpost-input--plain` |
+| Textarea | `outpost-textarea--plain` |
+| Radio button | `outpost-radio--plain` |
+| Primary button | `outpost-button--plain` |
+| Voice mic icon | `outpost-voice-button--plain` |
+
+```html
+<!-- Example: a third-party block's heading inside the composer keeps its own typography -->
+<h2 class="my-block-title outpost-heading--plain">Custom block heading</h2>
+
+<!-- Example: an error-state callout's button stays a regular button, not a stamp -->
+<button class="outpost-button outpost-button--plain my-error-retry">Retry</button>
+```
+
+The `--plain` mechanism is class-based (CSS `:not(.outpost-foo--plain)`) — adding the class on a single element opts only that element out without disabling mode-scoped tokens or affecting siblings. Mode-scoped paint tokens (background, text color, border) still flow through, so your component still inherits the active mode's surface palette — only the Field Notes character (rotation, decorative SVGs, swoosh underlines, uppercase letter-spacing) is suppressed.
 
 ## Commit messages
 

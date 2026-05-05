@@ -185,3 +185,126 @@
 	--outpost-chip-active-fg: var(--outpost-chip-fg-pressed);
 	--outpost-scrim: rgba(0, 0, 0, 0.5);
 }
+
+/* ----------------------------------------------------------------------
+ * FY-Theming day/night/system mode scopes
+ *
+ * Field Notes / Indie Zine aesthetic. Warm-paper neutrals replace the
+ * cool brand palette inside the composer subtree when a mode class is
+ * present on the root. Class is set by `Outpost_Mode_Controller`
+ * (per-user meta, defaults to 'system'). Tokens redeclare here; the
+ * cascade picks the active mode's value at paint time.
+ *
+ * Token defaults are CC0 warm-paper neutrals — not attributable to any
+ * specific user's site. Per-user overrides via the appearance settings
+ * page layer on top through `Outpost_Token_Resolver::to_css()` which
+ * emits an additional, higher-specificity `.outpost-mode-{mode}` block
+ * scoped to the resolver's per-user payload.
+ *
+ * `color-scheme` cues UA-rendered scrollbars, form controls, and the
+ * computed `prefers-color-scheme` value to match the active mode so
+ * native widgets render correctly inside the composer subtree.
+ * ---------------------------------------------------------------------- */
+.outpost-mode-day,
+.outpost-mode-system {
+	color-scheme: light;
+	--outpost-surface-bg: #fbfaf5;
+	--outpost-surface-fg: #241c4a;
+	--outpost-input-bg: #ffffff;
+	--outpost-input-fg: #241c4a;
+	--outpost-input-border: #2a2622;
+	--outpost-input-border-focus: #fb8500;
+	--outpost-input-placeholder: #6b6358;
+	--outpost-button-primary-bg: #241c4a;
+	--outpost-button-primary-fg: #ffffff;
+	--outpost-button-primary-border: #241c4a;
+	--outpost-button-secondary-bg: transparent;
+	--outpost-button-secondary-fg: #241c4a;
+	--outpost-button-secondary-border: #2a2622;
+	--outpost-button-ghost-fg: #241c4a;
+	--outpost-tab-fg: #6b6358;
+	--outpost-tab-fg-active: #241c4a;
+	--outpost-tab-indicator: #fb8500;
+	--outpost-chip-fg: #241c4a;
+	--outpost-chip-border: #2a2622;
+	--outpost-chip-bg-pressed: #fb8500;
+	--outpost-chip-fg-pressed: #ffffff;
+	--outpost-card-bg: #ffffff;
+	--outpost-card-fg: #241c4a;
+	--outpost-card-border: #2a2622;
+	--outpost-focus-ring-color: #fb8500;
+	--outpost-text-muted: #6b6358;
+	--outpost-border: #2a2622;
+	--outpost-tape: rgba(251, 133, 0, 0.85);
+	--outpost-halftone: rgba(36, 28, 74, 0.04);
+	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
+}
+
+.outpost-mode-night {
+	color-scheme: dark;
+	--outpost-surface-bg: #251f1c;
+	--outpost-surface-fg: #fbfaf5;
+	--outpost-input-bg: #1a1614;
+	--outpost-input-fg: #fbfaf5;
+	--outpost-input-border: #3a322c;
+	--outpost-input-border-focus: #fb8500;
+	--outpost-input-placeholder: #a9a097;
+	--outpost-button-primary-bg: #fb8500;
+	--outpost-button-primary-fg: #251f1c;
+	--outpost-button-primary-border: #fb8500;
+	--outpost-button-secondary-bg: transparent;
+	--outpost-button-secondary-fg: #fbfaf5;
+	--outpost-button-secondary-border: #3a322c;
+	--outpost-button-ghost-fg: #fbfaf5;
+	--outpost-tab-fg: #a9a097;
+	--outpost-tab-fg-active: #fbfaf5;
+	--outpost-tab-indicator: #fb8500;
+	--outpost-chip-fg: #fbfaf5;
+	--outpost-chip-border: #3a322c;
+	--outpost-chip-bg-pressed: #fb8500;
+	--outpost-chip-fg-pressed: #251f1c;
+	--outpost-card-bg: #1a1614;
+	--outpost-card-fg: #fbfaf5;
+	--outpost-card-border: #3a322c;
+	--outpost-focus-ring-color: #fb8500;
+	--outpost-text-muted: #a9a097;
+	--outpost-border: #3a322c;
+	--outpost-tape: rgba(251, 133, 0, 0.75);
+	--outpost-halftone: rgba(255, 255, 255, 0.03);
+	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
+}
+
+@media (prefers-color-scheme: dark) {
+	.outpost-mode-system {
+		color-scheme: dark;
+		--outpost-surface-bg: #251f1c;
+		--outpost-surface-fg: #fbfaf5;
+		--outpost-input-bg: #1a1614;
+		--outpost-input-fg: #fbfaf5;
+		--outpost-input-border: #3a322c;
+		--outpost-input-border-focus: #fb8500;
+		--outpost-input-placeholder: #a9a097;
+		--outpost-button-primary-bg: #fb8500;
+		--outpost-button-primary-fg: #251f1c;
+		--outpost-button-primary-border: #fb8500;
+		--outpost-button-secondary-bg: transparent;
+		--outpost-button-secondary-fg: #fbfaf5;
+		--outpost-button-secondary-border: #3a322c;
+		--outpost-button-ghost-fg: #fbfaf5;
+		--outpost-tab-fg: #a9a097;
+		--outpost-tab-fg-active: #fbfaf5;
+		--outpost-tab-indicator: #fb8500;
+		--outpost-chip-fg: #fbfaf5;
+		--outpost-chip-border: #3a322c;
+		--outpost-chip-bg-pressed: #fb8500;
+		--outpost-chip-fg-pressed: #251f1c;
+		--outpost-card-bg: #1a1614;
+		--outpost-card-fg: #fbfaf5;
+		--outpost-card-border: #3a322c;
+		--outpost-focus-ring-color: #fb8500;
+		--outpost-text-muted: #a9a097;
+		--outpost-border: #3a322c;
+		--outpost-tape: rgba(251, 133, 0, 0.75);
+		--outpost-halftone: rgba(255, 255, 255, 0.03);
+	}
+}

@@ -14,6 +14,9 @@
 #   B3  Hardcoded silo instance URLs outside the canonical allowlist
 #   B4  Untranslated user-facing strings in capabilities() arrays
 #   B5  Personal data in test fixtures (handles outside allowlist)
+#   B6  Hex literals in component CSS (Hard Contract: tokens.css is the
+#       single source of truth for paint values; structure.css must
+#       reference paint via var(--outpost-*) with NO fallback hex)
 #
 # Configuration files (siblings to this script):
 #
@@ -60,6 +63,7 @@ B2_PATHS=(includes/ tests/ bin/ languages/)
 B3_PATHS=(includes/ tests/ bin/ languages/)
 B4_PATHS=(includes/companions/)
 B5_PATHS=(tests/fixtures/)
+B6_PATHS=(pwa/src/styles/structure.css)
 
 EXCLUDE_PATTERNS=(
     --exclude-dir=vendor
@@ -314,6 +318,37 @@ check_b5() {
 }
 
 # ---------------------------------------------------------------------
+# B6 — hex literals in component CSS
+#
+# Hard Contract (CLAUDE.md): plugin owns layout, theme owns paint.
+# Token files (`pwa/src/styles/tokens.css`, `styles/outpost-tokens.css`)
+# are the single source of truth for paint values. Component CSS must
+# reference paint via `var(--outpost-{token})` with NO fallback hex —
+# fallback hexes inside `var(...)` are still hex code in a non-token
+# block and shadow theme overrides under service-worker cache misses.
+#
+# Catches both forms:
+#   - direct hex:   color: #241c4a;
+#   - fallback hex: color: var(--outpost-foo, #241c4a);
+#
+# B6 only scans component CSS (`pwa/src/styles/structure.css`). Token
+# files are exempt by design — they ARE the source of truth.
+# ---------------------------------------------------------------------
+check_b6() {
+    local hits=0
+    local matches
+    matches="$(
+        safe_grep -niE '#[0-9a-fA-F]{3,8}\b' "${B6_PATHS[@]}"
+    )"
+    if [[ -n "$matches" ]]; then
+        echo "B6: hex literal in component CSS (use a token from tokens.css instead):"
+        echo "$matches" | sed 's/^/    /'
+        hits=$(( hits + 1 ))
+    fi
+    return $hits
+}
+
+# ---------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------
 run_check() {
@@ -346,6 +381,9 @@ main() {
     fi
     if [[ -z "$ONLY_CHECK" || "$ONLY_CHECK" == "B5" ]]; then
         run_check "B5 personal data in test fixtures" check_b5 || failed=$(( failed + 1 ))
+    fi
+    if [[ -z "$ONLY_CHECK" || "$ONLY_CHECK" == "B6" ]]; then
+        run_check "B6 hex literals in component CSS" check_b6 || failed=$(( failed + 1 ))
     fi
 
     if [[ $failed -gt 0 ]]; then
