@@ -123,7 +123,21 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 		};
 	}
 
-	// Unknown mode — fall through to legacy parsing.
+	// Phase F modes (listen / watch / read / play / bookmark / photo / etc.)
+	// don't have first-class tab+variant routing in parse_dispatch_params
+	// yet — the proper fix is per-mode plumbing into ComposerTabs +
+	// cached_for transient fetch via /preview. Until that lands, fall
+	// through to the legacy share-target parser when there's a URL/text/
+	// title to share. The legacy parser routes URL-bearing payloads into
+	// the Reply tab with the URL pre-filled — semantically wrong for
+	// listen/watch/read but better than dropping the URL entirely.
+	if (mode || picker) {
+		const fallback = parse_share_target(search);
+		if (fallback) {
+			return fallback;
+		}
+	}
+
 	return null;
 }
 
