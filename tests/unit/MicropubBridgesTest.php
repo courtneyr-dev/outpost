@@ -92,6 +92,46 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertEquals( 'gallery', $result );
 	}
 
+	public function test_infer_post_format_dedupes_doubled_photo_array(): void {
+		// The upstream Micropub plugin enriches `$input['photo']`
+		// post-sideload, so a single-photo post may arrive with a
+		// 2-entry doubled array. Dedupe before deciding gallery vs
+		// image so a single unique URL still maps to image.
+		$result = $this->invoke_private(
+			'infer_post_format',
+			array(
+				array(
+					'photo' => array(
+						'https://example.test/single.jpg',
+						'https://example.test/single.jpg',
+					),
+				),
+			)
+		);
+		$this->assertEquals( 'image', $result );
+	}
+
+	public function test_infer_post_format_dedupes_doubled_three_photos(): void {
+		// Three unique photos doubled to 6 entries should still map
+		// to gallery (count > 1 after dedupe).
+		$result = $this->invoke_private(
+			'infer_post_format',
+			array(
+				array(
+					'photo' => array(
+						'https://example.test/a.jpg',
+						'https://example.test/b.jpg',
+						'https://example.test/c.jpg',
+						'https://example.test/a.jpg',
+						'https://example.test/b.jpg',
+						'https://example.test/c.jpg',
+					),
+				),
+			)
+		);
+		$this->assertEquals( 'gallery', $result );
+	}
+
 	public function test_infer_post_format_listen_of_maps_to_audio(): void {
 		$result = $this->invoke_private(
 			'infer_post_format',
