@@ -317,7 +317,12 @@ final class Outpost_Source_Detector {
 	 * @return string
 	 */
 	private static function build_composer_url( array $query_args ): string {
-		$base  = self::COMPOSER_PATH;
+		// Absolute URL via home_url() so consumers without host context
+		// (the iOS Shortcut JSON response, opened by Safari) get a
+		// resolvable URL. wp_safe_redirect() in the share-target 303
+		// path handles absolute URLs identically to relative ones, so
+		// this single source-of-truth is safe for both consumers.
+		$base  = home_url( self::COMPOSER_PATH );
 		$pairs = array();
 		foreach ( $query_args as $key => $value ) {
 			if ( null === $value || '' === $value ) {

@@ -28,6 +28,14 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
+		// home_url() is called by build_composer_url to make redirect_url
+		// absolute. Default tests assert against partial path/param strings
+		// so this stub returns a stable absolute base.
+		WP_Mock::userFunction( 'home_url' )->andReturnUsing(
+			static function ( string $path = '' ): string {
+				return 'https://example.test' . $path;
+			}
+		);
 	}
 
 	public function tearDown(): void {
@@ -200,6 +208,19 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertStringContainsString( 'mode=watch', $decision['redirect_url'] );
 		$this->assertStringContainsString( 'source=fake', $decision['redirect_url'] );
 		$this->assertStringContainsString( 'cached_for=', $decision['redirect_url'] );
+	}
+
+	public function test_dispatch_redirect_url_is_absolute(): void {
+		// Regression: iOS Shortcut JSON consumer needs absolute URL because
+		// Safari has no host context when opening the response. Relative
+		// /post/?... resolves to malformed Safari hostname.
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+
+		$decision = Outpost_Source_Detector::dispatch( 'https://example.com/page' );
+
+		$this->assertStringStartsWith( 'https://', $decision['redirect_url'] );
+		$this->assertStringContainsString( '/post/?', $decision['redirect_url'] );
 	}
 
 	// --- exact host beats wildcard ---------------------------------------
