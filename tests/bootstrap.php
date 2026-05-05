@@ -195,11 +195,80 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 }
 
 // Minimal WP_REST_Request stub so PHPUnit's mock machinery (createMock) has a
-// class to reflect against.
+// class to reflect against. Real WP supplies the full class; this stub
+// covers the methods Outpost code actually calls (param/header/body
+// getters + setters; FY-Theming's settings-save handler builds a synthetic
+// request to forward into the REST controller).
 if ( ! class_exists( 'WP_REST_Request' ) ) {
 	class WP_REST_Request {
+		/** @var string */
+		private $method = '';
+
+		/** @var string */
+		private $route = '';
+
+		/** @var array<string, mixed> */
+		private $params = array();
+
+		/** @var array<string, string> */
+		private $headers = array();
+
+		/** @var string */
+		private $body = '';
+
+		public function __construct( string $method = '', string $route = '' ) {
+			$this->method = $method;
+			$this->route  = $route;
+		}
+
+		public function get_method(): string {
+			return $this->method;
+		}
+
+		public function get_route(): string {
+			return $this->route;
+		}
+
+		public function set_param( string $key, $value ): void {
+			$this->params[ $key ] = $value;
+		}
+
 		public function get_param( $key ) {
-			return null;
+			return $this->params[ $key ] ?? null;
+		}
+
+		public function set_header( string $key, string $value ): void {
+			$this->headers[ strtolower( $key ) ] = $value;
+		}
+
+		public function get_header( string $key ): ?string {
+			return $this->headers[ strtolower( $key ) ] ?? null;
+		}
+
+		public function set_body( string $body ): void {
+			$this->body = $body;
+		}
+
+		public function get_body(): string {
+			return $this->body;
+		}
+
+		/**
+		 * @return array<string, mixed>|null
+		 */
+		public function get_json_params() {
+			if ( '' === $this->body ) {
+				return null;
+			}
+			$decoded = json_decode( $this->body, true );
+			return is_array( $decoded ) ? $decoded : null;
+		}
+
+		/**
+		 * @return array<string, mixed>
+		 */
+		public function get_body_params(): array {
+			return array();
 		}
 	}
 }
@@ -232,10 +301,10 @@ if ( ! class_exists( 'WP_Post' ) ) {
 // round-trip through `instanceof WP_Term` checks.
 if ( ! class_exists( 'WP_Term' ) ) {
 	class WP_Term {
-		public int $term_id   = 0;
-		public string $name   = '';
-		public string $slug   = '';
-		public int $count     = 0;
+		public int $term_id     = 0;
+		public string $name     = '';
+		public string $slug     = '';
+		public int $count       = 0;
 		public string $taxonomy = '';
 
 		public function __construct( array $fields = array() ) {
