@@ -137,6 +137,11 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token-authenticator.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-ios-shortcut-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-ios-shortcut-settings-page.php';
+// FY Theming — token resolver, theme.json reader, contrast, mode controller.
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-contrast.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-theme-json-reader.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-mode-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
 
 /**
  * Wire up Outpost's component registrations at `init` priority 0.

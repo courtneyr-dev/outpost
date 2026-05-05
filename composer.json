@@ -33,7 +33,8 @@
       "Outpost\\Tests\\Integration\\": "tests/integration/",
       "Outpost\\Tests\\Helpers\\": "tests/helpers/",
       "Outpost\\Tests\\Auth\\": "tests/auth/",
-      "Outpost\\Tests\\Admin\\": "tests/admin/"
+      "Outpost\\Tests\\Admin\\": "tests/admin/",
+      "Outpost\\Tests\\Theming\\": "tests/theming/"
     }
   },
   "scripts": {
