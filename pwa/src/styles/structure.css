@@ -78,19 +78,13 @@
 .outpost-button {
 	min-height: 2.75rem;
 	padding: 0.5rem 1rem;
-	border: 1px solid var(--outpost-button-primary-border, var(--outpost-primary-border, #241c4a));
+	border: 1px solid var(--outpost-button-primary-border);
 	border-radius: var(--outpost-button-primary-radius, var(--outpost-radius-md, 0.5rem));
 	font: inherit;
 	font-weight: 600;
 	cursor: pointer;
-	/*
-	 * Hard-coded russian-violet fallback (#241c4a) defends against
-	 * service-worker caches serving stale `outpost-tokens.css` from a
-	 * previous DS-1 build (when defaults were neutral). The token is
-	 * still the primary path; the literal is just the safety net.
-	 */
-	background: var(--outpost-button-primary-bg, var(--outpost-primary-bg, #241c4a));
-	color: var(--outpost-button-primary-fg, var(--outpost-primary-fg, #ffffff));
+	background: var(--outpost-button-primary-bg);
+	color: var(--outpost-button-primary-fg);
 }
 
 .outpost-button:focus {
@@ -105,8 +99,8 @@
 
 .outpost-button--secondary {
 	background: var(--outpost-button-secondary-bg, transparent);
-	color: var(--outpost-button-secondary-fg, #023047);
-	border-color: var(--outpost-button-secondary-border, var(--outpost-border, #647baf));
+	color: var(--outpost-button-secondary-fg);
+	border-color: var(--outpost-button-secondary-border);
 }
 
 .outpost-error {
@@ -227,9 +221,24 @@
 	50% { opacity: 0.55; }
 }
 
+@keyframes outpost-voice-pulse-reduced {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.78; }
+}
+
+/*
+ * Voice-pulse exception under reduced-motion: the pulse continues at a
+ * slower cycle and reduced amplitude rather than going still. The
+ * animation conveys the functional "recording right now" state — the
+ * visual difference between idle and recording disappears without it.
+ * Removing the cue would harm usability more than the dampened motion
+ * disturbs vestibular sensitivity. Every other animation in this file
+ * stops under prefers-reduced-motion: reduce; this is the deliberate
+ * exception, locked in FY-Theming.
+ */
 @media (prefers-reduced-motion: reduce) {
 	.outpost-voice-button--recording {
-		animation: none;
+		animation: outpost-voice-pulse-reduced 3s ease-in-out infinite;
 	}
 }
 
@@ -832,7 +841,7 @@
 	max-block-size: 90dvh;
 	display: flex;
 	flex-direction: column;
-	background: var(--outpost-card-bg, #ffffff);
+	background: var(--outpost-card-bg);
 	color: var(--outpost-card-fg, inherit);
 	border-block-start: 1px solid var(--outpost-card-border, currentColor);
 	border-start-start-radius: var(--outpost-radius-lg, 0.75rem);
@@ -1366,4 +1375,171 @@
 	align-items: center;
 	gap: 0.5rem;
 	font-size: 0.95rem;
+}
+
+/* ----------------------------------------------------------------------
+ * FY-Theming: Field Notes / Indie Zine treatment layer
+ *
+ * Layered on top of the structural rules above when a mode class is on
+ * the root. Treatments use mode-scoped tokens (--outpost-tape,
+ * --outpost-halftone, --outpost-font-family-display) plus existing
+ * paint tokens so theme overrides still flow through.
+ *
+ * Hard Contract preserved: every paint property routes through a token.
+ * Layout primitives (sizes, spacing, geometry) live in the structural
+ * rules above; the treatment layer only adds Field Notes character.
+ * ---------------------------------------------------------------------- */
+
+/* Composer surface — warm-paper background with halftone overlay. The
+ * halftone is a low-opacity dot pattern; mode-scoped --outpost-halftone
+ * tunes the dot color so day looks like newsprint, night looks like
+ * starfield grain. */
+.outpost-mode-day .outpost-shell,
+.outpost-mode-night .outpost-shell,
+.outpost-mode-system .outpost-shell {
+	background-color: var(--outpost-surface-bg);
+	color: var(--outpost-surface-fg);
+	background-image: url("../../../assets/svg/halftone-pattern.svg");
+	background-repeat: repeat;
+	background-size: 12px 12px;
+}
+
+/* Display-serif headings with a hand-drawn swoosh underline. Heading
+ * elements inside the composer subtree pick up the display family; the
+ * swoosh attaches via ::after. Headings without `.outpost-heading--plain`
+ * get the treatment; opt-out is one class. */
+.outpost-mode-day .outpost-shell h1,
+.outpost-mode-day .outpost-shell h2,
+.outpost-mode-night .outpost-shell h1,
+.outpost-mode-night .outpost-shell h2,
+.outpost-mode-system .outpost-shell h1,
+.outpost-mode-system .outpost-shell h2 {
+	font-family: var(--outpost-font-family-display, var(--outpost-font-family-body));
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	position: relative;
+	display: inline-block;
+}
+
+.outpost-mode-day .outpost-shell h2:not(.outpost-heading--plain)::after,
+.outpost-mode-night .outpost-shell h2:not(.outpost-heading--plain)::after,
+.outpost-mode-system .outpost-shell h2:not(.outpost-heading--plain)::after {
+	content: "";
+	display: block;
+	margin-top: 0.125rem;
+	height: 0.5rem;
+	background-image: url("../../../assets/svg/heading-swoosh.svg");
+	background-repeat: no-repeat;
+	background-position: left center;
+	background-size: contain;
+}
+
+/* Tab bar — washi-tape strips. Each tab tilts a degree, picks up the
+ * tape color from --outpost-tape (orange-translucent in both modes).
+ * Active tab tilts the opposite way to read as "the one that's been
+ * stuck on top." Tabs without `.outpost-tab--plain` get the treatment. */
+.outpost-mode-day .outpost-tab:not(.outpost-tab--plain),
+.outpost-mode-night .outpost-tab:not(.outpost-tab--plain),
+.outpost-mode-system .outpost-tab:not(.outpost-tab--plain) {
+	position: relative;
+	background-color: var(--outpost-tape);
+	transform: rotate(-1deg);
+	padding-inline: 0.875rem;
+	padding-block: 0.5rem;
+}
+
+.outpost-mode-day .outpost-tab[aria-selected='true']:not(.outpost-tab--plain),
+.outpost-mode-night .outpost-tab[aria-selected='true']:not(.outpost-tab--plain),
+.outpost-mode-system .outpost-tab[aria-selected='true']:not(.outpost-tab--plain) {
+	transform: rotate(1deg);
+	z-index: 1;
+}
+
+/* Form inputs — underline-only treatment. Replaces the four-sided box
+ * with a hand-drawn baseline so inputs read like a worksheet rather
+ * than a software form. Focus thickens the underline; the
+ * focus-ring-color token still drives accent. */
+.outpost-mode-day .outpost-input:not(.outpost-input--plain),
+.outpost-mode-night .outpost-input:not(.outpost-input--plain),
+.outpost-mode-system .outpost-input:not(.outpost-input--plain),
+.outpost-mode-day .outpost-textarea:not(.outpost-textarea--plain),
+.outpost-mode-night .outpost-textarea:not(.outpost-textarea--plain),
+.outpost-mode-system .outpost-textarea:not(.outpost-textarea--plain) {
+	border: 0;
+	border-block-end: 2px solid var(--outpost-input-border);
+	border-radius: 0;
+	background-color: transparent;
+	padding-inline: 0.25rem;
+}
+
+.outpost-mode-day .outpost-input:not(.outpost-input--plain):focus,
+.outpost-mode-night .outpost-input:not(.outpost-input--plain):focus,
+.outpost-mode-system .outpost-input:not(.outpost-input--plain):focus,
+.outpost-mode-day .outpost-textarea:not(.outpost-textarea--plain):focus,
+.outpost-mode-night .outpost-textarea:not(.outpost-textarea--plain):focus,
+.outpost-mode-system .outpost-textarea:not(.outpost-textarea--plain):focus {
+	outline: 0;
+	border-block-end-width: 3px;
+	border-block-end-color: var(--outpost-focus-ring-color);
+}
+
+/* Radio groups — hand-drawn circle SVGs replace the UA bullet. The
+ * input itself stays accessible (real radio with label); the SVG paints
+ * as the visible affordance. */
+.outpost-mode-day .outpost-radio:not(.outpost-radio--plain),
+.outpost-mode-night .outpost-radio:not(.outpost-radio--plain),
+.outpost-mode-system .outpost-radio:not(.outpost-radio--plain) {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 1.25rem;
+	height: 1.25rem;
+	background-image: url("../../../assets/svg/radio-idle.svg");
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
+	border: 0;
+	margin-inline-end: 0.5rem;
+	vertical-align: middle;
+}
+
+.outpost-mode-day .outpost-radio:not(.outpost-radio--plain):checked,
+.outpost-mode-night .outpost-radio:not(.outpost-radio--plain):checked,
+.outpost-mode-system .outpost-radio:not(.outpost-radio--plain):checked {
+	background-image: url("../../../assets/svg/radio-selected.svg");
+}
+
+/* Primary button — rubber-stamp treatment. Slightly rotated, ink-heavy
+ * border, transformed letter-spacing so it reads "stamped on" rather
+ * than "rendered by browser." Opt-out via `.outpost-button--plain`. */
+.outpost-mode-day .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain),
+.outpost-mode-night .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain),
+.outpost-mode-system .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain) {
+	transform: rotate(-1deg);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	font-size: 0.9375rem;
+	border-width: 2px;
+	border-style: solid;
+}
+
+.outpost-mode-day .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active,
+.outpost-mode-night .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active,
+.outpost-mode-system .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active {
+	transform: rotate(-1deg) translateY(1px);
+}
+
+/* Voice mic — clipart-stamp treatment. The mic icon swaps from emoji
+ * to an SVG silhouette in mode-class scope; preserves the recording
+ * pulse animation defined in the structural rules above. */
+.outpost-mode-day .outpost-voice-button:not(.outpost-voice-button--plain) .outpost-voice-button__icon,
+.outpost-mode-night .outpost-voice-button:not(.outpost-voice-button--plain) .outpost-voice-button__icon,
+.outpost-mode-system .outpost-voice-button:not(.outpost-voice-button--plain) .outpost-voice-button__icon {
+	display: inline-block;
+	width: 1.5rem;
+	height: 1.5rem;
+	background-image: url("../../../assets/svg/voice-mic-stamp.svg");
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
+	color: transparent;
 }

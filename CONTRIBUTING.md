@@ -86,13 +86,31 @@ Per [`CLAUDE.md`](CLAUDE.md), don't use *delve*, *leverage*, *synergy*, *robust*
 
 ## §5 audit lint (required CI check)
 
-Outpost is published on WordPress.org and serves any IndieWeb user — never just the author. The `bin/lint/section-5-audit.sh` script runs five checks in CI to enforce this:
+Outpost is published on WordPress.org and serves any IndieWeb user — never just the author. The `bin/lint/section-5-audit.sh` script runs six checks in CI to enforce this:
 
 - **B1** — case-study handle leakage (specific tokens from research docs)
 - **B2** — embedded credential heuristics (API key shapes, AWS keys, GitHub PATs)
 - **B3** — hardcoded fediverse instance URLs outside the canonical allowlist
 - **B4** — untranslated strings in companion `capabilities()` output
 - **B5** — personal data in test fixtures (handles outside the cryptography stock-name allowlist)
+- **B6** — hex literals in component CSS (Hard Contract: tokens.css is the single source of truth)
+
+#### Why B6 matters
+
+The Hard Contract in `CLAUDE.md` says *plugin owns layout, theme owns paint*. Token files (`pwa/src/styles/tokens.css`, `styles/outpost-tokens.css`) are the single source of truth for paint values. When component CSS uses `var(--outpost-foo, #abc123)`, the fallback hex is still hex code in a non-token block — and it shadows theme overrides whenever the token isn't set (service-worker cache misses, stale builds, or a theme that legitimately wants the token undefined). B6 catches both forms:
+
+```css
+/* ❌ direct hex in component CSS */
+.outpost-button { color: #241c4a; }
+
+/* ❌ fallback hex inside var() — still hex, still shadows theme */
+.outpost-button { color: var(--outpost-button-fg, #241c4a); }
+
+/* ✅ token reference, no fallback — tokens.css is authoritative */
+.outpost-button { color: var(--outpost-button-fg); }
+```
+
+If a token is missing from `tokens.css`, the fix is to add it there — not to inline a fallback hex in the component. B6 only scans `pwa/src/styles/structure.css`; the token files are exempt by design because they ARE the source of truth.
 
 ### Run locally
 
