@@ -503,8 +503,25 @@ final class Outpost_Micropub_Bridges {
 
 		$photo = $properties['photo'] ?? null;
 		if ( null !== $photo ) {
-			if ( is_array( $photo ) && count( $photo ) > 1 ) {
-				return 'gallery';
+			// Dedupe before counting. The upstream Micropub plugin
+			// enriches `$input['photo']` post-sideload — Outpost-uploaded
+			// photos arrive as `photo[]=url-1&...` but by the time this
+			// hook runs the array may contain each URL twice (original +
+			// canonical, both resolving to the same local URL). Without
+			// dedupe, a single-photo post misclassifies as 'gallery'
+			// because the doubled count is 2.
+			if ( is_array( $photo ) ) {
+				$unique = array_values(
+					array_unique(
+						array_filter(
+							$photo,
+							static fn ( $v ): bool => is_string( $v ) && '' !== $v
+						)
+					)
+				);
+				if ( count( $unique ) > 1 ) {
+					return 'gallery';
+				}
 			}
 			return 'image';
 		}
