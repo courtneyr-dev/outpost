@@ -57,7 +57,18 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 					'url'         => array(
 						'type'              => 'string',
 						'required'          => false,
-						'sanitize_callback' => 'esc_url_raw',
+						// Kindle / Apple Books / podcast clients bundle a
+						// quote + title + URL into the share-sheet text
+						// payload. iOS Shortcut authors typically wire
+						// Shortcut Input into a single field (the `url`
+						// field), so a multi-line text blob lands here
+						// instead of a clean URL. esc_url_raw strips the
+						// blob to empty string before the extractor sees
+						// it. sanitize_textarea_field preserves the raw
+						// content; Outpost_Source_Detector::extract_url_from_payload
+						// regex-extracts the embedded URL and runs full
+						// is_http_url validation before use.
+						'sanitize_callback' => 'sanitize_textarea_field',
 					),
 					'shared_text' => array(
 						'type'              => 'string',
