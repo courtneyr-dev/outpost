@@ -1408,12 +1408,12 @@
  * elements inside the composer subtree pick up the display family; the
  * swoosh attaches via ::after. Headings without `.outpost-heading--plain`
  * get the treatment; opt-out is one class. */
-.outpost-mode-day .outpost-shell h1,
-.outpost-mode-day .outpost-shell h2,
-.outpost-mode-night .outpost-shell h1,
-.outpost-mode-night .outpost-shell h2,
-.outpost-mode-system .outpost-shell h1,
-.outpost-mode-system .outpost-shell h2 {
+.outpost-mode-day .outpost-shell h1:not(.outpost-heading--plain),
+.outpost-mode-day .outpost-shell h2:not(.outpost-heading--plain),
+.outpost-mode-night .outpost-shell h1:not(.outpost-heading--plain),
+.outpost-mode-night .outpost-shell h2:not(.outpost-heading--plain),
+.outpost-mode-system .outpost-shell h1:not(.outpost-heading--plain),
+.outpost-mode-system .outpost-shell h2:not(.outpost-heading--plain) {
 	font-family: var(--outpost-font-family-display, var(--outpost-font-family-body));
 	font-weight: 600;
 	letter-spacing: -0.01em;

@@ -199,6 +199,32 @@ add_filter(
 );
 ```
 
+## Field Notes treatments — opting out
+
+The composer's Field Notes / Indie Zine treatment layer (washi-tape tabs, hand-drawn radios, underline-only inputs, rubber-stamp buttons, halftone surface, display-serif headings, clipart-stamp voice mic) activates only under one of three mode classes on the root: `.outpost-mode-day`, `.outpost-mode-night`, `.outpost-mode-system`. The mode class is set by `Outpost_Mode_Controller` based on per-user preference; it never appears outside the composer subtree.
+
+If you embed your own block, widget, or callout inside the composer surface and want it to render without Field Notes character — or if your block already has its own visual identity that the treatments would clash with — add a `--plain` modifier class to opt out per-instance. The opt-out is **public API**: site owners and theme authors can rely on it across versions.
+
+| Element | Add this class to opt out |
+|---|---|
+| Tab / sub-tab | `outpost-tab--plain` |
+| Heading (h1, h2) | `outpost-heading--plain` |
+| Text input | `outpost-input--plain` |
+| Textarea | `outpost-textarea--plain` |
+| Radio button | `outpost-radio--plain` |
+| Primary button | `outpost-button--plain` |
+| Voice mic icon | `outpost-voice-button--plain` |
+
+```html
+<!-- Example: a third-party block's heading inside the composer keeps its own typography -->
+<h2 class="my-block-title outpost-heading--plain">Custom block heading</h2>
+
+<!-- Example: an error-state callout's button stays a regular button, not a stamp -->
+<button class="outpost-button outpost-button--plain my-error-retry">Retry</button>
+```
+
+The `--plain` mechanism is class-based (CSS `:not(.outpost-foo--plain)`) — adding the class on a single element opts only that element out without disabling mode-scoped tokens or affecting siblings. Mode-scoped paint tokens (background, text color, border) still flow through, so your component still inherits the active mode's surface palette — only the Field Notes character (rotation, decorative SVGs, swoosh underlines, uppercase letter-spacing) is suppressed.
+
 ## Commit messages
 
 - Imperative mood ("Add Mastodon to Bridgy host map", not "Added").
