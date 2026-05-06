@@ -198,72 +198,68 @@ final class G35aFoundationTest extends \WP_Mock\Tools\TestCase {
 	public function test_oauth_state_generation_persists_with_ttl(): void {
 		$captured = array();
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
-		WP_Mock::userFunction( 'update_user_meta' )->andReturnUsing(
-			static function ( $uid, $key, $value ) use ( &$captured ) {
-				$captured[ $key ] = $value;
+		WP_Mock::userFunction( 'set_transient' )->andReturnUsing(
+			static function ( $key, $value, $ttl ) use ( &$captured ) {
+				$captured = array(
+					'key'   => $key,
+					'value' => $value,
+					'ttl'   => $ttl,
+				);
 				return true;
 			}
 		);
 
 		$state = Outpost_OAuth_State::generate( 'notion', 7 );
-		$this->assertSame( $state, $captured['outpost_oauth_state_notion'] );
-		$this->assertGreaterThan( time(), (int) $captured['outpost_oauth_state_notion_expires'] );
+		$this->assertNotEmpty( $state );
+		$this->assertStringStartsWith( 'outpost_oauth_state_', $captured['key'] );
+		$this->assertSame( 7, $captured['value']['user_id'] );
+		$this->assertSame( 'notion', $captured['value']['provider'] );
+		$this->assertSame( 600, $captured['ttl'] );
 	}
 
-	public function test_oauth_state_validation_passes_once_then_clears(): void {
+	public function test_oauth_state_validation_returns_user_id_then_clears(): void {
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
-		// Validation reads stored state + expires, then deletes both.
-		$state = 'test-state-value';
-		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
-			static function ( $uid, $key, $single ) use ( $state ) {
-				if ( 'outpost_oauth_state_notion' === $key ) {
-					return $state;
-				}
-				if ( 'outpost_oauth_state_notion_expires' === $key ) {
-					return time() + 100;
-				}
-				return '';
+		WP_Mock::userFunction( 'get_transient' )->andReturn(
+			array(
+				'user_id'  => 7,
+				'provider' => 'notion',
+			)
+		);
+		$deleted = false;
+		WP_Mock::userFunction( 'delete_transient' )->andReturnUsing(
+			static function () use ( &$deleted ) {
+				$deleted = true;
+				return true;
 			}
 		);
-		WP_Mock::userFunction( 'delete_user_meta' )->andReturn( true );
 
-		$this->assertTrue( Outpost_OAuth_State::validate( 'notion', 7, $state ) );
+		$this->assertSame( 7, Outpost_OAuth_State::validate( 'notion', 'some-state-value' ) );
+		$this->assertTrue( $deleted, 'state must clear on validation' );
 	}
 
-	public function test_oauth_state_validation_rejects_mismatch(): void {
+	public function test_oauth_state_validation_rejects_unknown_state(): void {
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
-		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
-			static function ( $uid, $key, $single ) {
-				if ( 'outpost_oauth_state_notion' === $key ) {
-					return 'real-state';
-				}
-				if ( 'outpost_oauth_state_notion_expires' === $key ) {
-					return time() + 100;
-				}
-				return '';
-			}
-		);
-		WP_Mock::userFunction( 'delete_user_meta' )->andReturn( true );
+		WP_Mock::userFunction( 'get_transient' )->andReturn( false );
+		WP_Mock::userFunction( 'delete_transient' )->andReturn( true );
 
-		$this->assertFalse( Outpost_OAuth_State::validate( 'notion', 7, 'wrong-state' ) );
+		$this->assertNull( Outpost_OAuth_State::validate( 'notion', 'unknown-state' ) );
 	}
 
-	public function test_oauth_state_validation_rejects_expired(): void {
+	public function test_oauth_state_validation_rejects_provider_mismatch(): void {
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
-		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
-			static function ( $uid, $key, $single ) {
-				if ( 'outpost_oauth_state_notion' === $key ) {
-					return 'real-state';
-				}
-				if ( 'outpost_oauth_state_notion_expires' === $key ) {
-					return time() - 100;
-				}
-				return '';
-			}
+		WP_Mock::userFunction( 'get_transient' )->andReturn(
+			array(
+				'user_id'  => 7,
+				'provider' => 'github',
+			)
 		);
-		WP_Mock::userFunction( 'delete_user_meta' )->andReturn( true );
+		WP_Mock::userFunction( 'delete_transient' )->andReturn( true );
 
-		$this->assertFalse( Outpost_OAuth_State::validate( 'notion', 7, 'real-state' ) );
+		$this->assertNull( Outpost_OAuth_State::validate( 'notion', 'state-for-other-provider' ) );
+	}
+
+	public function test_oauth_state_validation_rejects_empty_candidate(): void {
+		$this->assertNull( Outpost_OAuth_State::validate( 'notion', '' ) );
 	}
 
 	// --- Notion OAuth provider ------------------------------------------

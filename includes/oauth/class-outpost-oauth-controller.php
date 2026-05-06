@@ -95,7 +95,11 @@ final class Outpost_OAuth_Controller {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( __CLASS__, 'handle_callback' ),
-				'permission_callback' => array( __CLASS__, 'permission_check' ),
+				// Callback is hit by the OAuth provider redirecting the
+				// user's browser back; it can't carry a WP REST nonce.
+				// Authentication is the state value itself, validated
+				// inside the handler before any side effects.
+				'permission_callback' => '__return_true',
 				'show_in_index'       => false,
 			)
 		);
@@ -146,16 +150,21 @@ final class Outpost_OAuth_Controller {
 		if ( is_wp_error( $provider ) ) {
 			return $provider;
 		}
-		$user_id = (int) get_current_user_id();
-		$code    = (string) $request->get_param( 'code' );
-		$state   = (string) $request->get_param( 'state' );
+		$code  = (string) $request->get_param( 'code' );
+		$state = (string) $request->get_param( 'state' );
 
 		if ( '' === $code ) {
 			return self::redirect_to_settings( $provider->id(), 'no_code' );
 		}
-		if ( ! Outpost_OAuth_State::validate( $provider->id(), $user_id, $state ) ) {
+		// State validation derives the user_id; callback can't carry a
+		// REST nonce so the state value itself is the authentication.
+		$user_id = Outpost_OAuth_State::validate( $provider->id(), $state );
+		if ( null === $user_id ) {
 			return self::redirect_to_settings( $provider->id(), 'state_invalid' );
 		}
+		// Trust the user from the validated state for the rest of this
+		// request (credential persistence is per-user).
+		wp_set_current_user( $user_id );
 
 		$exchange = $provider->exchange_code( $code );
 		if ( is_wp_error( $exchange ) ) {

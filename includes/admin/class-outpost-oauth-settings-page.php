@@ -70,7 +70,14 @@ final class Outpost_OAuth_Settings_Page {
 		foreach ( $providers as $provider ) {
 			$id           = $provider->id();
 			$is_connected = Outpost_Credentials_Store::is_configured( $id, $user_id );
-			$start_url    = rest_url( 'outpost/v1/oauth/' . $id . '/start' );
+			// REST cookie auth requires _wpnonce when the request comes
+			// from the browser (clicking a link). Without it, the start
+			// endpoint rejects with rest_forbidden even for admins.
+			$start_url = wp_nonce_url(
+				rest_url( 'outpost/v1/oauth/' . $id . '/start' ),
+				'wp_rest',
+				'_wpnonce'
+			);
 			echo '<tr>';
 			echo '<td>' . esc_html( $provider->label() ) . '</td>';
 			echo '<td>' . ( $is_connected
