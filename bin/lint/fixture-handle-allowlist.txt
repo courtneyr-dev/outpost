@@ -16,3 +16,23 @@ trent
 walter
 peggy
 victor
+
+# JSON-LD reserved keywords (https://www.w3.org/TR/json-ld11/#syntax-tokens).
+# These appear as @context / @type / @id / @graph on schema.org JSON-LD
+# fixtures used by G4b extractor tests. They are syntax tokens, not
+# personal handles, and cannot leak personal data.
+context
+type
+id
+graph
+value
+vocab
+language
+list
+set
+index
+reverse
+nest
+container
+base
+included

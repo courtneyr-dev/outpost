@@ -102,6 +102,15 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-c
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/interface-schema-extractor.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-og-inbound.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-composite-inbound.php';
+// G4b concrete schema extractors. Auto-register on plugins_loaded below.
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/trait-schema-helpers.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-article-extractor.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-recipe-extractor.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-event-extractor.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-book-extractor.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-restaurant-extractor.php';
+// G4b composite-primitive demo: Apple Music + iTunes Lookup enrichment.
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/class-apple-music-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-unknown.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
@@ -342,6 +351,15 @@ add_action(
 		// Outpost PWA routes — those features postpone JS/CSS until first
 		// interaction and break the composer's first-paint mounting.
 		Outpost_Perfmatters_Defang::register();
+		// G4b — Auto-register the five built-in JSON-LD schema extractors
+		// so Og_Inbound dispatches to them when matching @type values
+		// surface in fetched HTML. Site owners can extend or override
+		// via the `outpost_og_extractors` filter.
+		Outpost_Og_Inbound::register_extractor( new Outpost_Article_Extractor() );
+		Outpost_Og_Inbound::register_extractor( new Outpost_Recipe_Extractor() );
+		Outpost_Og_Inbound::register_extractor( new Outpost_Event_Extractor() );
+		Outpost_Og_Inbound::register_extractor( new Outpost_Book_Extractor() );
+		Outpost_Og_Inbound::register_extractor( new Outpost_Restaurant_Extractor() );
 	},
 	5
 );
