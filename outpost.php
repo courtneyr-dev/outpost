@@ -143,6 +143,9 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
 // G14a — iFixit repair-guide inbound (og_tags-only; full api_json integration in G14b).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-ifixit.php';
+// G13a — Pretalx hosted SaaS conference inbound (og_tags-only;
+// self-hosted Pretalx and Sessionize wait on settings-UI foundation).
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-pretalx.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -306,6 +309,8 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_SuttaCentral() );
 		// G14a iFixit repair-guide inbound (og_tags-only).
 		Outpost_Source_Registry::register( new Outpost_Source_Ifixit() );
+		// G13a Pretalx hosted SaaS conference inbound.
+		Outpost_Source_Registry::register( new Outpost_Source_Pretalx() );
 	}
 );
 
