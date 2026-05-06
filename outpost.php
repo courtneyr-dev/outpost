@@ -137,6 +137,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-c
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-encryption-key-notice.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-oauth-settings-page.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-perfmatters-defang.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -306,6 +307,10 @@ add_action(
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		Outpost_Encryption_Key_Notice::register();
+		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
+		// Outpost PWA routes — those features postpone JS/CSS until first
+		// interaction and break the composer's first-paint mounting.
+		Outpost_Perfmatters_Defang::register();
 	},
 	5
 );
