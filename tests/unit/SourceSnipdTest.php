@@ -85,9 +85,33 @@ final class SourceSnipdTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( $source->matches_url( 'https://example.com/article' ) );
 	}
 
-	public function test_mode_is_listen(): void {
+	public function test_mode_for_snip_path_is_quote(): void {
+		// G15a item 1: /snip/{id} maps to Post Kind 'quote'. The snip is
+		// a transcript excerpt; the timestamped link is the citation.
 		$source = new Outpost_Source_Snipd();
-		$this->assertSame( 'listen', $source->mode_for_url( 'https://share.snipd.com/snip/anything' ) );
+		$this->assertSame( 'quote', $source->mode_for_url( 'https://share.snipd.com/snip/anything' ) );
+	}
+
+	public function test_mode_for_episode_path_is_listen(): void {
+		// G15a item 1: /episode/{id} preserves the existing F-phase
+		// listen mode — the episode itself is a single listen event.
+		$source = new Outpost_Source_Snipd();
+		$this->assertSame( 'listen', $source->mode_for_url( 'https://share.snipd.com/episode/abc' ) );
+	}
+
+	public function test_mode_for_show_path_is_bookmark(): void {
+		// G15a item 1: /show/{id} maps to bookmark — a show is a
+		// discovery target, not a single listen event.
+		$source = new Outpost_Source_Snipd();
+		$this->assertSame( 'bookmark', $source->mode_for_url( 'https://share.snipd.com/show/abc' ) );
+	}
+
+	public function test_mode_for_unknown_path_defaults_to_bookmark(): void {
+		// G15a item 1: defensive fallback for any future Snipd path
+		// patterns added to CLAIMED_PATH_PREFIXES without a matching
+		// PATH_TO_MODE entry. Safe default is bookmark.
+		$source = new Outpost_Source_Snipd();
+		$this->assertSame( 'bookmark', $source->mode_for_url( 'https://share.snipd.com/totally-new-thing/abc' ) );
 	}
 
 	public function test_mapping_produces_listen_h_entry(): void {
