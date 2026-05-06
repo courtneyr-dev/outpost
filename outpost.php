@@ -148,6 +148,9 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-ifixit.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-pretalx.php';
 // G9 outbound adapter: Telegraph (telegra.ph) — anonymous publishing.
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/outbound/class-telegraph-adapter.php';
+// G6 minimalist-blog inbound (og_tags-only; RSS-as-primary deferred to RSS extractor session).
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-bear-blog.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-mataroa.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -313,6 +316,9 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_Ifixit() );
 		// G13a Pretalx hosted SaaS conference inbound.
 		Outpost_Source_Registry::register( new Outpost_Source_Pretalx() );
+		// G6 — minimalist-blog inbound capture sources.
+		Outpost_Source_Registry::register( new Outpost_Source_Bear_Blog() );
+		Outpost_Source_Registry::register( new Outpost_Source_Mataroa() );
 	}
 );
 
