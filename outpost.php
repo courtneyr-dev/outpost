@@ -94,6 +94,14 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-r
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-api-json.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-api-xml.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-composite.php';
+// G4a — Adapter primitives. Higher-level than F-phase per-source extractors:
+// Og_Inbound wraps fetch + OG + JSON-LD parse + category dispatch;
+// Composite_Inbound wraps multi-source merging with primary/fallback/enrich roles.
+// Concrete schema extractors (Recipe / Event / Article / Book / Restaurant)
+// land in G4b — register via Outpost_Og_Inbound::register_extractor.
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/interface-schema-extractor.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-og-inbound.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-composite-inbound.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-unknown.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
