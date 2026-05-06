@@ -89,6 +89,25 @@ final class Outpost_OAuth_Provider_Notion extends Outpost_OAuth_Provider_Base {
 	}
 
 	/**
+	 * Notion's token endpoint requires a JSON body, not form-encoded.
+	 * Notion also rejects client_id/client_secret in the body — those
+	 * go in the Authorization header (see extra_token_request_headers).
+	 * Override the base hook to JSON-encode and drop the credential
+	 * fields.
+	 *
+	 * @param array<string,string> $body Default body from the base.
+	 * @return string JSON payload Notion's token endpoint accepts.
+	 */
+	protected function token_request_body( array $body ): string {
+		$payload = array(
+			'grant_type'   => 'authorization_code',
+			'code'         => $body['code'] ?? '',
+			'redirect_uri' => $body['redirect_uri'] ?? '',
+		);
+		return (string) wp_json_encode( $payload );
+	}
+
+	/**
 	 * Notion's token response includes non-standard fields. Preserve
 	 * them in the stored credentials so callers can identify the
 	 * connected workspace without a separate users.me API call.

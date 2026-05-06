@@ -133,6 +133,13 @@ abstract class Outpost_OAuth_Provider_Base {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public function exchange_code( string $code ) {
+		$body     = array(
+			'grant_type'    => 'authorization_code',
+			'code'          => $code,
+			'redirect_uri'  => $this->redirect_uri(),
+			'client_id'     => $this->client_id(),
+			'client_secret' => $this->client_secret(),
+		);
 		$response = wp_remote_post(
 			$this->token_url(),
 			array(
@@ -143,16 +150,26 @@ abstract class Outpost_OAuth_Provider_Base {
 					),
 					$this->extra_token_request_headers()
 				),
-				'body'    => array(
-					'grant_type'    => 'authorization_code',
-					'code'          => $code,
-					'redirect_uri'  => $this->redirect_uri(),
-					'client_id'     => $this->client_id(),
-					'client_secret' => $this->client_secret(),
-				),
+				'body'    => $this->token_request_body( $body ),
 			)
 		);
 		return $this->parse_token_response( $response );
+	}
+
+	/**
+	 * Hook for subclasses to control the request-body shape. Default
+	 * returns the array unchanged so wp_remote_post form-encodes it
+	 * (the standard OAuth 2.0 token-endpoint shape per RFC 6749).
+	 *
+	 * Notion overrides this to JSON-encode the body — Notion's token
+	 * endpoint requires Content-Type: application/json with a JSON body,
+	 * NOT form-encoded.
+	 *
+	 * @param array<string,string> $body Body parameters.
+	 * @return array<string,string>|string
+	 */
+	protected function token_request_body( array $body ) {
+		return $body;
 	}
 
 	/**
@@ -173,20 +190,31 @@ abstract class Outpost_OAuth_Provider_Base {
 	 */
 	final protected function parse_token_response( $response ) {
 		if ( is_wp_error( $response ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
+				error_log( 'Outpost OAuth token transport error: ' . $response->get_error_message() );
+			}
 			return new \WP_Error(
 				'outpost_oauth_token_transport',
 				$response->get_error_message()
 			);
 		}
-		$status  = (int) wp_remote_retrieve_response_code( $response );
-		$body    = (string) wp_remote_retrieve_body( $response );
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		$body   = (string) wp_remote_retrieve_body( $response );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ( $status < 200 || $status >= 300 ) ) {
+			/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
+			error_log( sprintf( 'Outpost OAuth token exchange failed: HTTP %d body=%s', $status, $body ) );
+		}
 		$decoded = json_decode( $body, true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $decoded ) ) {
 			return new \WP_Error(
 				'outpost_oauth_token_failed',
 				/* translators: %d: HTTP status */
 				sprintf( __( 'OAuth token exchange failed (HTTP %d).', 'outpost' ), $status ),
-				array( 'status' => $status )
+				array(
+					'status' => $status,
+					'body'   => $body,
+				)
 			);
 		}
 		if ( empty( $decoded['access_token'] ) ) {
