@@ -16,6 +16,7 @@ import { __ } from '@wordpress/i18n';
 import { share } from '@wordpress/icons';
 
 import './outpost-sidebar.scss';
+import { FetchRecentPanel } from './fetch-recent/fetch-recent-panel.js';
 
 /**
  * Render the Outpost PluginSidebar.
@@ -43,6 +44,7 @@ export function OutpostSidebar() {
 						</CardBody>
 					</Card>
 				</PanelBody>
+				<FetchRecentPanel />
 			</PluginSidebar>
 		</>
 	);
