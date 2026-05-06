@@ -1,0 +1,14 @@
+{
+	"request": {
+		"method": "POST",
+		"url": "/v1/oauth/token"
+	},
+	"response": {
+		"status": 401,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"error": "invalid_grant",
+			"error_description": "The provided authorization code is invalid."
+		}
+	}
+}

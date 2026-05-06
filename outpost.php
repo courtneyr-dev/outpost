@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.82
+ * Version:           0.1.83
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.82' );
+define( 'OUTPOST_VERSION', '0.1.83' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -51,6 +51,10 @@ define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/acce
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
+// G99-mock-server — test-time HTTP rewriter. No-op in production
+// because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the
+// integration-test bootstrap.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-mock-server-filter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-kinds-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-formats-adapter.php';
@@ -388,6 +392,10 @@ add_action(
 		// G3.5b — POSSE foundation: register meta keys + cron handler.
 		Outpost_POSSE_Meta::register();
 		Outpost_POSSE_Dispatcher::register();
+		// G99-mock-server — register the pre_http_request rewriter. Safe
+		// in production: rewrite is gated on OUTPOST_TEST_MOCK_SERVER_URL,
+		// which is only defined by integration-test bootstrap.
+		Outpost_Mock_Server_Filter::register();
 		Outpost_Encryption_Key_Notice::register();
 		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
 		// Outpost PWA routes — those features postpone JS/CSS until first

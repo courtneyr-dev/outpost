@@ -1,0 +1,17 @@
+{
+	"request": {
+		"method": "POST",
+		"url": "/v1/oauth/token"
+	},
+	"response": {
+		"status": 200,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"access_token": "fixture-access-token",
+			"refresh_token": "fixture-refresh-token",
+			"token_type": "Bearer",
+			"expires_in": 3600,
+			"scope": "read"
+		}
+	}
+}
