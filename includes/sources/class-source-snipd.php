@@ -37,6 +37,22 @@ final class Outpost_Source_Snipd extends Outpost_Source_Base {
 	private const CLAIMED_PATH_PREFIXES = array( '/snip/', '/episode/', '/show/' );
 
 	/**
+	 * Per-path Post Kind suggestion (G15a item 1).
+	 *
+	 * - /snip/{id}    → quote   (the snip's transcript becomes the body;
+	 *                            the timestamped link is the cite)
+	 * - /episode/{id} → listen  (existing F-phase behavior preserved)
+	 * - /show/{id}    → bookmark
+	 * - other Snipd paths → bookmark (safe default; matches_url already
+	 *                                 filters to the three claimed prefixes)
+	 */
+	private const PATH_TO_MODE = array(
+		'/snip/'    => 'quote',
+		'/episode/' => 'listen',
+		'/show/'    => 'bookmark',
+	);
+
+	/**
 	 * @return array<string,mixed>
 	 */
 	public function capabilities(): array {
@@ -96,5 +112,38 @@ final class Outpost_Source_Snipd extends Outpost_Source_Base {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Per-URL Post Kind suggestion (G15a item 1). Snipd's three share
+	 * patterns map to different IndieWeb kinds:
+	 *
+	 *   - /snip/{id}    → quote   (the snip is a transcript excerpt;
+	 *                              the timestamped link is the citation)
+	 *   - /episode/{id} → listen  (the episode itself, preserved)
+	 *   - /show/{id}    → bookmark (the show is a discovery target,
+	 *                              not a single listen event)
+	 *
+	 * Capabilities still declares mode='listen' as the dominant default;
+	 * this override branches on URL path so the dispatcher routes each
+	 * variant to the right composer mode.
+	 *
+	 * matches_url() filters to the three claimed prefixes before
+	 * mode_for_url runs, so the per-path map is exhaustive in practice.
+	 * Defensive fallback to bookmark for any future additions to
+	 * CLAIMED_PATH_PREFIXES that arrive without a matching mode entry.
+	 *
+	 * @param string $url URL the user shared.
+	 * @return string Composer mode slug.
+	 */
+	public function mode_for_url( string $url ): string {
+		$parts = wp_parse_url( $url );
+		$path  = is_array( $parts ) && isset( $parts['path'] ) ? (string) $parts['path'] : '/';
+		foreach ( self::PATH_TO_MODE as $prefix => $mode ) {
+			if ( 0 === strpos( $path, $prefix ) ) {
+				return $mode;
+			}
+		}
+		return 'bookmark';
 	}
 }
