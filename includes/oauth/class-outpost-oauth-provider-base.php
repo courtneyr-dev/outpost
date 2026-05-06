@@ -260,4 +260,114 @@ abstract class Outpost_OAuth_Provider_Base {
 		}
 		return Outpost_Credentials_Store::delete( $this->id(), $user_id );
 	}
+
+	/**
+	 * Whether the stored credentials for the user have expired or are
+	 * within 60 seconds of expiry. Returns false when no expiry is
+	 * tracked (e.g. Notion's never-expiring tokens).
+	 *
+	 * @since 0.1.71
+	 *
+	 * @param int $user_id User id.
+	 * @return bool True when credentials need refresh.
+	 */
+	public function is_expired( int $user_id ): bool {
+		$creds = Outpost_Credentials_Store::get( $this->id(), $user_id );
+		if ( ! is_array( $creds ) || empty( $creds['expires_in'] ) ) {
+			return false;
+		}
+		$obtained_at = isset( $creds['obtained_at'] ) ? (int) $creds['obtained_at'] : 0;
+		$expires_in  = (int) $creds['expires_in'];
+		if ( $obtained_at <= 0 || $expires_in <= 0 ) {
+			return false;
+		}
+		return time() >= ( $obtained_at + $expires_in - 60 );
+	}
+
+	/**
+	 * Refresh the stored access token using the stored refresh_token.
+	 *
+	 * @since 0.1.71
+	 *
+	 * @param int $user_id User id.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public function refresh_access_token( int $user_id ) {
+		$creds = Outpost_Credentials_Store::get( $this->id(), $user_id );
+		if ( ! is_array( $creds ) || empty( $creds['refresh_token'] ) ) {
+			return new \WP_Error(
+				'outpost_oauth_no_refresh_token',
+				__( 'No refresh_token stored — reconnect this provider.', 'outpost' )
+			);
+		}
+		$body     = array(
+			'grant_type'    => 'refresh_token',
+			'refresh_token' => (string) $creds['refresh_token'],
+			'client_id'     => $this->client_id(),
+			'client_secret' => $this->client_secret(),
+		);
+		$response = wp_remote_post(
+			$this->token_url(),
+			array(
+				'timeout' => 10,
+				'headers' => array_merge(
+					array( 'Accept' => 'application/json' ),
+					$this->extra_token_request_headers()
+				),
+				'body'    => $this->token_request_body( $body ),
+			)
+		);
+		$decoded  = $this->parse_token_response( $response );
+		if ( is_wp_error( $decoded ) ) {
+			return $decoded;
+		}
+		if ( empty( $decoded['refresh_token'] ) && ! empty( $creds['refresh_token'] ) ) {
+			$decoded['refresh_token'] = (string) $creds['refresh_token'];
+		}
+		$reshaped = $this->shape_credentials( $decoded );
+		Outpost_Credentials_Store::set( $this->id(), $reshaped, $user_id );
+		return $reshaped;
+	}
+
+	/**
+	 * Verify the stored connection. Default returns "not implemented"
+	 * WP_Error; providers override per their data-access endpoint.
+	 *
+	 * @since 0.1.71
+	 *
+	 * @param int $user_id User id.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public function verify_connection( int $user_id ) {
+		unset( $user_id );
+		return new \WP_Error(
+			'outpost_oauth_verify_not_implemented',
+			__( 'This provider does not implement connection verification.', 'outpost' )
+		);
+	}
+
+	/**
+	 * Hook called by the controller after successful token exchange AND
+	 * credential persistence. Default is a no-op. Providers that need
+	 * post-exchange registration / activation steps override this.
+	 *
+	 * Polar Flow's AccessLink uses this to POST /v3/users with the
+	 * access token to register the user with the application — without
+	 * that step, no Polar data API call works. RFC 6749 has no native
+	 * concept for this dance, so it lives in a provider-specific hook
+	 * rather than the base flow.
+	 *
+	 * Failures inside after_token_exchange() MUST NOT abort the connect
+	 * flow — credentials are already stored. Providers should log
+	 * failures at debug level and surface them on the next
+	 * verify_connection() call, where the user can retry registration.
+	 *
+	 * @since 0.1.76
+	 *
+	 * @param int                 $user_id User id.
+	 * @param array<string,mixed> $creds   The freshly-shaped credentials.
+	 */
+	public function after_token_exchange( int $user_id, array $creds ): void {
+		unset( $user_id, $creds );
+	}
 }

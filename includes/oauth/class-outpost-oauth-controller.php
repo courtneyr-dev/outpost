@@ -74,6 +74,17 @@ final class Outpost_OAuth_Controller {
 	}
 
 	/**
+	 * Return all registered providers in registration order.
+	 *
+	 * @since 0.1.71
+	 *
+	 * @return array<string,Outpost_OAuth_Provider_Base>
+	 */
+	public static function get_all_providers(): array {
+		return self::$providers;
+	}
+
+	/**
 	 * Register the three REST routes per provider.
 	 *
 	 * @since 0.1.69
@@ -109,6 +120,16 @@ final class Outpost_OAuth_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'handle_disconnect' ),
+				'permission_callback' => array( __CLASS__, 'permission_check' ),
+				'show_in_index'       => false,
+			)
+		);
+		register_rest_route(
+			'outpost/v1',
+			'/oauth/(?P<provider>[a-z0-9-]+)/verify',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'handle_verify' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
 			)
@@ -175,6 +196,11 @@ final class Outpost_OAuth_Controller {
 		if ( ! $stored ) {
 			return self::redirect_to_settings( $provider->id(), 'persist_failed' );
 		}
+		// G11c: post-exchange hook for providers that need a registration
+		// step after standard OAuth completes (Polar Flow's AccessLink
+		// POST /v3/users dance). Default is a no-op. Failures inside the
+		// hook MUST NOT abort the connect flow — creds are already stored.
+		$provider->after_token_exchange( $user_id, $creds );
 		return self::redirect_to_settings( $provider->id(), 'connected' );
 	}
 
@@ -192,6 +218,28 @@ final class Outpost_OAuth_Controller {
 		$user_id = (int) get_current_user_id();
 		$ok      = $provider->disconnect( $user_id );
 		return new \WP_REST_Response( array( 'disconnected' => $ok ), 200 );
+	}
+
+	/**
+	 * GET /verify — call the provider's verify_connection() and return
+	 * its shape.
+	 *
+	 * @since 0.1.71
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function handle_verify( \WP_REST_Request $request ) {
+		$provider = self::resolve_provider( $request );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
+		}
+		$user_id = (int) get_current_user_id();
+		$result  = $provider->verify_connection( $user_id );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return new \WP_REST_Response( $result, 200 );
 	}
 
 	/**

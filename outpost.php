@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.69
+ * Version:           0.1.76
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.69' );
+define( 'OUTPOST_VERSION', '0.1.76' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -149,6 +149,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/credentials/class-outpost-credential
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-state.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-provider-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-notion.php';
+// G11c — Polar Flow wellness OAuth provider (AccessLink register-user dance).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-polar.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
@@ -344,6 +346,8 @@ add_action(
 	'plugins_loaded',
 	static function () {
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Notion() );
+		// G11c — Polar Flow wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Polar() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		Outpost_Encryption_Key_Notice::register();

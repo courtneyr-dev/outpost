@@ -161,16 +161,8 @@ final class Outpost_OAuth_Settings_Page {
 	 * @return Outpost_OAuth_Provider_Base[]
 	 */
 	private static function registered_providers(): array {
-		$out = array();
-		// G3.5a ships Notion only; future providers add to this list as
-		// they're registered with the controller.
-		$ids = array( 'notion' );
-		foreach ( $ids as $id ) {
-			$p = Outpost_OAuth_Controller::get_provider( $id );
-			if ( null !== $p ) {
-				$out[] = $p;
-			}
-		}
-		return $out;
+		// Pull every provider the controller has been told about. Order
+		// follows registration order in outpost.php's plugins_loaded hook.
+		return array_values( Outpost_OAuth_Controller::get_all_providers() );
 	}
 }
