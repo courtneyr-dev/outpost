@@ -189,6 +189,77 @@ The fallback chain gives the adapter graceful degradation: official API down, fa
 
 Spec at `docs/dev/prompts/G4-adapter-primitives.md` — locked design decisions Og_Inbound 1–9 and Composite_Inbound 1–8.
 
-## What's NOT in G4a
+## G4b — concrete extractors
 
-Concrete schema extractors (Recipe / Event / Article / Book / Restaurant) ship in G4b — additive. Apple Music refactor demo deferred — the existing F-phase Apple Music adapter (PR #34) does not have an iTunes Lookup enrichment to refactor; see `.overnight-questions.md` Q1.
+Five JSON-LD schema extractors implementing `Outpost_Schema_Extractor` ship in G4b:
+
+| Extractor | `supported_types()` | Highlights |
+|---|---|---|
+| `Outpost_Article_Extractor` | Article, NewsArticle, BlogPosting | headline, author list, publish/modified dates, publisher, section, keywords, word count |
+| `Outpost_Recipe_Extractor` | Recipe | prep/cook/total minutes (ISO 8601 duration normalised), recipe yield, category, cuisine, ingredient + instruction lists, nutrition, aggregate rating |
+| `Outpost_Event_Extractor` | Event + 14 subtypes (MusicEvent, Festival, BusinessEvent, etc) | start/end timestamps, location name + address, organiser/performer lists, event status, attendance mode, offers (price + currency + availability) |
+| `Outpost_Book_Extractor` | Book, Audiobook | author list, ISBN-10/13 (hyphens stripped, length-validated), book format, page count, publisher, language |
+| `Outpost_Restaurant_Extractor` | Restaurant + 5 subtypes (CafeOrCoffeeShop, Bakery, etc) | formatted PostalAddress, telephone, cuisine list, price range, geo coordinates, opening hours specification, aggregate rating |
+
+All five register on `plugins_loaded` priority 5 in `outpost.php`. Site owners can override via the `outpost_og_extractors` filter.
+
+### Adding a third-party extractor
+
+Implement the interface, then register on `plugins_loaded`:
+
+```php
+final class My_Movie_Extractor implements Outpost_Schema_Extractor {
+    public function supported_types(): array {
+        return array( 'Movie' );
+    }
+    public function priority(): int {
+        return 20; // higher than the built-ins to win on conflict
+    }
+    public function extract( array $jsonld_block, string $url ): array {
+        return array(
+            'type'        => 'Movie',
+            'name'        => $jsonld_block['name'] ?? '',
+            'director'    => $jsonld_block['director']['name'] ?? '',
+            'duration'    => $jsonld_block['duration'] ?? '',
+            // ...
+        );
+    }
+}
+
+add_action( 'plugins_loaded', static function () {
+    Outpost_Og_Inbound::register_extractor( new My_Movie_Extractor() );
+}, 6 );
+```
+
+When multiple extractors claim the same `@type`, the higher `priority()` wins.
+
+### Schema-helpers trait
+
+`Outpost_Schema_Helpers` (in `includes/adapters/primitives/extractors/trait-schema-helpers.php`) centralises JSON-LD shape normalisation:
+
+- `as_string($mixed)` — pulls a string from string / Person.name / array[0]
+- `as_name_list($mixed)` — flattens authors / organisers / performers to a `string[]`
+- `as_image_url($mixed)` — resolves ImageObject `url` or `contentUrl` to a string URL
+- `as_iso_duration_minutes($mixed)` — parses `PT1H30M` → 90 minutes
+- `as_iso_date($mixed)` — passes through ISO 8601 date/datetime strings
+- `as_postal_address_string($mixed)` — formats a PostalAddress object as `streetAddress, addressLocality, addressRegion, postalCode, addressCountry`
+- `as_instruction_list($mixed)` — flattens HowToStep / HowToSection trees to a flat `string[]`
+
+Third-party extractors can `use` the trait to inherit these helpers.
+
+## Apple Music + iTunes Lookup composite demo (G4b)
+
+`Outpost_Apple_Music_Adapter::fetch( $url )` wraps `Composite_Inbound::fetch()` with two sources:
+
+1. **Primary** (`apple_music_og`) — calls `Outpost_Og_Inbound::fetch( $url )` to extract OG tags from Apple's canonical share page.
+2. **Enricher** (`itunes_lookup`) — parses album/song id from the URL, hits `https://itunes.apple.com/lookup?id={id}&country={country}` (anonymous public API, no auth), normalises the result to an `itunes_*` keyed shape including 1000×1000 artwork (rewritten from iTunes' default 100×100).
+
+Album URLs with `?i={track-id}` upgrade to song lookup automatically.
+
+The primary's response provides title / image / description from Apple's HTML; the enricher fills in `itunes_artist_name`, `itunes_collection_name`, `itunes_track_name`, `itunes_genre`, `itunes_release_date`, `itunes_artwork_high_res`. Failed enrichment is swallowed — the adapter still returns the OG-only response when iTunes Lookup is unreachable.
+
+This is the canonical pattern for any future Phase G adapter that wants OG scraping plus an authenticated/anonymous JSON enrichment: declare a primary callback for the cheap path, declare an enricher callback for the rich path, let the composite primitive handle parallelism + timeout + merge.
+
+## Reference
+
+Spec at `docs/dev/prompts/G4-adapter-primitives.md` — locked design decisions Og_Inbound 1–9 and Composite_Inbound 1–8.
