@@ -23,7 +23,13 @@ final class Outpost_OAuth_Settings_Page {
 	private const PAGE_SLUG   = 'outpost-oauth';
 
 	public static function register(): void {
-		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
+		// Priority 11 so the parent Outpost menu (registered at default
+		// priority 10 by Outpost_Admin_Page) exists before this submenu
+		// runs. Without this, add_submenu_page resolves the page hook as
+		// `admin_page_outpost-oauth` instead of `outpost_page_outpost-oauth`,
+		// and admin.php?page=outpost-oauth fails the cap check with a
+		// "not allowed" wp_die.
+		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 11 );
 	}
 
 	public static function register_menu(): void {
