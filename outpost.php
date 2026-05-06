@@ -124,6 +124,20 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-medium.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-reddit.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-mastodon.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-bluesky.php';
+// G3.5a — Encryption + credentials store + OAuth foundation + Notion (proof-of-concept consumer).
+require_once OUTPOST_PLUGIN_DIR . 'includes/encryption/class-outpost-encryption-exception.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/encryption/class-outpost-encryption-key-resolver.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/encryption/class-outpost-encryption.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/credentials/class-outpost-credentials-store.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-state.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-provider-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-notion.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-encryption-key-notice.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-oauth-settings-page.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-perfmatters-defang.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -280,7 +294,25 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_Reddit() );
 		Outpost_Source_Registry::register( new Outpost_Source_Mastodon() );
 		Outpost_Source_Registry::register( new Outpost_Source_Bluesky() );
+		// G3.5a Notion source (auth-required; uses OAuth credentials store).
+		Outpost_Source_Registry::register( new Outpost_Source_Notion() );
 	}
+);
+
+// G3.5a — Wire OAuth foundation + admin pieces into WordPress.
+add_action(
+	'plugins_loaded',
+	static function () {
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Notion() );
+		Outpost_OAuth_Controller::register();
+		Outpost_OAuth_Settings_Page::register();
+		Outpost_Encryption_Key_Notice::register();
+		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
+		// Outpost PWA routes — those features postpone JS/CSS until first
+		// interaction and break the composer's first-paint mounting.
+		Outpost_Perfmatters_Defang::register();
+	},
+	5
 );
 
 /**
