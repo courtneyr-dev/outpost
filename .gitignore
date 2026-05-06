@@ -97,3 +97,8 @@ wp-includes/
 # Note: .wordpress-org/ is tracked in git for version control
 # but excluded from plugin ZIP via .distignore
 .gstack/
+
+# Phase G overnight run working files (per docs/dev/prompts/G-overnight-runbook.md §5).
+# Both files are ephemeral status logs for Courtney's morning review; never committed.
+.overnight-progress.md
+.overnight-questions.md
