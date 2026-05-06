@@ -30,6 +30,10 @@ final class Outpost_OAuth_Settings_Page {
 		// and admin.php?page=outpost-oauth fails the cap check with a
 		// "not allowed" wp_die.
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 11 );
+		// G99: working Disconnect button via admin-post.php (the REST
+		// endpoint requires X-WP-Nonce which forms can't easily send;
+		// admin-post.php's referer-based nonce is form-friendly).
+		add_action( 'admin_post_outpost_oauth_disconnect', array( __CLASS__, 'handle_disconnect_post' ) );
 	}
 
 	public static function register_menu(): void {
@@ -85,16 +89,24 @@ final class Outpost_OAuth_Settings_Page {
 				: esc_html__( 'Not connected', 'outpost' ) ) . '</td>';
 			echo '<td>';
 			if ( $is_connected ) {
-				echo '<button type="button" class="button" disabled>'
-					. esc_html__( 'Disconnect (POST to /disconnect)', 'outpost' )
-					. '</button>';
-				echo '<p class="description" style="margin-top:.5em">'
-					. sprintf(
-						/* translators: %s: REST endpoint URL */
-						esc_html__( 'Disconnect via authenticated POST to %s', 'outpost' ),
-						'<code>' . esc_html( rest_url( 'outpost/v1/oauth/' . $id . '/disconnect' ) ) . '</code>'
+				// Working Disconnect form. The whole visible button is
+				// the click target (no padding/sizing trick needed —
+				// it's a real submit input). admin-post.php verifies
+				// the nonce + cap; handle_disconnect_post() dispatches.
+				echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline">';
+				echo '<input type="hidden" name="action" value="outpost_oauth_disconnect">';
+				echo '<input type="hidden" name="provider" value="' . esc_attr( $id ) . '">';
+				wp_nonce_field( 'outpost_oauth_disconnect_' . $id, '_outpost_disconnect_nonce' );
+				echo '<button type="submit" class="button">'
+					. esc_html(
+						sprintf(
+							/* translators: %s: provider label */
+							__( 'Disconnect %s', 'outpost' ),
+							$provider->label()
+						)
 					)
-					. '</p>';
+					. '</button>';
+				echo '</form>';
 			} else {
 				echo '<a class="button button-primary" href="' . esc_url( $start_url ) . '">';
 				echo esc_html(
@@ -146,10 +158,14 @@ final class Outpost_OAuth_Settings_Page {
 				/* translators: %s: provider label */
 				$message = sprintf( __( '%s connected with the provider but credential storage failed. Check site error logs.', 'outpost' ), $provider );
 				break;
+			case 'disconnected':
+				/* translators: %s: provider label */
+				$message = sprintf( __( '%s disconnected.', 'outpost' ), $provider );
+				break;
 			default:
 				return;
 		}
-		$class = ( 'connected' === $status ) ? 'notice-success' : 'notice-error';
+		$class = ( 'connected' === $status || 'disconnected' === $status ) ? 'notice-success' : 'notice-error';
 		printf(
 			'<div class="notice %s is-dismissible"><p>%s</p></div>',
 			esc_attr( $class ),
@@ -172,5 +188,39 @@ final class Outpost_OAuth_Settings_Page {
 			}
 		}
 		return $out;
+	}
+
+	/**
+	 * Handle the Disconnect form POST. Verifies nonce + cap, calls the
+	 * provider's disconnect() method, then redirects back to the
+	 * settings page with a status notice.
+	 *
+	 * Hooked on `admin_post_outpost_oauth_disconnect`.
+	 *
+	 * @since 0.1.77
+	 */
+	public static function handle_disconnect_post(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to disconnect OAuth providers.', 'outpost' ), '', array( 'response' => 403 ) );
+		}
+		$provider_id = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( (string) $_POST['provider'] ) ) : '';
+		check_admin_referer( 'outpost_oauth_disconnect_' . $provider_id, '_outpost_disconnect_nonce' );
+
+		$provider = Outpost_OAuth_Controller::get_provider( $provider_id );
+		if ( null !== $provider ) {
+			$provider->disconnect( (int) get_current_user_id() );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'                   => self::PAGE_SLUG,
+					'outpost_oauth_status'   => 'disconnected',
+					'outpost_oauth_provider' => $provider_id,
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 }
