@@ -138,6 +138,9 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-encryption-key-notice.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-oauth-settings-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-perfmatters-defang.php';
+// G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -296,6 +299,9 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_Bluesky() );
 		// G3.5a Notion source (auth-required; uses OAuth credentials store).
 		Outpost_Source_Registry::register( new Outpost_Source_Notion() );
+		// G10a scripture inbound (og_tags-only batch).
+		Outpost_Source_Registry::register( new Outpost_Source_Sefaria() );
+		Outpost_Source_Registry::register( new Outpost_Source_SuttaCentral() );
 	}
 );
 
