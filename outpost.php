@@ -146,6 +146,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-ifixit.php';
 // G13a — Pretalx hosted SaaS conference inbound (og_tags-only;
 // self-hosted Pretalx and Sessionize wait on settings-UI foundation).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-pretalx.php';
+// G9 outbound adapter: Telegraph (telegra.ph) — anonymous publishing.
+require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/outbound/class-telegraph-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
@@ -624,6 +626,9 @@ function outpost_activate(): void {
 	flush_rewrite_rules();
 }
 register_activation_hook( __FILE__, 'outpost_activate' );
+
+// G9 — Register Telegraph outbound adapter's transition_post_status hook.
+Outpost_Telegraph_Adapter::register();
 
 /**
  * Deactivation hook. Flushes rewrite rules so /post/* rules are dropped from
