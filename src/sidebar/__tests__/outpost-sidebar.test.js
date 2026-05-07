@@ -21,6 +21,13 @@ jest.mock( '@wordpress/edit-post', () => ( {
 	),
 } ) );
 
+// Mock the fetch-recent panel away — its own tests cover its behavior;
+// the parent test just needs OutpostSidebar to render without spawning
+// API requests from child components.
+jest.mock( '../fetch-recent/fetch-recent-panel.js', () => ( {
+	FetchRecentPanel: () => <div data-testid="fetch-recent-panel" />,
+} ) );
+
 describe( 'OutpostSidebar', () => {
 	it( 'renders the placeholder text', () => {
 		const { getByText } = render( <OutpostSidebar /> );
