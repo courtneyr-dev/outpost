@@ -112,3 +112,97 @@ jobs:
         # build/pwa/ is what staging deploys reference; CI rebuilds for
         # smoke only and discards the output.
         run: npm run build
+
+  test-integration:
+    name: Integration suite (wp-env + WireMock)
+    runs-on: ubuntu-latest
+    # Integration tests run against a real WordPress install via @wordpress/env
+    # plus a WireMock sidecar for upstream HTTP stubbing. The job's smoke
+    # criterion: wp-env starts, Outpost loads, the mock-server admin endpoint
+    # is reachable. Per-cluster stub migrations land as follow-up PRs that
+    # consume this infrastructure (see docs/dev/g99-stub-migration-inventory.md).
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-8.2-integration-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.2-integration-
+
+      - run: npm ci --no-audit --no-fund
+
+      - run: composer install --no-progress --prefer-dist --no-interaction
+
+      - name: Start WireMock sidecar
+        # The mock-server compose stack from PR #56. Binds 8888 on the runner
+        # so wp-env's tests-cli container can reach WireMock via the Docker
+        # bridge gateway.
+        working-directory: tests/mock-server
+        run: docker compose up -d
+
+      - name: Wait for WireMock health
+        run: |
+          for i in $(seq 1 24); do
+            if curl -sf http://localhost:8890/__admin/health >/dev/null 2>&1; then
+              echo "WireMock ready after $((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "WireMock failed to become healthy in 120s"
+          docker compose -f tests/mock-server/docker-compose.yml logs
+          exit 1
+
+      - name: Start wp-env
+        # First start pulls the WP/MySQL/PHP images (cached on subsequent runs).
+        # The tests env mirrors the dev env config plus WP_DEBUG_LOG enabled.
+        run: npm run wp-env:start
+
+      - name: Run integration suite
+        # The OUTPOST_TEST_MOCK_SERVER_URL constant is defined directly in
+        # wp-config.php via .wp-env.json's env.tests.config block — wp-env
+        # writes it on `wp-env start`, so by the time PHPUnit runs the
+        # constant is already in place. Avoids the env-var passthrough
+        # dance with `wp-env run --env`. 172.17.0.1 is the docker0 bridge
+        # gateway IP on Linux runners — the tests-cli container's view of
+        # the runner host where WireMock binds.
+        run: npm run test:integration
+
+      - name: wp-env logs (on failure)
+        if: failure()
+        # `wp-env logs` follows by default — `docker compose logs` reads
+        # the logs once and exits, which is what we want in CI.
+        run: |
+          for project in $(docker ps -a --format '{{.Label "com.docker.compose.project"}}' | sort -u | grep -i wp-env || true); do
+            echo "===== $project ====="
+            docker compose --project-name "$project" logs --tail=300 || true
+          done
+
+      - name: WireMock logs (on failure)
+        if: failure()
+        run: docker compose -f tests/mock-server/docker-compose.yml logs --tail=300 || true
+
+      - name: Stop wp-env
+        if: always()
+        run: npm run wp-env:stop || true
+
+      - name: Stop WireMock
+        if: always()
+        working-directory: tests/mock-server
+        run: docker compose down || true

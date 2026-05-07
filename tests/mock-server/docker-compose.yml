@@ -15,10 +15,16 @@
 
 services:
   wiremock:
-    image: wiremock/wiremock:3
+    # Pin to `latest` for now — `wiremock/wiremock:3` major-tag alias
+    # was deprecated on Docker Hub (manifest unknown). Repin to a
+    # specific X.Y.Z when stable behavior matters.
+    image: wiremock/wiremock:latest
     container_name: outpost-wiremock
     ports:
-      - "8888:8080"
+      # Host port 8890, NOT 8888 — wp-env claims 8888 (dev install) and
+      # 8889 (tests install). Putting WireMock on 8890 avoids a "port
+      # already allocated" collision when both stacks run in CI.
+      - "8890:8080"
     volumes:
       - ./wiremock-mappings:/home/wiremock/mappings:ro
     command: >
