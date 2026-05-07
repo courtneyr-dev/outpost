@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.72
+ * Version:           0.1.73
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.72' );
+define( 'OUTPOST_VERSION', '0.1.73' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -153,6 +153,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-oura.php';
 // G12a — Ride With GPS OAuth provider (cycling activity capture).
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ridewithgps.php';
+// G14b — Ravelry OAuth provider (knit/crochet patterns + projects).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ravelry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
@@ -352,6 +354,8 @@ add_action(
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Oura() );
 		// G12a — Ride With GPS cycling OAuth provider.
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ridewithgps() );
+		// G14b — Ravelry knit/crochet OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ravelry() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		Outpost_Encryption_Key_Notice::register();
