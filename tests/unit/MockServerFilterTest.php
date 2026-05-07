@@ -57,6 +57,26 @@ final class MockServerFilterTest extends TestCase {
 		$this->assertNotContains( 'wordpress.org', $hosts );
 	}
 
+	public function test_rewritable_hosts_includes_test_only_domains(): void {
+		// G99 stub-migration support: the .test TLD is reserved by
+		// RFC 6761 and never resolves in production. Future
+		// integration tests against generic primitives (Og_Inbound,
+		// RSS extractor, etc.) use fixture URLs on these hosts.
+		$hosts = Outpost_Mock_Server_Filter::rewritable_hosts();
+
+		$this->assertContains( 'example.test', $hosts );
+		$this->assertContains( 'fixture.outpost-fixture.test', $hosts );
+	}
+
+	public function test_rewrite_url_handles_test_only_host(): void {
+		$result = Outpost_Mock_Server_Filter::rewrite_url_if_eligible(
+			'https://example.test/og-inbound/article-fixture',
+			'http://localhost:8888'
+		);
+
+		$this->assertSame( 'http://localhost:8888/og-inbound/article-fixture', $result );
+	}
+
 	// The remaining behaviors require the constant to be defined.
 	// Use process isolation via a separate test method that defines
 	// the constant temporarily and verifies via reflection.
