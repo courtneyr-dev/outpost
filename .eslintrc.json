@@ -1,0 +1,5 @@
+{
+	"extends": "./node_modules/@wordpress/scripts/config/.eslintrc.js",
+	"root": false,
+	"ignorePatterns": ["build/**", "node_modules/**", "vendor/**", "pwa/**"]
+}

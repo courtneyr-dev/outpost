@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.80
+ * Version:           0.1.81
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.80' );
+define( 'OUTPOST_VERSION', '0.1.81' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -177,6 +177,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-destinatio
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-meta.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-dispatcher.php';
+// G3.5c — Gutenberg sidebar bundle (registers PluginSidebar + asset enqueue).
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-sidebar-assets.php';
 // G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
@@ -389,6 +391,8 @@ add_action(
 		// Outpost PWA routes — those features postpone JS/CSS until first
 		// interaction and break the composer's first-paint mounting.
 		Outpost_Perfmatters_Defang::register();
+		// G3.5c — Register the Gutenberg block-editor sidebar bundle.
+		Outpost_Sidebar_Assets::register();
 		// G4b — Auto-register the five built-in JSON-LD schema extractors
 		// so Og_Inbound dispatches to them when matching @type values
 		// surface in fetched HTML. Site owners can extend or override

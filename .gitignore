@@ -14,6 +14,14 @@ vendor/
 # its children — gitignore won't recurse into an ignored directory.
 build/*
 !build/pwa/
+# G3.5c — @wordpress/scripts emits the Gutenberg sidebar bundle here.
+# Committed for the same staging-deploy reasons as build/pwa/.
+!build/index.js
+!build/index.asset.php
+!build/index.css
+!build/style-index.css
+!build/index.css.map
+!build/index.js.map
 dist/
 pwa/dist/
 # Anchor .vite/ to the project root so Vite's dev server cache stays
