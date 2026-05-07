@@ -100,3 +100,37 @@ For routine development, the staging deploy ritual is faster:
 5. Smoke test via `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`
 
 Local wp-env is useful when you need to run integration tests, or when staging is down, or when you want to test against a different WP version than staging is running.
+
+## CI integration (G99 wp-env CI)
+
+The `test-integration` job in `.github/workflows/ci.yml` runs the integration suite on every push + PR against `main`. The job:
+
+1. Sets up Node 20 + PHP 8.2 with composer + npm caches.
+2. Brings up the WireMock sidecar from `tests/mock-server/docker-compose.yml` on the runner host (port 8888).
+3. Polls WireMock's `/__admin/health` endpoint with a 120s timeout before proceeding.
+4. Starts wp-env (`npm run wp-env:start`).
+5. Runs `npx wp-env run tests-cli ... composer test:integration` with `OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8888` passed through `--env`.
+6. On failure: dumps wp-env + WireMock logs to the job output for diagnosis.
+7. Always: stops wp-env + WireMock to release the runner cleanly.
+
+### Why `172.17.0.1` for the mock-server URL on Linux runners
+
+GitHub Actions Ubuntu runners use Linux Docker. The default bridge network gateway IP from inside any container is `172.17.0.1` — that's the address wp-env's `tests-cli` container sees the runner host on. WireMock binds to `0.0.0.0:8888` on the runner via `docker compose up`; from inside the container, `http://172.17.0.1:8888` reaches it.
+
+Local dev on macOS / Windows (Docker Desktop) can use `host.docker.internal:8888` instead — both work; `172.17.0.1` is the Linux-specific value the CI uses.
+
+### What gates green
+
+The smoke test in `tests/integration/IntegrationInfrastructureSmokeTest.php` covers:
+
+- WP core loaded under wp-env.
+- Outpost plugin loaded via the `muplugins_loaded` hook in `tests/integration/bootstrap.php`.
+- `OUTPOST_TEST_MOCK_SERVER_URL` constant promoted from the env var.
+- WireMock `/__admin/health` reachable from inside the wp-env container.
+- `Outpost_Mock_Server_Filter::maybe_rewrite` hooked on `pre_http_request`.
+
+If those five pass, every per-cluster stub migration follow-up (per `docs/dev/g99-stub-migration-inventory.md`) can ride this same job without re-debugging the platform — they just add their fixture JSON + the migrated test methods.
+
+### What's still skipped
+
+The 97 `markTestSkipped` calls inventoried in `docs/dev/g99-stub-migration-inventory.md` remain skipped after this PR — the CI job runs them (they're discovered) but they short-circuit at the `markTestSkipped` line. Migration is per-cluster follow-up PRs.
