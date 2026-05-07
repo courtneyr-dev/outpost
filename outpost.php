@@ -157,6 +157,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ridewithgps.php';
 // G14b — Ravelry OAuth provider (knit/crochet patterns + projects).
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ravelry.php';
+// G11b — WHOOP wellness OAuth provider.
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-whoop.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
@@ -360,6 +362,8 @@ add_action(
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ridewithgps() );
 		// G14b — Ravelry knit/crochet OAuth provider.
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ravelry() );
+		// G11b — WHOOP wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Whoop() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		Outpost_Encryption_Key_Notice::register();
