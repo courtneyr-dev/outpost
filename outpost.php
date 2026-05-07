@@ -151,6 +151,12 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-provider-b
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-notion.php';
 // G11c — Polar Flow wellness OAuth provider (AccessLink register-user dance).
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-polar.php';
+// G11a — Oura OAuth provider (membership-gated wellness data).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-oura.php';
+// G12a — Ride With GPS OAuth provider (cycling activity capture).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ridewithgps.php';
+// G14b — Ravelry OAuth provider (knit/crochet patterns + projects).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ravelry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
@@ -348,6 +354,12 @@ add_action(
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Notion() );
 		// G11c — Polar Flow wellness OAuth provider.
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Polar() );
+		// G11a — Oura wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Oura() );
+		// G12a — Ride With GPS cycling OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ridewithgps() );
+		// G14b — Ravelry knit/crochet OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ravelry() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		Outpost_Encryption_Key_Notice::register();

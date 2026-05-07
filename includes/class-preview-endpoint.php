@@ -342,8 +342,28 @@ final class Outpost_Preview_Endpoint {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	private static function handle_via_source( Outpost_Source_Base $source, string $url ) {
-		$caps         = $source->capabilities();
-		$source_id    = isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : '';
+		$caps      = $source->capabilities();
+		$source_id = isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : '';
+
+		// G8b: auth-required sources (e.g. Notion) bypass the extractor
+		// recipe path. Their authenticated fetch lives on the source class
+		// itself because the standard og_tags / oembed / mf2 extractors
+		// have no notion of bearer credentials. When the user is connected,
+		// dispatch to the source-specific authenticated fetcher; on
+		// success return its structured payload, on auth-class failures
+		// fall through to the unauthenticated extractor / legacy path so
+		// the user still sees something.
+		if ( ! empty( $caps['auth_required'] ) ) {
+			$auth_response = self::handle_via_authenticated_source( $source, $source_id, $url );
+			if ( null !== $auth_response ) {
+				return $auth_response;
+			}
+			// $auth_response === null signals "fall through" — disconnected
+			// user OR provider returned a soft error that should let the
+			// extractor / legacy path render whatever public metadata it
+			// can find.
+		}
+
 		$extractor_id = isset( $caps['extractor'] ) && is_string( $caps['extractor'] ) ? $caps['extractor'] : '';
 		$extractor    = Outpost_Source_Registry::get_extractor( $extractor_id );
 
@@ -458,6 +478,201 @@ final class Outpost_Preview_Endpoint {
 				'raw'        => $raw,
 				'warnings'   => array(),
 			)
+		);
+	}
+
+	/**
+	 * Dispatch an auth-required source to its authenticated fetcher.
+	 * Returns:
+	 *   - WP_REST_Response on success — structured payload from the
+	 *     source's authenticated API call.
+	 *   - WP_REST_Response on user-friendly auth failures (e.g. Notion
+	 *     page not shared with the integration) — carries the reason +
+	 *     message so the composer can surface a hint instead of falling
+	 *     through silently.
+	 *   - null when the call should fall through to the unauthenticated
+	 *     extractor / legacy path (disconnected user, anonymous request,
+	 *     transport/auth failures that the extractor might still handle
+	 *     via og:title scraping).
+	 *
+	 * Per-source dispatch is by id rather than via an abstract method
+	 * on Source_Base: the auth shape varies enough between providers
+	 * (Notion: page id parsing, bearer header, structured JSON; future
+	 * providers may need different request shapes) that locking it down
+	 * on the base now would be premature.
+	 *
+	 * @since 0.1.74
+	 *
+	 * @param Outpost_Source_Base $source    Source instance.
+	 * @param string              $source_id Source id from capabilities.
+	 * @param string              $url       Source URL.
+	 * @return WP_REST_Response|null
+	 */
+	private static function handle_via_authenticated_source( Outpost_Source_Base $source, string $source_id, string $url ) {
+		unset( $source );  // Reserved for future per-source attribute reads.
+		$user_id = (int) get_current_user_id();
+		if ( $user_id <= 0 ) {
+			// Anonymous request — no per-user creds to dispatch with.
+			// Fall through to the extractor / legacy path so og:title
+			// scraping at least populates a generic preview.
+			return null;
+		}
+		if ( ! Outpost_Credentials_Store::is_configured( $source_id, $user_id ) ) {
+			// Disconnected user. Fall through. The composer can offer a
+			// "Connect {provider} for richer previews" hint based on the
+			// source_id field in the legacy/extractor response shape.
+			return null;
+		}
+
+		// G8b ships Notion as the only auth-required source consumer.
+		// Future providers (Oura/RWG/Ravelry sources) add their own
+		// branches here when their share-target paths land.
+		if ( 'notion' !== $source_id ) {
+			return null;
+		}
+
+		$result = Outpost_Source_Notion::fetch_page( $url, $user_id );
+
+		if ( is_wp_error( $result ) ) {
+			$code = $result->get_error_code();
+			if ( 'outpost_notion_page_not_shared' === $code ) {
+				// User-friendly notice. Surface as a 200 so the composer
+				// can render the message AND fall back to og:title; the
+				// `fallback_reason` field tells the UI to show the
+				// "share this page with Outpost" hint.
+				return rest_ensure_response(
+					array(
+						'source_url'            => $url,
+						'source_id'             => $source_id,
+						'authenticated_source'  => $source_id,
+						'authenticated_status'  => 'page_not_shared',
+						'authenticated_message' => $result->get_error_message(),
+						'extracted'             => array(),
+						'raw'                   => array(),
+						'warnings'              => array(
+							array(
+								'code'    => $code,
+								'message' => $result->get_error_message(),
+							),
+						),
+					)
+				);
+			}
+			// Other errors (notion_unauthorized, transport, invalid_url)
+			// fall through. The composer will see a generic preview from
+			// the legacy path; the user can reconnect via Settings.
+			return null;
+		}
+
+		// Success path — Notion's structured payload (page + blocks).
+		// Project into the same response shape as the extractor path so
+		// the composer doesn't need a separate code branch per source.
+		$extracted = self::project_notion_result_for_preview( $result );
+		return rest_ensure_response(
+			array(
+				'source_url'           => $url,
+				'source_id'            => $source_id,
+				'authenticated_source' => $source_id,
+				'authenticated_status' => 'ok',
+				'extracted'            => $extracted,
+				'raw'                  => $result,
+				'warnings'             => array(),
+			)
+		);
+	}
+
+	/**
+	 * Project a Notion `fetch_page` result into a flat extracted-fields
+	 * shape the composer can consume without knowing Notion's API
+	 * structure. Pulls page title, icon, cover image, last_edited_time,
+	 * and a short text preview from the first block(s).
+	 *
+	 * @since 0.1.74
+	 *
+	 * @param array<string,mixed> $result Notion fetch_page output.
+	 * @return array<string,mixed>
+	 */
+	private static function project_notion_result_for_preview( array $result ): array {
+		$page   = is_array( $result['page'] ?? null ) ? $result['page'] : array();
+		$blocks = is_array( $result['blocks'] ?? null ) ? $result['blocks'] : array();
+
+		// Title: Notion stores it as `properties.title.title[].plain_text`
+		// (database-style title) OR `properties.Name.title[].plain_text`
+		// (workspace pages). Walk both shapes.
+		$title      = '';
+		$properties = is_array( $page['properties'] ?? null ) ? $page['properties'] : array();
+		foreach ( $properties as $prop_name => $prop ) {
+			unset( $prop_name );
+			if ( ! is_array( $prop ) || empty( $prop['title'] ) || ! is_array( $prop['title'] ) ) {
+				continue;
+			}
+			foreach ( $prop['title'] as $rich_text ) {
+				if ( is_array( $rich_text ) && isset( $rich_text['plain_text'] ) ) {
+					$title .= (string) $rich_text['plain_text'];
+				}
+			}
+			if ( '' !== $title ) {
+				break;
+			}
+		}
+
+		// Icon: emoji or external URL.
+		$icon = '';
+		if ( is_array( $page['icon'] ?? null ) ) {
+			if ( 'emoji' === ( $page['icon']['type'] ?? '' ) && isset( $page['icon']['emoji'] ) ) {
+				$icon = (string) $page['icon']['emoji'];
+			} elseif ( isset( $page['icon']['external']['url'] ) ) {
+				$icon = (string) $page['icon']['external']['url'];
+			} elseif ( isset( $page['icon']['file']['url'] ) ) {
+				$icon = (string) $page['icon']['file']['url'];
+			}
+		}
+
+		// Cover image (external or file URL).
+		$cover = '';
+		if ( is_array( $page['cover'] ?? null ) ) {
+			if ( isset( $page['cover']['external']['url'] ) ) {
+				$cover = (string) $page['cover']['external']['url'];
+			} elseif ( isset( $page['cover']['file']['url'] ) ) {
+				$cover = (string) $page['cover']['file']['url'];
+			}
+		}
+
+		// Short text preview: concat the first few paragraph/heading blocks.
+		$preview_parts = array();
+		$max_blocks    = 5;
+		foreach ( $blocks as $block ) {
+			if ( count( $preview_parts ) >= $max_blocks ) {
+				break;
+			}
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+			$type = isset( $block['type'] ) ? (string) $block['type'] : '';
+			if ( ! in_array( $type, array( 'paragraph', 'heading_1', 'heading_2', 'heading_3', 'bulleted_list_item', 'numbered_list_item', 'quote' ), true ) ) {
+				continue;
+			}
+			$container = is_array( $block[ $type ] ?? null ) ? $block[ $type ] : array();
+			$rich_text = is_array( $container['rich_text'] ?? null ) ? $container['rich_text'] : array();
+			$line      = '';
+			foreach ( $rich_text as $rt ) {
+				if ( is_array( $rt ) && isset( $rt['plain_text'] ) ) {
+					$line .= (string) $rt['plain_text'];
+				}
+			}
+			$line = trim( $line );
+			if ( '' !== $line ) {
+				$preview_parts[] = $line;
+			}
+		}
+
+		return array(
+			'p-name'             => $title,
+			'u-photo'            => $cover,
+			'p-summary'          => implode( "\n", $preview_parts ),
+			'notion-icon'        => $icon,
+			'notion-page-id'     => isset( $result['id'] ) ? (string) $result['id'] : '',
+			'notion-block-count' => count( $blocks ),
 		);
 	}
 

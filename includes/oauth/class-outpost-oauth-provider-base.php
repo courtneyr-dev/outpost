@@ -266,6 +266,10 @@ abstract class Outpost_OAuth_Provider_Base {
 	 * within 60 seconds of expiry. Returns false when no expiry is
 	 * tracked (e.g. Notion's never-expiring tokens).
 	 *
+	 * Expiry is computed against `obtained_at + expires_in - 60s`. The
+	 * 60s skew gives the refresh path room to fire before the token
+	 * actually expires.
+	 *
 	 * @since 0.1.71
 	 *
 	 * @param int $user_id User id.
@@ -286,6 +290,14 @@ abstract class Outpost_OAuth_Provider_Base {
 
 	/**
 	 * Refresh the stored access token using the stored refresh_token.
+	 * Returns the freshly-shaped credentials array on success or a
+	 * WP_Error when the refresh fails. The credentials store is updated
+	 * in-place on success.
+	 *
+	 * Concrete provider behavior is identical to RFC 6749 §6 — POST
+	 * `grant_type=refresh_token` + `refresh_token` to the token URL.
+	 * Providers that need extra headers (Notion's Basic auth) inherit
+	 * the existing `extra_token_request_headers()` hook automatically.
 	 *
 	 * @since 0.1.71
 	 *
@@ -321,6 +333,8 @@ abstract class Outpost_OAuth_Provider_Base {
 		if ( is_wp_error( $decoded ) ) {
 			return $decoded;
 		}
+		// If the provider didn't return a fresh refresh_token, preserve
+		// the existing one — RFC 6749 §6 allows omission to mean "reuse".
 		if ( empty( $decoded['refresh_token'] ) && ! empty( $creds['refresh_token'] ) ) {
 			$decoded['refresh_token'] = (string) $creds['refresh_token'];
 		}
@@ -330,8 +344,17 @@ abstract class Outpost_OAuth_Provider_Base {
 	}
 
 	/**
-	 * Verify the stored connection. Default returns "not implemented"
-	 * WP_Error; providers override per their data-access endpoint.
+	 * Verify the stored connection by hitting a provider-specific
+	 * endpoint that confirms the token is alive AND that data access
+	 * works (not just OAuth validity — for some providers, OAuth is
+	 * fine but data access is gated separately, e.g. Oura membership).
+	 *
+	 * Default returns a "not implemented" WP_Error. Providers that
+	 * support verification override this method.
+	 *
+	 * Verification responses follow the shape:
+	 *   `{ ok: true, ...provider-specific identity fields }`
+	 *   `{ ok: false, reason: 'auth_failed' | 'membership_required' | ... }`
 	 *
 	 * @since 0.1.71
 	 *

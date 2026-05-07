@@ -222,7 +222,9 @@ final class Outpost_OAuth_Controller {
 
 	/**
 	 * GET /verify — call the provider's verify_connection() and return
-	 * its shape.
+	 * its shape. Useful for UI confirmation that the stored credentials
+	 * still work AND that data access is alive (some providers gate
+	 * data access behind separate paid tiers).
 	 *
 	 * @since 0.1.71
 	 *
