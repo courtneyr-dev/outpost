@@ -72,9 +72,45 @@ Page fetches cache for 1 hour via WordPress transients keyed on the page ID. Re-
 - `outpost_notion_page_not_shared` — Notion 404. The Notion integration may not be granted access to the page, or the page was deleted. Surface as a "share with Outpost integration in Notion" prompt.
 - `outpost_notion_api_error` — non-2xx other than 404. Logged at debug level with the upstream status.
 
-## What's deferred to G8b
+## Share-target preview behavior (G8b)
 
-- Outbound: creating Notion pages from Outpost posts (note → Notion page, photo → Notion page).
-- Webhook sync: Notion → WP propagation when the source page changes.
-- Database queries: fetching Notion database items, not just pages.
-- Block-level caption + alt-text round-trip.
+When a user shares a Notion URL into the Outpost composer, the preview endpoint (`/wp-json/outpost/v1/preview`) follows this dispatch:
+
+1. **URL match.** Any URL on `notion.so`, `*.notion.site`, or `notion.com` matches the registered Notion source. The source's capabilities declare `auth_required: true`, which triggers G8b's authenticated-fetch branch.
+
+2. **Connected user, page accessible.** Preview returns:
+   ```json
+   {
+     "source_id": "notion",
+     "authenticated_source": "notion",
+     "authenticated_status": "ok",
+     "extracted": {
+       "p-name": "Page title from Notion",
+       "u-photo": "https://example.com/cover.jpg",
+       "p-summary": "First paragraph...\nA subhead\nMore text.",
+       "notion-icon": "📓",
+       "notion-page-id": "abc123def456...",
+       "notion-block-count": 12
+     },
+     "raw": { /* full page + blocks payload */ }
+   }
+   ```
+   The composer pre-fills `p-name` (page title) + `u-photo` (cover image) and surfaces the `p-summary` as the preview blurb.
+
+3. **Connected user, page NOT shared with the Outpost integration.** Preview returns 200 with `authenticated_status: "page_not_shared"` and a user-friendly `authenticated_message` ("This Notion page hasn't been shared with Outpost. In Notion, click ••• → Add connections → Outpost."). The composer renders the message as a hint and falls back to whatever og:title scraping can extract from Notion's public meta (typically just the page title with " | Notion" suffix).
+
+4. **Disconnected user (no Notion creds).** Preview falls through to the legacy og:title path. The composer can show a "Connect Notion for richer previews" hint based on the absence of `authenticated_source` in the response.
+
+5. **Anonymous request.** Same as disconnected — falls through.
+
+6. **Notion transport / 5xx failure.** Falls through silently to og:title; the user can retry or proceed with the URL alone.
+
+The 1-hour transient cache on `Outpost_Source_Notion::fetch_page` rides on top of this dispatch — repeated shares of the same page within the cache window skip the API roundtrip entirely.
+
+## What's deferred to follow-up PRs
+
+- **Outbound:** creating Notion pages from Outpost posts (note → Notion page, photo → Notion page).
+- **Webhook sync:** Notion → WP propagation when the source page changes.
+- **Database queries:** fetching Notion database items, not just pages.
+- **Block-level caption + alt-text round-trip.**
+- **Composer-side UI** that consumes the new `authenticated_*` response fields (the response shape is in place; the composer's React/Preact components need to surface the icon, cover image, block count). The legacy `extracted` keys (`p-name`, `u-photo`, `p-summary`) work without UI changes.
