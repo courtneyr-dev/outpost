@@ -18,7 +18,8 @@
     "tests": {
       "config": {
         "WP_DEBUG": true,
-        "WP_DEBUG_LOG": true
+        "WP_DEBUG_LOG": true,
+        "OUTPOST_TEST_MOCK_SERVER_URL": "http://172.17.0.1:8890"
       }
     }
   }
