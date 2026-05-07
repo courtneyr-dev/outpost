@@ -190,6 +190,10 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-sidebar-assets.php';
 // against the picker's filter in follow-up PRs.
 require_once OUTPOST_PLUGIN_DIR . 'includes/rest/class-outpost-fetch-recent-rest.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-test-provider.php';
+// G11a-consumer — Oura fetch-recent provider.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-oura.php';
+// G11b-consumer — WHOOP fetch-recent provider.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-whoop.php';
 // G11c-consumer — Polar Flow fetch-recent provider (transaction model).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-polar.php';
 // G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
@@ -413,6 +417,10 @@ add_action(
 		// G-fetch-recent-picker.
 		Outpost_Fetch_Recent_REST::register();
 		Outpost_Fetch_Recent_Test_Provider::register();
+		// G11a-consumer — Oura fetch-recent provider.
+		Outpost_Fetch_Recent_Oura::register();
+		// G11b-consumer — WHOOP fetch-recent provider.
+		Outpost_Fetch_Recent_Whoop::register();
 		// G11c-consumer — Polar Flow fetch-recent provider.
 		Outpost_Fetch_Recent_Polar::register();
 		// G4b — Auto-register the five built-in JSON-LD schema extractors
