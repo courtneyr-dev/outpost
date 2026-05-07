@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.88
+ * Version:           0.1.89
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.88' );
+define( 'OUTPOST_VERSION', '0.1.89' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -194,6 +194,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-t
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-oura.php';
 // G11b-consumer — WHOOP fetch-recent provider.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-whoop.php';
+// G11c-consumer — Polar Flow fetch-recent provider (transaction model).
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-polar.php';
 // G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
@@ -419,6 +421,8 @@ add_action(
 		Outpost_Fetch_Recent_Oura::register();
 		// G11b-consumer — WHOOP fetch-recent provider.
 		Outpost_Fetch_Recent_Whoop::register();
+		// G11c-consumer — Polar Flow fetch-recent provider.
+		Outpost_Fetch_Recent_Polar::register();
 		// G4b — Auto-register the five built-in JSON-LD schema extractors
 		// so Og_Inbound dispatches to them when matching @type values
 		// surface in fetched HTML. Site owners can extend or override
