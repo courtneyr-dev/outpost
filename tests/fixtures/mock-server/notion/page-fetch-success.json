@@ -1,0 +1,22 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPathPattern": "/v1/pages/.*"
+	},
+	"response": {
+		"status": 200,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"object": "page",
+			"id": "00000000-0000-0000-0000-000000000000",
+			"properties": {
+				"title": {
+					"title": [
+						{ "type": "text", "text": { "content": "Sample Notion page" } }
+					]
+				}
+			},
+			"url": "https://www.notion.so/sample-page"
+		}
+	}
+}

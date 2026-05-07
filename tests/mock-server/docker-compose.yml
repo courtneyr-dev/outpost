@@ -1,0 +1,32 @@
+# WireMock sidecar for Outpost integration tests (G99-mock-server).
+#
+# Runs alongside wp-env's WordPress containers. Used by the integration
+# suite via the OUTPOST_TEST_MOCK_SERVER_URL constant + the
+# Outpost_Mock_Server_Filter that rewrites outbound HTTP for the
+# hardcoded list of upstream API hosts.
+#
+# Local dev:
+#
+#   cd tests/mock-server && docker compose up -d
+#   composer test:integration
+#   docker compose down
+#
+# CI: see .github/workflows for the equivalent service definition.
+
+services:
+  wiremock:
+    image: wiremock/wiremock:3
+    container_name: outpost-wiremock
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./wiremock-mappings:/home/wiremock/mappings:ro
+    command: >
+      --port 8080
+      --verbose
+      --global-response-templating
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/__admin/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
