@@ -196,6 +196,11 @@ final class Outpost_OAuth_Controller {
 		if ( ! $stored ) {
 			return self::redirect_to_settings( $provider->id(), 'persist_failed' );
 		}
+		// G11c: post-exchange hook for providers that need a registration
+		// step after standard OAuth completes (Polar Flow's AccessLink
+		// POST /v3/users dance). Default is a no-op. Failures inside the
+		// hook MUST NOT abort the connect flow — creds are already stored.
+		$provider->after_token_exchange( $user_id, $creds );
 		return self::redirect_to_settings( $provider->id(), 'connected' );
 	}
 

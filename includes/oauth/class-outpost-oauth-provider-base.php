@@ -368,4 +368,29 @@ abstract class Outpost_OAuth_Provider_Base {
 			__( 'This provider does not implement connection verification.', 'outpost' )
 		);
 	}
+
+	/**
+	 * Hook called by the controller after successful token exchange AND
+	 * credential persistence. Default is a no-op. Providers that need
+	 * post-exchange registration / activation steps override this.
+	 *
+	 * Polar Flow's AccessLink uses this to POST /v3/users with the
+	 * access token to register the user with the application — without
+	 * that step, no Polar data API call works. RFC 6749 has no native
+	 * concept for this dance, so it lives in a provider-specific hook
+	 * rather than the base flow.
+	 *
+	 * Failures inside after_token_exchange() MUST NOT abort the connect
+	 * flow — credentials are already stored. Providers should log
+	 * failures at debug level and surface them on the next
+	 * verify_connection() call, where the user can retry registration.
+	 *
+	 * @since 0.1.76
+	 *
+	 * @param int                 $user_id User id.
+	 * @param array<string,mixed> $creds   The freshly-shaped credentials.
+	 */
+	public function after_token_exchange( int $user_id, array $creds ): void {
+		unset( $user_id, $creds );
+	}
 }

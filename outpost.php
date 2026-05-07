@@ -149,6 +149,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/credentials/class-outpost-credential
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-state.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-provider-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-notion.php';
+// G11c — Polar Flow wellness OAuth provider (AccessLink register-user dance).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-polar.php';
 // G11a — Oura OAuth provider (membership-gated wellness data).
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-oura.php';
 // G12a — Ride With GPS OAuth provider (cycling activity capture).
@@ -364,6 +366,8 @@ add_action(
 	'plugins_loaded',
 	static function () {
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Notion() );
+		// G11c — Polar Flow wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Polar() );
 		// G11a — Oura wellness OAuth provider.
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Oura() );
 		// G12a — Ride With GPS cycling OAuth provider.
