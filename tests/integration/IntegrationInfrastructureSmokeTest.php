@@ -102,7 +102,12 @@ final class IntegrationInfrastructureSmokeTest extends TestCase {
 			);
 		}
 		$health_url = rtrim( (string) constant( 'OUTPOST_TEST_MOCK_SERVER_URL' ), '/' ) . '/__admin/health';
-		$response   = wp_safe_remote_get( $health_url, array( 'timeout' => 10 ) );
+		// `wp_remote_get` not `wp_safe_remote_get` — the safe variant blocks
+		// private IPs (172.17.0.1, the Linux Docker bridge gateway) via WP's
+		// SSRF defenses. That protection's correct for production paths;
+		// inappropriate for a test-time health check against a known-good
+		// runner-host service.
+		$response = wp_remote_get( $health_url, array( 'timeout' => 10 ) );
 
 		$this->assertFalse(
 			is_wp_error( $response ),
