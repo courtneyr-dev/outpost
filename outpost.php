@@ -168,6 +168,8 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
+// G12a-source — Ride With GPS URL-paste consumer.
+require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-rwg.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-encryption-key-notice.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-oauth-settings-page.php';
 // G3.5d — Multi-tab settings UI foundation.
