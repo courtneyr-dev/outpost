@@ -149,6 +149,14 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/credentials/class-outpost-credential
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-state.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-provider-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-notion.php';
+// G11a — Oura OAuth provider (membership-gated wellness data).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-oura.php';
+// G12a — Ride With GPS OAuth provider (cycling activity capture).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ridewithgps.php';
+// G14b — Ravelry OAuth provider (knit/crochet patterns + projects).
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-ravelry.php';
+// G11b — WHOOP wellness OAuth provider.
+require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-provider-whoop.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
@@ -161,6 +169,12 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/settings/class-outpost-settings-hand
 require_once OUTPOST_PLUGIN_DIR . 'includes/settings/class-outpost-settings-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/settings/tabs/class-outpost-settings-tab-api-keys.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-perfmatters-defang.php';
+// G3.5b — POSSE-outbound foundation (base class + dispatcher + meta + registry).
+// No concrete destinations registered yet; G5 ships the first ones.
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-destination-base.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-meta.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-registry.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-dispatcher.php';
 // G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
@@ -350,11 +364,22 @@ add_action(
 	'plugins_loaded',
 	static function () {
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Notion() );
+		// G11a — Oura wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Oura() );
+		// G12a — Ride With GPS cycling OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ridewithgps() );
+		// G14b — Ravelry knit/crochet OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Ravelry() );
+		// G11b — WHOOP wellness OAuth provider.
+		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Whoop() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
 		// G3.5d — Multi-tab settings UI.
 		Outpost_Settings_Page::register();
 		Outpost_Settings_Handler::register();
+		// G3.5b — POSSE foundation: register meta keys + cron handler.
+		Outpost_POSSE_Meta::register();
+		Outpost_POSSE_Dispatcher::register();
 		Outpost_Encryption_Key_Notice::register();
 		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
 		// Outpost PWA routes — those features postpone JS/CSS until first
