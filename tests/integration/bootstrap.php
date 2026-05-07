@@ -28,7 +28,7 @@ declare(strict_types=1);
 // helper Outpost_Mock_Server gate on the constant — without it, the
 // filter is a no-op and the helper throws a clear error. CI passes
 // this env var through `wp-env run tests-cli`; local dev sessions can
-// `export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8888` before
+// `export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8890` before
 // running `npm run test:integration`.
 $outpost_mock_server_url = getenv( 'OUTPOST_TEST_MOCK_SERVER_URL' );
 if ( false !== $outpost_mock_server_url && '' !== $outpost_mock_server_url

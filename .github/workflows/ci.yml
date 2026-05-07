@@ -159,7 +159,7 @@ jobs:
       - name: Wait for WireMock health
         run: |
           for i in $(seq 1 24); do
-            if curl -sf http://localhost:8888/__admin/health >/dev/null 2>&1; then
+            if curl -sf http://localhost:8890/__admin/health >/dev/null 2>&1; then
               echo "WireMock ready after $((i * 5))s"
               exit 0
             fi
@@ -181,7 +181,7 @@ jobs:
         # 172.17.0.1 is the docker0 bridge gateway IP on Linux runners — the
         # tests-cli container's view of the runner host where WireMock binds.
         env:
-          OUTPOST_TEST_MOCK_SERVER_URL: http://172.17.0.1:8888
+          OUTPOST_TEST_MOCK_SERVER_URL: http://172.17.0.1:8890
         run: |
           npx wp-env run tests-cli --env-cwd=wp-content/plugins/outpost \
             bash -c 'OUTPOST_TEST_MOCK_SERVER_URL="${{ env.OUTPOST_TEST_MOCK_SERVER_URL }}" composer test:integration'
