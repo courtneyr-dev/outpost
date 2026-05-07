@@ -58,6 +58,14 @@ final class Outpost_Mock_Server_Filter {
 		'www.youtube.com',
 		'youtube.com',
 		'youtu.be',
+		// G99 test-only hosts. These never resolve in production (the
+		// .test TLD is reserved per RFC 6761) and are only used by
+		// integration tests that exercise generic primitives like
+		// Og_Inbound or the RSS extractor against fixture URLs. Listing
+		// them here lets fixture URLs use stable, predictable host
+		// names without polluting the production-host allowlist.
+		'example.test',
+		'fixture.outpost-fixture.test',
 	);
 
 	/**
