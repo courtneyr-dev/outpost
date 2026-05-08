@@ -36,6 +36,16 @@ if ( false !== $outpost_mock_server_url && '' !== $outpost_mock_server_url
 	define( 'OUTPOST_TEST_MOCK_SERVER_URL', $outpost_mock_server_url );
 }
 
+// Load Composer's autoloader before anything else so test helpers
+// (Outpost_Mock_Server in tests/_helpers/, registered via the
+// autoload-dev classmap) are available to the integration tests.
+// Without this, `class_exists('Outpost_Mock_Server')` returns false
+// and migrated stubs that depend on the helper skip silently.
+$outpost_autoloader = dirname( __DIR__, 2 ) . '/vendor/autoload.php';
+if ( file_exists( $outpost_autoloader ) ) {
+	require_once $outpost_autoloader;
+}
+
 $wp_tests_dir = getenv( 'WP_TESTS_DIR' );
 if ( ! $wp_tests_dir ) {
 	// @wordpress/env's default location for the WP test suite.
