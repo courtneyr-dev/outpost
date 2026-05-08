@@ -1,0 +1,16 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPathPattern": "/v1/pages/[a-f0-9]{32}"
+	},
+	"response": {
+		"status": 404,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"object": "error",
+			"status": 404,
+			"code": "object_not_found",
+			"message": "Could not find page with ID. Make sure the relevant pages and databases are shared with your integration."
+		}
+	}
+}

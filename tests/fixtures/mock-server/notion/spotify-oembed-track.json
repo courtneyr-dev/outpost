@@ -1,0 +1,23 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPathPattern": "/oembed.*"
+	},
+	"response": {
+		"status": 200,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"version": "1.0",
+			"type": "rich",
+			"provider_name": "Spotify",
+			"provider_url": "https://spotify.com",
+			"title": "Sample Track",
+			"thumbnail_url": "https://example.test/spotify-thumb.jpg",
+			"thumbnail_width": 300,
+			"thumbnail_height": 300,
+			"width": 456,
+			"height": 152,
+			"html": "<iframe src=\"https://open.spotify.com/embed/track/0000000000000000000000\"></iframe>"
+		}
+	}
+}

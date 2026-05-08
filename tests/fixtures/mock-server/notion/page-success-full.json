@@ -1,0 +1,40 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPathPattern": "/v1/pages/[a-f0-9]{32}"
+	},
+	"response": {
+		"status": 200,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"object": "page",
+			"id": "aaaaaaaa-1111-2222-3333-44445555aaaa",
+			"created_time": "2026-05-01T10:00:00.000Z",
+			"last_edited_time": "2026-05-08T14:30:00.000Z",
+			"icon": {
+				"type": "emoji",
+				"emoji": "📝"
+			},
+			"cover": {
+				"type": "external",
+				"external": {
+					"url": "https://example.test/notion-cover.jpg"
+				}
+			},
+			"properties": {
+				"title": {
+					"id": "title",
+					"type": "title",
+					"title": [
+						{
+							"type": "text",
+							"text": { "content": "Sample Notion Page" },
+							"plain_text": "Sample Notion Page"
+						}
+					]
+				}
+			},
+			"url": "https://www.notion.so/Workspace-aaaaaaaa11112222333344445555aaaa"
+		}
+	}
+}

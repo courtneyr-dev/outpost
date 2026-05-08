@@ -1,0 +1,45 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPathPattern": "/v1/blocks/[a-f0-9]{32}/children.*"
+	},
+	"response": {
+		"status": 200,
+		"headers": { "Content-Type": "application/json" },
+		"jsonBody": {
+			"object": "list",
+			"results": [
+				{
+					"object": "block",
+					"id": "bbbbbbbb-1111-1111-1111-111111111111",
+					"type": "heading_1",
+					"heading_1": {
+						"rich_text": [
+							{
+								"type": "text",
+								"text": { "content": "Heading One" },
+								"plain_text": "Heading One"
+							}
+						]
+					}
+				},
+				{
+					"object": "block",
+					"id": "bbbbbbbb-2222-2222-2222-222222222222",
+					"type": "paragraph",
+					"paragraph": {
+						"rich_text": [
+							{
+								"type": "text",
+								"text": { "content": "First paragraph of body content." },
+								"plain_text": "First paragraph of body content."
+							}
+						]
+					}
+				}
+			],
+			"next_cursor": null,
+			"has_more": false
+		}
+	}
+}
