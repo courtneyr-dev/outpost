@@ -1,0 +1,20 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPath": "/oembed",
+		"queryParameters": {
+			"url": {
+				"matches": ".*spotify.*\\/track\\/9999999999999999999999.*"
+			}
+		}
+	},
+	"response": {
+		"status": 404,
+		"headers": {
+			"Content-Type": "application/json; charset=utf-8"
+		},
+		"jsonBody": {
+			"error": "not found"
+		}
+	}
+}
