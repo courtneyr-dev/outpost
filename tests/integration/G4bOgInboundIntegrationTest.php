@@ -115,7 +115,8 @@ final class G4bOgInboundIntegrationTest extends TestCase {
 		$this->assertIsArray( $schema );
 		$this->assertSame( 'Sample Article Title', $schema['headline'] );
 		$this->assertSame( 'Article', $schema['type'] );
-		$this->assertSame( 'Jane Author', $schema['author'] );
+		// Article extractor returns author as a string array (multi-author safe).
+		$this->assertSame( array( 'Jane Author' ), $schema['author'] );
 		$this->assertSame( '2026-05-01T10:00:00+00:00', $schema['date_published'] );
 
 		// Cache hit on second call: WireMock should still see exactly 1 request.
@@ -192,7 +193,7 @@ final class G4bOgInboundIntegrationTest extends TestCase {
 		// extractor registered for that). Article wins, second Article is
 		// ignored per first-match-wins semantics.
 		$this->assertSame( 'First-Matching Article Wins', $schema['headline'] );
-		$this->assertSame( 'Sam Author', $schema['author'] );
+		$this->assertSame( array( 'Sam Author' ), $schema['author'] );
 		$this->assertSame( 'Article', $schema['type'] );
 	}
 }
