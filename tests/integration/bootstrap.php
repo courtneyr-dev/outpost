@@ -36,6 +36,14 @@ if ( false !== $outpost_mock_server_url && '' !== $outpost_mock_server_url
 	define( 'OUTPOST_TEST_MOCK_SERVER_URL', $outpost_mock_server_url );
 }
 
+// Make Outpost_PWA_Shell::halt() a no-op so share-target / route-handler
+// tests can capture state without exit()ing PHPUnit. Mirrors the same
+// constant set in tests/bootstrap.php for unit tests; integration env
+// previously didn't need it because no migrated cluster exercised halt().
+if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
+	define( 'OUTPOST_TESTING_PWA_SHELL', true );
+}
+
 // Load Composer's autoloader before anything else so test helpers
 // (Outpost_Mock_Server in tests/_helpers/, registered via the
 // autoload-dev classmap) are available to the integration tests.
