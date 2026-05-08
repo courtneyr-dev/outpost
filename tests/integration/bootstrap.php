@@ -71,4 +71,38 @@ tests_add_filter(
 	}
 );
 
+/**
+ * Whitelist the mock-server host past `wp_http_validate_url()`'s
+ * private-IP block. `wp_safe_remote_get` (used by Og_Inbound and
+ * other production fetchers) rejects 172.17.0.1 — the Linux Docker
+ * bridge gateway where WireMock binds — as a private IP via
+ * RFC 1918 enforcement. The `http_request_host_is_external` filter
+ * narrows the bypass to only the configured mock-server host;
+ * production paths stay fully protected.
+ *
+ * Scoped on the OUTPOST_TEST_MOCK_SERVER_URL constant — production
+ * never defines that constant so the filter is a no-op outside
+ * integration tests.
+ */
+tests_add_filter(
+	'muplugins_loaded',
+	static function (): void {
+		if ( ! defined( 'OUTPOST_TEST_MOCK_SERVER_URL' ) ) {
+			return;
+		}
+		$mock_host = wp_parse_url( OUTPOST_TEST_MOCK_SERVER_URL, PHP_URL_HOST );
+		if ( ! is_string( $mock_host ) || '' === $mock_host ) {
+			return;
+		}
+		add_filter(
+			'http_request_host_is_external',
+			static function ( $is_external, $host ) use ( $mock_host ) {
+				return $host === $mock_host ? true : $is_external;
+			},
+			10,
+			2
+		);
+	}
+);
+
 require_once $wp_tests_dir . '/includes/bootstrap.php';

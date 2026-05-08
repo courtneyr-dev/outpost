@@ -62,12 +62,17 @@ final class G4bOgInboundIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * Build the URL the SUT shares: Outpost_Mock_Server_Filter rewrites
-	 * `example.test` (in REWRITABLE_HOSTS) to OUTPOST_TEST_MOCK_SERVER_URL,
-	 * so the SUT-visible URL is just `https://example.test<path>`.
+	 * Build the URL the SUT receives. We hit OUTPOST_TEST_MOCK_SERVER_URL
+	 * directly (the WireMock runner-host base) rather than going through
+	 * the Outpost_Mock_Server_Filter rewrite path with an `example.test`
+	 * URL — `wp_http_validate_url()` (called inside Og_Inbound::fetch
+	 * before any pre_http_request filter fires) rejects unresolvable
+	 * `.test` TLDs with `outpost_og_invalid_url`. The rewriter is
+	 * exercised separately by OAuth provider integration tests whose
+	 * upstream hosts pass wp_http_validate_url.
 	 */
 	private function mock_url( string $path ): string {
-		return 'https://example.test' . $path;
+		return rtrim( (string) constant( 'OUTPOST_TEST_MOCK_SERVER_URL' ), '/' ) . $path;
 	}
 
 	/**
