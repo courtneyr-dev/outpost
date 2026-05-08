@@ -159,7 +159,7 @@ jobs:
       - name: Wait for WireMock health
         run: |
           for i in $(seq 1 24); do
-            if curl -sf http://localhost:8890/__admin/health >/dev/null 2>&1; then
+            if curl -sf http://localhost:8080/__admin/health >/dev/null 2>&1; then
               echo "WireMock ready after $((i * 5))s"
               exit 0
             fi

@@ -106,18 +106,18 @@ Local wp-env is useful when you need to run integration tests, or when staging i
 The `test-integration` job in `.github/workflows/ci.yml` runs the integration suite on every push + PR against `main`. The job:
 
 1. Sets up Node 20 + PHP 8.2 with composer + npm caches.
-2. Brings up the WireMock sidecar from `tests/mock-server/docker-compose.yml` on the runner host (port 8890 — *not* 8888, since wp-env already binds 8888 for its dev install and 8889 for tests).
+2. Brings up the WireMock sidecar from `tests/mock-server/docker-compose.yml` on the runner host (port 8080 — *not* 8888, since wp-env already binds 8888 for its dev install and 8889 for tests).
 3. Polls WireMock's `/__admin/health` endpoint with a 120s timeout before proceeding.
 4. Starts wp-env (`npm run wp-env:start`).
-5. Runs `npx wp-env run tests-cli ... composer test:integration` with `OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8890` passed through `--env`.
+5. Runs `npx wp-env run tests-cli ... composer test:integration` with `OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8080` passed through `--env`.
 6. On failure: dumps wp-env + WireMock logs to the job output for diagnosis.
 7. Always: stops wp-env + WireMock to release the runner cleanly.
 
 ### Why `172.17.0.1` for the mock-server URL on Linux runners
 
-GitHub Actions Ubuntu runners use Linux Docker. The default bridge network gateway IP from inside any container is `172.17.0.1` — that's the address wp-env's `tests-cli` container sees the runner host on. WireMock binds to `0.0.0.0:8890` on the runner via `docker compose up`; from inside the container, `http://172.17.0.1:8890` reaches it.
+GitHub Actions Ubuntu runners use Linux Docker. The default bridge network gateway IP from inside any container is `172.17.0.1` — that's the address wp-env's `tests-cli` container sees the runner host on. WireMock binds to `0.0.0.0:8080` on the runner via `docker compose up`; from inside the container, `http://172.17.0.1:8080` reaches it.
 
-Local dev on macOS / Windows (Docker Desktop) can use `host.docker.internal:8890` instead — both work; `172.17.0.1` is the Linux-specific value the CI uses.
+Local dev on macOS / Windows (Docker Desktop) can use `host.docker.internal:8080` instead — both work; `172.17.0.1` is the Linux-specific value the CI uses.
 
 ### What gates green
 
