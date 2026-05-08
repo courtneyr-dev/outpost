@@ -1,0 +1,13 @@
+{
+	"request": {
+		"method": "GET",
+		"url": "/og-inbound/article-fixture"
+	},
+	"response": {
+		"status": 200,
+		"headers": {
+			"Content-Type": "text/html; charset=utf-8"
+		},
+		"body": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Sample Article Title</title><meta property=\"og:title\" content=\"Sample Article Title\"><meta property=\"og:description\" content=\"A short description.\"><meta property=\"og:image\" content=\"https://example.test/og-inbound/article-fixture/cover.jpg\"><meta property=\"og:site_name\" content=\"Sample Site\"><meta property=\"og:type\" content=\"article\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Article\",\"headline\":\"Sample Article Title\",\"author\":{\"@type\":\"Person\",\"name\":\"Jane Author\"},\"datePublished\":\"2026-05-01T10:00:00+00:00\",\"description\":\"A short description.\"}</script></head><body><h1>Sample Article Title</h1></body></html>"
+	}
+}

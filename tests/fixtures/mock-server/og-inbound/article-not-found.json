@@ -1,0 +1,13 @@
+{
+	"request": {
+		"method": "GET",
+		"url": "/og-inbound/missing-fixture"
+	},
+	"response": {
+		"status": 404,
+		"headers": {
+			"Content-Type": "text/html; charset=utf-8"
+		},
+		"body": "<!DOCTYPE html><html><head><title>Not Found</title></head><body>404</body></html>"
+	}
+}

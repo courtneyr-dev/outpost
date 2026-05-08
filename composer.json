@@ -35,7 +35,10 @@
       "Outpost\\Tests\\Auth\\": "tests/auth/",
       "Outpost\\Tests\\Admin\\": "tests/admin/",
       "Outpost\\Tests\\Theming\\": "tests/theming/"
-    }
+    },
+    "classmap": [
+      "tests/_helpers/"
+    ]
   },
   "scripts": {
     "lint": "phpcs",

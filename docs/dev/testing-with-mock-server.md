@@ -14,15 +14,15 @@ docker compose up -d
 
 # Run the integration suite. The integration bootstrap promotes
 # OUTPOST_TEST_MOCK_SERVER_URL from the env var; export it first
-# (port 8890, not 8888 — wp-env claims 8888 for its dev install).
-export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8890
+# (port 8080, not 8888 — wp-env claims 8888 for its dev install).
+export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8080
 composer test:integration
 
 # Tear down when done.
 docker compose down
 ```
 
-The mock server listens on host port 8890 (container port 8080). Stubs and journaled requests are wiped between tests via `Outpost_Mock_Server::reset()`.
+The mock server listens on host port 8080 (container port 8080). Stubs and journaled requests are wiped between tests via `Outpost_Mock_Server::reset()`.
 
 ## How rewriting works
 

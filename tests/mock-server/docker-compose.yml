@@ -21,10 +21,12 @@ services:
     image: wiremock/wiremock:latest
     container_name: outpost-wiremock
     ports:
-      # Host port 8890, NOT 8888 — wp-env claims 8888 (dev install) and
-      # 8889 (tests install). Putting WireMock on 8890 avoids a "port
-      # already allocated" collision when both stacks run in CI.
-      - "8890:8080"
+      # Host port 8080, NOT 8888/8889 — wp-env claims those, AND
+      # wp_http_validate_url() (called by wp_safe_remote_get during
+      # Og_Inbound::fetch and other safe fetchers) rejects non-standard
+      # ports. Default-allowed are 80, 443, 8080 only. 8080 satisfies
+      # both constraints.
+      - "8080:8080"
     volumes:
       - ./wiremock-mappings:/home/wiremock/mappings:ro
     command: >
