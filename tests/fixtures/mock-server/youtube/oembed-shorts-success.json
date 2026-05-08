@@ -1,0 +1,32 @@
+{
+	"request": {
+		"method": "GET",
+		"urlPath": "/oembed",
+		"queryParameters": {
+			"url": {
+				"matches": ".*youtube.*\\/shorts\\/.*"
+			}
+		}
+	},
+	"response": {
+		"status": 200,
+		"headers": {
+			"Content-Type": "application/json; charset=utf-8"
+		},
+		"jsonBody": {
+			"title": "Sample Short Video",
+			"author_name": "Sample Shorts Creator",
+			"author_url": "https://www.youtube.com/channel/UCEXAMPLESHORTS00000",
+			"type": "video",
+			"height": 720,
+			"width": 405,
+			"version": "1.0",
+			"provider_name": "YouTube",
+			"provider_url": "https://www.youtube.com/",
+			"thumbnail_height": 360,
+			"thumbnail_width": 480,
+			"thumbnail_url": "https://i.ytimg.com/vi/SHORTS_EXAMPLE/hqdefault.jpg",
+			"html": "<iframe width=\"405\" height=\"720\" src=\"https://www.youtube.com/embed/SHORTS_EXAMPLE?feature=oembed\" frameborder=\"0\" allowfullscreen></iframe>"
+		}
+	}
+}
