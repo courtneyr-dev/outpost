@@ -95,11 +95,42 @@ final class Outpost_Shortcut_Controller {
 	}
 
 	/**
+	 * Test-only override for the JSON body source. When non-null,
+	 * `read_json_payload()` calls this instead of
+	 * `file_get_contents('php://input')`. Production never sets this;
+	 * integration tests use it to inject JSON bodies without
+	 * `stream_wrapper_register` hacks (which would replace ALL
+	 * `php://*` paths and risk breaking PHP/WP internals).
+	 *
+	 * Pattern is reusable for any future controller that reads
+	 * `php://input` directly. See
+	 * `docs/dev/integration-test-gotchas.md` § gotcha #10.
+	 *
+	 * @var callable|null
+	 */
+	private static $payload_source_for_tests = null;
+
+	/**
+	 * Test seam: override the JSON body source. Pass null to clear
+	 * (must be cleared in tearDown to avoid leakage across tests).
+	 * Production code MUST NOT call this method.
+	 *
+	 * @param callable|null $reader Callable returning the raw body string.
+	 */
+	public static function set_payload_source_for_tests( ?callable $reader ): void {
+		self::$payload_source_for_tests = $reader;
+	}
+
+	/**
 	 * @return array<string,mixed>|null
 	 */
 	private static function read_json_payload(): ?array {
-		$raw = file_get_contents( 'php://input' );
-		if ( false === $raw || '' === $raw ) {
+		if ( null !== self::$payload_source_for_tests ) {
+			$raw = (string) call_user_func( self::$payload_source_for_tests );
+		} else {
+			$raw = (string) file_get_contents( 'php://input' );
+		}
+		if ( '' === $raw ) {
 			return null;
 		}
 		$decoded = json_decode( $raw, true );
