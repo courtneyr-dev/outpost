@@ -275,12 +275,43 @@ final class Outpost_Share_Target_Controller {
 	}
 
 	/**
+	 * Test-only override for the redirect side-effect. When non-null,
+	 * `redirect()` calls this with `(url, status)` instead of
+	 * `wp_safe_redirect()`. Production never sets this; integration
+	 * tests use it to capture the redirect URL without relying on the
+	 * `wp_redirect` filter (which never fires under
+	 * `OUTPOST_TESTING_PWA_SHELL` because `wp_safe_redirect()` is
+	 * skipped — the failure mode that produced the
+	 * 2026-05-09 review-theater incident).
+	 *
+	 * Pattern mirrors gotcha #10's `set_payload_source_for_tests` on
+	 * `Outpost_Shortcut_Controller` (PR #74). See
+	 * `docs/dev/integration-test-gotchas.md`.
+	 *
+	 * @var callable|null
+	 */
+	private static $redirect_callback_for_tests = null;
+
+	/**
+	 * Test seam: override the redirect side-effect. Pass null to clear
+	 * (must be cleared in tearDown to avoid leakage across tests).
+	 * Production code MUST NOT call this method.
+	 *
+	 * @param callable|null $callback Callable receiving (string $url, int $status).
+	 */
+	public static function set_redirect_callback_for_tests( ?callable $callback ): void {
+		self::$redirect_callback_for_tests = $callback;
+	}
+
+	/**
 	 * Send a redirect to the composer URL and halt the request.
 	 *
 	 * @param string $url Target URL.
 	 */
 	private static function redirect( string $url ): void {
-		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
+		if ( null !== self::$redirect_callback_for_tests ) {
+			call_user_func( self::$redirect_callback_for_tests, $url, 303 );
+		} elseif ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
 			wp_safe_redirect( $url, 303 );
 		}
 		Outpost_PWA_Shell::halt();

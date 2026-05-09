@@ -91,26 +91,25 @@ final class SpotifyEndToEndTest extends TestCase {
 		$this->reset_request_globals();
 		$this->captured_redirects = array();
 
-		// Capture wp_safe_redirect's URL+status without actually emitting
-		// the Location header (which would set headers_sent state and
-		// pollute the next test). Returning a non-redirectable value
-		// from `wp_redirect` aborts the redirect.
-		add_filter(
-			'wp_redirect',
+		// Capture redirect URLs via the controller's
+		// `set_redirect_callback_for_tests` seam. The previous
+		// `add_filter('wp_redirect', ...)` pattern was a no-op under
+		// `OUTPOST_TESTING_PWA_SHELL` because `wp_safe_redirect()` is
+		// skipped — see `docs/dev/integration-test-gotchas.md` § gotcha #10
+		// and `integration_suite_was_always_red_lesson.md` for the
+		// 2026-05-09 review-theater discovery.
+		Outpost_Share_Target_Controller::set_redirect_callback_for_tests(
 			function ( $location, $status ) {
 				$this->captured_redirects[] = array(
 					'url'    => (string) $location,
 					'status' => (int) $status,
 				);
-				return false;
-			},
-			10,
-			2
+			}
 		);
 	}
 
 	protected function tearDown(): void {
-		remove_all_filters( 'wp_redirect' );
+		Outpost_Share_Target_Controller::set_redirect_callback_for_tests( null );
 		if ( $this->test_user_id > 0 ) {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
 			wp_delete_user( $this->test_user_id );
