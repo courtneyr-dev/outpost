@@ -211,6 +211,73 @@ Zero production callers. Same posture as `OUTPOST_TESTING_PWA_SHELL`.
 
 ---
 
+## Gotcha #11 — Outpost loaded as muplugin in integration tests, not as activated plugin
+
+**Symptom:** chip-dependent integration tests silently see zero chips. `Outpost_Companion_Registry::active()` filters out every Outpost adapter as inactive even though the plugin code is loaded and running. Tests that depend on `chips_for_mode()` returning real chips fail with `actual size 0 matches expected size N`.
+
+**Root cause:** The integration test bootstrap loads Outpost via:
+
+```php
+tests_add_filter( 'muplugins_loaded', static function (): void {
+    require dirname( __DIR__, 2 ) . '/outpost.php';
+});
+```
+
+This executes the plugin file but does NOT register Outpost in the `active_plugins` option. `is_plugin_active( OUTPOST_PLUGIN_BASENAME )` returns false → `Outpost_Companion_Detector::status()` returns `'inactive'` → every adapter that delegates to the detector (including the umbrella `Manual_Share_Adapter` whose `file()` returns `OUTPOST_PLUGIN_BASENAME`) reports inactive → `Companion_Registry::active()` filters them out → `chips_for_mode()` returns empty.
+
+The umbrella adapter is meant to be always-active when Outpost is loaded — that's why it returns `OUTPOST_PLUGIN_BASENAME` from `file()`. But "loaded" and "active" are different things in WP, and the test environment doesn't model the production "active" state.
+
+Same shape as **gotcha #9**: test environment failing to honestly model the production environment. Like #9, the failure mode is silent — tests appear to test the SUT but their assertions never see real data.
+
+**Fix:** in `tests/integration/bootstrap.php`, register a `option_active_plugins` filter that appends `OUTPOST_PLUGIN_BASENAME` to the active plugins list:
+
+```php
+tests_add_filter(
+    'muplugins_loaded',
+    static function (): void {
+        if ( ! defined( 'OUTPOST_PLUGIN_BASENAME' ) ) {
+            return;
+        }
+        add_filter(
+            'option_active_plugins',
+            static function ( $plugins ) {
+                if ( ! is_array( $plugins ) ) {
+                    $plugins = array();
+                }
+                if ( ! in_array( OUTPOST_PLUGIN_BASENAME, $plugins, true ) ) {
+                    $plugins[] = OUTPOST_PLUGIN_BASENAME;
+                }
+                return $plugins;
+            }
+        );
+    }
+);
+```
+
+`option_active_plugins` (vs `pre_option_active_plugins`) APPENDS to whatever the WP test suite already registered (e.g., indieauth + micropub from `.wp-env.json`'s plugins list) — production plugins stay activated, Outpost just joins them. Production never sees this filter because production never registers it.
+
+**Why "fix the environment, not each test class":** patching each affected test class's setUp with active_plugins boilerplate reproduces the failure mode that produced this gotcha — easy to forget, silent no-op when forgotten, and you'd have to remember to add it to every future test class that depends on companion adapters being active. Per the meta-rule from the 2026-05-09 review-theater discovery: the test environment should honestly model the production environment.
+
+**Where surfaced:** PR-A1.5 (integration bootstrap fix), opened 2026-05-09. Discovered during PR-A2 attempt when local diagnostic inside wp-env tests-cli showed `Manual_Share_Adapter::is_active()` returning false despite `Platform_Registry::all_platforms()` returning all 10 default platforms.
+
+**Affected tests pre-fix (incomplete list):** at minimum the chip-count assertions in `ManualShareIntegrationTest` PR #80; likely affects future tests that depend on `Companion_Registry::active()` containing real adapters.
+
+**Diagnostic that surfaced it:**
+
+```
+$ docker exec --workdir /var/www/html/wp-content/plugins/outpost \
+    wp-env-outpost-2fc8d835-tests-cli-1 wp eval '...'
+Adapter is_active: no
+Platform count: 10
+First platform id: instagram-feed
+platform_chips count: 10
+chips_for_mode(photo) count: 0      ← smoking gun
+```
+
+**Memory:** `outpost_companion_active_plugins_test_env.md`.
+
+---
+
 # Assertion discipline (anti-patterns to avoid)
 
 Three rules surfaced during the PR #70/#71 patterns review. Not gotchas in the platform sense — these are test-authoring anti-patterns to avoid.
