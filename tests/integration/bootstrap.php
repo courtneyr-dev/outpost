@@ -113,4 +113,47 @@ tests_add_filter(
 	}
 );
 
+/**
+ * Make `is_plugin_active( OUTPOST_PLUGIN_BASENAME )` return true under
+ * the integration test environment. The WP test suite loads Outpost via
+ * the `muplugins_loaded` filter above, which executes the plugin file
+ * but does NOT register Outpost in the `active_plugins` option. Without
+ * this filter, every companion adapter that delegates to
+ * `Outpost_Companion_Detector::status()` (which itself calls
+ * `is_plugin_active()`) returns 'inactive' for Outpost, so
+ * `Manual_Share_Adapter::is_active()` returns false, so
+ * `Companion_Registry::active()` filters it out, so chip-dependent
+ * tests silently see zero chips.
+ *
+ * Discovered 2026-05-09 (gotcha #11). See
+ * `docs/dev/integration-test-gotchas.md` for the full diagnosis. Same
+ * shape as gotcha #9 (test environment failing to model production
+ * faithfully) — fix the environment, not each test class.
+ *
+ * Appends to the live option value so any plugins activated by the WP
+ * test suite (or by `.wp-env.json`'s plugins list — currently
+ * indieauth + micropub) stay activated. Production never reads this
+ * filter because production never registers it.
+ */
+tests_add_filter(
+	'muplugins_loaded',
+	static function (): void {
+		if ( ! defined( 'OUTPOST_PLUGIN_BASENAME' ) ) {
+			return;
+		}
+		add_filter(
+			'option_active_plugins',
+			static function ( $plugins ) {
+				if ( ! is_array( $plugins ) ) {
+					$plugins = array();
+				}
+				if ( ! in_array( OUTPOST_PLUGIN_BASENAME, $plugins, true ) ) {
+					$plugins[] = OUTPOST_PLUGIN_BASENAME;
+				}
+				return $plugins;
+			}
+		);
+	}
+);
+
 require_once $wp_tests_dir . '/includes/bootstrap.php';
