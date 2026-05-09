@@ -92,22 +92,19 @@ final class YouTubeEndToEndTest extends TestCase {
 		$this->reset_request_globals();
 		$this->captured_redirects = array();
 
-		add_filter(
-			'wp_redirect',
+		// See SpotifyEndToEndTest::setUp for rationale — gotcha #10.
+		Outpost_Share_Target_Controller::set_redirect_callback_for_tests(
 			function ( $location, $status ) {
 				$this->captured_redirects[] = array(
 					'url'    => (string) $location,
 					'status' => (int) $status,
 				);
-				return false;
-			},
-			10,
-			2
+			}
 		);
 	}
 
 	protected function tearDown(): void {
-		remove_all_filters( 'wp_redirect' );
+		Outpost_Share_Target_Controller::set_redirect_callback_for_tests( null );
 		if ( $this->test_user_id > 0 ) {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
 			wp_delete_user( $this->test_user_id );

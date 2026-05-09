@@ -170,10 +170,32 @@ final class Outpost_Shortcut_Controller {
 	}
 
 	/**
+	 * Test-only override for the redirect side-effect. Mirrors the
+	 * pattern on `Outpost_Share_Target_Controller`. See
+	 * `docs/dev/integration-test-gotchas.md` § gotcha #10.
+	 *
+	 * @var callable|null
+	 */
+	private static $redirect_callback_for_tests = null;
+
+	/**
+	 * Test seam: override the redirect side-effect. Pass null to clear
+	 * (must be cleared in tearDown to avoid leakage across tests).
+	 * Production code MUST NOT call this method.
+	 *
+	 * @param callable|null $callback Callable receiving (string $url, int $status).
+	 */
+	public static function set_redirect_callback_for_tests( ?callable $callback ): void {
+		self::$redirect_callback_for_tests = $callback;
+	}
+
+	/**
 	 * @param string $url Target URL.
 	 */
 	private static function redirect( string $url ): void {
-		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
+		if ( null !== self::$redirect_callback_for_tests ) {
+			call_user_func( self::$redirect_callback_for_tests, $url, 303 );
+		} elseif ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
 			wp_safe_redirect( $url, 303 );
 		}
 		Outpost_PWA_Shell::halt();
