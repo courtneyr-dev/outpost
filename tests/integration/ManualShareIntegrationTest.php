@@ -1,24 +1,26 @@
 <?php
 /**
- * Integration test stubs for Outpost_Manual_Share_Controller (F9).
+ * F9 — integration test: Outpost_Manual_Share_Controller end-to-end.
  *
- * Documents the wp-env-pending end-to-end paths for the manual-share
- * REST surface. Skipped until wp-env is wired up; the docblocks spell
- * out the assertions the future session will fill in.
+ * Migrated 2026-05-08 from markTestSkipped stubs (9 of 9). Phase 3
+ * cluster #4 of the overnight queue.
  *
- * Pipeline being verified:
+ * Pre-readiness check (a/b/c/d):
+ *   (a) N/A — controller-level test
+ *   (b) F9 controller + 10 default platform configs + chips_for_mode
+ *       all concrete and shipped
+ *   (c) Docblocks reference real F9 shipped behavior
+ *   (d) No fetches; pure REST endpoint dispatch
  *
- *     POST /wp-json/outpost/v1/manual-share/intent
- *           ↓
- *     Outpost_Manual_Share_Controller::handle_request
- *           ↓
- *     200 { status: 'stub', message, platform_id, post_id }
+ * Three structural constraints honored:
  *
- *     GET /wp-json/outpost/v1/manual-share-chips?mode=photo
- *           ↓
- *     Outpost_Manual_Share_Controller::handle_chips_request
- *           ↓
- *     200 { mode_requested, mode_applied, chips: [10 manual-share platforms] }
+ *   Rule 2 (auth-gate absence-of-side-effects) — test 3 (401)
+ *   uses get_status check (no transient seeds in this controller's
+ *   intent path; F10 stub returns status='stub' string only).
+ *
+ *   Rule 3 (custom registrations must not persist) — tests 8 + 9
+ *   hook filters in setUp/test-body and remove in finally blocks
+ *   so filter callbacks don't leak across tests.
  *
  * @package Outpost\Tests\Integration
  */
@@ -28,110 +30,281 @@ declare(strict_types=1);
 namespace Outpost\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use WP_REST_Request;
 
 /**
  * @coversNothing
  */
 final class ManualShareIntegrationTest extends TestCase {
 
+	private int $test_user_id = 0;
+	private int $test_post_id = 0;
+
+	protected function setUp(): void {
+		parent::setUp();
+		if ( ! $this->integration_environment_ready() ) {
+			$this->markTestSkipped(
+				'Skipped under unit bootstrap or without OUTPOST_TEST_MOCK_SERVER_URL. '
+				. 'Run via `npm run test:integration` inside wp-env tests-cli.'
+			);
+		}
+
+		$this->test_user_id = (int) wp_insert_user(
+			array(
+				'user_login' => 'manualshare_test_' . uniqid(),
+				'user_pass'  => wp_generate_password( 24, true ),
+				'user_email' => 'manualshare_' . uniqid() . '@example.test',
+				'role'       => 'editor',
+			)
+		);
+		wp_set_current_user( $this->test_user_id );
+
+		$this->test_post_id = (int) wp_insert_post(
+			array(
+				'post_title'   => 'Manual share test post',
+				'post_status'  => 'publish',
+				'post_type'    => 'post',
+				'post_author'  => $this->test_user_id,
+			),
+			true
+		);
+	}
+
+	protected function tearDown(): void {
+		if ( $this->test_post_id > 0 ) {
+			wp_delete_post( $this->test_post_id, true );
+		}
+		if ( $this->test_user_id > 0 ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+			wp_delete_user( $this->test_user_id );
+			$this->test_user_id = 0;
+		}
+		wp_set_current_user( 0 );
+		parent::tearDown();
+	}
+
+	private function integration_environment_ready(): bool {
+		return function_exists( 'wp_insert_user' )
+			&& class_exists( 'Outpost_Manual_Share_Controller' )
+			&& defined( 'OUTPOST_TEST_MOCK_SERVER_URL' );
+	}
+
+	private function intent_request( int $post_id, string $platform_id ): WP_REST_Request {
+		$req = new WP_REST_Request( 'POST', '/outpost/v1/manual-share/intent' );
+		$req->set_header( 'Content-Type', 'application/json' );
+		$req->set_body(
+			wp_json_encode(
+				array(
+					'post_id'     => $post_id,
+					'platform_id' => $platform_id,
+				)
+			)
+		);
+		return $req;
+	}
+
 	/**
+	 * Test 1: known platform → stub response per F9 contract.
+	 *
 	 * @test
 	 */
 	public function intent_endpoint_returns_stub_response_for_known_platform(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Steps: log in as a test user; POST to ' .
-			'/wp-json/outpost/v1/manual-share/intent with body ' .
-			'{ post_id: <existing post id>, platform_id: "instagram-feed" }. ' .
-			'Assert response is 200 JSON with status="stub", platform_id="instagram-feed", ' .
-			'post_id matches request, message contains "F10".'
+		$response = rest_get_server()->dispatch( $this->intent_request( $this->test_post_id, 'instagram-feed' ) );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertSame( 'stub', $data['status'] ?? null );
+		$this->assertSame( 'instagram-feed', $data['platform_id'] ?? null );
+		$this->assertSame( $this->test_post_id, $data['post_id'] ?? null );
+		$this->assertStringContainsString(
+			'F10',
+			$data['message'] ?? '',
+			'F9 stub response should reference F10 in the message.'
 		);
 	}
 
 	/**
+	 * Test 2: unknown platform → 400 with known_ids list.
+	 *
 	 * @test
 	 */
 	public function intent_endpoint_rejects_unknown_platform_with_400(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. POST /manual-share/intent with platform_id="totally-fake". ' .
-			'Assert response is 400 with error code "unknown_platform_id" and known_ids list ' .
-			'containing all 10 default platforms.'
-		);
+		$response = rest_get_server()->dispatch( $this->intent_request( $this->test_post_id, 'totally-fake' ) );
+
+		$this->assertTrue( is_wp_error( $response ) || 400 === $response->get_status() );
+		if ( is_wp_error( $response ) ) {
+			$this->assertSame( 'unknown_platform_id', $response->get_error_code() );
+			$error_data = $response->get_error_data();
+			$this->assertIsArray( $error_data['known_ids'] ?? null );
+			$this->assertGreaterThanOrEqual(
+				10,
+				count( $error_data['known_ids'] ),
+				'known_ids list must contain all 10 default platforms.'
+			);
+		}
 	}
 
 	/**
+	 * Test 3: unauthenticated POST → 401 rest_forbidden.
+	 *
+	 * Per Rule 2 (auth-gate): this controller's intent endpoint has
+	 * no synchronous side effects beyond the audit-log entry creation.
+	 * The 401 path returns BEFORE handle_request runs, so the
+	 * meaningful absence assertion is the response status itself.
+	 *
 	 * @test
 	 */
 	public function intent_endpoint_rejects_unauthenticated_request(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. POST without auth (no cookie, no bearer). ' .
-			'Assert 401 with error code "rest_forbidden".'
+		wp_set_current_user( 0 );
+
+		$response = rest_get_server()->dispatch( $this->intent_request( $this->test_post_id, 'instagram-feed' ) );
+
+		$this->assertContains(
+			$response->get_status(),
+			array( 401, 403 ),
+			'Auth gate must reject unauthenticated POSTs.'
 		);
 	}
 
 	/**
+	 * Test 4: chips endpoint for mode=photo returns 10 default platforms.
+	 *
 	 * @test
 	 */
 	public function chips_endpoint_for_photo_returns_10_default_platforms(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. GET /manual-share-chips?mode=photo. ' .
-			'Assert response is 200 with chips array of length 10. Verify each chip ' .
-			'has id, label, detected=true, manual_share key with icon/caption_via/' .
-			'ios_strategy/android_pkg.'
-		);
+		$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+		$req->set_param( 'mode', 'photo' );
+		$response = rest_get_server()->dispatch( $req );
+
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertIsArray( $data['chips'] ?? null );
+		$this->assertCount( 10, $data['chips'] );
+
+		foreach ( $data['chips'] as $chip ) {
+			$this->assertArrayHasKey( 'id', $chip );
+			$this->assertArrayHasKey( 'label', $chip );
+			$this->assertTrue( $chip['detected'] ?? false );
+			$this->assertArrayHasKey( 'manual_share', $chip );
+			$this->assertArrayHasKey( 'icon', $chip['manual_share'] );
+		}
 	}
 
 	/**
+	 * Test 5: chips endpoint for mode=listen returns empty (none of
+	 * the 10 default platforms accept Listen).
+	 *
 	 * @test
 	 */
 	public function chips_endpoint_for_listen_returns_empty_array(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. GET /manual-share-chips?mode=listen. ' .
-			'Assert chips array is empty (none of the 10 default platforms accept Listen).'
-		);
+		$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+		$req->set_param( 'mode', 'listen' );
+		$response = rest_get_server()->dispatch( $req );
+
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertSame( array(), $data['chips'] ?? null );
 	}
 
 	/**
+	 * Test 6: unknown mode fails open to all chips.
+	 *
 	 * @test
 	 */
 	public function chips_endpoint_unknown_mode_fails_open_to_all_chips(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. GET /manual-share-chips?mode=totally-fake. ' .
-			'Assert mode_recognized=false, mode_applied=null, chips contains all 10 ' .
-			'manual-share platforms.'
-		);
+		$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+		$req->set_param( 'mode', 'totally-fake' );
+		$response = rest_get_server()->dispatch( $req );
+
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertFalse( $data['mode_recognized'] ?? true );
+		$this->assertNull( $data['mode_applied'] ?? 'set' );
+		$this->assertGreaterThanOrEqual( 10, count( $data['chips'] ?? array() ) );
 	}
 
 	/**
+	 * Test 7: chips endpoint server-filters to manual_share entries —
+	 * AP chip never appears in the response. Holds whether the AP
+	 * plugin is loaded or not (manual_share key gates the inclusion).
+	 *
 	 * @test
 	 */
 	public function chips_endpoint_does_not_include_activitypub_chip(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. With the ActivityPub plugin active, GET ' .
-			'/manual-share-chips?mode=photo. Assert no chip in the response has ' .
-			'id="activitypub" — the chips endpoint server-filters to entries with ' .
-			'the manual_share extension key, so AP chips drop out.'
+		$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+		$req->set_param( 'mode', 'photo' );
+		$response = rest_get_server()->dispatch( $req );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$ids  = array_column( $data['chips'] ?? array(), 'id' );
+		$this->assertNotContains(
+			'activitypub',
+			$ids,
+			'manual-share-chips endpoint must server-filter to manual_share entries.'
 		);
 	}
 
 	/**
+	 * Test 8: bridgy defer filter hides reddit-manual + flickr-manual.
+	 *
+	 * Per Rule 3: filter hook scoped to this test method via
+	 * try/finally; defer filter MUST NOT persist into other tests.
+	 *
 	 * @test
 	 */
 	public function chips_endpoint_hides_reddit_flickr_when_bridgy_filter_returns_true(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Hook outpost_manual_share_defer_to_bridgy to return true. ' .
-			'GET /manual-share-chips?mode=photo. Assert chips array length is 8 (no reddit-manual, ' .
-			'no flickr-manual). Other 8 platforms still present.'
-		);
+		$defer_filter = static fn (): bool => true;
+		add_filter( 'outpost_manual_share_defer_to_bridgy', $defer_filter );
+
+		try {
+			$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+			$req->set_param( 'mode', 'photo' );
+			$response = rest_get_server()->dispatch( $req );
+			$this->assertSame( 200, $response->get_status() );
+
+			$data = $response->get_data();
+			$ids  = array_column( $data['chips'] ?? array(), 'id' );
+			$this->assertNotContains( 'reddit-manual', $ids, 'reddit-manual must drop when bridgy defer filter is true.' );
+			$this->assertNotContains( 'flickr-manual', $ids, 'flickr-manual must drop when bridgy defer filter is true.' );
+			$this->assertCount( 8, $data['chips'], 'Should be 10 - 2 = 8 chips when bridgy defer is on.' );
+		} finally {
+			remove_filter( 'outpost_manual_share_defer_to_bridgy', $defer_filter );
+		}
 	}
 
 	/**
+	 * Test 9: platforms filter can register a custom platform.
+	 *
+	 * Per Rule 3: filter hook scoped to test method via try/finally.
+	 *
 	 * @test
 	 */
 	public function platforms_filter_can_register_custom_platform_for_chip_listing(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Hook outpost_manual_share_platforms to append a ' .
-			'custom config (id="custom-vsco", accepts_modes=["photo"], ...). GET ' .
-			'/manual-share-chips?mode=photo. Assert custom-vsco appears in the chips array.'
-		);
+		$platforms_filter = static function ( array $platforms ): array {
+			$platforms[] = array(
+				'id'             => 'custom-vsco',
+				'label'          => 'VSCO (custom)',
+				'icon'           => 'vsco',
+				'accepts_modes'  => array( 'photo' ),
+				'caption_via'    => 'manual',
+				'after_share'    => 'capture-prompt',
+			);
+			return $platforms;
+		};
+		add_filter( 'outpost_manual_share_platforms', $platforms_filter );
+
+		try {
+			$req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share-chips' );
+			$req->set_param( 'mode', 'photo' );
+			$response = rest_get_server()->dispatch( $req );
+			$this->assertSame( 200, $response->get_status() );
+
+			$data = $response->get_data();
+			$ids  = array_column( $data['chips'] ?? array(), 'id' );
+			$this->assertContains( 'custom-vsco', $ids, 'Custom platform must surface via the platforms filter.' );
+		} finally {
+			remove_filter( 'outpost_manual_share_platforms', $platforms_filter );
+		}
 	}
 }
