@@ -1,9 +1,18 @@
 <?php
 /**
- * Integration test stubs for the F12 phase-2 capture flow.
+ * F12 — integration test: phase-2 silo URL capture flow.
  *
- * Skipped until wp-env is wired up; documents the wp-env-pending
- * paths the future session will fill in.
+ * Migrated 2026-05-08 from markTestSkipped stubs (6 of 6). Phase 3
+ * cluster #3 of the overnight queue.
+ *
+ * Pre-readiness check (a/b/c/d) all passed:
+ *
+ *   (a) N/A — controller-level + admin notice tests
+ *   (b) F12 controllers concrete; REST endpoints use get_param;
+ *       Pending_Capture_Detector has set_candidate_resolver_for_tests
+ *       seam so tests don't need to wait past the 30-second grace
+ *   (c) Docblocks reference real F12 shipped behavior
+ *   (d) No fetches; all assertions on post-meta / rendered HTML
  *
  * @package Outpost\Tests\Integration
  */
@@ -12,74 +21,315 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Integration;
 
+use Outpost_Manual_Share_Audit_Log;
+use Outpost_Manual_Share_Pending_Capture_Detector;
 use PHPUnit\Framework\TestCase;
+use WP_REST_Request;
 
 /**
  * @coversNothing
  */
 final class SyndicationCaptureFlowTest extends TestCase {
 
+	private int $test_user_id    = 0;
+	private int $other_user_id   = 0;
+	private int $test_post_id    = 0;
+
+	protected function setUp(): void {
+		parent::setUp();
+		if ( ! $this->integration_environment_ready() ) {
+			$this->markTestSkipped(
+				'Skipped under unit bootstrap or without OUTPOST_TEST_MOCK_SERVER_URL. '
+				. 'Run via `npm run test:integration` inside wp-env tests-cli.'
+			);
+		}
+
+		$this->test_user_id = (int) wp_insert_user(
+			array(
+				'user_login' => 'capture_test_' . uniqid(),
+				'user_pass'  => wp_generate_password( 24, true ),
+				'user_email' => 'capture_' . uniqid() . '@example.test',
+				'role'       => 'editor',
+			)
+		);
+		$this->other_user_id = (int) wp_insert_user(
+			array(
+				'user_login' => 'capture_other_' . uniqid(),
+				'user_pass'  => wp_generate_password( 24, true ),
+				'user_email' => 'capture_other_' . uniqid() . '@example.test',
+				'role'       => 'editor',
+			)
+		);
+		wp_set_current_user( $this->test_user_id );
+
+		$this->test_post_id = (int) wp_insert_post(
+			array(
+				'post_title'   => 'Photo post for capture test',
+				'post_status'  => 'publish',
+				'post_type'    => 'post',
+				'post_author'  => $this->test_user_id,
+				'post_content' => '<p>Body content.</p>',
+			),
+			true
+		);
+	}
+
+	protected function tearDown(): void {
+		Outpost_Manual_Share_Pending_Capture_Detector::set_candidate_resolver_for_tests( null );
+
+		if ( $this->test_post_id > 0 ) {
+			wp_delete_post( $this->test_post_id, true );
+		}
+		require_once ABSPATH . 'wp-admin/includes/user.php';
+		if ( $this->test_user_id > 0 ) {
+			wp_delete_user( $this->test_user_id );
+		}
+		if ( $this->other_user_id > 0 ) {
+			wp_delete_user( $this->other_user_id );
+		}
+		$this->test_user_id = $this->other_user_id = $this->test_post_id = 0;
+		wp_set_current_user( 0 );
+		parent::tearDown();
+	}
+
+	private function integration_environment_ready(): bool {
+		return function_exists( 'wp_insert_user' )
+			&& class_exists( 'Outpost_Manual_Share_Audit_Log' )
+			&& class_exists( 'Outpost_Manual_Share_Pending_Capture_Detector' )
+			&& defined( 'OUTPOST_TEST_MOCK_SERVER_URL' );
+	}
+
 	/**
+	 * Add an audit-log entry directly + roll its `added_at` past the
+	 * 30-second grace period so the detector picks it up without
+	 * waiting in real time.
+	 */
+	private function seed_pending_entry( int $post_id, string $platform_id = 'instagram-feed' ): string {
+		$entry        = Outpost_Manual_Share_Audit_Log::add_entry( $post_id, $platform_id, 'navigator_share' );
+		$audit_log_id = (string) $entry['audit_log_id'];
+
+		// Roll added_at into the past so detector's grace check passes.
+		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
+		foreach ( $entries as $i => $e ) {
+			if ( ( $e['audit_log_id'] ?? '' ) === $audit_log_id ) {
+				$entries[ $i ]['added_at'] = gmdate( 'c', time() - HOUR_IN_SECONDS );
+			}
+		}
+		update_post_meta( $post_id, 'outpost_manual_share_log', $entries );
+
+		// Force detector to surface this post (defaults rely on WP_Query
+		// against meta_key existence; the seam keeps the test isolated).
+		Outpost_Manual_Share_Pending_Capture_Detector::set_candidate_resolver_for_tests(
+			static fn (): array => array( $post_id )
+		);
+
+		return $audit_log_id;
+	}
+
+	/**
+	 * Test 1: full capture loop — fire intent, wait past grace,
+	 * pending endpoint surfaces entry, capture endpoint records
+	 * silo URL, post meta updates, rendered content includes
+	 * u-syndication anchor.
+	 *
 	 * @test
 	 */
 	public function full_capture_loop_writes_audit_log_and_renders_u_syndication(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Steps: log in as a test user; create a Photo post via Micropub; ' .
-			'fire manual-share intent (Android UA mocked) → audit_log_id returned; sleep past grace; ' .
-			'GET /manual-share/pending → entry returned; POST /manual-share/capture with ' .
-			'silo_url=https://example.com/p/abc → status=recorded; fetch the post HTML → ' .
-			'<div class="outpost-syndication-links" hidden> with one <a class="u-syndication" ' .
-			'href="https://example.com/p/abc" rel="syndication"> present; audit log entry now has ' .
-			'completed_at + silo_url + outcome=fired.'
+		$audit_log_id = $this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+
+		// Pending endpoint surfaces the entry.
+		$pending_req = new WP_REST_Request( 'GET', '/outpost/v1/manual-share/pending' );
+		$pending     = rest_get_server()->dispatch( $pending_req );
+		$this->assertSame( 200, $pending->get_status() );
+		$pending_data = $pending->get_data();
+		$this->assertNotEmpty( $pending_data, 'Pending endpoint should surface the seeded entry.' );
+
+		// Capture endpoint records the silo URL.
+		$capture_req = new WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' );
+		$capture_req->set_header( 'Content-Type', 'application/json' );
+		$capture_req->set_body(
+			wp_json_encode(
+				array(
+					'post_id'      => $this->test_post_id,
+					'audit_log_id' => $audit_log_id,
+					'silo_url'     => 'https://www.instagram.com/p/abc123/',
+				)
+			)
 		);
+		$capture = rest_get_server()->dispatch( $capture_req );
+		$this->assertSame( 200, $capture->get_status() );
+		$capture_data = $capture->get_data();
+		$this->assertSame( 'recorded', $capture_data['status'] ?? null );
+
+		// Post meta records the silo URL.
+		$links = get_post_meta( $this->test_post_id, 'outpost_syndication_links', true );
+		$this->assertIsArray( $links );
+		$this->assertNotEmpty( $links );
+		$urls = array_column( $links, 'url' );
+		$this->assertContains( 'https://www.instagram.com/p/abc123/', $urls );
+
+		// the_content filter renders the u-syndication anchor.
+		$content = apply_filters( 'the_content', get_post_field( 'post_content', $this->test_post_id ) );
+		$this->assertStringContainsString( 'u-syndication', $content );
+		$this->assertStringContainsString( 'https://www.instagram.com/p/abc123/', $content );
 	}
 
 	/**
+	 * Test 2: capture endpoint rejects unauthenticated request.
+	 *
 	 * @test
 	 */
 	public function capture_endpoint_rejects_non_authenticated_request(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. POST /manual-share/capture without auth → 401 rest_forbidden.'
+		wp_set_current_user( 0 );
+
+		$req = new WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' );
+		$req->set_header( 'Content-Type', 'application/json' );
+		$req->set_body(
+			wp_json_encode(
+				array(
+					'post_id'      => $this->test_post_id,
+					'audit_log_id' => 'abc',
+					'silo_url'     => 'https://www.instagram.com/p/abc123/',
+				)
+			)
+		);
+		$response = rest_get_server()->dispatch( $req );
+
+		$this->assertContains(
+			$response->get_status(),
+			array( 401, 403 ),
+			'Unauthenticated capture should return 401 (rest_forbidden) or 403.'
 		);
 	}
 
 	/**
+	 * Test 3: pending endpoint isolates by user. User A's posts are
+	 * not surfaced when User B queries.
+	 *
 	 * @test
 	 */
 	public function pending_endpoint_only_returns_users_own_posts(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. User A creates post + fires intent. User B logs in. ' .
-			'GET /manual-share/pending as user B → empty (does not surface user A\'s pending).'
+		$this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+
+		// Switch to User B and query — must return empty (post belongs to User A).
+		wp_set_current_user( $this->other_user_id );
+		// Detector seam returns the post regardless of owner; user filtering
+		// happens inside the controller's per-user gate (post_author check).
+		// To exercise that gate, force the resolver to return our post.
+		Outpost_Manual_Share_Pending_Capture_Detector::set_candidate_resolver_for_tests(
+			fn (): array => array( $this->test_post_id )
+		);
+
+		$req      = new WP_REST_Request( 'GET', '/outpost/v1/manual-share/pending' );
+		$response = rest_get_server()->dispatch( $req );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$post_ids_returned = array_map(
+			static fn ( $entry ): int => (int) ( $entry['post_id'] ?? 0 ),
+			is_array( $data ) ? $data : array()
+		);
+		$this->assertNotContains(
+			$this->test_post_id,
+			$post_ids_returned,
+			'User B must not see User A\'s pending entries.'
 		);
 	}
 
 	/**
+	 * Test 4: outpost_syndication_links is exposed via the WP REST
+	 * post-meta API once captured.
+	 *
 	 * @test
 	 */
 	public function rest_api_exposes_outpost_syndication_links_post_meta(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Capture URL on post 42; GET /wp-json/wp/v2/posts/42 → ' .
-			'response includes meta.outpost_syndication_links array with the recorded entry.'
+		$audit_log_id = $this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+
+		// Capture first.
+		$req = new WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' );
+		$req->set_header( 'Content-Type', 'application/json' );
+		$req->set_body(
+			wp_json_encode(
+				array(
+					'post_id'      => $this->test_post_id,
+					'audit_log_id' => $audit_log_id,
+					'silo_url'     => 'https://www.instagram.com/p/exposed/',
+				)
+			)
 		);
+		rest_get_server()->dispatch( $req );
+
+		// Now GET the post via core REST.
+		$post_req = new WP_REST_Request( 'GET', '/wp/v2/posts/' . $this->test_post_id );
+		$post_req->set_param( 'context', 'edit' );
+		$post_resp = rest_get_server()->dispatch( $post_req );
+		$this->assertSame( 200, $post_resp->get_status() );
+
+		$post_data = $post_resp->get_data();
+		$this->assertArrayHasKey( 'meta', $post_data );
+		$this->assertArrayHasKey( 'outpost_syndication_links', $post_data['meta'] );
+		$urls = array_column( $post_data['meta']['outpost_syndication_links'], 'url' );
+		$this->assertContains( 'https://www.instagram.com/p/exposed/', $urls );
 	}
 
 	/**
+	 * Test 5: pending notice renders on admin post-edit screen.
+	 *
 	 * @test
 	 */
 	public function admin_post_edit_screen_shows_pending_notice(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Fire intent on post 42; visit /wp-admin/post.php?post=42&action=edit; ' .
-			'assert HTML includes notice with "pending syndication" + platform name.'
+		$this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+
+		// Capture admin_notices output. The notice class hooks into
+		// admin_notices and renders only when on the post-edit screen
+		// for a post with pending entries.
+		$GLOBALS['post']             = get_post( $this->test_post_id );
+		$_GET['post']                = $this->test_post_id;
+		$_GET['action']              = 'edit';
+		$GLOBALS['pagenow']          = 'post.php';
+		$GLOBALS['typenow']          = 'post';
+
+		ob_start();
+		do_action( 'admin_notices' );
+		$notices_html = (string) ob_get_clean();
+
+		unset( $_GET['post'], $_GET['action'], $GLOBALS['pagenow'], $GLOBALS['typenow'], $GLOBALS['post'] );
+
+		$this->assertNotEmpty( $notices_html );
+		$this->assertMatchesRegularExpression(
+			'/pending|syndication|instagram/i',
+			$notices_html,
+			'Admin notice must mention pending syndication.'
 		);
 	}
 
 	/**
+	 * Test 6: the_excerpt filter also includes the u-syndication
+	 * anchor (Bridgy feed-scanning paths benefit).
+	 *
 	 * @test
 	 */
 	public function the_excerpt_filter_also_includes_syndication_links(): void {
-		$this->markTestSkipped(
-			'wp-env setup pending. Capture URL on post 42; render the_excerpt() → output includes ' .
-			'the u-syndication anchor (Bridgy feed-scanning paths benefit).'
+		$audit_log_id = $this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+
+		// Capture so meta exists.
+		$req = new WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' );
+		$req->set_header( 'Content-Type', 'application/json' );
+		$req->set_body(
+			wp_json_encode(
+				array(
+					'post_id'      => $this->test_post_id,
+					'audit_log_id' => $audit_log_id,
+					'silo_url'     => 'https://www.instagram.com/p/excerpt/',
+				)
+			)
 		);
+		rest_get_server()->dispatch( $req );
+
+		// Render via the_excerpt filter chain.
+		$excerpt_in  = 'A short excerpt.';
+		$excerpt_out = apply_filters( 'the_excerpt', $excerpt_in );
+		$this->assertStringContainsString( 'u-syndication', $excerpt_out );
+		$this->assertStringContainsString( 'https://www.instagram.com/p/excerpt/', $excerpt_out );
 	}
 }
