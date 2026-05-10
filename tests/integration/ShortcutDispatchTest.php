@@ -76,17 +76,14 @@ final class ShortcutDispatchTest extends TestCase {
 		$this->captured_redirects = array();
 		$this->purge_prefill_transients();
 
-		add_filter(
-			'wp_redirect',
+		// See SpotifyEndToEndTest::setUp for rationale — gotcha #10.
+		Outpost_Shortcut_Controller::set_redirect_callback_for_tests(
 			function ( $location, $status ) {
 				$this->captured_redirects[] = array(
 					'url'    => (string) $location,
 					'status' => (int) $status,
 				);
-				return false;
-			},
-			10,
-			2
+			}
 		);
 	}
 
@@ -97,7 +94,7 @@ final class ShortcutDispatchTest extends TestCase {
 		// across test classes.
 		Outpost_Shortcut_Controller::set_payload_source_for_tests( null );
 
-		remove_all_filters( 'wp_redirect' );
+		Outpost_Shortcut_Controller::set_redirect_callback_for_tests( null );
 		$this->purge_prefill_transients();
 		if ( $this->test_user_id > 0 ) {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
