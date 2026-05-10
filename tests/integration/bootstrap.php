@@ -23,17 +23,43 @@
 
 declare(strict_types=1);
 
-// Promote OUTPOST_TEST_MOCK_SERVER_URL from the environment to a PHP
-// constant when set. Both Outpost_Mock_Server_Filter and the test
-// helper Outpost_Mock_Server gate on the constant — without it, the
-// filter is a no-op and the helper throws a clear error. CI passes
-// this env var through `wp-env run tests-cli`; local dev sessions can
-// `export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8080` before
-// running `npm run test:integration`.
-$outpost_mock_server_url = getenv( 'OUTPOST_TEST_MOCK_SERVER_URL' );
-if ( false !== $outpost_mock_server_url && '' !== $outpost_mock_server_url
-	&& ! defined( 'OUTPOST_TEST_MOCK_SERVER_URL' ) ) {
-	define( 'OUTPOST_TEST_MOCK_SERVER_URL', $outpost_mock_server_url );
+// Resolve OUTPOST_TEST_MOCK_SERVER_URL with this priority:
+//
+//   1. Already-defined constant (no-op; honor whatever set it first).
+//   2. `OUTPOST_TEST_MOCK_SERVER_URL` env var (e.g. `export …` before
+//      `npm run test:integration` for ad-hoc overrides).
+//   3. Platform detection: macOS Docker Desktop → `host.docker.internal`;
+//      Linux Docker (CI runners) → `172.17.0.1`.
+//
+// macOS Docker Desktop and Linux Docker handle the host bridge IP
+// differently:
+//   - macOS Docker Desktop: `host.docker.internal` resolves via Docker
+//     Desktop's special host-gateway alias; `172.17.0.1` does NOT route.
+//   - Linux Docker (CI ubuntu-latest): `172.17.0.1` IS the docker0
+//     bridge gateway; `host.docker.internal` is not defined by default.
+//
+// Both Outpost_Mock_Server_Filter and the test helper
+// Outpost_Mock_Server gate on the constant — without it, the filter is
+// a no-op and the helper throws a clear error. Discovered 2026-05-09
+// when running integration suite on macOS local dev hit a 10s connect
+// timeout against 172.17.0.1. Pre-2026-05-09 behavior pinned the URL
+// to 172.17.0.1 via .wp-env.json's `env.tests.config` mapping; that
+// entry has been removed in favor of this detection.
+if ( ! defined( 'OUTPOST_TEST_MOCK_SERVER_URL' ) ) {
+	$outpost_mock_server_url = getenv( 'OUTPOST_TEST_MOCK_SERVER_URL' );
+	if ( false === $outpost_mock_server_url || '' === $outpost_mock_server_url ) {
+		// Try host.docker.internal first (macOS Docker Desktop convention).
+		// Falls back to 172.17.0.1 (Linux Docker bridge gateway, CI).
+		$hd_internal = @gethostbyname( 'host.docker.internal' );
+		if ( false !== $hd_internal && 'host.docker.internal' !== $hd_internal ) {
+			$outpost_mock_server_url = 'http://host.docker.internal:8080';
+		} else {
+			$outpost_mock_server_url = 'http://172.17.0.1:8080';
+		}
+	}
+	if ( '' !== $outpost_mock_server_url ) {
+		define( 'OUTPOST_TEST_MOCK_SERVER_URL', $outpost_mock_server_url );
+	}
 }
 
 // Make Outpost_PWA_Shell::halt() a no-op so share-target / route-handler
