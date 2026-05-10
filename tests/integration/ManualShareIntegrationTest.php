@@ -29,6 +29,7 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Integration;
 
+use Outpost_Manual_Share_Platform_Registry;
 use PHPUnit\Framework\TestCase;
 use WP_REST_Request;
 
@@ -68,9 +69,20 @@ final class ManualShareIntegrationTest extends TestCase {
 			),
 			true
 		);
+
+		// Fix 3: clear Platform_Registry's static $resolved cache so any
+		// per-test `outpost_manual_share_platforms` filter actually fires.
+		// Without this reset, the first call to `all_platforms()` in any
+		// test populates the cache; subsequent tests' filter registrations
+		// see the cached value and never re-evaluate.
+		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
 	}
 
 	protected function tearDown(): void {
+		// Fix 3: clear Platform_Registry cache so any filter registrations
+		// in this test don't leak into the next test class.
+		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
+
 		if ( $this->test_post_id > 0 ) {
 			wp_delete_post( $this->test_post_id, true );
 		}
@@ -116,10 +128,20 @@ final class ManualShareIntegrationTest extends TestCase {
 		$this->assertSame( 'stub', $data['status'] ?? null );
 		$this->assertSame( 'instagram-feed', $data['platform_id'] ?? null );
 		$this->assertSame( $this->test_post_id, $data['post_id'] ?? null );
+		// Fix 1: F10 has shipped — desktop platform path now returns a
+		// "not yet implemented for this platform (desktop)" message
+		// (see Outpost_Manual_Share_Intent_Payload_Builder::build_stub_response).
+		// Original assertion referenced "F10" in the message but that
+		// reference is gone post-F10-ship. Match the current SUT shape.
 		$this->assertStringContainsString(
-			'F10',
+			'not yet implemented',
 			$data['message'] ?? '',
-			'F9 stub response should reference F10 in the message.'
+			'Desktop stub response should describe the unimplemented state.'
+		);
+		$this->assertStringContainsString(
+			'instagram-feed',
+			$data['message'] ?? '',
+			'Stub response message should reference the requested platform_id.'
 		);
 	}
 
@@ -219,7 +241,12 @@ final class ManualShareIntegrationTest extends TestCase {
 		$this->assertSame( 200, $response->get_status() );
 		$data = $response->get_data();
 		$this->assertFalse( $data['mode_recognized'] ?? true );
-		$this->assertNull( $data['mode_applied'] ?? 'set' );
+		// Fix 2: `assertNull( $x ?? 'set' )` is structurally broken —
+		// `null ?? 'set'` returns 'set' (PHP null-coalescing semantics),
+		// so the assertion can never pass regardless of $data['mode_applied'].
+		// Split into key-existence + null-value checks; both must hold.
+		$this->assertArrayHasKey( 'mode_applied', $data );
+		$this->assertNull( $data['mode_applied'] );
 		$this->assertGreaterThanOrEqual( 10, count( $data['chips'] ?? array() ) );
 	}
 
@@ -281,14 +308,32 @@ final class ManualShareIntegrationTest extends TestCase {
 	 * @test
 	 */
 	public function platforms_filter_can_register_custom_platform_for_chip_listing(): void {
+		// Fix 3.5: mock platform config must use schema-valid enum values.
+		// Original mock had `caption_via => 'manual'` and `after_share =>
+		// 'capture-prompt'`; Platform_Config validates the two enum-
+		// constrained required fields strictly:
+		//   VALID_CAPTION_VIA  = [intent, clipboard, web_intent]
+		//   VALID_AFTER_SHARE  = [mark_done, prompt_for_silo_url, silent]
+		// Fix 3 (Platform_Registry cache reset) made the filter fire and
+		// the validation run for the first time, exposing the bad mock.
+		// Schema audit confirmed these are the ONLY two enum-constrained
+		// required fields — the remaining 4 required fields (id, label,
+		// icon, accepts_modes) accept any non-empty string / non-empty
+		// array, and the 10 optional fields silently default when absent
+		// or wrong-typed. After this fix no more invalid values can hide.
+		// Chose `clipboard` because VSCO is a photo-share app where a
+		// manual-paste caption flow matches 4 of the 10 default platforms
+		// (instagram-feed, instagram-stories, threads, tiktok all use
+		// `clipboard`). Chose `prompt_for_silo_url` for after_share to
+		// match the test's existing intent (capture silo URL after share).
 		$platforms_filter = static function ( array $platforms ): array {
 			$platforms[] = array(
 				'id'             => 'custom-vsco',
 				'label'          => 'VSCO (custom)',
 				'icon'           => 'vsco',
 				'accepts_modes'  => array( 'photo' ),
-				'caption_via'    => 'manual',
-				'after_share'    => 'capture-prompt',
+				'caption_via'    => 'clipboard',
+				'after_share'    => 'prompt_for_silo_url',
 			);
 			return $platforms;
 		};
