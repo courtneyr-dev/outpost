@@ -267,6 +267,7 @@ final class ShareTargetDispatchTest extends TestCase {
 		add_action( 'outpost_sources_init', $fake_init, 5 );
 		Outpost_Source_Registry::reset_for_tests();
 		do_action( 'outpost_sources_init' );
+		Outpost_Source_Registry::mark_bootstrapped_for_tests();
 
 		try {
 			$redirect_url = $this->dispatch_share_target_post( array( 'url' => self::FAKE_URL ) );
@@ -288,6 +289,7 @@ final class ShareTargetDispatchTest extends TestCase {
 			remove_action( 'outpost_sources_init', $fake_init, 5 );
 			Outpost_Source_Registry::reset_for_tests();
 			do_action( 'outpost_sources_init' );
+			Outpost_Source_Registry::mark_bootstrapped_for_tests();
 		}
 	}
 

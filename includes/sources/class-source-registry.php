@@ -242,4 +242,25 @@ final class Outpost_Source_Registry {
 		self::$sources      = array();
 		self::$bootstrapped = false;
 	}
+
+	/**
+	 * Test seam. Sets the bootstrapped flag without firing
+	 * `outpost_sources_init`. Used by tests that manually register
+	 * sources via `do_action( 'outpost_sources_init' )` and need to
+	 * mark the registry as already-bootstrapped so subsequent
+	 * implicit `ensure_bootstrapped()` calls become no-ops.
+	 *
+	 * Without this seam, `reset_for_tests()` clears `$bootstrapped`
+	 * to false, the manual `do_action()` populates `$sources` but
+	 * NEVER touches `$bootstrapped`, and the next dispatch path's
+	 * implicit `ensure_bootstrapped()` re-fires the action against
+	 * an already-populated `$sources` — throwing
+	 * `InvalidArgumentException: source id "..." already registered`.
+	 *
+	 * Production code never calls this. See
+	 * `docs/dev/integration-test-gotchas.md` gotcha #12.
+	 */
+	public static function mark_bootstrapped_for_tests(): void {
+		self::$bootstrapped = true;
+	}
 }
