@@ -100,7 +100,7 @@ final class SyndicationCaptureFlowTest extends TestCase {
 	}
 
 	/**
-	 * Add an audit-log entry directly + roll its `added_at` past the
+	 * Add an audit-log entry directly + roll its `fired_at` past the
 	 * 30-second grace period so the detector picks it up without
 	 * waiting in real time.
 	 */
@@ -112,11 +112,16 @@ final class SyndicationCaptureFlowTest extends TestCase {
 		// reads internal storage, so it uses the 'id' key.
 		$audit_log_id = (string) $entry['id'];
 
-		// Roll added_at into the past so detector's grace check passes.
+		// Roll fired_at into the past so detector's grace check passes.
+		// Audit_Log::add_entry() writes fired_at = now; Pending_Capture_Detector
+		// reads fired_at for the grace + retention checks. The previous version
+		// of this helper wrote added_at, which is the canonical column on the
+		// outpost_syndication_links meta (a DIFFERENT meta key) — confusing the
+		// two schemas. fired_at is canonical here.
 		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
 		foreach ( $entries as $i => $e ) {
 			if ( ( $e['id'] ?? '' ) === $audit_log_id ) {
-				$entries[ $i ]['added_at'] = gmdate( 'c', time() - HOUR_IN_SECONDS );
+				$entries[ $i ]['fired_at'] = gmdate( 'c', time() - HOUR_IN_SECONDS );
 			}
 		}
 		update_post_meta( $post_id, 'outpost_manual_share_log', $entries );
@@ -299,6 +304,11 @@ final class SyndicationCaptureFlowTest extends TestCase {
 		$_GET['action']              = 'edit';
 		$GLOBALS['pagenow']          = 'post.php';
 		$GLOBALS['typenow']          = 'post';
+		// Initialize WP_Screen so get_current_screen() returns non-null and
+		// the notice's first guard passes. With 'post.php', WP_Screen::get
+		// computes base = 'post'. Confirmed empirically + matches WP core
+		// behavior for the post-edit context.
+		set_current_screen( 'post.php' );
 
 		ob_start();
 		do_action( 'admin_notices' );
