@@ -182,4 +182,33 @@ tests_add_filter(
 	}
 );
 
+/**
+ * Configure pretty permalinks for the test environment.
+ *
+ * `.wp-env.json` doesn't set `permalink_structure`, so WordPress defaults
+ * to plain permalinks (`?p=ID`). Under plain permalinks,
+ * `WP_Rewrite::wp_rewrite_rules()` returns `''` (empty string) instead of
+ * an array because the rule builder short-circuits when there's no
+ * permalink structure to apply. Tests that depend on the rewrite-rules
+ * table (currently `RouteHandlerIntegrationTest`; future Phase H admin
+ * surfaces) fail with "Failed asserting that '' is of type array".
+ *
+ * Setting permalink_structure at muplugins_loaded is early enough for
+ * `WP_Rewrite::init()` (fires on `init` action) to read the updated
+ * value before building rules. Production-shaped WP installs default to
+ * `/%postname%/` after admin's first permalinks-page visit; the test
+ * env should match that posture.
+ *
+ * Same posture as the integration bootstrap's other env-fixing filters:
+ * gotcha #1's `http_request_host_is_external`, gotcha #11's
+ * `option_active_plugins`. See PR-Aux-5-diagnosis Cluster C
+ * (`docs/dev/pr-a3-diagnosis.md`).
+ */
+tests_add_filter(
+	'muplugins_loaded',
+	static function (): void {
+		update_option( 'permalink_structure', '/%postname%/' );
+	}
+);
+
 require_once $wp_tests_dir . '/includes/bootstrap.php';
