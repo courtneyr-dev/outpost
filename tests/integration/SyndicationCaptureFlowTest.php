@@ -106,12 +106,16 @@ final class SyndicationCaptureFlowTest extends TestCase {
 	 */
 	private function seed_pending_entry( int $post_id, string $platform_id = 'instagram-feed' ): string {
 		$entry        = Outpost_Manual_Share_Audit_Log::add_entry( $post_id, $platform_id, 'navigator_share' );
-		$audit_log_id = (string) $entry['audit_log_id'];
+		// SUT returns entries keyed with 'id' (canonical, per Audit_Log class docblock).
+		// The external capture-endpoint JSON contract uses 'audit_log_id' as a more
+		// descriptive parameter name; the two are deliberately separate. This helper
+		// reads internal storage, so it uses the 'id' key.
+		$audit_log_id = (string) $entry['id'];
 
 		// Roll added_at into the past so detector's grace check passes.
 		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
 		foreach ( $entries as $i => $e ) {
-			if ( ( $e['audit_log_id'] ?? '' ) === $audit_log_id ) {
+			if ( ( $e['id'] ?? '' ) === $audit_log_id ) {
 				$entries[ $i ]['added_at'] = gmdate( 'c', time() - HOUR_IN_SECONDS );
 			}
 		}
