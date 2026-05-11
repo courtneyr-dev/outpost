@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.100
+ * Version:           0.1.101
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.100' );
+define( 'OUTPOST_VERSION', '0.1.101' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -186,13 +186,14 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-destinatio
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-meta.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-dispatcher.php';
-// G5a — Newsletter POSSE-outbound destinations (first cluster: Beehiiv,
-// Buttondown). Kit + write.as ship in G5b. Shared content transformer
-// lives in G5a since both consumers — Beehiiv (HTML) and Buttondown
-// (markdown) — ship here.
+// G5a — Newsletter POSSE-outbound destinations (Beehiiv, Buttondown) +
+// shared content transformer. G5b extends with Kit + write.as.
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/class-outpost-posse-content-transformer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/destinations/class-outpost-posse-destination-beehiiv.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/posse/destinations/class-outpost-posse-destination-buttondown.php';
+// G5b — Kit (v3 API secret path; OAuth v4 in G5-kit-oauth follow-up) + write.as.
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/destinations/class-outpost-posse-destination-kit.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/posse/destinations/class-outpost-posse-destination-write-as.php';
 // G3.5c — Gutenberg sidebar bundle (registers PluginSidebar + asset enqueue).
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-sidebar-assets.php';
 // G-fetch-recent-picker — composer primitive for "no shareable URL"
@@ -416,9 +417,11 @@ add_action(
 		// G5a — Register Beehiiv + Buttondown destinations. Each register()
 		// hooks `init` for the registry binding and adds settings fields
 		// to the G3.5d `api_keys` tab via `outpost_settings_fields_api_keys`.
-		// Kit + write.as land in G5b.
 		Outpost_POSSE_Destination_Beehiiv::register();
 		Outpost_POSSE_Destination_Buttondown::register();
+		// G5b — Register Kit (v3 API secret) + write.as destinations.
+		Outpost_POSSE_Destination_Kit::register();
+		Outpost_POSSE_Destination_WriteAs::register();
 		// G99-mock-server — register the pre_http_request rewriter. Safe
 		// in production: rewrite is gated on OUTPOST_TEST_MOCK_SERVER_URL,
 		// which is only defined by integration-test bootstrap.

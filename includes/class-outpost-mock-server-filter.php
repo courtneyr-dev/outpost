@@ -58,10 +58,12 @@ final class Outpost_Mock_Server_Filter {
 		'www.youtube.com',
 		'youtube.com',
 		'youtu.be',
-		// G5a — Newsletter POSSE-outbound (Beehiiv + Buttondown). G5b adds
-		// api.convertkit.com (Kit v3) and write.as.
+		// G5a — Newsletter POSSE-outbound (Beehiiv + Buttondown).
 		'api.beehiiv.com',
 		'api.buttondown.email',
+		// G5b — Kit (v3 host is api.convertkit.com) + write.as.
+		'api.convertkit.com',
+		'write.as',
 		// G99 test-only hosts. These never resolve in production (the
 		// .test TLD is reserved per RFC 6761) and are only used by
 		// integration tests that exercise generic primitives like
