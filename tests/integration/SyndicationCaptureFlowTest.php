@@ -173,9 +173,16 @@ final class SyndicationCaptureFlowTest extends TestCase {
 		$this->assertContains( 'https://www.instagram.com/p/abc123/', $urls );
 
 		// the_content filter renders the u-syndication anchor.
+		// Outpost_Syndication_Links_Renderer::append_links() reads the
+		// post id via get_the_ID(), which requires $GLOBALS['post'] set
+		// + setup_postdata(). Per PR-Aux-6-diagnosis cluster B-secondary-α:
+		// stock WP test-authoring hygiene, not a platform gotcha.
+		$GLOBALS['post'] = get_post( $this->test_post_id );
+		setup_postdata( $GLOBALS['post'] );
 		$content = apply_filters( 'the_content', get_post_field( 'post_content', $this->test_post_id ) );
 		$this->assertStringContainsString( 'u-syndication', $content );
 		$this->assertStringContainsString( 'https://www.instagram.com/p/abc123/', $content );
+		wp_reset_postdata();
 	}
 
 	/**
@@ -331,9 +338,15 @@ final class SyndicationCaptureFlowTest extends TestCase {
 		rest_get_server()->dispatch( $req );
 
 		// Render via the_excerpt filter chain.
+		// Renderer::append_links_excerpt() reads get_the_ID(); requires
+		// $GLOBALS['post'] + setup_postdata(). Same fix as the F1 test
+		// above. Per PR-Aux-6-diagnosis cluster B-secondary-α.
+		$GLOBALS['post'] = get_post( $this->test_post_id );
+		setup_postdata( $GLOBALS['post'] );
 		$excerpt_in  = 'A short excerpt.';
 		$excerpt_out = apply_filters( 'the_excerpt', $excerpt_in );
 		$this->assertStringContainsString( 'u-syndication', $excerpt_out );
 		$this->assertStringContainsString( 'https://www.instagram.com/p/excerpt/', $excerpt_out );
+		wp_reset_postdata();
 	}
 }
