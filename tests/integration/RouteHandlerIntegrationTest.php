@@ -46,6 +46,16 @@ final class RouteHandlerIntegrationTest extends TestCase {
 		// integration env may flush before that fires for the test class.
 		Outpost_Route_Handler::register_rewrite_rules();
 		flush_rewrite_rules( false );
+
+		// Populate $wp->public_query_vars by firing the `query_vars`
+		// filter. Production fires this from WP::parse_request() during a
+		// normal request; the test doesn't go through parse_request, so
+		// we mirror the exact line from WP core that populates the
+		// property. Full parse_request invocation would also trigger
+		// rewrite matching and query building — the test doesn't need
+		// those and they'd have side effects on adjacent tests.
+		global $wp;
+		$wp->public_query_vars = apply_filters( 'query_vars', $wp->public_query_vars );
 	}
 
 	private function integration_environment_ready(): bool {
