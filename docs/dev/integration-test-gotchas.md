@@ -278,6 +278,57 @@ chips_for_mode(photo) count: 0      ← smoking gun
 
 ---
 
+## Gotcha #12 — `Outpost_Source_Registry::$bootstrapped` state drift between manual `do_action` and implicit `ensure_bootstrapped()`
+
+**Status:** Fixed (PR #98, May 11 2026) — production seam `Outpost_Source_Registry::mark_bootstrapped_for_tests()` ships; Rule 3 below revised to use it.
+
+**Symptom:** A test that follows the Rule 3 custom-source registration pattern (`add_action` + `reset_for_tests()` + manual `do_action`) hits `InvalidArgumentException: Outpost_Source_Registry: source id "..." already registered` on the next implicit dispatch — even when the test cleans up correctly in its own `finally` block. The throw fires from a downstream test that triggers `ensure_bootstrapped()` via a normal dispatch path, not from the test that registered the fake source.
+
+**Root cause — production-API contract gap.** `Outpost_Source_Registry` maintains two pieces of state: `$sources` (the registered source instances) and `$bootstrapped` (whether the boot action has fired). The lazy bootstrap path keeps them in lockstep, but two other operations don't:
+
+| Operation | Touches `$sources` | Touches `$bootstrapped` |
+|---|---|---|
+| `register($source)` | Appends | No |
+| `reset_for_tests()` | Clears | Clears to `false` |
+| `ensure_bootstrapped()` | Populated by action callbacks | Sets `true` BEFORE firing action |
+| Manual `do_action('outpost_sources_init')` from test code | Populated by action callbacks | **NOT TOUCHED** ← the gap |
+
+Rule 3's documented pattern uses manual `do_action()` in both setup and finally. Neither call sets `$bootstrapped=true`. The next implicit `ensure_bootstrapped()` from a dispatch path therefore re-fires the action against an already-populated `$sources`, producing duplicate-id throws.
+
+**Fix — production test seam** (`includes/sources/class-source-registry.php`):
+
+```php
+/**
+ * Test seam — mark the registry as bootstrapped without firing the
+ * action. Use this AFTER a manual `do_action( 'outpost_sources_init' )`
+ * so a subsequent implicit `ensure_bootstrapped()` doesn't re-fire the
+ * action against an already-populated $sources (gotcha #12). Zero
+ * production callers; the seam is for assertion-discipline Rule 3
+ * patterns only.
+ */
+public static function mark_bootstrapped_for_tests(): void {
+    self::$bootstrapped = true;
+}
+```
+
+Production-callers proof: `grep -rn "mark_bootstrapped_for_tests" includes/ outpost.php uninstall.php pwa/` returns one match — the definition itself. Same posture as `OUTPOST_TESTING_PWA_SHELL` (#9), `set_payload_source_for_tests` (#10), and `option_active_plugins` (#11).
+
+**Why not classified as instance of an existing gotcha:**
+
+| Existing gotcha | Why not |
+|---|---|
+| #9 (`OUTPOST_TESTING_PWA_SHELL` missing) | About `exit()` short-circuiting; different mechanism |
+| #10 (`php://input` no test seam) | About body injection; unrelated |
+| #11 (`active_plugins` filter missing) | About `is_plugin_active()`; different static, different contract |
+
+Gotcha #12 is a **production-API contract gap** — the static-state coordination between `reset_for_tests()` and the post-action `$bootstrapped` flag was missing a complementary seam.
+
+**Where surfaced:** PR-Aux-5-diagnosis (#92, cluster A). Production fix PR-A3a (#98). Cascade-anticipation pattern that prevented later regressions: `feedback_anticipate_cascade.md` memory file (4 instances of the same shape across the recovery week — see `pr-aux-6-diagnosis.md` § "Diagnostic incompleteness — fourth instance recap").
+
+**Memory:** `outpost_source_registry_bootstrap_drift.md`.
+
+---
+
 # Assertion discipline (anti-patterns to avoid)
 
 Three rules surfaced during the PR #70/#71 patterns review. Not gotchas in the platform sense — these are test-authoring anti-patterns to avoid.
@@ -322,7 +373,7 @@ The rule catches TOCTOU regressions where the auth check is moved AFTER dispatch
 
 When a test registers a fake source / companion / filter callback into a static-state singleton (e.g., `Outpost_Source_Registry::register`, `add_action('outpost_sources_init', ...)`), the registration MUST be undone in tearDown OR scoped to a single test method via try/finally.
 
-**Pattern:**
+**Pattern (revised 2026-05-11 to address gotcha #12):**
 
 ```php
 public function unambiguous_dispatch_writes_prefill_transient(): void {
@@ -330,6 +381,7 @@ public function unambiguous_dispatch_writes_prefill_transient(): void {
     add_action( 'outpost_sources_init', $fake_init, 5 );
     Outpost_Source_Registry::reset_for_tests();
     do_action( 'outpost_sources_init' );
+    Outpost_Source_Registry::mark_bootstrapped_for_tests();  // gotcha #12
 
     try {
         // ... test body
@@ -337,13 +389,14 @@ public function unambiguous_dispatch_writes_prefill_transient(): void {
         remove_action( 'outpost_sources_init', $fake_init, 5 );
         Outpost_Source_Registry::reset_for_tests();
         do_action( 'outpost_sources_init' );
+        Outpost_Source_Registry::mark_bootstrapped_for_tests();  // gotcha #12
     }
 }
 ```
 
-The reset+replay restores the production source set; without cleanup, the fake source leaks into the next test, where it can match URLs the next test didn't expect to claim. Symptom: tests pass in isolation, fail when the class runs in suite order.
+The reset+replay restores the production source set; without cleanup, the fake source leaks into the next test, where it can match URLs the next test didn't expect to claim. The `mark_bootstrapped_for_tests()` calls (added in PR #98) close gotcha #12 — without them, the next implicit `ensure_bootstrapped()` re-fires the action against an already-populated `$sources` and throws duplicate-id. Symptom of forgetting either piece: tests pass in isolation, fail when the class runs in suite order.
 
-**Surfaced:** PR #70/#71 review. Applied in cluster #6 test 4 (`unambiguous_dispatch_writes_prefill_transient`).
+**Surfaced:** PR #70/#71 review. Applied in cluster #6 test 4 (`unambiguous_dispatch_writes_prefill_transient`). Revised in PR #98 to add the `mark_bootstrapped_for_tests()` step.
 
 ---
 
@@ -369,4 +422,4 @@ The likely candidates: #1 (Docker bridge), #2 (port restrictions), #6 (autoloade
 
 ---
 
-**Last updated:** 2026-05-08 (overnight queue Phase 2). Next update: when an 11th gotcha surfaces or one is resolved by a production change.
+**Last updated:** 2026-05-11 (PR-A4 honest audit refresh). Adds gotcha #12 entry retroactively (surfaced PR #92, fixed PR #98). Revises Rule 3 to include `mark_bootstrapped_for_tests()`. Next update: when a 13th gotcha surfaces or one is resolved by a production change.
