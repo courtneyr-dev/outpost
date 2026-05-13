@@ -23,6 +23,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		\PFBT_Format_Detector::$mark_as_manual_calls = array();
 	}
 
 	public function tearDown(): void {
@@ -758,6 +759,46 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 				),
 			),
 			$result
+		);
+	}
+
+	// --- C1 coordination: mark_format_manual ------------------------------
+	//
+	// Outpost's apply_post_format calls mark_format_manual after applying
+	// either an explicit `mp-post-format` value or an inferred format. This
+	// satisfies the coordination contract C1 with PFBT_Format_Detector (auto-
+	// detect re-enabled in PFBT v2.3.0+): once Outpost decides the format,
+	// PFBT's detector must respect that choice on every subsequent save.
+
+	public function test_mark_format_manual_calls_pfbt_with_post_id(): void {
+		$this->invoke_private( 'mark_format_manual', array( 123 ) );
+
+		$this->assertSame( array( 123 ), \PFBT_Format_Detector::$mark_as_manual_calls );
+	}
+
+	public function test_mark_format_manual_passes_each_distinct_post_id(): void {
+		$this->invoke_private( 'mark_format_manual', array( 100 ) );
+		$this->invoke_private( 'mark_format_manual', array( 200 ) );
+		$this->invoke_private( 'mark_format_manual', array( 300 ) );
+
+		$this->assertSame(
+			array( 100, 200, 300 ),
+			\PFBT_Format_Detector::$mark_as_manual_calls
+		);
+	}
+
+	public function test_mark_format_manual_is_idempotent_call_pattern(): void {
+		// PFBT_Format_Detector::mark_as_manual is documented idempotent on the
+		// PFBT side (update_post_meta of the same value is a no-op). Outpost's
+		// wrapper passes through the same post ID without dedup; verify the
+		// call pattern matches the contract.
+		$this->invoke_private( 'mark_format_manual', array( 555 ) );
+		$this->invoke_private( 'mark_format_manual', array( 555 ) );
+
+		$this->assertSame(
+			array( 555, 555 ),
+			\PFBT_Format_Detector::$mark_as_manual_calls,
+			'mark_format_manual passes each call through; PFBT side handles idempotence'
 		);
 	}
 }
