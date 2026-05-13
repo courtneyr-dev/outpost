@@ -80,6 +80,16 @@ export interface HEntryProperties {
 	 * when `photo` is an array; otherwise a string.
 	 */
 	'mp-photo-alt'?: string | string[];
+	/**
+	 * Video URL — string (single video per post) or string[] (rare). Per the
+	 * Micropub spec's standard `video` property: a URL the post embeds or
+	 * references. Outpost emits this from the Doing-variant snapshot picker
+	 * (URL paste only — no client-side upload pipeline) and from the Recipe
+	 * mode's optional cover video. Server-side downstream (the Shanske
+	 * Micropub plugin) handles the URL as-is; rendering plugins (Post Kinds,
+	 * theme templates) decide what to do with it.
+	 */
+	video?: string | string[];
 	category?: string[];
 	'mp-syndicate-to'?: string[];
 	/** Optional permalink slug. Native Micropub spec property. */

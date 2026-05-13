@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
+	discover_media_endpoint,
+	upload_media,
 	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
+import { process_photo, PhotoError } from '../../lib/photo';
 import {
 	geocode,
 	geo_uri,
@@ -13,6 +16,11 @@ import {
 	type GeocodeResult,
 } from '../../lib/geocode';
 import { GeocodePicker } from '../geocode-picker';
+import {
+	MediaPicker,
+	all_entries_have_alt,
+	type MediaEntry,
+} from '../media-picker';
 import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
@@ -253,6 +261,8 @@ const VARIANT_ORDER: Variant[] = [
 type Status =
 	| { kind: 'idle' }
 	| { kind: 'discovering-endpoint' }
+	| { kind: 'processing-photo' }
+	| { kind: 'uploading-photo'; current: number; total: number }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location?: string }
 	| { kind: 'queued' }
@@ -288,21 +298,24 @@ function consume_share_target_for_doing(): {
 }
 
 /**
- * Map Doing-tab variant → WordPress post format. Used by
- * `mp-post-format` so the Post Formats for Block Themes companion (or
- * vanilla WP post_format taxonomy) classifies the post correctly:
+ * Map Doing-tab variant → WordPress post format. Used by `mp-post-format`
+ * so the Post Formats for Block Themes companion classifies the post when
+ * Outpost can decide unambiguously from the variant choice alone.
  *
- *   - listen / jam       → audio (track, album, podcast episode)
- *   - watch              → video
- *   - read               → standard (reading list — no native WP format fits)
- *   - play / game        → standard
- *   - checkin            → status (location-based snap)
- *   - eat / drink        → standard
+ *   - listen / jam       → audio (always audio — track, album, podcast)
+ *   - watch              → video (always video)
  *
- * Other variants without an obvious format mapping return null; the
- * composer omits `mp-post-format` in that case so the bridge falls
- * back to the user's More-panel selection or the site's default
- * format.
+ * Variants whose format depends on attached media (Checkin / Eat / Drink /
+ * Exercise — may carry images / video / both / neither) intentionally
+ * return null. Outpost leaves `mp-post-format` unset so PFBT_Format_Detector
+ * (auto-detection re-enabled in PFBT v2.3.0+) decides from the post content
+ * on save. Per coordination contract C1: when Outpost DOES set
+ * `mp-post-format`, the Micropub bridge calls
+ * `PFBT_Format_Detector::mark_as_manual()` so the detector respects
+ * Outpost's choice on subsequent saves.
+ *
+ * Read / Play / Game are URL-anchored without a clean format mapping —
+ * also null; user's More-panel selection or site default wins.
  */
 function post_format_for_variant(variant: Variant): string | null {
 	switch (variant) {
@@ -311,10 +324,6 @@ function post_format_for_variant(variant: Variant): string | null {
 			return 'audio';
 		case 'watch':
 			return 'video';
-		case 'checkin':
-			return 'status';
-		case 'exercise':
-			return 'status';
 		default:
 			return null;
 	}
@@ -362,6 +371,34 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	// Photo / Life / Recipe — venue name + optional OSM coordinates.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
+
+	// User-attached media for the snapshot-shaped variants (Checkin / Eat /
+	// Drink / Exercise — every variant whose config has hasGeocode: true).
+	// Per Decision 1 of the 2026-05-13 locked-decisions doc, these variants
+	// accept image attachments (file upload via the Micropub media endpoint,
+	// same pipeline as PhotoMode) AND a single optional video URL paste (no
+	// client-side upload — the URL gets posted verbatim as the `video`
+	// h-entry property and downstream consumers handle embedding).
+	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
+	const [video_url, setVideoUrl] = useState('');
+	// Media endpoint is discovered once per session and cached, matching
+	// PhotoMode's pattern. Discovery only fires when the submit handler
+	// actually needs to upload images.
+	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
+
+	// Clear user-attached media when switching variants. A user picking a
+	// photo for Checkin then switching to Listen would otherwise see the
+	// photo "follow" the variant change, which is surprising — and Listen's
+	// existing source-preview cover would conflict with it.
+	useEffect(() => {
+		setMediaEntries((current) => {
+			for (const entry of current) {
+				URL.revokeObjectURL(entry.preview_url);
+			}
+			return [];
+		});
+		setVideoUrl('');
+	}, [variant]);
 
 	// Stale geocode results from a previous variant would otherwise re-render
 	// when the user comes back to a hasGeocode variant. Clear on switch.
@@ -511,12 +548,77 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			}
 		}
 
+		// Alt-text discipline for user-attached photos. Mirrors PhotoMode's
+		// rule: every entry must have alt text OR be marked decorative.
+		if (media_entries.length > 0 && !all_entries_have_alt(media_entries)) {
+			setStatus({
+				kind: 'error',
+				message:
+					'Every photo needs alt text, or mark it decorative. Decorative photos submit empty alt to indicate they\'re purely visual.',
+			});
+			return;
+		}
+
+		// Video URL: optional, but if provided must be a safe http(s) URL.
+		const trimmed_video_url = video_url.trim();
+		if (trimmed_video_url !== '' && !is_safe_http_url(trimmed_video_url)) {
+			setStatus({ kind: 'error', message: 'Video URL must be http:// or https://.' });
+			return;
+		}
+
 		try {
 			let micropub_endpoint = endpoint;
 			if (!micropub_endpoint) {
 				setStatus({ kind: 'discovering-endpoint' });
 				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
 				setEndpoint(micropub_endpoint);
+			}
+
+			// Process + upload any user-attached photos. The pipeline mirrors
+			// PhotoMode: EXIF strip + canvas downscale + JPEG re-encode →
+			// per-photo POST to the Micropub media endpoint → collect Location
+			// header URLs for the final h-entry submission.
+			let uploaded_photo_urls: string[] = [];
+			let alt_values: string[] = [];
+			if (media_entries.length > 0) {
+				setStatus({ kind: 'processing-photo' });
+				const processed_blobs: Blob[] = [];
+				for (const entry of media_entries) {
+					const processed = await process_photo(entry.file);
+					processed_blobs.push(processed.blob);
+				}
+
+				let resolved_media_endpoint = media_endpoint;
+				if (!resolved_media_endpoint) {
+					setStatus({ kind: 'discovering-endpoint' });
+					resolved_media_endpoint = await discover_media_endpoint(
+						micropub_endpoint,
+						token.accessToken,
+						micropubEnv,
+					);
+					setMediaEndpoint(resolved_media_endpoint);
+				}
+
+				for (let i = 0; i < processed_blobs.length; i++) {
+					setStatus({
+						kind: 'uploading-photo',
+						current: i + 1,
+						total: processed_blobs.length,
+					});
+					const upload = await upload_media(
+						{
+							blob: processed_blobs[i]!,
+							filename: `photo-${String(i + 1)}.jpg`,
+							accessToken: token.accessToken,
+							mediaEndpoint: resolved_media_endpoint,
+						},
+						micropubEnv,
+					);
+					uploaded_photo_urls.push(upload.location);
+				}
+				alt_values = media_entries.map((e) =>
+					e.decorative ? '' : e.alt.trim(),
+				);
 			}
 
 			// Build the h-entry properties. Routing is variant-aware:
@@ -566,11 +668,27 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			if (config.hasRating && trimmed_rating !== '') {
 				base.rating = trimmed_rating;
 			}
-			// Auto-attached metadata from the source-preview fetch (Spotify
-			// album art, YouTube thumbnail, etc.). User-invisible state in
-			// the form, but rides on the h-entry submission.
-			if (cover_url) {
+			// Photo property: user-attached uploads win over source-preview
+			// cover. hasGeocode variants (Checkin / Eat / Drink / Exercise)
+			// always have cover_url empty (no source-preview flow), so the
+			// fallback only matters for URL-anchored variants like Listen /
+			// Watch / Read where cover_url comes from Spotify/YouTube oEmbed.
+			if (uploaded_photo_urls.length > 0) {
+				base.photo =
+					uploaded_photo_urls.length === 1
+						? uploaded_photo_urls[0]!
+						: uploaded_photo_urls;
+				base['mp-photo-alt'] =
+					alt_values.length === 1 ? alt_values[0]! : alt_values;
+			} else if (cover_url) {
 				base.photo = cover_url;
+			}
+			// Video URL: paste-only (no client-side upload pipeline). Submitted
+			// verbatim as the Micropub spec's standard `video` property;
+			// downstream rendering (Post Kinds, theme templates) decides
+			// embedding.
+			if (trimmed_video_url) {
+				base.video = trimmed_video_url;
 			}
 			if (publication) {
 				base['p-publication'] = publication;
@@ -622,6 +740,11 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
 				setVenueName('');
+				for (const entry of media_entries) {
+					URL.revokeObjectURL(entry.preview_url);
+				}
+				setMediaEntries([]);
+				setVideoUrl('');
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -640,6 +763,11 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 						setRating('');
 						setContent('');
 						setMoreValues(empty_more_values());
+						for (const entry of media_entries) {
+							URL.revokeObjectURL(entry.preview_url);
+						}
+						setMediaEntries([]);
+						setVideoUrl('');
 						return;
 					} catch (_q_err) {
 						// Queue write failed; fall through to error display.
@@ -649,30 +777,47 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			}
 		} catch (err) {
 			const message =
-				err instanceof MicropubError
+				err instanceof PhotoError
 					? err.code + ': ' + err.message
-					: err instanceof Error
-						? err.message
-						: 'Unknown error';
+					: err instanceof MicropubError
+						? err.code + ': ' + err.message
+						: err instanceof Error
+							? err.message
+							: 'Unknown error';
 			setStatus({ kind: 'error', message });
 		}
 	};
 
-	const submitting = status.kind === 'discovering-endpoint' || status.kind === 'posting';
+	const submitting =
+		status.kind === 'discovering-endpoint' ||
+		status.kind === 'processing-photo' ||
+		status.kind === 'uploading-photo' ||
+		status.kind === 'posting';
 	const submit_label =
 		status.kind === 'discovering-endpoint'
 			? 'Finding endpoint…'
-			: status.kind === 'posting'
-				? 'Posting…'
-				: config.submitLabel;
+			: status.kind === 'processing-photo'
+				? 'Preparing photos…'
+				: status.kind === 'uploading-photo'
+					? `Uploading ${String(status.current)} of ${String(status.total)}…`
+					: status.kind === 'posting'
+						? 'Posting…'
+						: config.submitLabel;
 	// Variant-aware enable: URL-anchored kinds (listen/watch/etc.) need a URL;
 	// content-shaped kinds (eat/drink) need their primary text input. Without
 	// this branch, eat/drink users with a food name typed in but no venue URL
 	// see a permanently-disabled submit and a `required` browser-validation
 	// block — caught by both the code review and a11y audit.
-	const can_submit = config.targetRequired
+	//
+	// hasGeocode variants with attached media also gate on alt-text discipline:
+	// every photo must have alt text OR be marked decorative before submit
+	// enables. This matches PhotoMode's contract.
+	const base_can_submit = config.targetRequired
 		? !!target_url.trim()
 		: !!person_name.trim();
+	const media_complete =
+		media_entries.length === 0 || all_entries_have_alt(media_entries);
+	const can_submit = base_can_submit && media_complete;
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-listen-mode-title">
@@ -904,6 +1049,38 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								)}
 							</div>
 						</details>
+					</>
+				)}
+
+				{config.hasGeocode && (
+					<>
+						<MediaPicker
+							entries={media_entries}
+							onChange={setMediaEntries}
+							disabled={submitting}
+							idPrefix={`outpost-listen-${variant}-media`}
+							emptyLabel="Attach a photo (optional)"
+							nonEmptyLabel="Add more photos"
+						/>
+
+						<label class="outpost-label" for="outpost-listen-video-url">
+							Video URL (optional)
+						</label>
+						<input
+							id="outpost-listen-video-url"
+							class="outpost-input"
+							type="url"
+							value={video_url}
+							onInput={(event): void =>
+								setVideoUrl((event.target as HTMLInputElement).value)
+							}
+							placeholder="https://… (YouTube, Vimeo, direct .mp4)"
+							inputMode="url"
+							autoComplete="url"
+							autoCapitalize="none"
+							spellcheck={false}
+							disabled={submitting}
+						/>
 					</>
 				)}
 
