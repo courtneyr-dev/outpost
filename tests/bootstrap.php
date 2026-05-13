@@ -351,6 +351,24 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	}
 }
 
+// Minimal PFBT_Format_Detector stub for unit tests. Real PFBT plugin supplies
+// the full class; Outpost's apply_post_format → mark_format_manual coordination
+// (C1 contract) calls the static API on this class only — `mark_as_manual()`.
+// Stub tracks invocations so MicropubBridgesTest can assert the wiring works
+// without loading PFBT itself.
+//
+// Reset tracking between tests via `PFBT_Format_Detector::$mark_as_manual_calls = []`.
+if ( ! class_exists( 'PFBT_Format_Detector' ) ) {
+	class PFBT_Format_Detector {
+		/** @var int[] List of post IDs passed to mark_as_manual(). */
+		public static array $mark_as_manual_calls = array();
+
+		public static function mark_as_manual( int $post_id ): void {
+			self::$mark_as_manual_calls[] = $post_id;
+		}
+	}
+}
+
 // Load the bootstrap. This pulls in the constant block, the detector class,
 // the companion-base class, and every procedural helper outpost.php defines.
 require_once dirname( __DIR__ ) . '/outpost.php';

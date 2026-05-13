@@ -444,6 +444,11 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * Only runs when Post Formats for Block Themes is active.
 	 *
+	 * After applying the format, mark it manual via the PFBT detector
+	 * (coordination contract C1) so PFBT's re-enabled auto-detection on
+	 * `save_post` does not override Outpost's choice on future saves of
+	 * the same post.
+	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map.
 	 */
@@ -457,6 +462,7 @@ final class Outpost_Micropub_Bridges {
 		if ( null !== $explicit ) {
 			if ( in_array( $explicit, $valid, true ) ) {
 				set_post_format( $post_id, 'standard' === $explicit ? '' : $explicit );
+				self::mark_format_manual( $post_id );
 			}
 			return;
 		}
@@ -469,6 +475,38 @@ final class Outpost_Micropub_Bridges {
 			return;
 		}
 		set_post_format( $post_id, 'standard' === $inferred ? '' : $inferred );
+		self::mark_format_manual( $post_id );
+	}
+
+	/**
+	 * Mark PFBT's manual-format flag so the detector respects Outpost's choice.
+	 *
+	 * Coordination contract C1 with `PFBT_Format_Detector` (auto-detection
+	 * re-enabled in PFBT v2.3.0+). Outpost's `apply_post_format` runs at
+	 * `after_micropub` priority 20 — by then the Micropub plugin's
+	 * `wp_insert_post` has already fired `save_post`, so PFBT's detector
+	 * may have applied a content-derived format on first save. After
+	 * Outpost overrides with `mp-post-format` or its own inference, this
+	 * call locks in that choice: subsequent saves (user edits, sync
+	 * refreshes) see the manual flag and PFBT skips applying its detected
+	 * format. The audit meta `_pfbt_format_detected` continues to record
+	 * what the content suggests, so divergence is visible without breaking
+	 * the user-facing format.
+	 *
+	 * `class_exists` guard: PFBT may be active under an older version that
+	 * lacks the `mark_as_manual` API. Calling without the guard would fail
+	 * autoloading on those installs. The companion-detection check at the
+	 * top of `apply_post_format` already confirmed the plugin is active;
+	 * the class check confirms the API surface.
+	 *
+	 * Idempotent: marking an already-manual post is a no-op.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	private static function mark_format_manual( int $post_id ): void {
+		if ( class_exists( '\PFBT_Format_Detector' ) ) {
+			\PFBT_Format_Detector::mark_as_manual( $post_id );
+		}
 	}
 
 	/**
