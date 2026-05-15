@@ -7,6 +7,20 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed (PR #104 — PWA media affordances for Doing-variant snapshots)
+
+MediaPicker shared component lands in `pwa/src/components/media-picker.tsx` — file upload + alt-text discipline (mirrors PhotoMode contract) + single optional video URL paste. Wired into Checkin / Eat / Drink / Exercise variants of Listen-mode. New `MediaEntry` type with `all_entries_have_alt` helper. 20 new vitest tests; full PWA suite at 330 tests.
+
+`post_format_for_variant` narrowed for snapshot variants: Checkin and Exercise now return null instead of `'status'`. Combined with PFBT's apply-once + audit-always semantics (post-formats-for-block-themes PR #4 v2.3.0), format becomes content-driven for snapshot variants — Checkin with photos becomes image/gallery, Checkin with a video URL becomes video, Checkin with neither becomes status. Outpost stops over-claiming format authority over content-shaped posts.
+
+OUTPOST_VERSION: 0.1.102 → 0.1.103.
+
+### Changed (PR #103 — C1 coordination: mark PFBT format-manual after apply_post_format)
+
+`apply_post_format` now calls `PFBT_Format_Detector::mark_as_manual()` after applying either an explicit `mp-post-format` value or an inferred format. Closes coordination contract C1 with PFBT v2.3.0+: PFBT's re-enabled auto-detection on `save_post` no longer overrides Outpost's choice on subsequent saves. PFBT_Format_Detector stub added to `tests/bootstrap.php`. 3 new unit tests.
+
+OUTPOST_VERSION: 0.1.101 → 0.1.102.
+
 ### Reverted (v0.1.61 readability CSS pass)
 
 User feedback: the v0.1.61 styling pass lost the previous design's button-like aesthetic on the radio variant picker and the comfortable theme-token-driven layout. Reverted `pwa/src/styles/structure.css` to its v0.1.59 baseline. The earlier design — `flex-wrap` variant picker with transparent borders that highlight only when checked, the original spacing, the original heading sizes — is back.
