@@ -16,10 +16,13 @@
 
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import { register, propsFor } from 'prop-for-that';
+import { online, network } from 'prop-for-that/plugins';
 import './styles/structure.css';
 import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
 import { ComposerTabs } from './components/composer-tabs';
+import { ConnectionBanner } from './components/connection-banner';
 import { read_token, type StoredToken, type TokenStoreEnvironment } from './lib/token-store';
 import { parse_share_target, parse_dispatch_params, stash_share_target } from './lib/share-target';
 
@@ -142,7 +145,21 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 
 export function mount(root: Element, props: AppProps): void {
 	root.classList.add('outpost-app');
-	render(<App {...props} />, root);
+	// Sample connectivity once and expose it to CSS on :root as
+	// --live-online / --live-net-* so the connection banner reacts in pure
+	// CSS (see connection-banner.tsx + structure.css). No JS in the reaction
+	// path. network is Chromium-only and no-ops elsewhere; online works
+	// everywhere via navigator.onLine.
+	register(online);
+	register(network);
+	propsFor(['online', 'network']);
+	render(
+		<>
+			<ConnectionBanner />
+			<App {...props} />
+		</>,
+		root,
+	);
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
