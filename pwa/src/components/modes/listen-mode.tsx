@@ -838,7 +838,15 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								name="outpost-listen-variant"
 								value={id}
 								checked={variant === id}
-								onChange={(): void => setVariant(id)}
+								onChange={(): void => {
+									setVariant(id);
+									// A success/error banner belongs to the submission
+									// that produced it. Left in place across a variant
+									// switch it reads as "this variant posted" — the
+									// 2026-07-02 UX pass mistook a lingering Listen
+									// success for a Checkin one.
+									setStatus({ kind: 'idle' });
+								}}
 								disabled={submitting}
 							/>
 							<span>{VARIANTS[id].label}</span>

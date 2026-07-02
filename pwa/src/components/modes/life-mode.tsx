@@ -210,7 +210,12 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 								name="outpost-life-variant"
 								value={id}
 								checked={variant === id}
-								onChange={(): void => setVariant(id)}
+								onChange={(): void => {
+									setVariant(id);
+									// Clear any lingering success/error banner — it
+									// belongs to the previous variant's submission.
+									setStatus({ kind: 'idle' });
+								}}
 								disabled={submitting}
 							/>
 							<span>{VARIANTS[id].label}</span>
