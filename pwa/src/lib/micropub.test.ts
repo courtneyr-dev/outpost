@@ -142,6 +142,40 @@ describe('post_note', () => {
 		expect(result.location).toBe('https://example.test/queued');
 	});
 
+	it('treats bare 200 as success when a gateway rewrites the status', async () => {
+		const env: MicropubEnvironment = {
+			fetch: async () =>
+				make_response({
+					status: 200,
+					headers: { Location: 'https://example.test/2026/07/02/rewritten' },
+				}),
+		};
+		const result = await post_note(
+			{
+				content: 'Gateway-mangled post',
+				accessToken: 'abc',
+				micropubEndpoint: 'https://example.test/mp',
+			},
+			env,
+		);
+		expect(result.location).toBe('https://example.test/2026/07/02/rewritten');
+	});
+
+	it('returns an empty result on 200 with no Location header (soft success, no failure banner)', async () => {
+		const env: MicropubEnvironment = {
+			fetch: async () => make_response({ status: 200 }),
+		};
+		const result = await post_note(
+			{
+				content: 'Stripped response',
+				accessToken: 'abc',
+				micropubEndpoint: 'https://example.test/mp',
+			},
+			env,
+		);
+		expect(result.location).toBeUndefined();
+	});
+
 	it('throws post_failed on 4xx with body included in message', async () => {
 		const env: MicropubEnvironment = {
 			fetch: async () =>

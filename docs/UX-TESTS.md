@@ -85,10 +85,10 @@ Expected: it expands without errors and shows the configured options (syndicatio
 
 ---
 
-## D. Reply tab (7 variants)
+## D. Reply tab (9 variants)
 
-**D1. Variant picker renders all seven** `[auto]`
-Expected radios in order: Reply, Like, Repost, Bookmark, RSVP, Follow, Wishlist — in a fieldset with a legend, arrow-key navigable as a radio group. Heading and submit-button label update to match the selected variant (e.g. "Post like").
+**D1. Variant picker renders all nine** `[auto]`
+Expected radios in order: Reply, Like, Repost, Bookmark, RSVP, Follow, Wishlist, Tag, Issue — in a fieldset with a legend, arrow-key navigable as a radio group. Heading and submit-button label update to match the selected variant (e.g. "Post like").
 
 **D2. Reply requires URL and content** `[auto]`
 Select Reply. Fill only the URL.

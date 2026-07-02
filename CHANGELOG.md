@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Micropub client accepts any 2xx as success)
+
+`post_h_entry` and `upload_media` rejected any status other than 201/202, so a bare 200 — observed on GoDaddy managed WP where the gateway rewrites the origin status — surfaced a `post_failed` banner even though the post published, inviting duplicate resubmits (found by the 2026-07-02 UX test pass: Bookmark, Photo, Listen, Checkin). Both now accept any 2xx; a 2xx without a Location header stays the existing soft success. Docs: UX-TESTS.md D1 corrected to the nine shipping Reply variants (adds Tag, Issue).
+
+OUTPOST_VERSION: 0.1.104 → 0.1.105.
+
 ### Changed (PR #104 — PWA media affordances for Doing-variant snapshots)
 
 MediaPicker shared component lands in `pwa/src/components/media-picker.tsx` — file upload + alt-text discipline (mirrors PhotoMode contract) + single optional video URL paste. Wired into Checkin / Eat / Drink / Exercise variants of Listen-mode. New `MediaEntry` type with `all_entries_have_alt` helper. 20 new vitest tests; full PWA suite at 330 tests.
