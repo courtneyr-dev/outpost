@@ -244,3 +244,80 @@ After a full pass across all tabs, the browser console shows no uncaught errors 
 | Offline | 0 | 3 |
 | Visual/PWA | 4 | 1 |
 | **Total** | **33** | **9** |
+
+---
+
+# Tier 2 — exhaustive variant pass
+
+Tier 1 above is a breadth smoke test: every area once. Tier 2 drives **every postable variant end-to-end** and exercises **every distinct control** at least once. Run it before a release, after changes to the modes or the Micropub client, or whenever Tier 1 passes but you want real confidence. All `[auto]`.
+
+**Rules (in addition to the Tier 1 "How to run" rules):**
+
+- Staging only. Every post's text content starts with `UX-TEST`.
+- **All syndication chips OFF on every post.** If a chip renders pre-selected, click it off before submitting. Tier 2 must never publish to an external network.
+- Verify every "posted" claim in wp-admin (`edit.php`, newest first): a NEW post ID with a fresh timestamp. Do not trust the banner alone — that lesson is why F4b exists.
+- After each section, trash that section's posts before moving on (keeps the newest-first check unambiguous).
+- Post-run, the deeper property check (`mf2_*` post meta) is done from Claude Code with wp-cli: `wp @staging post meta list <ID> | grep -E "mf2_"` on a sample of trashed posts. The browser agent only needs to report post IDs.
+
+Target URLs: use `https://qkf.b0d.myftpupload.com/` for on-site targets and `https://www.youtube.com/watch?v=dQw4w9WgXcQ` / `https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT` for media targets.
+
+## T2.A — Reply tab: all nine variants post
+
+For each: select the variant, fill the target URL (plus content where required, prefixed `UX-TEST`), toggle any syndication chips OFF, submit, expect a success banner, verify the new post in wp-admin, note the ID.
+
+**T2.1 Reply** — "In reply to" = staging URL, content `UX-TEST t2 reply` (both required). Also click "Show preview" first and confirm a citation renders.
+**T2.2 Like** — URL only.
+**T2.3 Repost** — URL only.
+**T2.4 Bookmark** — URL + note `UX-TEST t2 bookmark`.
+**T2.5 RSVP** — "Event URL" = staging URL. Confirm the yes/no/maybe/interested picker shows with "yes" preselected; choose **maybe**; submit.
+**T2.6 Follow** — "Person or feed URL" = staging URL.
+**T2.7 Wishlist** — target URL + note `UX-TEST t2 wishlist`.
+**T2.8 Tag** — target URL + note `UX-TEST t2 tag`.
+**T2.9 Issue** — target URL + note `UX-TEST t2 issue`.
+
+Expected mf2 properties (for the wp-cli follow-up): in-reply-to, like-of, repost-of, bookmark-of, rsvp, follow-of, wishlist-of, tag-of, issue-of.
+
+## T2.B — Doing tab: all ten variants post, every control exercised
+
+**T2.10 Listen + rating + artist + title** — Spotify track URL, Title `UX-TEST t2 listen`, Artist `Test Artist`, Rating `4`, comment `UX-TEST t2 listen`. Verify posted (Audio format expected).
+**T2.11 Watch** — YouTube URL, Title `UX-TEST t2 watch`, Director field filled, Rating `5`.
+**T2.12 Read + read-status** — any book URL (e.g. `https://qkf.b0d.myftpupload.com/`), Title `UX-TEST t2 read`, Author filled, set the read-status dropdown to **reading**, Rating `3`.
+**T2.13 Play** — any URL, Title `UX-TEST t2 play`.
+**T2.14 Game** — any URL, Title `UX-TEST t2 game` (same property as Play; distinct label).
+**T2.15 Jam** — Spotify URL, Artist filled, comment `UX-TEST t2 jam`.
+**T2.16 Checkin** — type `geo:29.12,-103.24`, Place name `UX-TEST t2 checkin`. (Submit must be DISABLED before the geo value is entered — re-assert F4's gating.)
+**T2.17 Eat + media** — "What did you eat?" = `UX-TEST t2 eat`, attach an image with alt text, type a venue `geo:` value in the optional venue field.
+**T2.18 Drink + video URL** — "What did you drink?" = `UX-TEST t2 drink`, paste a YouTube URL in "Video URL (optional)", no image.
+**T2.19 Exercise** — "What activity?" = `UX-TEST t2 exercise`, note in the optional content field, venue left empty.
+
+Expected mf2 properties: listen-of ×2 (Listen, Jam), watch-of, read-of (+read-status), play-of ×2, location, eat-of, drink-of, exercise.
+
+## T2.C — Life tab: both variants
+
+**T2.20 Mood + title** — Title `UX-TEST t2 mood title`, "How are you feeling?" = `focused`, context `UX-TEST t2 mood`.
+**T2.21 Weather** — "Conditions" = `UX-TEST t2 72F sunny`.
+
+## T2.D — Photo: decorative-alt path
+
+**T2.22 Decorative toggle** — attach an image, leave alt empty, flip the decorative toggle instead. Submit must enable (decorative = deliberate empty alt), post succeeds, caption `UX-TEST t2 decorative`.
+
+## T2.E — More panel: values actually land on the post
+
+**T2.23 Note + More panel round trip** — On the Post tab, write `UX-TEST t2 more panel`. Open More; set Category `UX-Test-Cat` (new), Tag `ux-test-tag`, Slug `ux-test-t2-slug`, Post Format `Aside`. Submit. In wp-admin, open the new post's row/quick-edit and confirm ALL FOUR landed: the category exists and is assigned, the tag is assigned, the slug is `ux-test-t2-slug`, the format is Aside. This is the only Tier 2 test where wp-admin verification goes beyond "the post exists."
+**T2.24 Syndication chips render-only** — On the Post tab, open the chip strip (if any chips are configured). Confirm chips render with pressed/unpressed states and that every chip is OFF before any Tier 2 submission. Do NOT submit with a chip on.
+
+## T2.F — Error paths
+
+**T2.25 Invalid target URL** — Reply tab, Wishlist, target `notaurl` → clear inline error, nothing posts.
+**T2.26 Rating out of range** — Doing tab, Listen, rating `9` → expect the "Rating must be a number between 1 and 5." error; nothing posts.
+**T2.27 Invalid video URL scheme** — Doing tab, Drink, video URL `ftp://example.com/x` → expect the video-URL validation error; nothing posts.
+
+## T2.G — State hygiene
+
+**T2.28 Life-tab banner reset** — Post T2.20's mood, then switch the Type radio to Weather without submitting: the success banner must disappear (same contract as F4b, Life mode).
+**T2.29 Error banner reset** — Trigger T2.26's rating error, then switch variant to Watch: the error banner must disappear.
+**T2.30 Console sweep** — After all sections: no uncaught console errors.
+
+## Tier 2 cleanup and accounting
+
+~21 posts created (T2.1–T2.23). Trash via the per-section sweeps + a final `UX-TEST` search; report created vs trashed counts (photo/media posts may not text-match — check the Media Library and newest-first list). Claude Code then runs the wp-cli property audit on the trashed IDs and permanently empties nothing — Trash emptying stays manual.

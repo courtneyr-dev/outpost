@@ -80,3 +80,55 @@ saw, console errors if any. After the table, list:
 1. Paste the results table back into your Claude Code session — failures become the next work items.
 2. Run the `[manual]` tests on your phone per the SMOKE-TESTS.md device matrix (iPhone Safari for K1/K2/L4; Android for J2/K3).
 3. Only after staging passes: repeat the run against `https://courtneyr.dev/post/` if a live pass is needed — same prompt with the URL swapped, and be aware test posts publish to the public site until cleanup.
+
+---
+
+# Tier 2 runner — exhaustive variant pass
+
+Run Tier 2 only after Tier 1 passes. It creates ~21 posts, so it runs in **two batches** to keep the agent session manageable. Paste Batch 1; when it reports, paste Batch 2 in a fresh conversation.
+
+## Batch 1 prompt (T2.1 – T2.9, Reply tab)
+
+```
+You are running Tier 2 (exhaustive variant pass), Batch 1, on the Outpost
+composer. Fetch and read the "Tier 2" section of
+https://raw.githubusercontent.com/courtneyr-dev/outpost/main/docs/UX-TESTS.md
+then run tests T2.1 through T2.9 in order against
+https://qkf.b0d.myftpupload.com/post/?_cb=<current unix timestamp>.
+
+Hard rules: staging only; every post's text starts with "UX-TEST"; toggle
+every syndication chip OFF before each submit; verify each post in
+wp-admin (edit.php, newest first) and record its ID; after T2.9, trash all
+nine posts via the UX-TEST search and per-row Trash links.
+
+Report: | ID | Result | Post ID | Notes | — then created-vs-trashed counts
+and any UX observations. On FAIL: screenshot, console errors, continue.
+STOP only if login fails or the page is blank.
+```
+
+## Batch 2 prompt (T2.10 – T2.30, everything else)
+
+```
+You are running Tier 2 (exhaustive variant pass), Batch 2, on the Outpost
+composer. Fetch and read the "Tier 2" section of
+https://raw.githubusercontent.com/courtneyr-dev/outpost/main/docs/UX-TESTS.md
+then run tests T2.10 through T2.30 in order against
+https://qkf.b0d.myftpupload.com/post/?_cb=<current unix timestamp>.
+
+Hard rules: staging only; every post's text starts with "UX-TEST"; toggle
+every syndication chip OFF before each submit; verify each post in
+wp-admin and record its ID; T2.23 additionally requires confirming the
+category, tag, slug, and Aside format all landed on the post; for file
+uploads (T2.17, T2.22) use any small image, or mark BLOCKED if you cannot
+attach one; trash each section's posts before starting the next section.
+
+Report: | ID | Result | Post ID | Notes | — then created-vs-trashed counts
+(note that media posts may not text-match the UX-TEST search; reconcile
+against the newest-first post list) and any UX observations. On FAIL:
+screenshot, console errors, continue. STOP only if login fails or the
+page is blank.
+```
+
+## After Tier 2
+
+Paste both batch reports into Claude Code. It then runs the wp-cli property audit on the reported post IDs (`wp @staging post meta list <ID> | grep mf2_`) to confirm each variant wrote the right Micropub property — the browser can't see post meta, so this closes the maker/checker loop.
