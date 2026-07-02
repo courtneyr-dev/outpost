@@ -246,8 +246,9 @@ export async function discover_micropub_endpoint(
  * value becomes a key in the form body; arrays get `[]` suffix per the
  * Micropub spec (`category[]=tag1&category[]=tag2`).
  *
- * The server responds with 201 Created or 202 Accepted (both success); both
- * return a Location header pointing at the new post.
+ * The server responds with 201 Created or 202 Accepted per the spec, and a
+ * Location header pointing at the new post. Any other 2xx (bare 200 from a
+ * status-rewriting gateway) is also treated as success.
  *
  * Used by Note (content only), Reply (content + in-reply-to), and future
  * modes that build richer h-entry shapes (Like, Repost, Bookmark, RSVP,
@@ -299,7 +300,12 @@ export async function post_h_entry(
 		);
 	}
 
-	if (response.status !== 201 && response.status !== 202) {
+	// Any 2xx is success. The spec says 201/202, but real deployments return
+	// bare 200 with the post created — observed 2026-07-02 on GoDaddy managed
+	// WP, where the gateway can rewrite the origin status (Bookmark / Photo /
+	// Listen / Checkin all "failed" with 200 while the posts published).
+	// Rejecting 200 makes users resubmit and create duplicates.
+	if (!response.ok) {
 		const error_text = await safe_read_text(response);
 		throw new MicropubError(
 			'post_h_entry: micropub endpoint returned ' +
@@ -311,7 +317,7 @@ export async function post_h_entry(
 
 	const location = response.headers.get('location') ?? response.headers.get('Location');
 	if (!location) {
-		// Spec violation but the post did succeed (we got 201/202). Soft-fail:
+		// Spec violation but the post did succeed (we got a 2xx). Soft-fail:
 		// caller renders a generic "posted" success without a link. See
 		// PostNoteResult docblock for context on which servers omit Location.
 		return {};
@@ -524,7 +530,10 @@ export async function upload_media(
 		);
 	}
 
-	if (response.status !== 201 && response.status !== 202) {
+	// Any 2xx is success — same gateway-rewrites-201-to-200 tolerance as
+	// post_h_entry. Unlike posting, upload still hard-requires the Location
+	// header below (without it there is no file URL to attach).
+	if (!response.ok) {
 		const error_text = await safe_read_text(response);
 		throw new MicropubError(
 			'upload_media: media endpoint returned ' +

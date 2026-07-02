@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.104
+ * Version:           0.1.105
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.104' );
+define( 'OUTPOST_VERSION', '0.1.105' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
