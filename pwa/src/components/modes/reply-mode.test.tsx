@@ -188,4 +188,45 @@ describe('ReplyMode variant picker', () => {
 		await flush();
 		expect(rsvp_radios().length).toBe(0);
 	});
+
+	it('clears the success banner when switching variants', async () => {
+		// Regression: the 2026-07-02 UX pass posted a Like, switched to
+		// another variant, and read the lingering "Posted to" banner as
+		// that variant's success. The banner belongs to the submission
+		// that produced it — a variant switch must reset it.
+		const env = {
+			fetch: async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+				if (init?.method === 'POST') {
+					return new Response('', {
+						status: 201,
+						headers: { Location: 'https://example.test/2026/07/02/like-1' },
+					});
+				}
+				// Endpoint discovery GET against token.me.
+				return new Response('<html></html>', {
+					status: 200,
+					headers: { Link: '<https://example.test/mp>; rel="micropub"' },
+				});
+			},
+		};
+		render(<ReplyMode token={mock_token} micropubEnv={env} />, root);
+
+		variant_radios()[1]?.click(); // Like — URL only
+		await flush();
+		set_value(input_for('outpost-reply-target'), 'https://example.test/some-post/');
+		await flush();
+		root
+			.querySelector('form')
+			?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+		await flush();
+		await flush();
+
+		const banner = root.querySelector('p.outpost-status') as HTMLParagraphElement;
+		expect(banner.hidden).toBe(false);
+		expect(banner.textContent).toContain('Posted to');
+
+		variant_radios()[3]?.click(); // Bookmark
+		await flush();
+		expect(banner.hidden).toBe(true);
+	});
 });

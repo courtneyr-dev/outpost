@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (variant switch clears the status banner)
+
+Switching the variant radio in Reply, Doing, and Life modes now resets the success/error banner to idle. Previously a "Posted…" banner from one variant lingered across the switch and read as the new variant's result — the 2026-07-02 UX retest mistook a lingering Listen success for a Checkin one (the checkin never submitted; its submit is correctly gated on a location value). New ReplyMode regression test (post → banner shown → switch variant → banner hidden). UX-TESTS.md F4 rewritten to match Checkin's location-required design, F4b added for the banner reset.
+
+OUTPOST_VERSION: 0.1.105 → 0.1.106.
+
 ### Fixed (Micropub client accepts any 2xx as success)
 
 `post_h_entry` and `upload_media` rejected any status other than 201/202, so a bare 200 — observed on GoDaddy managed WP where the gateway rewrites the origin status — surfaced a `post_failed` banner even though the post published, inviting duplicate resubmits (found by the 2026-07-02 UX test pass: Bookmark, Photo, Listen, Checkin). Both now accept any 2xx; a 2xx without a Location header stays the existing soft success. Docs: UX-TESTS.md D1 corrected to the nine shipping Reply variants (adds Tag, Issue).

@@ -141,12 +141,16 @@ Expected: success; published post carries the listen-of target.
 Select Eat. Fill the primary field with `UX-TEST eat`, attach an image via the media picker, leave alt empty.
 Expected: submit blocked until alt text is present (same alt discipline as Photo). With alt filled, post succeeds.
 
-**F4. Snapshot variant with video URL** `[auto]`
-Select Checkin (or Eat). Paste a video URL into the optional video field, no image.
-Expected: accepted; post succeeds. (Skip the location picker part — see F5.)
+**F4. Checkin requires a location; posts with video URL** `[auto]`
+Select Checkin. With only a note and a video URL filled, the submit button stays DISABLED — a checkin without a location is not submittable by design. Now type `geo:29.12,-103.24` into "Location URL or geo:lat,lon" (typed manually — no permission prompt) and a place name `UX-TEST checkin place`, keep the video URL, submit.
+Expected: submit enables once the location field has a value; post succeeds and is verifiable in wp-admin.
+
+**F4b. Success banner resets on variant switch** `[auto]`
+After any successful Doing-tab post (e.g. F2), switch to a different variant without submitting.
+Expected: the "Posted…" banner disappears. A lingering banner misreads as the new variant having posted.
 
 **F5. Checkin location picker** `[manual]` (geolocation permission)
-Select Checkin and use the location control.
+Select Checkin and use the location picker control (device GPS, not typed coordinates).
 Expected: permission prompt; a location resolves and attaches to the post.
 
 ---
