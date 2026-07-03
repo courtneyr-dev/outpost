@@ -540,7 +540,10 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		}
 
 		// Rating sanity: numeric, 1-5 inclusive. Empty is valid (no rating).
-		if (trimmed_rating !== '') {
+		// Gated by hasRating: shared component state can carry a stale rating
+		// from a previous variant — the 2026-07-02 Tier 2 pass hit a Listen
+		// rating error surfacing on Drink, which has no rating field.
+		if (config.hasRating && trimmed_rating !== '') {
 			const r = Number(trimmed_rating);
 			if (!Number.isFinite(r) || r < 1 || r > 5) {
 				setStatus({ kind: 'error', message: 'Rating must be a number between 1 and 5.' });
@@ -548,9 +551,15 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			}
 		}
 
+		// Media + video inputs only render for hasGeocode (snapshot) variants;
+		// scope their state the same way so values left over from another
+		// variant never validate or submit here.
+		const active_media = config.hasGeocode ? media_entries : [];
+		const trimmed_video_url = config.hasGeocode ? video_url.trim() : '';
+
 		// Alt-text discipline for user-attached photos. Mirrors PhotoMode's
 		// rule: every entry must have alt text OR be marked decorative.
-		if (media_entries.length > 0 && !all_entries_have_alt(media_entries)) {
+		if (active_media.length > 0 && !all_entries_have_alt(active_media)) {
 			setStatus({
 				kind: 'error',
 				message:
@@ -560,7 +569,6 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		}
 
 		// Video URL: optional, but if provided must be a safe http(s) URL.
-		const trimmed_video_url = video_url.trim();
 		if (trimmed_video_url !== '' && !is_safe_http_url(trimmed_video_url)) {
 			setStatus({ kind: 'error', message: 'Video URL must be http:// or https://.' });
 			return;
@@ -580,10 +588,10 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 			// header URLs for the final h-entry submission.
 			let uploaded_photo_urls: string[] = [];
 			let alt_values: string[] = [];
-			if (media_entries.length > 0) {
+			if (active_media.length > 0) {
 				setStatus({ kind: 'processing-photo' });
 				const processed_blobs: Blob[] = [];
-				for (const entry of media_entries) {
+				for (const entry of active_media) {
 					const processed = await process_photo(entry.file);
 					processed_blobs.push(processed.blob);
 				}
@@ -616,7 +624,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					);
 					uploaded_photo_urls.push(upload.location);
 				}
-				alt_values = media_entries.map((e) =>
+				alt_values = active_media.map((e) =>
 					e.decorative ? '' : e.alt.trim(),
 				);
 			}
@@ -816,7 +824,9 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		? !!target_url.trim()
 		: !!person_name.trim();
 	const media_complete =
-		media_entries.length === 0 || all_entries_have_alt(media_entries);
+		!config.hasGeocode ||
+		media_entries.length === 0 ||
+		all_entries_have_alt(media_entries);
 	const can_submit = base_can_submit && media_complete;
 
 	return (
@@ -1168,7 +1178,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 								)}
 							</>
 						) : (
-							'Posted successfully.'
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
 						)
 					) : status.kind === 'queued' ? (
 						"Saved for later. Outpost will post this when you're back online."

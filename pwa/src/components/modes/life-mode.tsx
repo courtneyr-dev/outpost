@@ -324,7 +324,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 								)}
 							</>
 						) : (
-							'Posted successfully.'
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
 						)
 					) : status.kind === 'queued' ? (
 						"Saved for later. Outpost will post this when you're back online."
