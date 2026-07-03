@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.107
+ * Version:           0.1.108
  * Requires at least: 6.5
  * Tested up to:      6.9
  * Requires PHP:      8.2
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.107' );
+define( 'OUTPOST_VERSION', '0.1.108' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -333,6 +333,12 @@ add_action(
 		// FY Theming — REST endpoint + appearance settings sub-menu.
 		Outpost_Appearance_REST_Controller::register();
 		Outpost_Appearance_Settings_Page::register();
+		// G3.5d — Multi-tab settings save handler. Registers here (not at
+		// `plugins_loaded` with Outpost_Settings_Page) because register()
+		// enumerates tabs via Outpost_Settings_Registry::get_tabs(), which
+		// translates tab labels. See the JIT-trap comment above this block.
+		// admin_post_* actions fire long after `init`, so this is safe.
+		Outpost_Settings_Handler::register();
 	},
 	0
 );
@@ -408,9 +414,12 @@ add_action(
 		Outpost_OAuth_Controller::add_provider( new Outpost_OAuth_Provider_Whoop() );
 		Outpost_OAuth_Controller::register();
 		Outpost_OAuth_Settings_Page::register();
-		// G3.5d — Multi-tab settings UI.
+		// G3.5d — Multi-tab settings UI. The save handler registers in the
+		// `init` block above instead: its register() enumerates tabs, and
+		// Outpost_Settings_Registry::get_tabs() translates tab labels —
+		// pre-init translation trips the WP 6.7+ JIT textdomain notice,
+		// which breaks REST responses when debug output is displayed.
 		Outpost_Settings_Page::register();
-		Outpost_Settings_Handler::register();
 		// G3.5b — POSSE foundation: register meta keys + cron handler.
 		Outpost_POSSE_Meta::register();
 		Outpost_POSSE_Dispatcher::register();

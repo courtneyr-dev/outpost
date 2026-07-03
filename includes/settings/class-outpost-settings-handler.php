@@ -30,8 +30,9 @@ final class Outpost_Settings_Handler {
 	public const NONCE_FIELD = 'outpost_settings_nonce';
 
 	/**
-	 * Hook the per-tab admin_post handlers. Called once during
-	 * plugins_loaded; iterates registered tabs.
+	 * Hook the per-tab admin_post handlers. Called once at `init`
+	 * (never earlier — iterating tabs translates their labels, and
+	 * pre-init translation trips WP 6.7's JIT textdomain notice).
 	 *
 	 * @since 0.1.79
 	 */
