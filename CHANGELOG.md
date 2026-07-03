@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Doing-tab fields are variant-scoped; honest no-link success copy)
+
+Found by the 2026-07-02 Tier 2 exhaustive pass. (1) Shared Doing-tab state leaked across variants: a stale rating from Listen re-validated on Drink (phantom "Rating must be a number between 1 and 5." on a variant with no rating field), a stale video URL would submit from variants without the video field, and stale alt-less media could disable submit on variants without the picker. Rating validation now gates on `hasRating`; media + video state scopes to `hasGeocode` variants for validation, upload, payload, and submit-enable. Two ListenMode regression tests (335 total). (2) The bare "Posted successfully." message (2xx without a Location header) now reads "Posted, but the server did not return a link. Check your site to confirm it published." in all five modes — the Tier 2 pass proved that shape can mean a phantom post (Follow/Eat/Drink/Weather created nothing server-side; investigation open).
+
+OUTPOST_VERSION: 0.1.106 → 0.1.107.
+
 ### Fixed (variant switch clears the status banner)
 
 Switching the variant radio in Reply, Doing, and Life modes now resets the success/error banner to idle. Previously a "Posted…" banner from one variant lingered across the switch and read as the new variant's result — the 2026-07-02 UX retest mistook a lingering Listen success for a Checkin one (the checkin never submitted; its submit is correctly gated on a location value). New ReplyMode regression test (post → banner shown → switch variant → banner hidden). UX-TESTS.md F4 rewritten to match Checkin's location-required design, F4b added for the banner reset.
