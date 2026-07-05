@@ -51,6 +51,8 @@ export interface MorePanelValues {
 	xfnRels: string[];
 	/** Selected syndication target UIDs (subset of fetched targets). */
 	syndicateTo: string[];
+	/** Promote an otherwise stream-only kind onto the main archive (sends `pkiw-promote`). */
+	promoteToMain: boolean;
 }
 
 export const empty_more_values = (): MorePanelValues => ({
@@ -61,6 +63,7 @@ export const empty_more_values = (): MorePanelValues => ({
 	yoastFocusKw: null,
 	xfnRels: [],
 	syndicateTo: [],
+	promoteToMain: false,
 });
 
 export interface MorePanelProps {
@@ -108,6 +111,7 @@ export function MorePanel(props: MorePanelProps) {
 	const post_formats_list = composerConfig.postFormats;
 	const yoast_active = composerConfig.companions['yoast'] === 'active';
 	const xfn_active = composerConfig.companions['xfn'] === 'active';
+	const post_kinds_active = composerConfig.companions['post-kinds'] === 'active';
 
 	// Bridgy auto-suggest: when the Reply / Doing target URL host matches a
 	// known silo, the matching publish target gets surfaced as a separate
@@ -383,6 +387,27 @@ export function MorePanel(props: MorePanelProps) {
 						won't apply.
 					</p>
 				)}
+
+				{post_kinds_active && (
+					<fieldset class="outpost-post-kinds-surface">
+						<legend class="outpost-label">Post surface</legend>
+						<label class="outpost-checkbox">
+							<input
+								type="checkbox"
+								checked={values.promoteToMain}
+								onChange={(e): void =>
+									onChange({
+										...values,
+										promoteToMain: (e.target as HTMLInputElement)
+											.checked,
+									})
+								}
+								disabled={disabled}
+							/>
+							<span>Promote to main archive</span>
+						</label>
+					</fieldset>
+				)}
 		</div>
 	);
 }
@@ -550,6 +575,11 @@ export function merge_more_values<T>(
 	}
 	if (values.syndicateTo.length > 0) {
 		merged['mp-syndicate-to'] = values.syndicateTo;
+	}
+	// Post Kinds surface override — promote a stream-only kind onto the main
+	// archive. The plugin's Micropub bridge maps this to the pkiw_promote meta.
+	if (values.promoteToMain) {
+		merged['pkiw-promote'] = true;
 	}
 	return merged as T;
 }
