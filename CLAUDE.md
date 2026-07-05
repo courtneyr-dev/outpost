@@ -127,6 +127,55 @@ bin/                        Helper scripts
 - Token in encrypted IndexedDB, never localStorage or cookies.
 - Service worker scope is `/post/` only, never the whole site.
 
+## Testing
+
+Every feature and bugfix lands with tests — failing test first, then the fix. Cover edge cases and failure paths, not just the happy path. Unit (WP_Mock) + integration (wp-env + WireMock) + Playwright e2e where there's a UI.
+
+- **No OR-assertions in defense-in-depth contexts.** An assertion like `assertTrue($a || $b)` weakens both branches — a regression in one is masked by the other passing. Where the architecture is "layer A blocks AND layer B blocks," assert both independently, each with its own failure message. See CI/lint discipline in prior sessions for the concrete before/after (PR #70/#71 review).
+- **Auth-gate tests need explicit absence-of-side-effects assertions.** "401 returned" is trivially true for any error path. Assert the protected work didn't fire: no transients written, no hooks fired (`did_action()` returns 0), no state mutated. Without this, a refactor that moves the auth check after the side effect still passes.
+- **No self-grading tests.** A test that asserts against its own implementation's output (rather than an independent expectation) isn't a check.
+- **CI green is the source of truth, not local runs.** The integration suite was red for a long stretch here while people trusted local PHPUnit — treat a red CI run as authoritative even when local tests pass, and don't report a fix as verified until the CI job that covers it is green.
+
+## Security by default
+
+Sanitize input, validate data, escape output (Security Trinity above). Secrets live in env/config, never in code or commits. Public-facing features get a security review pass before shipping.
+
+Real incidents from this repo's history, so the pattern doesn't regress:
+- **Bearer-token-in-URL leak** — the token used to ride in the query string; moved to the JSON body (Micropub-spec compliant) so it stops leaking through access logs, browser history, and CDN cache keys.
+- **Filter privilege-escalation** — a hostile `outpost_companion_adapters` filter could once instantiate arbitrary classes; now restricted to `Outpost_*_Adapter`-pattern class names plus a `is_subclass_of` check.
+- **Token-store XSS size limit** — the encrypted IndexedDB token store defeats casual DevTools inspection (non-extractable `CryptoKey`) but does **not** defeat same-origin XSS; that's documented honestly rather than oversold, and is why CSP work matters.
+- **Cookie + bearer credential collision** — a same-origin PWA calling WordPress REST with `Authorization: Bearer` also carries the `wordpress_logged_in_*` cookie if the user is logged into wp-admin in the same browser. WordPress's cookie-auth path then demands a nonce bearer auth doesn't have, and the request 403s. Fix: `credentials: 'omit'` on every bearer-authenticated fetch. Endpoints that intentionally support cookie fallback keep `credentials: 'include'`.
+
+## Accessibility
+
+WCAG 2.2 AA is the floor, built in from the first component rather than audited in later. Keyboard-only pass (everything reachable, no traps, visible focus) + screen reader spot-check before shipping UI. This repo has already shipped fixes in this vein — drawer focus trap (Tab/Shift-Tab now stays inside the modal) and persistent live-region containers for iOS VoiceOver (conditionally-mounted `role="alert"` / `aria-live` regions get missed by VoiceOver; containers now stay mounted with `hidden` toggling). Extend that pattern rather than re-deriving it per component.
+
+## Release gate — prepare ≠ ship
+
+Never cut a release, tag, or deploy without Courtney's explicit go, even when all machinery is ready.
+
+**Green deploy ≠ deployed.** A green deploy workflow run does not mean the plugin actually updated on the target site. Verify with `wp plugin list` (or `wp @staging` / `wp @live` per the site's wp-cli alias) on the target after every deploy. This repo has hit exactly this failure mode: deploy runs reported green for weeks while the target stayed on a stale version.
+
+**There are TWO deploy repos, one per site** — pushing one is not enough:
+- staging → submodule bump in `staging-courtneyr-dev/plugins/outpost`, push to main triggers the GH Action rsync
+- live → submodule bump in `courtneyr-dev-site/wp-content/plugins/outpost`, push to main triggers the GH Action rsync
+
+A deploy ships **every** submodule pin in the target repo, not just the one you bumped — bumping Outpost's pin can silently regress an unrelated submodule (e.g. the theme) back to whatever commit that repo has pinned. Check sibling submodule pins against their own repo's main before pushing either deploy repo.
+
+## Commit convention — Emoji-Log
+
+Every commit going forward uses exactly one of these seven prefixes, imperative mood, no others:
+
+| Prefix | Use for |
+|---|---|
+| `📦 NEW:` | Something entirely new |
+| `👌 IMPROVE:` | Enhancement / refactor |
+| `🐛 FIX:` | Bug fix |
+| `📖 DOC:` | Documentation |
+| `🚀 RELEASE:` | New version |
+| `🤖 TEST:` | Testing |
+| `‼️ BREAKING:` | Breaks previous versions |
+
 ## WordPress.org Compliance
 
 Outpost is GPLv2-or-later, free, fully functional. Per [WordPress.org Plugin Guideline §5](https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/#5-trialware-is-not-permitted), every feature in the WordPress.org version must work without payment. There are no:
