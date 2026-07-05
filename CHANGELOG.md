@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (Promote-to-main-archive toggle in the composer More panel)
+
+When Post Kinds for IndieWeb is active, the composer's More panel shows a "Promote to main archive" toggle. It sends the Micropub `pkiw-promote` property, which the plugin maps to the `pkiw_promote` meta — so a post whose kind is normally stream-only (checkin, listen, etc.) can be pushed onto the main archive at creation, the same override the WP editor toggle writes. Hidden when Post Kinds is not active.
+
+OUTPOST_VERSION: 0.1.108 → 0.1.109.
+
 ### Fixed (Doing-tab fields are variant-scoped; honest no-link success copy)
 
 Found by the 2026-07-02 Tier 2 exhaustive pass. (1) Shared Doing-tab state leaked across variants: a stale rating from Listen re-validated on Drink (phantom "Rating must be a number between 1 and 5." on a variant with no rating field), a stale video URL would submit from variants without the video field, and stale alt-less media could disable submit on variants without the picker. Rating validation now gates on `hasRating`; media + video state scopes to `hasGeocode` variants for validation, upload, payload, and submit-enable. Two ListenMode regression tests (335 total). (2) The bare "Posted successfully." message (2xx without a Location header) now reads "Posted, but the server did not return a link. Check your site to confirm it published." in all five modes — the Tier 2 pass proved that shape can mean a phantom post (Follow/Eat/Drink/Weather created nothing server-side; investigation open).
