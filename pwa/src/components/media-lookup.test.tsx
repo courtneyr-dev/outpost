@@ -185,10 +185,10 @@ describe('MediaLookup', () => {
 	});
 
 	it('renders a Movie/TV toggle when showTypeToggle is set and passes type to the lookup', async () => {
-		let captured_body: Record<string, unknown> = {};
+		let captured_body = new URLSearchParams();
 		const env: MediaLookupEnvironment = {
 			fetch: async (_i: RequestInfo | URL, init?: RequestInit) => {
-				captured_body = JSON.parse((init?.body as string) ?? '{}');
+				captured_body = new URLSearchParams((init?.body as string) ?? '');
 				return make_response({ body: { results: [], kind: 'watch', notConfigured: false } });
 			},
 		};
@@ -213,7 +213,7 @@ describe('MediaLookup', () => {
 		await flush();
 		search_button().click();
 		await flush();
-		expect(captured_body['type']).toBe('tv');
+		expect(captured_body.get('type')).toBe('tv');
 	});
 
 	it('does not render a type toggle without showTypeToggle', () => {

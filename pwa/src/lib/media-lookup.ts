@@ -9,11 +9,13 @@
  * Why a proxy instead of calling Post Kinds directly: managed-WP hosts
  * (GoDaddy's Apache) strip the `Authorization` header, so a bearer-in-header
  * request from the PWA authenticates as anonymous and Post Kinds' edit_posts
- * gate 403s. This mirrors `preview.ts`: the token rides in the request body,
- * `credentials: 'include'` sends the WordPress cookie so a logged-in site
- * owner's session authenticates the same-site dispatch, and the bearer header
- * covers the header-surviving hosts. See CLAUDE.md B2 + the cookie/bearer
- * collision note.
+ * gate 403s. This mirrors `micropub.ts`: the token rides in a form-encoded
+ * `access_token` field, which populates PHP's `$_POST` — the only place
+ * IndieAuth's `get_token_from_request()` looks. A JSON body never reaches
+ * `$_POST`, so on GoDaddy it stays anonymous and 403s. `credentials: 'omit'`
+ * avoids the cookie/nonce collision (a logged-in wp-admin session would
+ * otherwise attach `wordpress_logged_in_*` and demand a nonce bearer auth
+ * doesn't carry). See CLAUDE.md B1 #8 + the cookie/bearer collision note.
  */
 
 export interface MediaLookupEnvironment {
@@ -76,20 +78,30 @@ export async function lookup_media(
 		// Cache-bust so managed-WP edge caches (GoDaddy promotes some POST-ish
 		// responses) don't serve a stale result for a repeated query.
 		const url_with_cache_bust = LOOKUP_ENDPOINT + '?_t=' + String(Date.now());
+		// Form-encode the body — NOT JSON — for the same reason micropub.ts does:
+		// GoDaddy's Apache strips the Authorization header, so the IndieAuth token
+		// must ride as an `access_token` form field. That populates PHP's $_POST,
+		// which is what IndieAuth's get_token_from_request() reads to authenticate
+		// the WordPress user. The lookup proxy then dispatches internally to Post
+		// Kinds (which requires an authenticated user), so a JSON body — which
+		// never reaches $_POST — leaves the request unauthenticated on GoDaddy.
+		// credentials:'omit' avoids the cookie/nonce collision (see micropub.ts).
+		const body = new URLSearchParams();
+		body.append('kind', params.kind);
+		body.append('q', params.query);
+		body.append('access_token', params.accessToken);
+		if (params.type) {
+			body.append('type', params.type);
+		}
 		response = await env.fetch(url_with_cache_bust, {
 			method: 'POST',
-			credentials: 'include',
+			credentials: 'omit',
 			headers: {
 				Authorization: 'Bearer ' + params.accessToken,
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({
-				kind: params.kind,
-				q: params.query,
-				access_token: params.accessToken,
-				...(params.type ? { type: params.type } : {}),
-			}),
+			body: body.toString(),
 		});
 	} catch (err) {
 		throw new MediaLookupError(
