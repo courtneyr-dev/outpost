@@ -35,7 +35,12 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function tearDown(): void {
-		unset( $_POST['access_token'], $_SERVER['HTTP_AUTHORIZATION'] );
+		unset(
+			$_POST['access_token'],
+			$_SERVER['HTTP_AUTHORIZATION'],
+			$_SERVER['REDIRECT_HTTP_AUTHORIZATION'],
+			$_SERVER['REQUEST_URI']
+		);
 		WP_Mock::tearDown();
 	}
 
@@ -482,5 +487,58 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
+	}
+
+	// --- GoDaddy header reinjection (determine_current_user shim) -----------
+
+	private function mock_body_token_helpers(): void {
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing(
+			static fn( $v ) => is_string( $v ) ? trim( $v ) : $v
+		);
+	}
+
+	public function test_reinject_restores_header_from_body_token(): void {
+		// Mobile on GoDaddy: header stripped, token in the body, no WP user yet.
+		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/lookup?_t=1';
+		$_POST['access_token']  = 'live-token'; // outpost-lint:fixture-credential
+		$this->mock_body_token_helpers();
+
+		$result = Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
+
+		$this->assertNull( $result, 'must pass through — it restores the header, it does not resolve the user' );
+		$this->assertSame( 'Bearer live-token', $_SERVER['HTTP_AUTHORIZATION'] ?? '' );
+	}
+
+	public function test_reinject_skips_when_header_already_present(): void {
+		$_SERVER['REQUEST_URI']       = '/wp-json/outpost/v1/lookup';
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer already-here'; // outpost-lint:fixture-credential
+		$_POST['access_token']         = 'other-token'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+
+		Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
+
+		$this->assertSame( 'Bearer already-here', $_SERVER['HTTP_AUTHORIZATION'] );
+	}
+
+	public function test_reinject_skips_when_not_the_lookup_route(): void {
+		$_SERVER['REQUEST_URI'] = '/wp-json/wp/v2/posts';
+		$_POST['access_token']  = 'tok'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+
+		Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
+
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'must not touch auth for unrelated routes' );
+	}
+
+	public function test_reinject_passes_through_already_resolved_user(): void {
+		// A cookie/header already authenticated the request — do nothing.
+		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/lookup';
+		$_POST['access_token']  = 'tok'; // outpost-lint:fixture-credential
+
+		$result = Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( 7 );
+
+		$this->assertSame( 7, $result );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER );
 	}
 }

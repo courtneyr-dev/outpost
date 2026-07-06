@@ -75,6 +75,74 @@ final class Outpost_Media_Lookup_Endpoint {
 	 */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
+		// Managed-WP hosts (GoDaddy's Apache) strip the Authorization header, so
+		// the PWA sends the IndieAuth token in the request body. This endpoint
+		// dispatches internally to Post Kinds, which needs an authenticated user
+		// — so restore the header from the body token BEFORE IndieAuth's own
+		// determine_current_user callback (priority 10) runs, letting it validate
+		// the token and set the user. Scoped to this route inside the callback.
+		add_filter( 'determine_current_user', array( self::class, 'reinject_bearer_from_body' ), 1 );
+	}
+
+	/**
+	 * Restore a stripped Authorization header from the request body so IndieAuth
+	 * can authenticate the token and set the current user before this endpoint's
+	 * internal Post Kinds dispatch runs.
+	 *
+	 * Managed-WP hosts (GoDaddy) drop HTTP_AUTHORIZATION; the PWA falls back to
+	 * sending the token in the body. Unlike preview/geocode (which fetch
+	 * externally and need no WP user), the lookup proxy calls rest_do_request
+	 * against Post Kinds' edit_posts-gated route, so the user must be set.
+	 *
+	 * Hooked at priority 1 on determine_current_user, ahead of IndieAuth
+	 * (priority 10/20). Returns the incoming value unchanged — it only restores
+	 * the header, it never authenticates on its own, and it only acts when the
+	 * header was actually missing (so it can't create a cookie/nonce collision).
+	 *
+	 * @param int|false|null $user User id resolved so far.
+	 * @return int|false|null
+	 */
+	public static function reinject_bearer_from_body( $user ) {
+		if ( ! empty( $user ) ) {
+			return $user;
+		}
+		// Only for this endpoint's route (pretty or plain-permalink form).
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? rawurldecode( (string) wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		if ( false === strpos( $uri, self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
+			return $user;
+		}
+		// Header present (host didn't strip it) — nothing to restore.
+		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) || ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			return $user;
+		}
+		$token = self::body_access_token();
+		if ( '' !== $token ) {
+			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		}
+		return $user;
+	}
+
+	/**
+	 * The `access_token` from the request body (form-encoded $_POST or a JSON
+	 * body), sanitized, or '' when absent.
+	 */
+	private static function body_access_token(): string {
+		// Bearer-token auth path; nonces don't apply to token-authenticated
+		// requests, and managed-WP hosts strip the header so the token rides
+		// in the body.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
+		$post_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : '';
+		if ( '' !== $post_token ) {
+			return $post_token;
+		}
+		$raw = file_get_contents( 'php://input' );
+		if ( false !== $raw && '' !== $raw ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
+				return sanitize_text_field( $decoded['access_token'] );
+			}
+		}
+		return '';
 	}
 
 	/**
@@ -155,18 +223,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		}
 		// Spec-compliant body fallback (GoDaddy strips HTTP_AUTHORIZATION).
 		// Bodies don't leak through access logs / history / CDN cache keys.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
-		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
-		if ( null === $body_token ) {
-			$raw = file_get_contents( 'php://input' );
-			if ( false !== $raw && '' !== $raw ) {
-				$decoded = json_decode( $raw, true );
-				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) ) {
-					$body_token = $decoded['access_token'];
-				}
-			}
-		}
-		return is_string( $body_token ) && '' !== $body_token;
+		return '' !== self::body_access_token();
 	}
 
 	/**
