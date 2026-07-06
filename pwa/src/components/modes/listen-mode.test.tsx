@@ -4,6 +4,7 @@ import { render } from 'preact';
 import { ListenMode } from './listen-mode';
 import type { StoredToken } from '../../lib/token-store';
 import type { MicropubEnvironment } from '../../lib/micropub';
+import type { MediaLookupEnvironment } from '../../lib/media-lookup';
 
 const mock_token: StoredToken = {
 	accessToken: 'test-token',
@@ -136,5 +137,63 @@ describe('ListenMode variant-scoped field state', () => {
 		expect(posted_bodies.length).toBe(1);
 		expect(posted_bodies[0]).toContain('listen-of=');
 		expect(posted_bodies[0]).not.toContain('video=');
+	});
+});
+
+describe('ListenMode media lookup wiring', () => {
+	function lookup_env(rows: unknown[]): MediaLookupEnvironment {
+		return {
+			fetch: async () =>
+				new Response(JSON.stringify({ results: rows, kind: 'listen', notConfigured: false }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		};
+	}
+
+	it('renders the metadata lookup for the default Listen variant', () => {
+		mount(make_env());
+		expect(root.querySelector('.outpost-media-lookup__search')).toBeTruthy();
+	});
+
+	it('does not render the metadata lookup for Eat (no catalog to search)', async () => {
+		mount(make_env());
+		variant_radios()[7]?.click(); // eat
+		await flush();
+		expect(root.querySelector('.outpost-media-lookup__search')).toBeNull();
+	});
+
+	it('shows the Movie/TV toggle only for Watch', async () => {
+		mount(make_env());
+		variant_radios()[1]?.click(); // watch
+		await flush();
+		expect(root.querySelector('input[value="tv"]')).toBeTruthy();
+		variant_radios()[0]?.click(); // back to listen (no toggle)
+		await flush();
+		expect(root.querySelector('input[value="tv"]')).toBeNull();
+	});
+
+	it('fills Title and Artist from a Listen lookup result', async () => {
+		const env = lookup_env([
+			{
+				title: 'Discovery',
+				cover: 'https://img.example/discovery.jpg',
+				creator: 'Daft Punk',
+				year: '2001',
+				external_id: 'mbid-1',
+				url: '',
+			},
+		]);
+		render(<ListenMode token={mock_token} micropubEnv={make_env()} mediaLookupEnv={env} />, root);
+
+		set_value(input_for('outpost-listen-listen-media-lookup-query'), 'Discovery');
+		await flush();
+		(root.querySelector('.outpost-media-lookup__search') as HTMLButtonElement).click();
+		await flush(3);
+		(root.querySelector('.outpost-media-lookup__result') as HTMLButtonElement).click();
+		await flush(2);
+
+		expect(input_for('outpost-listen-watch-title').value).toBe('Discovery');
+		expect(input_for('outpost-listen-person').value).toBe('Daft Punk');
 	});
 });

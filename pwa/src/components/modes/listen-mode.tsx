@@ -16,6 +16,8 @@ import {
 	type GeocodeResult,
 } from '../../lib/geocode';
 import { GeocodePicker } from '../geocode-picker';
+import { MediaLookup } from '../media-lookup';
+import type { MediaLookupResult, MediaLookupEnvironment } from '../../lib/media-lookup';
 import {
 	MediaPicker,
 	all_entries_have_alt,
@@ -64,6 +66,8 @@ export interface ListenModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Injectable environment for the metadata lookup (tests pass a stub). */
+	mediaLookupEnv?: MediaLookupEnvironment;
 }
 
 type Variant =
@@ -114,6 +118,26 @@ interface VariantConfig {
 	hasTitle?: boolean;
 	/** Show the OpenStreetMap geocode lookup (Checkin and Eat/Drink). */
 	hasGeocode?: boolean;
+	/** Post Kinds metadata lookup category. When set, the mode shows the
+	 *  one-tap MediaLookup search that fills title/creator/cover from Post
+	 *  Kinds' lookup APIs. Eat/Drink/Exercise have no catalog to search. */
+	lookup?: 'video' | 'book' | 'music' | 'game' | 'venue';
+}
+
+/** Human label for the MediaLookup search input, per lookup category. */
+function lookup_label(category: NonNullable<VariantConfig['lookup']>): string {
+	switch (category) {
+		case 'video':
+			return 'Look up a movie or show';
+		case 'book':
+			return 'Look up a book';
+		case 'music':
+			return 'Look up an album or track';
+		case 'game':
+			return 'Look up a game';
+		case 'venue':
+			return 'Look up a place';
+	}
 }
 
 const VARIANTS: Record<Variant, VariantConfig> = {
@@ -128,6 +152,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personLabel: 'Artist',
 		personProperty: 'author',
 		hasRating: true,
+		lookup: 'music',
 	},
 	watch: {
 		label: 'Watch',
@@ -140,6 +165,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personLabel: 'Director (optional)',
 		personProperty: 'author',
 		hasRating: true,
+		lookup: 'video',
 	},
 	read: {
 		label: 'Read',
@@ -153,6 +179,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personProperty: 'author',
 		hasReadStatus: true,
 		hasRating: true,
+		lookup: 'book',
 	},
 	play: {
 		label: 'Play',
@@ -163,6 +190,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetRequired: true,
 		hasTitle: true,
 		hasRating: true,
+		lookup: 'game',
 	},
 	game: {
 		label: 'Game',
@@ -176,6 +204,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetRequired: true,
 		hasTitle: true,
 		hasRating: true,
+		lookup: 'game',
 	},
 	jam: {
 		// Same overlap as Game: Jam and Listen share listen-of, but the post
@@ -191,6 +220,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personLabel: 'Artist',
 		personProperty: 'author',
 		hasRating: true,
+		lookup: 'music',
 	},
 	checkin: {
 		label: 'Checkin',
@@ -202,6 +232,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personLabel: 'Place name (optional)',
 		personProperty: 'name',
 		hasGeocode: true,
+		lookup: 'venue',
 	},
 	eat: {
 		// Post Kinds maps Eat to `eat-of` (food name string), with optional
@@ -330,7 +361,7 @@ function post_format_for_variant(variant: Variant): string | null {
 	}
 }
 
-export function ListenMode({ token, micropubEnv, composerConfig }: ListenModeProps) {
+export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv }: ListenModeProps) {
 	const initial_share = consume_share_target_for_doing();
 
 	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'listen');
@@ -495,6 +526,27 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 		}
 		setGeoResults([]);
 		setGeoQuery('');
+	};
+
+	// Fill composer fields from a Post Kinds metadata lookup result. Variant-
+	// aware: title-bearing kinds (watch/read/listen/jam/play/game) route the
+	// title to the Title field and creator to the person input (artist /
+	// director / author); Checkin has no Title field, so the result title is
+	// the place name (person input). Cover art and a canonical URL (when the
+	// provider returns one) fill too; an empty result.url keeps whatever the
+	// user typed. The referenced poster URL is NOT uploaded to the media
+	// library — it rides through as `u-photo` verbatim (Courtney's call).
+	const handle_lookup_select = (result: MediaLookupResult): void => {
+		const config_for_select = VARIANTS[variant];
+		if (config_for_select.hasTitle) {
+			if (result.title) setWatchTitle(result.title);
+			if (result.creator) setPersonName(result.creator);
+		} else if (result.title) {
+			setPersonName(result.title);
+		}
+		if (result.cover) setCoverUrl(result.cover);
+		if (result.url) setTargetUrl(result.url);
+		setStatus({ kind: 'idle' });
 	};
 
 	const config = VARIANTS[variant];
@@ -889,6 +941,20 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 					spellcheck={false}
 					required={config.targetRequired}
 				/>
+
+				{config.lookup && (
+					<MediaLookup
+						idPrefix={`outpost-listen-${variant}`}
+						kind={variant}
+						label={lookup_label(config.lookup)}
+						initialQuery={watch_title || person_name}
+						accessToken={token.accessToken}
+						onSelect={handle_lookup_select}
+						showTypeToggle={config.lookup === 'video'}
+						disabled={submitting}
+						{...(mediaLookupEnv ? { env: mediaLookupEnv } : {})}
+					/>
+				)}
 
 				{config.hasTitle && (
 					<>

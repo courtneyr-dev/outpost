@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added (One-tap media metadata lookup in the composer)
+
+Every media Doing mode (Watch, Read, Listen, Jam, Play, Game, Checkin) gains a "Look it up" search that fills the title, creator, cover art, and — when the provider returns one — a canonical URL, from Post Kinds for IndieWeb's lookup APIs (TMDB, OpenLibrary, MusicBrainz, BoardGameGeek/RAWG, Foursquare/Nominatim). It's the same data behind Post Kinds' "Fetch from TMDB" button, surfaced inside the PWA for every media kind; Watch adds a Movie/TV toggle. Because managed-WP hosts (GoDaddy) strip the `Authorization` header, the lookup goes through a same-site proxy at `/wp-json/outpost/v1/lookup` that dispatches to Post Kinds internally via `rest_do_request` — the bearer rides in the request body and the logged-in cookie authenticates the dispatch. Music/book/game/venue only return results once their API keys are set in Post Kinds → API Connections; the composer shows "not configured" as a friendly hint rather than an error. The whole feature is hidden when Post Kinds is not active. Referenced poster URLs pass through as `u-photo` verbatim (not uploaded to the media library). New `outpost_media_lookup_kind_map` and `outpost_media_lookup_permission` filters. 53 new tests (28 PHP endpoint, 15 client lib, 10 component, 4 mode-wiring).
+
+OUTPOST_VERSION: 0.1.110 → 0.1.111.
+
 ### Added (Promote-to-main-archive toggle in the composer More panel)
 
 When Post Kinds for IndieWeb is active, the composer's More panel shows a "Promote to main archive" toggle. It sends the Micropub `pkiw-promote` property, which the plugin maps to the `pkiw_promote` meta — so a post whose kind is normally stream-only (checkin, listen, etc.) can be pushed onto the main archive at creation, the same override the WP editor toggle writes. Hidden when Post Kinds is not active.
