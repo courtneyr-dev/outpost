@@ -12,6 +12,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { CharCounter } from '../char-counter';
@@ -241,7 +242,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
-	const [more_open, setMoreOpen] = useState(false);
+	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
 

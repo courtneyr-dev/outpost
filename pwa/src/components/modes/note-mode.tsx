@@ -10,6 +10,7 @@ import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../..
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
@@ -186,7 +187,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
 
-	const [more_open, setMoreOpen] = useState(false);
+	const [more_open, setMoreOpen] = useMoreOpen();
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 

@@ -10,6 +10,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { useMoreOpen } from '../../lib/composer-prefs';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
@@ -95,7 +96,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
-	const [more_open, setMoreOpen] = useState(false);
+	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
 
