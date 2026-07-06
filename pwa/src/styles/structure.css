@@ -1223,6 +1223,92 @@
 	margin: 0;
 }
 
+/* --- Media metadata lookup (Watch/Read/Listen/Jam/Play/Game/Checkin) ---
+ * Structural only; every color/font resolves through var(--outpost-*). */
+.outpost-media-lookup {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.outpost-media-lookup__type {
+	display: flex;
+	gap: 0.75rem;
+	align-items: center;
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+
+.outpost-media-lookup__results {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.outpost-media-lookup__result {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	inline-size: 100%;
+	text-align: start;
+	/* Comfortable touch target for a cover + two lines of metadata. */
+	min-block-size: 44px;
+	padding: 0.5rem 0.75rem;
+	background: var(--outpost-result-bg, transparent);
+	color: var(--outpost-result-fg, inherit);
+	border: 1px solid var(--outpost-border, currentColor);
+	border-radius: var(--outpost-radius, 0.25rem);
+	cursor: pointer;
+}
+
+.outpost-media-lookup__result:hover,
+.outpost-media-lookup__result:focus-visible {
+	background: var(--outpost-result-bg-hover, var(--outpost-chip-active-bg, transparent));
+	color: var(--outpost-result-fg-hover, var(--outpost-chip-active-fg, inherit));
+}
+
+.outpost-media-lookup__result:focus-visible {
+	outline: 2px solid var(--outpost-focus, currentColor);
+	outline-offset: 2px;
+}
+
+.outpost-media-lookup__cover {
+	flex: 0 0 auto;
+	inline-size: 46px;
+	block-size: 69px;
+	object-fit: cover;
+	border-radius: var(--outpost-radius, 0.25rem);
+	/* Neutral placeholder for the missing-cover box; not a forced paint —
+	 * currentColor tints from the inherited text color, so the theme controls it. */
+	background: var(--outpost-cover-placeholder-bg, transparent);
+	border: 1px solid var(--outpost-border, currentColor);
+}
+
+.outpost-media-lookup__meta {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	min-inline-size: 0;
+}
+
+.outpost-media-lookup__title {
+	font-weight: 600;
+}
+
+.outpost-media-lookup__year {
+	font-weight: 400;
+}
+
+.outpost-media-lookup__creator {
+	font-size: 0.85rem;
+	/* De-emphasis via font-size, not opacity (WCAG 1.4.3 — opacity lowers
+	 * contrast against unknown theme backgrounds). */
+}
+
 /* Soft warning variant of .outpost-status — used for "no results" messages
  * that aren't quite errors but are worth surfacing distinctly. */
 .outpost-status--warn {
