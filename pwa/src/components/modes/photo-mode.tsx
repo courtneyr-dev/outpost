@@ -12,6 +12,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { useMoreOpen } from '../../lib/composer-prefs';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
@@ -90,7 +91,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
-	const [more_open, setMoreOpen] = useState(false);
+	const [more_open, setMoreOpen] = useMoreOpen();
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 

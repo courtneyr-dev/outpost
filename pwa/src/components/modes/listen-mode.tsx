@@ -26,6 +26,7 @@ import type { StoredToken } from '../../lib/token-store';
 import type { ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
+import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import type { DoingVariant } from '../../lib/share-target';
 import { fetch_source_preview, PreviewError } from '../../lib/preview';
@@ -355,7 +356,7 @@ export function ListenMode({ token, micropubEnv, composerConfig }: ListenModePro
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
-	const [more_open, setMoreOpen] = useState(false);
+	const [more_open, setMoreOpen] = useMoreOpen();
 
 	// Geocode-search state, used by checkin / eat / drink (any variant whose
 	// config has `hasGeocode: true`).
