@@ -46,21 +46,21 @@ describe('lookup_media', () => {
 		expect(results[0]?.externalId).toBe('/works/OL893415W');
 	});
 
-	it('sends kind + query + access_token in the body', async () => {
-		let captured_body: Record<string, unknown> = {};
+	it('sends kind + query + access_token as form-encoded fields', async () => {
+		let captured_body = new URLSearchParams();
 		const env: MediaLookupEnvironment = {
 			fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-				captured_body = JSON.parse((init?.body as string) ?? '{}');
+				captured_body = new URLSearchParams((init?.body as string) ?? '');
 				return ok_body([]);
 			},
 		};
 		await lookup_media({ kind: 'listen', query: 'Discovery', accessToken: 'tok-1' }, env);
-		expect(captured_body['kind']).toBe('listen');
-		expect(captured_body['q']).toBe('Discovery');
-		expect(captured_body['access_token']).toBe('tok-1');
+		expect(captured_body.get('kind')).toBe('listen');
+		expect(captured_body.get('q')).toBe('Discovery');
+		expect(captured_body.get('access_token')).toBe('tok-1');
 	});
 
-	it('sends Authorization Bearer header and credentials include', async () => {
+	it('sends Authorization Bearer header, form content-type, and omits credentials', async () => {
 		let captured_headers: Record<string, string> = {};
 		let captured_credentials: RequestCredentials | undefined;
 		const env: MediaLookupEnvironment = {
@@ -72,14 +72,15 @@ describe('lookup_media', () => {
 		};
 		await lookup_media({ kind: 'watch', query: 'The Bear', accessToken: 'token-xyz' }, env);
 		expect(captured_headers['Authorization']).toBe('Bearer token-xyz');
-		expect(captured_credentials).toBe('include');
+		expect(captured_headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+		expect(captured_credentials).toBe('omit');
 	});
 
 	it('includes type in the body when provided (movie/tv toggle)', async () => {
-		let captured_body: Record<string, unknown> = {};
+		let captured_body = new URLSearchParams();
 		const env: MediaLookupEnvironment = {
 			fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-				captured_body = JSON.parse((init?.body as string) ?? '{}');
+				captured_body = new URLSearchParams((init?.body as string) ?? '');
 				return ok_body([]);
 			},
 		};
@@ -87,19 +88,19 @@ describe('lookup_media', () => {
 			{ kind: 'watch', query: 'The Bear', type: 'tv', accessToken: 'abc' },
 			env,
 		);
-		expect(captured_body['type']).toBe('tv');
+		expect(captured_body.get('type')).toBe('tv');
 	});
 
 	it('omits type from the body when not provided', async () => {
-		let captured_body: Record<string, unknown> = {};
+		let captured_body = new URLSearchParams();
 		const env: MediaLookupEnvironment = {
 			fetch: async (_input: RequestInfo | URL, init?: RequestInit) => {
-				captured_body = JSON.parse((init?.body as string) ?? '{}');
+				captured_body = new URLSearchParams((init?.body as string) ?? '');
 				return ok_body([]);
 			},
 		};
 		await lookup_media({ kind: 'read', query: 'Dune', accessToken: 'abc' }, env);
-		expect('type' in captured_body).toBe(false);
+		expect(captured_body.has('type')).toBe(false);
 	});
 
 	it('throws unauthorized on 401', async () => {
