@@ -361,6 +361,35 @@ function post_format_for_variant(variant: Variant): string | null {
 	}
 }
 
+/** Streaming hosts WordPress/Post Kinds oEmbed into an inline player. */
+const EMBEDDABLE_MEDIA_HOSTS = [
+	'open.spotify.com',
+	'spotify.link',
+	'youtube.com',
+	'youtu.be',
+	'music.apple.com',
+	'soundcloud.com',
+	'bandcamp.com',
+	'tidal.com',
+	'deezer.com',
+	'mixcloud.com',
+];
+
+/**
+ * Whether a target URL points at a streaming provider that oEmbeds into a
+ * player showing its own artwork. When it does, the composer suppresses the
+ * separately looked-up cover so the art isn't duplicated beneath the card.
+ */
+function is_embeddable_media_url(url: string): boolean {
+	let host: string;
+	try {
+		host = new URL(url).hostname.toLowerCase();
+	} catch {
+		return false;
+	}
+	return EMBEDDABLE_MEDIA_HOSTS.some((provider) => host === provider || host.endsWith('.' + provider));
+}
+
 export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv }: ListenModeProps) {
 	const initial_share = consume_share_target_for_doing();
 
@@ -741,7 +770,11 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						: uploaded_photo_urls;
 				base['mp-photo-alt'] =
 					alt_values.length === 1 ? alt_values[0]! : alt_values;
-			} else if (cover_url) {
+			} else if (cover_url && !is_embeddable_media_url(trimmed_url)) {
+				// Skip the looked-up cover when the target is a streaming URL
+				// (Spotify / YouTube / Apple Music …): Post Kinds oEmbeds the
+				// URL into a player that already shows album art, so attaching
+				// the cover too duplicated it as a stray gallery below the card.
 				base.photo = cover_url;
 			}
 			// Video URL: paste-only (no client-side upload pipeline). Submitted
