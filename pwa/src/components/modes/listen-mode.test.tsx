@@ -196,4 +196,66 @@ describe('ListenMode media lookup wiring', () => {
 		expect(input_for('outpost-listen-watch-title').value).toBe('Discovery');
 		expect(input_for('outpost-listen-person').value).toBe('Daft Punk');
 	});
+
+	it('drops the lookup cover photo when the target is a Spotify (embeddable) URL', async () => {
+		const env = lookup_env([
+			{
+				title: 'American Obituary',
+				cover: 'https://img.example/cover.jpg',
+				creator: 'U2',
+				year: '',
+				external_id: 'mbid-1',
+				url: '',
+			},
+		]);
+		render(<ListenMode token={mock_token} micropubEnv={make_env()} mediaLookupEnv={env} />, root);
+
+		set_value(input_for('outpost-listen-listen-media-lookup-query'), 'American Obituary');
+		await flush();
+		(root.querySelector('.outpost-media-lookup__search') as HTMLButtonElement).click();
+		await flush(3);
+		(root.querySelector('.outpost-media-lookup__result') as HTMLButtonElement).click();
+		await flush(2);
+
+		// The Spotify player supplies album art, so the separately looked-up
+		// cover must NOT also ride along as a photo (that duplicated the art in
+		// a gallery below the card).
+		set_value(input_for('outpost-listen-target'), 'https://open.spotify.com/track/3OeSl8lZH1');
+		await flush();
+		submit();
+		await flush(2);
+
+		expect(posted_bodies.length).toBe(1);
+		expect(posted_bodies[0]).toContain('listen-of=');
+		expect(posted_bodies[0]).not.toContain('photo=');
+	});
+
+	it('keeps the lookup cover photo for a non-embeddable target URL', async () => {
+		const env = lookup_env([
+			{
+				title: 'Some Album',
+				cover: 'https://img.example/cover.jpg',
+				creator: 'Some Artist',
+				year: '',
+				external_id: 'mbid-2',
+				url: '',
+			},
+		]);
+		render(<ListenMode token={mock_token} micropubEnv={make_env()} mediaLookupEnv={env} />, root);
+
+		set_value(input_for('outpost-listen-listen-media-lookup-query'), 'Some Album');
+		await flush();
+		(root.querySelector('.outpost-media-lookup__search') as HTMLButtonElement).click();
+		await flush(3);
+		(root.querySelector('.outpost-media-lookup__result') as HTMLButtonElement).click();
+		await flush(2);
+
+		set_value(input_for('outpost-listen-target'), 'https://example.com/album');
+		await flush();
+		submit();
+		await flush(2);
+
+		expect(posted_bodies.length).toBe(1);
+		expect(posted_bodies[0]).toContain('photo=');
+	});
 });

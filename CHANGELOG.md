@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Streaming listens no longer duplicate the album art below the card)
+
+Posting a listen with both a streaming URL (Spotify/YouTube/Apple Music…) and a looked-up album returned a clean player card — plus the lookup's cover art duplicated in a stray gallery beneath it (once as the remote image, once sideloaded). Post Kinds oEmbeds the streaming URL into a player that already shows the artwork, so the composer now suppresses the separately looked-up cover when the target is a recognized streaming host. Non-streaming targets keep the cover as before. The Spotify player itself is gated by a site's cookie-consent tooling, not by Outpost.
+
+OUTPOST_VERSION: 0.1.113 → 0.1.114.
+
 ### Fixed (Media lookup authenticates on GoDaddy — send the token form-encoded)
 
 The one-tap media lookup kept returning "The lookup was rejected. Sign out and back in to refresh your token." on GoDaddy even after signing out and back in. Root cause: the client sent the request as a JSON body, but PHP only auto-populates `$_POST` for form-encoded requests, and IndieAuth's `get_token_from_request()` reads the token exclusively from `$_POST['access_token']`. On managed-WP hosts that strip the `Authorization` header, that left the request anonymous and the internal Post Kinds dispatch 403'd. The `Authorization`-header reinjection shipped in 0.1.112 (#117) couldn't cover the gap on its own — it depended on reading `php://input`, which WordPress's REST stack has already consumed by the time `determine_current_user` runs. The fix mirrors the proven `micropub.ts` path: send the token as an `access_token` form field (`application/x-www-form-urlencoded`) so `$_POST` is always populated, with `credentials: 'omit'` to avoid the cookie/nonce collision. The reinject stays as header-path defense-in-depth for hosts that do forward the header.
