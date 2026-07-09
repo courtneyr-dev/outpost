@@ -19,7 +19,7 @@
  * doesn't double-read.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 
 export type SyndicationStatus =
 	| 'no_syndication'

@@ -13,7 +13,7 @@
  * Hard Contract: zero color values. Structural classes only.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import { submit_capture, type CaptureApiEnvironment, type CaptureResponse } from '../lib/manual-share/capture-api';
 

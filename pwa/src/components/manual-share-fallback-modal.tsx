@@ -17,7 +17,7 @@
  * existing `.outpost-*` token classes.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 import type { ManualModalProps, StrategyOutcome } from '../lib/manual-share/strategies/types';
 
 export interface ManualShareFallbackModalProps extends ManualModalProps {
