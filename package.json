@@ -38,7 +38,8 @@
     "start:wp": "wp-scripts start",
     "lint:wp": "wp-scripts lint-js src",
     "format:wp": "wp-scripts format src",
-    "test:wp:unit": "wp-scripts test-unit-js"
+    "test:wp:unit": "wp-scripts test-unit-js",
+    "screenshots:docs": "node scripts/capture-docs-screenshots.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
