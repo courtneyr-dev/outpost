@@ -10,6 +10,16 @@ Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built fo
 
 **Status:** Pre-release, [v0.1.4](https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.4) — first functional end-to-end version. Sign in via IndieAuth, post a note via Micropub, see the new post URL. Composer modes (Reply, Photo, Article, Listen group) land in Phase C.
 
+## User documentation
+
+New to Outpost? The user guide lives in [`docs/index.md`](docs/index.md):
+
+- [Installation](docs/installation.md) — GitHub install plus the required IndieAuth and Micropub plugins.
+- [Getting started](docs/getting-started.md) — sign in, post a note from your phone, install to your home screen.
+- [Settings](docs/settings.md) — composer defaults, API keys, appearance, OAuth connections.
+- [Troubleshooting](docs/troubleshooting.md) — managed-host auth issues, offline queue, dependency notices.
+- [Privacy and data](docs/privacy-and-data.md) — what's stored and which services are contacted.
+
 ## What this is
 
 Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` (configurable). It's optimised for the post shapes IndieWeb people actually publish — quick notes, replies, likes, photos, and life-tracking entries (listen, watch, read, checkin, play) — with one-tap syndication chips that default to **on** for every configured destination.
@@ -86,6 +96,12 @@ Outpost is being built across ~40 small, atomic sessions, each scoped to a speci
 - **H — Settings and onboarding**
 - **I — Distribution** (WordPress.org submission)
 - **J — Documentation and launch**
+
+## Support
+
+- Questions and bug reports: [GitHub issues](https://github.com/courtneyr-dev/outpost/issues).
+- Security vulnerabilities: follow [`SECURITY.md`](SECURITY.md) — don't open a public issue.
+- Contributions: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
