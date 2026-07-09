@@ -9,93 +9,98 @@
  * MUST stay in parity with `styles/outpost-tokens.css`. CI verifies
  * parity on every build via `bin/check-tokens-parity.mjs`. If you edit
  * one file you must mirror the change to the other.
+ *
+ * `:root` carries the Outpost & Co. brand defaults (forest / cream /
+ * walnut / ochre — claude.ai/design handoff, May 2026). The
+ * `.outpost-mode-*` blocks are the FY-Theming "Field Notes" per-user
+ * appearance themes, unchanged.
  */
 
 :root {
-	/* Surface */
-	--outpost-surface-bg: #ffffff;
-	--outpost-surface-fg: #023047;
+	/* Surface — cream canvas, walnut ink (Outpost & Co. brand) */
+	--outpost-surface-bg: #f5efe4;
+	--outpost-surface-fg: #2b1f14;
 	--outpost-surface-border: transparent;
 
 	/* Input (textarea, text input, select, datetime) */
 	--outpost-input-bg: #ffffff;
-	--outpost-input-fg: #023047;
-	--outpost-input-border: #647baf;
-	--outpost-input-border-focus: #126782;
-	--outpost-input-placeholder: #647baf;
+	--outpost-input-fg: #2b1f14;
+	--outpost-input-border: #b59a78;
+	--outpost-input-border-focus: #855c2a;
+	--outpost-input-placeholder: #7a5c3e;
 	--outpost-input-radius: var(--outpost-radius-sm);
 
-	/* Button — primary (submit). Russian-violet with white text — 13:1 contrast. */
-	--outpost-button-primary-bg: #241c4a;
-	--outpost-button-primary-fg: #ffffff;
-	--outpost-button-primary-border: #241c4a;
-	--outpost-button-primary-bg-hover: #1a1437;
-	--outpost-button-primary-bg-active: #120e26;
-	--outpost-button-primary-bg-disabled: #bcb5e3;
-	--outpost-button-primary-fg-disabled: #647baf;
+	/* Button — primary (submit). Forest-700 on cream — ~9:1 contrast. */
+	--outpost-button-primary-bg: #2a4a39;
+	--outpost-button-primary-fg: #faf6ec;
+	--outpost-button-primary-border: #2a4a39;
+	--outpost-button-primary-bg-hover: #34604a;
+	--outpost-button-primary-bg-active: #213a2d;
+	--outpost-button-primary-bg-disabled: #9bbba9;
+	--outpost-button-primary-fg-disabled: #4a7a62;
 	--outpost-button-primary-radius: var(--outpost-radius-md);
 
 	/* Button — secondary (cancel, edit, link-style). Outline style. */
 	--outpost-button-secondary-bg: transparent;
-	--outpost-button-secondary-fg: #023047;
-	--outpost-button-secondary-border: #647baf;
-	--outpost-button-secondary-bg-hover: #f4f6fb;
+	--outpost-button-secondary-fg: #2b1f14;
+	--outpost-button-secondary-border: #d4c8b1;
+	--outpost-button-secondary-bg-hover: #ece3d1;
 	--outpost-button-secondary-radius: var(--outpost-radius-sm);
 
 	/* Button — ghost (icon-only: mic, close, settings) */
 	--outpost-button-ghost-bg: transparent;
-	--outpost-button-ghost-fg: #023047;
+	--outpost-button-ghost-fg: #2b1f14;
 	--outpost-button-ghost-border: transparent;
-	--outpost-button-ghost-bg-hover: #f4f6fb;
+	--outpost-button-ghost-bg-hover: #ece3d1;
 	--outpost-button-ghost-radius: var(--outpost-radius-sm);
 
 	/* Tab */
 	--outpost-tab-bg: transparent;
-	--outpost-tab-fg: #647baf;
+	--outpost-tab-fg: #7a5c3e;
 	--outpost-tab-bg-active: transparent;
-	--outpost-tab-fg-active: #241c4a;
-	--outpost-tab-indicator: #241c4a;
+	--outpost-tab-fg-active: #1c2e25;
+	--outpost-tab-indicator: #2a4a39;
 	--outpost-tab-indicator-size: 2px;
 
 	/* Chip (syndication, sub-mode picker, XFN) */
 	--outpost-chip-bg: transparent;
-	--outpost-chip-fg: #023047;
-	--outpost-chip-border: #647baf;
-	--outpost-chip-bg-pressed: #241c4a;
-	--outpost-chip-fg-pressed: #ffffff;
+	--outpost-chip-fg: #2b1f14;
+	--outpost-chip-border: #b59a78;
+	--outpost-chip-bg-pressed: #2a4a39;
+	--outpost-chip-fg-pressed: #faf6ec;
 	--outpost-chip-radius: var(--outpost-radius-pill);
 
 	/* Card (preview, install prompt, error banner, queue inspector) */
-	--outpost-card-bg: #ffffff;
-	--outpost-card-fg: #023047;
-	--outpost-card-border: #647baf;
-	--outpost-card-shadow: none;
+	--outpost-card-bg: #faf6ec;
+	--outpost-card-fg: #2b1f14;
+	--outpost-card-border: #d4c8b1;
+	--outpost-card-shadow: var(--outpost-shadow-sm);
 	--outpost-card-radius: var(--outpost-radius-md);
 
-	/* Status — soft banded backgrounds, prussian-blue text reads at 9:1+ */
-	--outpost-error-bg: #fee2c3;
-	--outpost-error-fg: #023047;
-	--outpost-error-border: #fb8500;
-	--outpost-success-bg: #e6f7e9;
-	--outpost-success-fg: #023047;
-	--outpost-success-border: #2e8b57;
-	--outpost-warning-bg: #fdf2dc;
-	--outpost-warning-fg: #023047;
-	--outpost-warning-border: #ffb703;
-	--outpost-info-bg: #e6f1f7;
-	--outpost-info-fg: #023047;
-	--outpost-info-border: #126782;
+	/* Status — soft warm bands, walnut-900 text reads 10:1+ */
+	--outpost-error-bg: #f4ddd5;
+	--outpost-error-fg: #2b1f14;
+	--outpost-error-border: #a8412f;
+	--outpost-success-bg: #e3ede1;
+	--outpost-success-fg: #2b1f14;
+	--outpost-success-border: #4a7a4e;
+	--outpost-warning-bg: #f3e6cc;
+	--outpost-warning-fg: #2b1f14;
+	--outpost-warning-border: #a87a3e;
+	--outpost-info-bg: #e2ebe4;
+	--outpost-info-fg: #2b1f14;
+	--outpost-info-border: #34604a;
 
-	/* Focus — cerulean clears 3:1 against white per WCAG UI minimum */
-	--outpost-focus-ring-color: #126782;
+	/* Focus — ochre amber-600 clears 3:1 on cream + white per WCAG 2.2 */
+	--outpost-focus-ring-color: #855c2a;
 	--outpost-focus-ring-width: 2px;
 	--outpost-focus-ring-offset: 2px;
 	--outpost-focus-ring-style: solid;
 
-	/* Type */
-	--outpost-font-family-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	/* Type — Outpost & Co. families (named, not force-loaded; graceful fallback) */
+	--outpost-font-family-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	--outpost-font-family-ui: var(--outpost-font-family-body);
-	--outpost-font-family-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+	--outpost-font-family-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	--outpost-font-size-body: 1rem;
 	--outpost-font-size-label: 0.875rem;
 	--outpost-font-size-meta: 0.8125rem;
@@ -120,10 +125,10 @@
 	--outpost-radius-lg: 0.75rem;
 	--outpost-radius-pill: 999px;
 
-	/* Shadow */
-	--outpost-shadow-sm: 0 1px 2px rgba(2, 48, 71, 0.08);
-	--outpost-shadow-md: 0 4px 12px rgba(2, 48, 71, 0.12);
-	--outpost-shadow-toolbar: 0 -2px 8px rgba(2, 48, 71, 0.08);
+	/* Shadow — warm walnut tint */
+	--outpost-shadow-sm: 0 1px 2px rgba(43, 31, 20, 0.08);
+	--outpost-shadow-md: 0 4px 12px rgba(43, 31, 20, 0.12);
+	--outpost-shadow-toolbar: 0 -2px 8px rgba(43, 31, 20, 0.08);
 
 	/* Animation */
 	--outpost-duration-fast: 120ms;
@@ -137,13 +142,13 @@
 	--outpost-border: var(--outpost-card-border);
 	--outpost-radius: var(--outpost-radius-md);
 	--outpost-focus: var(--outpost-focus-ring-color);
-	--outpost-text-muted: #647baf;
+	--outpost-text-muted: #7a5c3e;
 	--outpost-primary-bg: var(--outpost-button-primary-bg);
 	--outpost-primary-fg: var(--outpost-button-primary-fg);
 	--outpost-primary-border: var(--outpost-button-primary-border);
 	--outpost-chip-active-bg: var(--outpost-chip-bg-pressed);
 	--outpost-chip-active-fg: var(--outpost-chip-fg-pressed);
-	--outpost-scrim: rgba(0, 0, 0, 0.5);
+	--outpost-scrim: rgba(43, 31, 20, 0.45);
 }
 
 /* ----------------------------------------------------------------------

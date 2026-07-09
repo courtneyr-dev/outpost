@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 200" role="img" aria-label="Outpost &amp; Co.">
+  <title>Outpost &amp; Co. — hand-carved wooden plank variant</title>
+  <defs>
+    
+    <pattern id="wood-grain" patternUnits="userSpaceOnUse" width="560" height="200">
+      <rect width="560" height="200" fill="#3e2613"></rect>
+      <path d="M0 22 Q140 14 280 22 T560 22" stroke="#26160a" stroke-width="0.9" fill="none" opacity=".7"></path>
+      <path d="M0 48 Q200 40 360 48 T560 48" stroke="#5a3a1d" stroke-width="0.6" fill="none" opacity=".45"></path>
+      <path d="M0 74 Q120 66 320 76 T560 74" stroke="#26160a" stroke-width="1" fill="none" opacity=".65"></path>
+      <path d="M0 102 Q220 94 400 102 T560 102" stroke="#5a3a1d" stroke-width="0.7" fill="none" opacity=".4"></path>
+      <path d="M0 128 Q180 122 340 130 T560 128" stroke="#26160a" stroke-width="1" fill="none" opacity=".6"></path>
+      <path d="M0 154 Q220 146 400 154 T560 154" stroke="#5a3a1d" stroke-width="0.6" fill="none" opacity=".4"></path>
+      <path d="M0 178 Q140 170 280 178 T560 178" stroke="#26160a" stroke-width="0.9" fill="none" opacity=".7"></path>
+      
+      <ellipse cx="92" cy="92" rx="6" ry="3" fill="#18100a" opacity=".85"></ellipse>
+      <ellipse cx="92" cy="92" rx="3.2" ry="1.6" fill="#0c0805" opacity=".95"></ellipse>
+      <ellipse cx="468" cy="138" rx="5" ry="2.6" fill="#18100a" opacity=".8"></ellipse>
+    </pattern>
+  </defs>
+
+  
+  <g>
+    <rect x="6" y="6" width="548" height="188" rx="10" fill="url(#wood-grain)"></rect>
+    
+    <rect x="22" y="22" width="516" height="156" rx="6" fill="none" stroke="#18100a" stroke-width="1.5" opacity=".75"></rect>
+    <rect x="23" y="23" width="514" height="154" rx="6" fill="none" stroke="#c2935a" stroke-width="0.8" opacity=".45"></rect>
+  </g>
+
+  
+  <g text-anchor="middle">
+    
+    <text x="282" y="120" font-family="Zilla Slab, Georgia, serif" font-size="78" font-weight="700" letter-spacing="2" fill="#0c0805" opacity=".85">OUTPOST</text>
+    
+    <text x="280" y="118" font-family="Zilla Slab, Georgia, serif" font-size="78" font-weight="700" letter-spacing="2" fill="#f0e4c8">OUTPOST</text>
+
+    
+    <text x="281" y="157" font-family="Zilla Slab, Georgia, serif" font-size="22" font-weight="600" letter-spacing="4" fill="#0c0805" opacity=".75">&amp; CO.</text>
+    
+    <text x="280" y="156" font-family="Zilla Slab, Georgia, serif" font-size="22" font-weight="600" letter-spacing="4" fill="#f0e4c8">&amp; CO.</text>
+  </g>
+
+  
+  <g stroke="#f0e4c8" stroke-width="1.6" stroke-linecap="round" opacity=".7" fill="none">
+    <path d="M60 100 l8 -10 M64 92 l-4 12"></path>
+    <path d="M500 100 l-8 -10 M496 92 l4 12"></path>
+  </g>
+</svg>
