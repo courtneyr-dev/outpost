@@ -668,7 +668,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			// PhotoMode: EXIF strip + canvas downscale + JPEG re-encode →
 			// per-photo POST to the Micropub media endpoint → collect Location
 			// header URLs for the final h-entry submission.
-			let uploaded_photo_urls: string[] = [];
+			const uploaded_photo_urls: string[] = [];
 			let alt_values: string[] = [];
 			if (active_media.length > 0) {
 				setStatus({ kind: 'processing-photo' });
