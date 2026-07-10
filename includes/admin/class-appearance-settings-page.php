@@ -161,7 +161,7 @@ final class Outpost_Appearance_Settings_Page {
 		);
 		foreach ( array( 'day', 'night' ) as $mode ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitized per-token downstream before save.
-			$colors_in        = isset( $_POST[ 'colors_' . $mode ] ) && is_array( $_POST[ 'colors_' . $mode ] )
+			$colors_in = isset( $_POST[ 'colors_' . $mode ] ) && is_array( $_POST[ 'colors_' . $mode ] )
 				? wp_unslash( (array) $_POST[ 'colors_' . $mode ] )
 				: array();
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitized per-token downstream before save.

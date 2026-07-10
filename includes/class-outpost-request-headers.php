@@ -37,10 +37,10 @@ final class Outpost_Request_Headers {
 	public static function authorization(): string {
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Credential compared/validated by callers; sanitizing would corrupt it. Unslashed here, never stored or output.
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			return Outpost_Request_Headers::server_string( 'HTTP_AUTHORIZATION' );
+			return self::server_string( 'HTTP_AUTHORIZATION' );
 		}
 		if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			return Outpost_Request_Headers::server_string( 'REDIRECT_HTTP_AUTHORIZATION' );
+			return self::server_string( 'REDIRECT_HTTP_AUTHORIZATION' );
 		}
 		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		return '';
