@@ -91,7 +91,7 @@ final class Outpost_Shortcut_Controller {
 	 */
 	private static function is_post(): bool {
 		return isset( $_SERVER['REQUEST_METHOD'] )
-			&& 'POST' === strtoupper( (string) $_SERVER['REQUEST_METHOD'] );
+			&& 'POST' === strtoupper( Outpost_Request_Headers::server_string( 'REQUEST_METHOD' ) );
 	}
 
 	/**
@@ -151,12 +151,7 @@ final class Outpost_Shortcut_Controller {
 	 * @return bool
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-		}
+		$header = Outpost_Request_Headers::authorization();
 		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
