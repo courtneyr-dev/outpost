@@ -7,7 +7,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Security (Telegraph tokens now encrypted at rest)
+
+Telegraph access tokens move from plain user meta into the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) — the last credential the plugin still stored unencrypted. Tokens written by earlier versions migrate automatically on first use; the plaintext copy is deleted only after the encrypted write succeeds. Unit-tested (encrypted read, migration, no plaintext residue).
+
+### Fixed (phantom-post investigation closed — root cause upstream)
+
+The 0.1.107 "phantom post" reports (Follow/Eat/Drink/Weather said "Posted" while creating nothing) are explained: Micropub 2.5.0 and earlier answered failed post inserts with a success status and no Location header, and the composer correctly treated the 2xx as success. Micropub 2.5.1 (released 2026-07-08) returns the real error code, which the composer already surfaces via its existing error path. Outpost now shows a dismissible admin notice when the active Micropub plugin predates 2.5.1, and the composer keeps its hedged "check your site" copy for success responses without a Location.
 
 ## [1.0.0] - 2026-07-09
 
