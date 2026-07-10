@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.0.0] - 2026-07-09
+
+First stable release. Rolls up the 0.1.x pre-release line; the entries below through 0.1.114 describe the work that landed in it. Release-readiness pass: Plugin Check (plugin_repo + security) clean on the distribution, WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+.
+
 ### Fixed (Streaming listens no longer duplicate the album art below the card)
 
 Posting a listen with both a streaming URL (Spotify/YouTube/Apple Music…) and a looked-up album returned a clean player card — plus the lookup's cover art duplicated in a stray gallery beneath it (once as the remote image, once sideloaded). Post Kinds oEmbeds the streaming URL into a player that already shows the artwork, so the composer now suppresses the separately looked-up cover when the target is a recognized streaming host. Non-streaming targets keep the cover as before. The Spotify player itself is gated by a site's cookie-consent tooling, not by Outpost.

@@ -214,9 +214,9 @@ final class Outpost_Media_Lookup_Endpoint {
 	private static function has_bearer_header(): bool {
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		}
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
@@ -430,7 +430,7 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * (the only value the web server sets and an attacker can't forge).
 	 */
 	private static function client_ip(): string {
-		return (string) ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+		return (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
 	}
 
 	/**

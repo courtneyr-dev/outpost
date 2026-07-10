@@ -142,8 +142,8 @@ final class Outpost_Share_Target_Controller {
 	 */
 	private static function build_context(): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only User-Agent inspection; not authenticated state.
-		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) : 'GET';
-		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : 'GET';
+		$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) : '';
 		// phpcs:enable
 		$platform = 'unknown';
 		if ( false !== stripos( $ua, 'iphone' ) || false !== stripos( $ua, 'ipad' ) ) {
@@ -256,9 +256,9 @@ final class Outpost_Share_Target_Controller {
 	private static function has_bearer_header(): bool {
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		}
 		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}

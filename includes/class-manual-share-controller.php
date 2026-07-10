@@ -176,9 +176,9 @@ final class Outpost_Manual_Share_Controller {
 	private static function has_bearer_header(): bool {
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		}
 		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
@@ -402,7 +402,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			return '';
 		}
-		return (string) $_SERVER['HTTP_USER_AGENT'];
+		return (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] );
 	}
 
 	/**
