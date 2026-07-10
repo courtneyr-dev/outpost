@@ -26,9 +26,9 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Symptom:** the composer reports success — especially the softer message "Posted, but the server did not return a link. Check your site to confirm it published" — but no post exists on your site.
 
-**Cause:** there's an open, changelog-documented investigation into "phantom posts": the Follow, Eat, Drink, and Weather variants have returned success while creating nothing server-side. This is why these docs don't describe those variants as reliable.
+**Cause:** root-caused (2026-07-09): the Micropub plugin, version 2.5.0 and earlier, answered failed post inserts with a success status — so when the server rejected an entry (seen with the Follow, Eat, Drink, and Weather variants), the composer had nothing but a success code and an absent link to go on.
 
-**Fix:** no user-side fix yet. Check your site after posting from those variants, and re-post from a core mode (Note, Reply, Photo) if the entry is missing.
+**Fix:** update the Micropub plugin to 2.5.1 or newer. From that version the server returns a real error code, and the composer shows the actual failure instead of a hedged success. Outpost also shows an admin notice when the installed Micropub predates 2.5.1.
 
 **Check next:** on managed hosts, a rewritten status code can produce the same "no link returned" message even though the post published — so always check the site before re-submitting, or you may create duplicates.
 

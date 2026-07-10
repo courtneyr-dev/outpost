@@ -668,6 +668,7 @@ function outpost_render_admin_notices(): void {
 
 	$blocker = Outpost_Companion_Detector::first_unsatisfied();
 	if ( null === $blocker ) {
+		outpost_render_micropub_version_advisory();
 		return;
 	}
 
@@ -694,6 +695,35 @@ function outpost_render_admin_notices(): void {
 	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
+
+/**
+ * Warn when the active Micropub plugin predates 2.5.1.
+ *
+ * Micropub 2.5.0 and earlier answered failed post inserts with a success
+ * status, so the composer showed "posted" while nothing was created (the
+ * phantom-post reports tracked since 0.1.107). Micropub 2.5.1 returns the
+ * real error code, which the composer surfaces. Nudge admins to update.
+ *
+ * @since 1.0.1
+ */
+function outpost_render_micropub_version_advisory(): void {
+	if ( ! defined( 'MICROPUB_PLUGIN_VERSION' ) ) {
+		return;
+	}
+	if ( version_compare( (string) MICROPUB_PLUGIN_VERSION, '2.5.1', '>=' ) ) {
+		return;
+	}
+	printf(
+		'<div class="notice notice-warning is-dismissible"><p>%s</p></div>',
+		esc_html(
+			sprintf(
+				/* translators: %s: installed Micropub plugin version. */
+				__( 'Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead.', 'outpost' ),
+				(string) MICROPUB_PLUGIN_VERSION
+			)
+		)
+	);
+}
 
 /**
  * Register the plugin's row meta link to the bookmarklet generator (added in Phase E).
