@@ -8,7 +8,7 @@
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built for WordPress 6.5+ / 7.0 development branch.
 
-**Status:** Pre-release, [v0.1.4](https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.4) — first functional end-to-end version. Sign in via IndieAuth, post a note via Micropub, see the new post URL. Composer modes (Reply, Photo, Article, Listen group) land in Phase C.
+**Status:** version 1.0.0, prepared for release (2026-07-09 readiness audit: Plugin Check clean). Not yet listed on WordPress.org — install from GitHub.
 
 ## User documentation
 

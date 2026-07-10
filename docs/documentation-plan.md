@@ -4,7 +4,7 @@ Working notes for the Outpost user documentation: scope, structure, validation, 
 
 ## Plugin summary
 
-Outpost is a pre-release WordPress plugin (version 0.1.114 per the plugin header) that serves a mobile-first PWA composer at `/post`. Users sign in with IndieAuth, post notes/replies/photos/life-tracking entries through the Micropub API, and syndicate to configured destinations (POSSE). It requires WordPress 6.5+, PHP 8.2+, and the IndieAuth and Micropub plugins; optional companions (Post Kinds, Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast, ActivityPub) add features at runtime. It is not confirmed to be listed on WordPress.org; installation is from GitHub, and the compiled PWA bundle is committed (`build/pwa/`), so no build step is needed.
+Outpost is a WordPress plugin (version 1.0.0 per the plugin header) that serves a mobile-first PWA composer at `/post`. Users sign in with IndieAuth, post notes/replies/photos/life-tracking entries through the Micropub API, and syndicate to configured destinations (POSSE). It requires WordPress 6.5+, PHP 8.2+, and the IndieAuth and Micropub plugins; optional companions (Post Kinds, Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast, ActivityPub) add features at runtime. It is not confirmed to be listed on WordPress.org; installation is from GitHub, and the compiled PWA bundle is committed (`build/pwa/`), so no build step is needed.
 
 ## Audience
 
@@ -44,7 +44,7 @@ GitHub Pages from `/docs` on the main branch, plain Markdown with the Primer the
 
 ## Assumptions
 
-- The plugin header version (0.1.114) is the most current statement of version; docs cite it as "as of version 0.1.114 (plugin header)."
+- The plugin header version (1.0.0) is the most current statement of version; docs cite the plugin header.
 - GitHub install is the only supported path; no WordPress.org availability is claimed anywhere.
 - The committed `build/pwa/` bundle is current enough that a repo ZIP is activatable without building (matches the repo's own .gitignore rationale and staging-deploy workflow).
 - Composer runtime dependencies aren't needed (no `vendor/autoload.php` require in the plugin bootstrap).
@@ -53,7 +53,7 @@ GitHub Pages from `/docs` on the main branch, plain Markdown with the Primer the
 
 ## Needs maintainer review
 
-1. **Canonical version conflict.** `outpost.php` header says 0.1.114, `readme.txt` Stable tag says 0.1.63, `package.json` says 0.1.68. Docs cite the plugin header; please confirm or reconcile.
+1. **Canonical version conflict — resolved 2026-07-09.** Header, `readme.txt` stable tag, `package.json`, and CHANGELOG all now say 1.0.0 (release-readiness audit). Tagging and deploying remain maintainer actions.
 2. **Two top-level "Outpost" admin menus.** `Outpost_Admin_Page` (slug `outpost`, position 76) and `Outpost_Settings_Page` (slug `outpost-settings`, position 80) both register top-level menus titled "Outpost." Docs describe both as-is; confirm whether consolidation is planned so settings.md can be simplified.
 3. **Route slug configurability.** readme.txt says the `/post` slug is configurable in Settings → Outpost; the route handler hardcodes `^post/` and no route-slug setting exists. Docs state the route is fixed — confirm, or point to the setting if it exists somewhere unexamined.
 4. **"Encrypted IndexedDB" for offline drafts.** The token store encrypts (AES-GCM, verified in `pwa/src/lib/token-store.ts`), but `pwa/src/lib/offline-queue.ts` shows no encryption of queued drafts (which include the access token). Docs attribute the drafts-encrypted claim to the readme; confirm or fix the readme.
@@ -62,7 +62,7 @@ GitHub Pages from `/docs` on the main branch, plain Markdown with the Primer the
 7. **Phantom-post investigation** (Follow/Eat/Drink/Weather posting success with no post created; changelog 0.1.107). Docs route users to troubleshooting; confirm status before those variants get task documentation.
 8. **Uninstall cleanup is minimal.** `uninstall.php` deletes only `outpost_rewrite_version`; settings, credentials, and meta persist after uninstall (marked as future cleanup in the file). Users are told this in privacy-and-data.md; confirm whether fuller cleanup should land before wider distribution.
 9. **Bridgy/ActivityPub auto-suggest chips** — research docs describe intent; end-to-end behavior wasn't verified. Docs describe the Bridgy auto-suggest setting only as it appears in the settings UI.
-10. **WordPress.org availability** — readme.txt is directory-shaped, but the README calls the plugin pre-release and the Distribution phase unshipped. Docs claim GitHub-only; confirm at release time.
+10. **WordPress.org availability** — readme.txt is directory-shaped and the slug was unclaimed as of 2026-07-09. Docs claim GitHub-only; update installation.md and faq.md once the plugin is listed.
 11. **Default syndication destinations "on by default"** — documented per the readme and settings copy; confirm fresh-install behavior matches for every destination type.
 12. **iOS Shortcut base link** — the settings page falls back to "iCloud Shortcut link is not yet published" when `assets/ios-shortcut-base-link.txt` has no real link; confirm whether current builds ship a working link so getting-started can mention it more confidently.
 13. **readme.txt says Post Kinds "adds" the Listen/Watch/Read/Checkin/Play (and Follow) modes**, but the code shows all composer tabs always visible (`pwa/src/components/composer-tabs.tsx`; `listen-mode.tsx` notes "the tab is always visible" and that without Post Kinds the posts render as generic notes). Docs describe Post Kinds as powering the media lookup and proper post-kind rendering; confirm and fix the readme copy.

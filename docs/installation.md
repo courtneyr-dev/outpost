@@ -1,6 +1,6 @@
 # Installation
 
-How to install Outpost from GitHub and get its required plugins in place. Outpost is pre-release and not confirmed to be in the WordPress.org directory, so installation is from the GitHub repository.
+How to install Outpost from GitHub and get its required plugins in place. Outpost is not confirmed to be in the WordPress.org directory, so installation is from the GitHub repository.
 
 ## Before you start
 

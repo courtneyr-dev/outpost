@@ -12,7 +12,7 @@ Outpost is for WordPress site owners who want fast mobile posting without Jetpac
 
 ## Current status
 
-Outpost is pre-release software, as of version 0.1.114 (plugin header). It is not confirmed to be available in the WordPress.org plugin directory — install it from GitHub (see [Installation](installation.md)).
+Outpost is at version 1.0.0 (plugin header). It is not confirmed to be available in the WordPress.org plugin directory — install it from GitHub (see [Installation](installation.md)).
 
 ## Requirements
 
