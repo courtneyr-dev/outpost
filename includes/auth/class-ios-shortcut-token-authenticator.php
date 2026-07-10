@@ -118,12 +118,7 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 	 * emit instead of HTTP_AUTHORIZATION.
 	 */
 	private static function extract_bearer_token(): ?string {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' === $header ) {
 			return null;
 		}
@@ -142,7 +137,7 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 		if ( empty( $_SERVER['REQUEST_URI'] ) ) {
 			return false;
 		}
-		$uri = (string) wp_unslash( $_SERVER['REQUEST_URI'] );
+		$uri = Outpost_Request_Headers::server_string( 'REQUEST_URI' );
 		// Strip query string before path comparison.
 		$path = strtok( $uri, '?' );
 		if ( false === $path ) {

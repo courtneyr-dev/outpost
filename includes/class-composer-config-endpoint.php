@@ -180,7 +180,7 @@ final class Outpost_Composer_Config_Endpoint {
 		if ( ! isset( $_SERVER['REQUEST_URI'] ) ) {
 			return $result;
 		}
-		$uri = (string) wp_unslash( $_SERVER['REQUEST_URI'] );
+		$uri = Outpost_Request_Headers::server_string( 'REQUEST_URI' );
 		// Path-anchored match. The previous strpos-based check accepted any
 		// URI containing the substring `/wp-json/outpost/v1/composer-config`,
 		// which an attacker could smuggle into another endpoint's URI
@@ -326,12 +326,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 * caller is still rate-limited and the response carries no PII.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
 		}
@@ -372,7 +367,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 */
 	private static function client_ip(): string {
 		$default = isset( $_SERVER['REMOTE_ADDR'] )
-			? (string) wp_unslash( $_SERVER['REMOTE_ADDR'] )
+			? Outpost_Request_Headers::server_string( 'REMOTE_ADDR' )
 			: 'unknown';
 
 		$trust_proxy = defined( 'OUTPOST_TRUST_FORWARDED_HEADERS' )
@@ -382,10 +377,10 @@ final class Outpost_Composer_Config_Endpoint {
 		}
 
 		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			return (string) wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] );
+			return Outpost_Request_Headers::server_string( 'HTTP_CF_CONNECTING_IP' );
 		}
 		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$forwarded = (string) wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+			$forwarded = Outpost_Request_Headers::server_string( 'HTTP_X_FORWARDED_FOR' );
 			$first     = trim( explode( ',', $forwarded )[0] );
 			if ( '' !== $first ) {
 				return $first;

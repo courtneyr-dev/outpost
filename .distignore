@@ -39,3 +39,6 @@ CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 SECURITY.md
 CHANGELOG.md
+/vendor
+.phpunit.result.cache
+composer.phar

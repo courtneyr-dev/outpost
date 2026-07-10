@@ -50,6 +50,7 @@ define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/acce
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 // G99-mock-server — test-time HTTP rewriter. No-op in production
 // because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the

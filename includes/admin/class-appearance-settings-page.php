@@ -148,6 +148,7 @@ final class Outpost_Appearance_Settings_Page {
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( (string) $_POST['mode_preference'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Keys only; every entry is passed through sanitize_key() two lines down.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
 			? array_keys( wp_unslash( (array) $_POST['bypass_contrast'] ) )
 			: array();
@@ -159,9 +160,11 @@ final class Outpost_Appearance_Settings_Page {
 			'bypass_contrast' => $bypass_in,
 		);
 		foreach ( array( 'day', 'night' ) as $mode ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitized per-token downstream before save.
 			$colors_in        = isset( $_POST[ 'colors_' . $mode ] ) && is_array( $_POST[ 'colors_' . $mode ] )
 				? wp_unslash( (array) $_POST[ 'colors_' . $mode ] )
 				: array();
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitized per-token downstream before save.
 			$fonts_in         = isset( $_POST[ 'fonts_' . $mode ] ) && is_array( $_POST[ 'fonts_' . $mode ] )
 				? wp_unslash( (array) $_POST[ 'fonts_' . $mode ] )
 				: array();
