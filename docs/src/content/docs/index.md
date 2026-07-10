@@ -7,13 +7,13 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress. Thes
 
 ## What Outpost does
 
-Outpost serves a posting app at `/post` on your own WordPress site. Open it on your phone, write a note, reply to a URL, or log something you're listening to or watching, and the post publishes to your site through the Micropub API. Syndication chips let you send the same post to other platforms — the IndieWeb pattern called POSSE (Publish on your Own Site, Syndicate Elsewhere).
+Outpost serves a posting app at `/post` on your own WordPress site. Open it on your phone, write a note, reply to a URL, or log something you're listening to or watching, and the post publishes to your site through the Micropub API. Syndication chips let you send the same post to other platforms — the [IndieWeb](https://indieweb.org/) pattern called [POSSE](https://indieweb.org/POSSE) (Publish on your Own Site, Syndicate Elsewhere).
 
 Because the composer is a real PWA, it installs to your iOS or Android home screen, works offline with a queued-draft system, and hooks into the OS share sheet so you can reply to any page from any app.
 
 ## Who it's for
 
-Outpost is for WordPress site owners who want fast mobile posting without Jetpack, app stores, or third-party accounts. It authenticates with IndieAuth — a sign-in protocol where your own website is your identity.
+Outpost is for WordPress site owners who want fast mobile posting without Jetpack, app stores, or third-party accounts. It authenticates with [IndieAuth](https://indieauth.net/) — a sign-in protocol where your own website is your identity.
 
 ## Before you install
 

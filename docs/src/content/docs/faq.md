@@ -15,11 +15,11 @@ No. That's much of the point: Outpost uses Micropub for publishing and IndieAuth
 
 ## What are Micropub and IndieAuth?
 
-Micropub is an open API standard for publishing to your own website — the Micropub plugin gives your WordPress site that endpoint, and the Outpost composer posts through it. IndieAuth is a sign-in protocol where your own website is your identity; the IndieAuth plugin lets you sign in to the composer with your site. Both plugins are required.
+[Micropub](https://indieweb.org/Micropub) is an open API standard for publishing to your own website — the Micropub plugin gives your WordPress site that endpoint, and the Outpost composer posts through it. [IndieAuth](https://indieauth.net/) is a sign-in protocol where your own website is your identity; the IndieAuth plugin lets you sign in to the composer with your site. Both plugins are required.
 
 ## What is POSSE?
 
-Publish on your Own Site, Syndicate Elsewhere — an IndieWeb practice where the canonical copy of a post lives on your site, and copies go out to other platforms. Outpost's syndication chips implement this: every configured destination is enabled by default on each post, and you tap a chip to skip it.
+[Publish on your Own Site, Syndicate Elsewhere](https://indieweb.org/POSSE) — an [IndieWeb](https://indieweb.org/) practice where the canonical copy of a post lives on your site, and copies go out to other platforms. Outpost's syndication chips implement this: every configured destination is enabled by default on each post, and you tap a chip to skip it.
 
 ## Does Outpost work offline?
 
@@ -28,6 +28,10 @@ Yes, for composing. Drafts written offline queue on your device and submit autom
 ## Does it work on iPhone?
 
 Yes. The composer installs to the iOS home screen via Safari's "Add to Home Screen." iOS Safari doesn't support the share-sheet Web Share Target API, so sharing pages into Outpost from other apps goes through an Apple Shortcut instead — set it up at Settings → Outpost iOS Shortcut in wp-admin.
+
+## Does it work on Android?
+
+Yes. In Chrome, accept the install banner, or open the browser menu and choose **Install app** (or **Add to Home screen** on older versions). Once installed as a PWA, Outpost also registers as a share target — share any page from any app straight into the composer, no extra setup. That's one step simpler than iOS, which needs the Shortcut bridge for sharing.
 
 ## Do I need Post Kinds for the Listen, Watch, Read, Checkin, and Play modes?
 
