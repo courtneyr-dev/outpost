@@ -13,7 +13,7 @@
  * snooze-all endpoints.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 
 export type SnoozeDuration = 'P1D' | 'P3D' | 'P7D' | 'forever';
 
