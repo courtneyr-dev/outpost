@@ -18,7 +18,7 @@
  * Hard Contract: zero color values; structural classes only.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import { SnoozeMenu, type SnoozeDuration } from './snooze-menu';
 import { SyndicationCaptureForm } from './syndication-capture-form';

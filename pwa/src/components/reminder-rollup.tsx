@@ -12,7 +12,7 @@
  * Pure presentational. Tests pass synthetic props.
  */
 
-import { h, type FunctionComponent } from 'preact';
+import { type FunctionComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import { SnoozeMenu, type SnoozeDuration } from './snooze-menu';
 import type { PendingPost } from '../lib/manual-share/capture-api';

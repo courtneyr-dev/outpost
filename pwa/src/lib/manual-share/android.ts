@@ -74,7 +74,7 @@ export async function execute_android_share(
 		if ( env.clipboard_write_text ) {
 			await env.clipboard_write_text( payload.clipboard_text );
 		}
-	} catch ( err ) {
+	} catch ( _err ) {
 		// Clipboard failure is not fatal — continue with the share.
 		// The user just won't have the caption pre-pasted in their
 		// destination app.

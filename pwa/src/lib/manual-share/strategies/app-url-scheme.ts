@@ -51,6 +51,7 @@ export async function race_visibility_against_timeout(
 	return new Promise<'fired' | 'rejected'>( ( resolve ) => {
 		let resolved = false;
 		let timer_handle: unknown = undefined;
+		// eslint-disable-next-line prefer-const -- assigned after settle() is defined; a const initializer can be hit by synchronous callback re-entry (see CLAUDE.md F11 #10).
 		let unsubscribe: ( () => void ) | undefined;
 
 		const settle = ( outcome: 'fired' | 'rejected' ): void => {
