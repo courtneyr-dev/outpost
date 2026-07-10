@@ -12,13 +12,17 @@ Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built fo
 
 ## User documentation
 
-New to Outpost? The user guide lives in [`docs/index.md`](docs/index.md):
+**User documentation:** [Read the complete Outpost documentation](https://courtneyr-dev.github.io/outpost/)
 
-- [Installation](docs/installation.md) — GitHub install plus the required IndieAuth and Micropub plugins.
-- [Getting started](docs/getting-started.md) — sign in, post a note from your phone, install to your home screen.
-- [Settings](docs/settings.md) — composer defaults, API keys, appearance, OAuth connections.
-- [Troubleshooting](docs/troubleshooting.md) — managed-host auth issues, offline queue, dependency notices.
-- [Privacy and data](docs/privacy-and-data.md) — what's stored and which services are contacted.
+Key pages:
+
+- [Installation](https://courtneyr-dev.github.io/outpost/installation/) — GitHub install plus the required IndieAuth and Micropub plugins.
+- [Getting started](https://courtneyr-dev.github.io/outpost/getting-started/) — sign in, post a note from your phone, install to your home screen.
+- [Settings](https://courtneyr-dev.github.io/outpost/settings/) — composer defaults, API keys, appearance, OAuth connections.
+- [Troubleshooting](https://courtneyr-dev.github.io/outpost/troubleshooting/) — managed-host auth issues, offline queue, dependency notices.
+- [Privacy and data](https://courtneyr-dev.github.io/outpost/privacy-and-data/) — what's stored and which services are contacted.
+
+The docs site builds from [`docs/`](docs/) with Astro Starlight — see [docs/MAINTAINING.md](docs/MAINTAINING.md) to update it.
 
 ## What this is
 

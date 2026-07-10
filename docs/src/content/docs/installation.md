@@ -1,4 +1,7 @@
-# Installation
+---
+title: Installation
+description: "Install Outpost from a GitHub release ZIP, activate the required IndieAuth and Micropub plugins, and confirm the /post composer loads on your site."
+---
 
 How to install Outpost from GitHub and get its required plugins in place. Outpost is not confirmed to be in the WordPress.org directory, so installation is from the GitHub repository.
 
@@ -48,8 +51,4 @@ If `/post` returns a 404, deactivate and reactivate the plugin (activation re-re
 
 ## Next step
 
-Head to [Getting started](getting-started.md) to sign in and post your first note.
-
----
-
-[Documentation home](index.md) · Previous: [Home](index.md) · Next: [Getting started](getting-started.md)
+Head to [Getting started](/outpost/getting-started/) to sign in and post your first note.

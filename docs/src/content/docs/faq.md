@@ -1,10 +1,13 @@
-# FAQ
+---
+title: FAQ
+description: "Short answers to common Outpost questions: WordPress.org availability, Micropub and IndieAuth, POSSE, offline use, and what happens on deactivation."
+---
 
 Quick answers to the questions Outpost users ask most.
 
 ## Is Outpost on WordPress.org?
 
-Not that we can confirm — Outpost (version 1.0.0) is not yet confirmed to be listed there. Install it from GitHub per the [installation guide](installation.md). Its two required dependencies (IndieAuth and Micropub) are on WordPress.org.
+Not that we can confirm — Outpost (version 1.0.0) is not yet confirmed to be listed there. Install it from GitHub per the [installation guide](/outpost/installation/). Its two required dependencies (IndieAuth and Micropub) are on WordPress.org.
 
 ## Does Outpost require Jetpack?
 
@@ -44,8 +47,4 @@ Destinations depend on what you configure: Bridgy-backed silos (Mastodon, Bluesk
 
 ## What happens to my posts if I deactivate Outpost?
 
-Nothing — posts are regular WordPress posts created through Micropub. Deactivating removes the composer at `/post` but touches no content. See [Privacy and data](privacy-and-data.md) for what uninstalling cleans up.
-
----
-
-[Documentation home](index.md) · Previous: [Troubleshooting](troubleshooting.md) · Next: [Privacy and data](privacy-and-data.md)
+Nothing — posts are regular WordPress posts created through Micropub. Deactivating removes the composer at `/post` but touches no content. See [Privacy and data](/outpost/privacy-and-data/) for what uninstalling cleans up.

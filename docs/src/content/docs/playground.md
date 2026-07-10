@@ -1,4 +1,7 @@
-# Playground preview
+---
+title: Playground preview
+description: "Try Outpost on a disposable WordPress site in your browser with WordPress Playground — no server, hosting account, or installation required."
+---
 
 How to spin up a disposable WordPress site with Outpost preinstalled, using WordPress Playground — for trying the plugin, capturing screenshots, or (eventually) powering the WordPress.org Live Preview button.
 
@@ -40,7 +43,3 @@ Outpost is not yet listed on WordPress.org, so everything here waits until the p
 1. Deploy the blueprint to the plugin's SVN repository at `assets/blueprints/blueprint.json` (the top-level `assets/` directory, alongside screenshots and banners — not inside `trunk/`).
 2. In the plugin's admin area on WordPress.org, enable the Live Preview button.
 3. Verify the preview boots from the directory page — in that context the directory provides the Outpost plugin itself, and the blueprint's install steps cover the IndieAuth and Micropub dependencies.
-
----
-
-[Documentation home](index.md)
