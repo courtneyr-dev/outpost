@@ -14,20 +14,17 @@ Outpost is not yet listed on WordPress.org — the `outpost` slug is unclaimed a
 
 Screenshots regenerate with `npm run screenshots:docs` (see `scripts/capture-docs-screenshots.cjs`); re-copy from `docs/assets/screenshots/` after regenerating and keep the readme.txt captions in sync.
 
-## Still missing for a complete listing
+## Banner and icon
 
-These need a designer or maintainer — do not generate them programmatically:
-
-- `banner-1544x500.png` (and optional `banner-772x250.png`) — directory page header banner.
-- `icon-256x256.png` (and optional `icon-128x128.png`) — directory icon. The repo has SVG icons at `assets/icons/outpost-icon.svg` and `assets/icons/outpost-icon-maskable.svg` that a designer can export to PNG at the required sizes. The directory also accepts an `icon.svg` directly.
+`banner-1544x500.png`, `banner-772x250.png`, `icon-256x256.png`, `icon-128x128.png`, and `icon.svg` come from the Outpost & Co design system ("WordPress Listing Assets v2" — trail-sign icons and park-postcard banners, one family across all four plugins). The design project is the source of truth; replace these files from there rather than editing the PNGs directly.
 
 ## How these map to SVN on deploy
 
 The WordPress.org directory reads listing assets from the **top-level `assets/` directory of the plugin's SVN repository** (a sibling of `trunk/` and `tags/`, not shipped inside the plugin ZIP):
 
 - `.wordpress-org/screenshot-*.png` → `assets/screenshot-*.png`
-- `.wordpress-org/banner-*.png` → `assets/banner-*.png` (once created)
-- `.wordpress-org/icon-*.png` / `icon.svg` → `assets/icon-*.png` / `assets/icon.svg` (once created)
+- `.wordpress-org/banner-*.png` → `assets/banner-*.png`
+- `.wordpress-org/icon-*.png` / `icon.svg` → `assets/icon-*.png` / `assets/icon.svg`
 - `.wordpress-org/blueprints/blueprint.json` → `assets/blueprints/blueprint.json` (enables the Live Preview button; toggle it in the plugin's admin area on WordPress.org after deploy)
 
 Deploy tooling such as `10up/action-wordpress-plugin-asset-update` uses `.wordpress-org/` as its default source directory for exactly this mapping. Screenshot captions come from `readme.txt`, not from the image files, so caption edits happen there.

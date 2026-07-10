@@ -1,6 +1,6 @@
 # Privacy and data
 
-What Outpost stores on your site and your device, which external services it talks to, and what it adds to your public pages. Everything here comes from reading the plugin source at version 0.1.114 (plugin header); items we couldn't verify are called out.
+What Outpost stores on your site and your device, which external services it talks to, and what it adds to your public pages. Everything here comes from reading the plugin source at version 1.0.0 (plugin header); items we couldn't verify are called out.
 
 ## Data stored in your WordPress database
 
