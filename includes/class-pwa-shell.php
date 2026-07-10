@@ -83,7 +83,7 @@ final class Outpost_PWA_Shell {
 		<?php if ( null !== $entry_url_versioned ) : ?>
 	<link rel="modulepreload" href="<?php echo esc_url( $entry_url_versioned ); ?>">
 		<?php endif; ?>
-	<meta name="theme-color" content="#241c4a">
+	<meta name="theme-color" content="#2a4a39">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -223,8 +223,8 @@ final class Outpost_PWA_Shell {
 		.outpost-install-prompt__action {
 			display: inline-block;
 			padding: 0.625rem 1.25rem;
-			background: #241c4a;
-			color: #ffffff;
+			background: #2a4a39;
+			color: #faf6ec;
 			border-radius: 0.5rem;
 			text-decoration: none;
 			font-weight: 600;
@@ -320,8 +320,8 @@ final class Outpost_PWA_Shell {
 			// violates WCAG 1.3.4 (Orientation) by preventing landscape use
 			// on mounted phones / tablets / accessibility-rotated devices.
 			'orientation'      => 'any',
-			'background_color' => '#ffffff',
-			'theme_color'      => '#241c4a',
+			'background_color' => '#f5efe4',
+			'theme_color'      => '#2a4a39',
 			'icons'            => array(
 				array(
 					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon.svg',
