@@ -107,7 +107,7 @@ final class Outpost_Media_Lookup_Endpoint {
 			return $user;
 		}
 		// Only for this endpoint's route (pretty or plain-permalink form).
-		$uri = isset( $_SERVER['REQUEST_URI'] ) ? rawurldecode( (string) wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? rawurldecode( Outpost_Request_Headers::server_string( 'REQUEST_URI' ) ) : '';
 		if ( false === strpos( $uri, self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
 			return $user;
 		}
@@ -212,12 +212,7 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * Authorization header.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
 		}
@@ -430,7 +425,7 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * (the only value the web server sets and an attacker can't forge).
 	 */
 	private static function client_ip(): string {
-		return (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+		return Outpost_Request_Headers::server_string( 'REMOTE_ADDR', '0.0.0.0' );
 	}
 
 	/**

@@ -143,12 +143,7 @@ final class Outpost_Preview_Endpoint {
 	 * a bearer header without local validation is acceptable.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
 		}

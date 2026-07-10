@@ -126,12 +126,7 @@ final class Outpost_Geocode_Endpoint {
 	 * header without local validation.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
 			return true;
 		}
@@ -246,7 +241,7 @@ final class Outpost_Geocode_Endpoint {
 		// `uniqid()` per call would defeat rate limiting entirely. The
 		// secondary counter is the safety net: even if a filter sidesteps
 		// the primary, the actual IP from the TCP layer still rate-limits.
-		$remote_ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) : '0.0.0.0';
+		$remote_ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? Outpost_Request_Headers::server_string( 'REMOTE_ADDR' ) : '0.0.0.0';
 		$remote_key   = 'outpost_geocode_rl_remote_' . md5( $remote_ip );
 		$remote_count = (int) get_transient( $remote_key );
 		// Secondary cap is the higher of the two limits times a small
@@ -283,7 +278,7 @@ final class Outpost_Geocode_Endpoint {
 	 * different resolution path (e.g., a custom Varnish setup).
 	 */
 	private static function client_ip(): string {
-		$default = (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+		$default = Outpost_Request_Headers::server_string( 'REMOTE_ADDR', '0.0.0.0' );
 
 		$trust_proxy = defined( 'OUTPOST_TRUST_FORWARDED_HEADERS' )
 			&& OUTPOST_TRUST_FORWARDED_HEADERS;
@@ -291,9 +286,9 @@ final class Outpost_Geocode_Endpoint {
 		if ( $trust_proxy ) {
 			// phpcs:disable WordPress.Security.ValidatedSanitizedInput
 			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-				$default = (string) wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] );
+				$default = Outpost_Request_Headers::server_string( 'HTTP_CF_CONNECTING_IP' );
 			} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-				$chain = (string) wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+				$chain = Outpost_Request_Headers::server_string( 'HTTP_X_FORWARDED_FOR' );
 				$first = trim( explode( ',', $chain )[0] );
 				if ( '' !== $first ) {
 					$default = $first;

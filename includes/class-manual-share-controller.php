@@ -174,12 +174,7 @@ final class Outpost_Manual_Share_Controller {
 	 * composer-config / syndicate-targets / geocode endpoints.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
@@ -402,7 +397,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			return '';
 		}
-		return (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] );
+		return Outpost_Request_Headers::server_string( 'HTTP_USER_AGENT' );
 	}
 
 	/**
