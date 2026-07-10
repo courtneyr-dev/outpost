@@ -79,7 +79,7 @@ final class Outpost_PWA_Shell {
 	<title>Outpost</title>
 	<link rel="manifest" href="/post/manifest.json">
 	<link rel="icon" type="image/svg+xml" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
-	<link rel="apple-touch-icon" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
+	<link rel="apple-touch-icon" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/apple-touch-icon.png' ); ?>">
 		<?php if ( null !== $entry_url_versioned ) : ?>
 	<link rel="modulepreload" href="<?php echo esc_url( $entry_url_versioned ); ?>">
 		<?php endif; ?>
