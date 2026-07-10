@@ -1,4 +1,7 @@
-# Troubleshooting
+---
+title: Troubleshooting
+description: "Fixes for common Outpost problems: missing-plugin notices, managed-hosting sign-in failures, posts that never appear, stuck offline queues, and 404s."
+---
 
 Symptoms, likely causes, and fixes for the problems Outpost users actually hit, based on the plugin's changelog and known issues.
 
@@ -60,8 +63,4 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 ## When to open an issue
 
-If none of the above fits — or a documented fix doesn't work on a current version — open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues). Include your WordPress and PHP versions, your host, the composer mode you used, and the exact message you saw. For security problems, follow [SECURITY.md](../SECURITY.md) instead of filing a public issue.
-
----
-
-[Documentation home](index.md) · Previous: [Screenshots](screenshots.md) · Next: [FAQ](faq.md)
+If none of the above fits — or a documented fix doesn't work on a current version — open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues). Include your WordPress and PHP versions, your host, the composer mode you used, and the exact message you saw. For security problems, follow [SECURITY.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/../SECURITY.md) instead of filing a public issue.

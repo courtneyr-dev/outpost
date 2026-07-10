@@ -31,7 +31,7 @@ POSSE-first: every syndication destination configured on your site is enabled by
 
 **What can go wrong:** Outpost needs the IndieAuth and Micropub plugins — without them, wp-admin shows a notice and `/post` shows a setup prompt instead of the composer. Some managed hosts strip the Authorization header that Micropub sign-in depends on (see FAQ).
 
-Long-form documentation — installation, settings, common tasks, troubleshooting, privacy — lives in the [Outpost docs on GitHub](https://github.com/courtneyr-dev/outpost/tree/main/docs).
+Long-form documentation — installation, settings, common tasks, troubleshooting, privacy — lives at [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io/outpost/).
 
 == Requirements ==
 

@@ -1,4 +1,7 @@
-# Accessibility
+---
+title: Accessibility
+description: "Where Outpost's accessibility work stands: what the repository's audit records as done and what still needs testing. Evidence, not a conformance claim."
+---
 
 Where Outpost's accessibility work stands: what the repo's own audit records as done, and what still needs testing. This page describes evidence, not compliance — Outpost does not claim WCAG conformance, and neither do these docs.
 
@@ -11,7 +14,7 @@ Where Outpost's accessibility work stands: what the repo's own audit records as 
 
 ## What the repo's checklist records
 
-The repo keeps a WCAG 2.1/2.2 Level AA checklist at [docs/accessibility/A11Y-CHECKLIST.md](accessibility/A11Y-CHECKLIST.md). As of its v0.1.8 audit it records these as met in the composer:
+The repo keeps a WCAG 2.1/2.2 Level AA checklist at [docs/accessibility/A11Y-CHECKLIST.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/accessibility/A11Y-CHECKLIST.md). As of its v0.1.8 audit it records these as met in the composer:
 
 - Semantic landmarks and a single `h1` per surface.
 - Real interactive elements — buttons and links, no click-handling `div`s.
@@ -39,7 +42,3 @@ Open items straight from the repo's checklist and test inventory:
 ## Reporting accessibility issues
 
 Accessibility reports are bug reports: open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues) with the assistive tech, browser, and composer mode involved.
-
----
-
-[Documentation home](index.md) · Previous: [Privacy and data](privacy-and-data.md) · Next: [Documentation plan](documentation-plan.md)

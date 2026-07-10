@@ -1,4 +1,7 @@
-# Privacy and data
+---
+title: Privacy and data
+description: "What Outpost stores on your site and device, which external services it contacts, and what it adds to your public pages — verified against the source."
+---
 
 What Outpost stores on your site and your device, which external services it talks to, and what it adds to your public pages. Everything here comes from reading the plugin source at version 1.0.0 (plugin header); items we couldn't verify are called out.
 
@@ -27,11 +30,11 @@ Attached to individual posts as they're published or syndicated:
 
 - `outpost_ios_shortcut_token` — the iOS Shortcut bridge token.
 - `outpost_appearance_mode` — day/night preference.
-- `outpost_creds_*` — per-user OAuth and API credentials, encrypted via libsodium. Exception: the developer notes record that Telegraph tokens are currently stored unencrypted in user meta (flagged for maintainer attention below).
+- `outpost_creds_*` — per-user OAuth and API credentials, encrypted via libsodium. Telegraph tokens moved into this encrypted store in version 1.0.0; any older plaintext copy is migrated into it and deleted the first time the adapter runs.
 
 ### On uninstall
 
-Deleting the plugin from the Plugins screen runs a cleanup that currently removes only `outpost_rewrite_version`. Other options, post meta, and user meta listed above are not removed by the current uninstall script — the script marks them as future cleanup. If you want a full purge after uninstalling, you'd remove those rows manually.
+Deleting the plugin from the Plugins screen runs a cleanup that currently removes only `outpost_rewrite_version`. Other options, post meta, and user meta listed above are not removed by the current uninstall script — the script marks them as future cleanup. The [Uninstall](/outpost/uninstall/) page walks through removal and what remains.
 
 ## External services contacted
 
@@ -67,8 +70,4 @@ Verified in source: the options/meta inventories above, the external host list, 
 
 Attributed to the plugin's readme (not independently verified): offline drafts encrypted in IndexedDB; EXIF data stripped from photo uploads.
 
-Flagged for the maintainer (see [documentation plan](documentation-plan.md)): the unencrypted Telegraph tokens, the draft-encryption and EXIF claims, and the limited uninstall cleanup.
-
----
-
-[Documentation home](index.md) · Previous: [FAQ](faq.md) · Next: [Accessibility](accessibility.md)
+Flagged for the maintainer (see [documentation plan](https://github.com/courtneyr-dev/outpost/blob/main/docs/documentation-plan.md)): the draft-encryption and EXIF claims, and the limited uninstall cleanup.

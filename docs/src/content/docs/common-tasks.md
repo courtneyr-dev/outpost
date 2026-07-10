@@ -1,6 +1,9 @@
-# Common tasks
+---
+title: Common tasks
+description: "How-to recipes for everyday Outpost work: notes, replies, photos, bookmarklets, offline posting, life-tracking services, and syndication checks."
+---
 
-Step-by-step recipes for the things you'll do most often with Outpost. All of these assume the setup in [Getting started](getting-started.md) is done.
+Step-by-step recipes for the things you'll do most often with Outpost. All of these assume the setup in [Getting started](/outpost/getting-started/) is done.
 
 ## Post a note
 
@@ -52,7 +55,7 @@ Choose the Article variant in the composer. Outpost hands off to the block edito
 ## Change which variant the composer opens to
 
 1. Go to wp-admin → Outpost (first menu) and scroll to the Settings section.
-2. Set "Default Post variant" (Article, Note, Status, Aside, or Quote) and save. See [Settings](settings.md).
+2. Set "Default Post variant" (Article, Note, Status, Aside, or Quote) and save. See [Settings](/outpost/settings/).
 
 ## Confirm a post syndicated
 
@@ -71,8 +74,4 @@ Just post — if the network is down, the draft queues on your device and Outpos
 
 ## Troubleshoot a post that didn't appear
 
-See [Troubleshooting](troubleshooting.md) — start with "The composer said it posted, but there's no post."
-
----
-
-[Documentation home](index.md) · Previous: [Settings](settings.md) · Next: [Screenshots](screenshots.md)
+See [Troubleshooting](/outpost/troubleshooting/) — start with "The composer said it posted, but there's no post."

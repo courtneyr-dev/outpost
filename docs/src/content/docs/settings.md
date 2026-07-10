@@ -1,4 +1,7 @@
-# Settings
+---
+title: Settings
+description: "Reference for every user-visible Outpost setting — where it lives in wp-admin, what it changes, and when to adjust it."
+---
 
 Every user-visible Outpost setting, where to find it in wp-admin, and when to change it.
 
@@ -11,7 +14,7 @@ Heads up on navigation: Outpost currently registers **two top-level "Outpost" me
 These are site-wide defaults; each user can override them at post time from the composer's More options panel.
 
 | Setting | What it does | Default |
-|---|---|---|
+| --- | --- | --- |
 | Default Post variant | Which variant the Post tab opens to on every fresh composer load. Choices: Article (title + body), Note (auto-format from content length), Status, Aside, Quote. | Article |
 | Bridgy auto-suggest | When a Reply or Doing target URL's host matches a known silo, pre-check the matching Bridgy publish target. Bridgy is a bridge service that syndicates posts to networks like Mastodon and Bluesky. Turn off if you prefer explicit syndication only. | On |
 | Auto Post-Format inference | Sets the WordPress post format automatically from the post's content signals (likes become link format, photos become image or gallery, and so on). Turn off if you prefer manual format selection. | On |
@@ -24,7 +27,7 @@ These are site-wide defaults; each user can override them at post time from the 
 
 The default tab. Syndication destinations and integrations (newsletter services and similar) register their credential fields here — the exact fields you see depend on which destination adapters are available in your version.
 
-Sensitive fields are stored encrypted. If the Outpost encryption key isn't configured, this tab shows an error — "Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set." — and hides the form until the key exists. Outpost can generate a key automatically (stored in the database) but recommends defining the `OUTPOST_ENCRYPTION_KEY` constant in `wp-config.php`; an admin notice explains this. See the developer note at [concepts/encryption-key.md](concepts/encryption-key.md) for details.
+Sensitive fields are stored encrypted. If the Outpost encryption key isn't configured, this tab shows an error — "Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set." — and hides the form until the key exists. Outpost can generate a key automatically (stored in the database) but recommends defining the `OUTPOST_ENCRYPTION_KEY` constant in `wp-config.php`; an admin notice explains this. See the developer note at [concepts/encryption-key.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/concepts/encryption-key.md) for details.
 
 If a tab shows "No settings registered for this tab yet," no destination has added fields — that's expected until you're running adapters that need credentials.
 
@@ -55,7 +58,3 @@ iOS Safari doesn't support the Web Share Target API, so iOS users install a smal
 ## Settings that don't exist (yet)
 
 The plugin's readme mentions configuring the composer's route slug, but the current code serves the composer at the fixed path `/post` with no route-slug setting. Documented here so you don't go hunting for it.
-
----
-
-[Documentation home](index.md) · Previous: [Getting started](getting-started.md) · Next: [Common tasks](common-tasks.md)
