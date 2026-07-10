@@ -91,7 +91,7 @@ final class Outpost_Shortcut_Controller {
 	 */
 	private static function is_post(): bool {
 		return isset( $_SERVER['REQUEST_METHOD'] )
-			&& 'POST' === strtoupper( (string) $_SERVER['REQUEST_METHOD'] );
+			&& 'POST' === strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) );
 	}
 
 	/**
@@ -153,9 +153,9 @@ final class Outpost_Shortcut_Controller {
 	private static function has_bearer_header(): bool {
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		}
 		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
