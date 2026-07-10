@@ -47,6 +47,13 @@ final class Outpost_Telegraph_Adapter {
 
 	private const ACCESS_TOKEN_META_PREFIX = 'outpost_telegraph_access_token_user_';
 
+	/**
+	 * Provider id under which the access token lives in the encrypted
+	 * credentials store. The META_PREFIX key above is the legacy
+	 * plaintext location, kept only for one-time migration.
+	 */
+	private const CREDENTIALS_PROVIDER = 'telegraph';
+
 	private const POST_URL_META = 'outpost_telegraph_post_url';
 
 	private const POST_PATH_META = 'outpost_telegraph_page_path';
@@ -197,11 +204,22 @@ final class Outpost_Telegraph_Adapter {
 	 * @return string|WP_Error
 	 */
 	public static function ensure_access_token( int $user_id ) {
-		$key = self::ACCESS_TOKEN_META_PREFIX . $user_id;
-		// TODO Phase H — encrypt user-meta access tokens.
-		$token = (string) get_user_meta( $user_id, $key, true );
-		if ( '' !== $token ) {
-			return $token;
+		// Encrypted store first (Outpost_Credentials_Store, per-user scope).
+		$creds = Outpost_Credentials_Store::get( self::CREDENTIALS_PROVIDER, $user_id );
+		if ( is_array( $creds ) && ! empty( $creds['access_token'] ) ) {
+			return (string) $creds['access_token'];
+		}
+
+		// One-time migration: earlier versions stored the token as plain
+		// user meta. Move it into the encrypted store and delete the
+		// plaintext copy only after the encrypted write succeeds.
+		$key    = self::ACCESS_TOKEN_META_PREFIX . $user_id;
+		$legacy = (string) get_user_meta( $user_id, $key, true );
+		if ( '' !== $legacy ) {
+			if ( Outpost_Credentials_Store::set( self::CREDENTIALS_PROVIDER, array( 'access_token' => $legacy ), $user_id ) ) {
+				delete_user_meta( $user_id, $key );
+			}
+			return $legacy;
 		}
 
 		$short_name = (string) get_option( self::SHORT_NAME_OPTION, get_bloginfo( 'name' ) );
@@ -228,7 +246,9 @@ final class Outpost_Telegraph_Adapter {
 			return new \WP_Error( 'outpost_telegraph_account_failed', __( 'Telegraph account creation returned no token.', 'outpost' ) );
 		}
 		$token = (string) $result['access_token'];
-		update_user_meta( $user_id, $key, $token );
+		if ( ! Outpost_Credentials_Store::set( self::CREDENTIALS_PROVIDER, array( 'access_token' => $token ), $user_id ) ) {
+			return new \WP_Error( 'outpost_telegraph_token_store_failed', __( 'Telegraph token could not be stored securely.', 'outpost' ) );
+		}
 		return $token;
 	}
 

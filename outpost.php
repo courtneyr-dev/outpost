@@ -3,9 +3,9 @@
  * Plugin Name:       Outpost
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           0.1.114
+ * Version:           1.0.0
  * Requires at least: 6.5
- * Tested up to:      6.9
+ * Tested up to:      7.0
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '0.1.114' );
+define( 'OUTPOST_VERSION', '1.0.0' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -50,6 +50,7 @@ define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/acce
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 // G99-mock-server — test-time HTTP rewriter. No-op in production
 // because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the
@@ -668,6 +669,7 @@ function outpost_render_admin_notices(): void {
 
 	$blocker = Outpost_Companion_Detector::first_unsatisfied();
 	if ( null === $blocker ) {
+		outpost_render_micropub_version_advisory();
 		return;
 	}
 
@@ -694,6 +696,35 @@ function outpost_render_admin_notices(): void {
 	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
+
+/**
+ * Warn when the active Micropub plugin predates 2.5.1.
+ *
+ * Micropub 2.5.0 and earlier answered failed post inserts with a success
+ * status, so the composer showed "posted" while nothing was created (the
+ * phantom-post reports tracked since 0.1.107). Micropub 2.5.1 returns the
+ * real error code, which the composer surfaces. Nudge admins to update.
+ *
+ * @since 1.0.1
+ */
+function outpost_render_micropub_version_advisory(): void {
+	if ( ! defined( 'MICROPUB_PLUGIN_VERSION' ) ) {
+		return;
+	}
+	if ( version_compare( (string) MICROPUB_PLUGIN_VERSION, '2.5.1', '>=' ) ) {
+		return;
+	}
+	printf(
+		'<div class="notice notice-warning is-dismissible"><p>%s</p></div>',
+		esc_html(
+			sprintf(
+				/* translators: %s: installed Micropub plugin version. */
+				__( 'Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead.', 'outpost' ),
+				(string) MICROPUB_PLUGIN_VERSION
+			)
+		)
+	);
+}
 
 /**
  * Register the plugin's row meta link to the bookmarklet generator (added in Phase E).

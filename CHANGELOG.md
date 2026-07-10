@@ -7,6 +7,18 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security (Telegraph tokens now encrypted at rest)
+
+Telegraph access tokens move from plain user meta into the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) — the last credential the plugin still stored unencrypted. Tokens written by earlier versions migrate automatically on first use; the plaintext copy is deleted only after the encrypted write succeeds. Unit-tested (encrypted read, migration, no plaintext residue).
+
+### Fixed (phantom-post investigation closed — root cause upstream)
+
+The 0.1.107 "phantom post" reports (Follow/Eat/Drink/Weather said "Posted" while creating nothing) are explained: Micropub 2.5.0 and earlier answered failed post inserts with a success status and no Location header, and the composer correctly treated the 2xx as success. Micropub 2.5.1 (released 2026-07-08) returns the real error code, which the composer already surfaces via its existing error path. Outpost now shows a dismissible admin notice when the active Micropub plugin predates 2.5.1, and the composer keeps its hedged "check your site" copy for success responses without a Location.
+
+## [1.0.0] - 2026-07-09
+
+First stable release. Rolls up the 0.1.x pre-release line; the entries below through 0.1.114 describe the work that landed in it. Release-readiness pass: Plugin Check (plugin_repo + security) clean on the distribution, WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+.
+
 ### Fixed (Streaming listens no longer duplicate the album art below the card)
 
 Posting a listen with both a streaming URL (Spotify/YouTube/Apple Music…) and a looked-up album returned a clean player card — plus the lookup's cover art duplicated in a stray gallery beneath it (once as the remote image, once sideloaded). Post Kinds oEmbeds the streaming URL into a player that already shows the artwork, so the composer now suppresses the separately looked-up cover when the target is a recognized streaming host. Non-streaming targets keep the cover as before. The Spotify player itself is gated by a site's cookie-consent tooling, not by Outpost.

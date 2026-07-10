@@ -58,7 +58,7 @@ The G9 PR ships the **first-publish** path. Updates (calling `editPage` with the
 
 ## Encryption deferred
 
-Per-user access tokens are stored in plain WP user-meta with a TODO note. Encrypting credentials is a separate Phase H concern that affects every API-key-storing adapter.
+Per-user access tokens live in the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) as of 1.0.1. Tokens written by earlier versions to plain user meta migrate automatically on first use, and the plaintext copy is deleted once the encrypted write succeeds.
 
 ## Pseudonymous use case
 
@@ -77,5 +77,4 @@ add_filter( 'outpost_telegraph_post_types', function () {
 
 - Settings page UI (configure via wp-cli for v1)
 - Update / editPage path (first-publish only — adapter stores what's needed for updates)
-- Encrypted token storage (TODO Phase H)
 - Posse_Adapter_Base extension — Telegraph hooks `transition_post_status` directly. The `Posse_Adapter_Base` from G5 prompt does not yet exist; once it lands, refactoring Telegraph to extend it is a small mechanical change.

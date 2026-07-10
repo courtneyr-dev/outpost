@@ -141,6 +141,26 @@ if ( ! function_exists( 'get_locale' ) ) {
 		return 'en_US';
 	}
 }
+if ( ! function_exists( 'wp_unslash' ) ) {
+	/**
+	 * Unit-test shim for wp_unslash(): strip magic-quote slashes from
+	 * strings (recursively for arrays), pass everything else through —
+	 * mirrors wp-includes/formatting.php closely enough for the
+	 * $_SERVER header reads exercised in these suites.
+	 *
+	 * @param mixed $value Value to unslash.
+	 * @return mixed
+	 */
+	function wp_unslash( $value ) {
+		if ( is_string( $value ) ) {
+			return stripslashes( $value );
+		}
+		if ( is_array( $value ) ) {
+			return array_map( 'wp_unslash', $value );
+		}
+		return $value;
+	}
+}
 if ( ! function_exists( 'wp_parse_url' ) ) {
 	function wp_parse_url( string $url, int $component = -1 ) {
 		// WordPress's wp_parse_url is a thin wrapper around parse_url with
