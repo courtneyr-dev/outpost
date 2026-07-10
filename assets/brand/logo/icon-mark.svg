@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Outpost &amp; Co.">
+  <title>Outpost &amp; Co. — icon mark</title>
+  <rect width="96" height="96" rx="14" fill="#2a4a39"></rect>
+  <g transform="translate(12 8)" fill="#f5efe4">
+    
+    <path d="M 33 8 L 36 3 L 39 8 L 39 84 L 33 84 Z"></path>
+    
+    <path d="M 1 12 L 52 12 L 64 19 L 52 26 L 1 26 Z"></path>
+    
+    <path d="M 20 34 L 70 34 L 70 48 L 20 48 L 8 41 Z"></path>
+    
+    <path d="M 8 56 L 40 56 L 52 63 L 40 70 L 8 70 Z"></path>
+  </g>
+</svg>

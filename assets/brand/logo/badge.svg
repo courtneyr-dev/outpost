@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="Outpost &amp; Co.">
+  <title>Outpost &amp; Co. — national park badge variant</title>
+  <defs>
+    <path id="arc-top" d="M 60 160 A 100 100 0 0 1 260 160"></path>
+    <path id="arc-bot" d="M 70 175 A 90 90 0 0 0 250 175"></path>
+  </defs>
+
+  
+  <circle cx="160" cy="160" r="142" fill="#f5efe4" stroke="#2a4a39" stroke-width="6"></circle>
+  <circle cx="160" cy="160" r="128" fill="none" stroke="#2a4a39" stroke-width="1.5"></circle>
+
+  
+  <circle cx="160" cy="160" r="100" fill="#e7b072"></circle>
+
+  
+  <path d="M60 200 Q100 160 140 195 Q170 165 200 195 Q230 170 260 200 L260 220 L60 220 Z" fill="#34604a"></path>
+
+  
+  <g fill="#1c2e25">
+    <path d="M86 200 l-9 14 h6 l-7 10 h6 l-5 8 h18 l-5 -8 h6 l-7 -10 h6 z"></path>
+    <path d="M236 198 l-9 14 h6 l-7 10 h6 l-5 8 h18 l-5 -8 h6 l-7 -10 h6 z"></path>
+    <path d="M114 208 l-7 11 h4 l-5 8 h4 l-3 6 h14 l-3 -6 h4 l-5 -8 h4 z"></path>
+    <path d="M204 208 l-7 11 h4 l-5 8 h4 l-3 6 h14 l-3 -6 h4 l-5 -8 h4 z"></path>
+  </g>
+
+  
+  <g transform="translate(140 180)" fill="#2b1f14">
+    <path d="M20 0 L40 16 L0 16 Z"></path>
+    <rect x="4" y="16" width="32" height="24"></rect>
+    <rect x="16" y="26" width="8" height="14" fill="#d18a3a"></rect>
+    <rect x="26" y="6" width="4" height="8"></rect>
+  </g>
+
+  
+  <circle cx="160" cy="118" r="14" fill="#d18a3a"></circle>
+  <g stroke="#d18a3a" stroke-width="2" stroke-linecap="round">
+    <line x1="160" y1="92" x2="160" y2="98"></line>
+    <line x1="138" y1="118" x2="132" y2="118"></line>
+    <line x1="188" y1="118" x2="182" y2="118"></line>
+    <line x1="142" y1="100" x2="146" y2="104"></line>
+    <line x1="178" y1="100" x2="174" y2="104"></line>
+  </g>
+
+  
+  <text font-family="Zilla Slab, Georgia, serif" font-size="22" font-weight="700" letter-spacing="6" fill="#2a4a39">
+    <textPath href="#arc-top" startOffset="50%" text-anchor="middle">OUTPOST &amp; CO.</textPath>
+  </text>
+
+  
+  <text font-family="IBM Plex Sans, system-ui, sans-serif" font-size="11" font-weight="500" letter-spacing="4" fill="#2a4a39">
+    <textPath href="#arc-bot" startOffset="50%" text-anchor="middle">HOSTING · DOMAINS · EMAIL</textPath>
+  </text>
+
+  
+  <g fill="#2a4a39">
+    <path d="M50 160 l3 -8 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 z"></path>
+    <path d="M270 160 l3 -8 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 z"></path>
+  </g>
+</svg>
