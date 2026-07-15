@@ -48,7 +48,7 @@ Expected result: an Outpost icon on your home screen that opens straight into th
 ## First-run notes
 
 - **Offline posting:** if you post without a connection, the draft queues on your device and submits when you're back online. A queue indicator shows pending drafts with retry and dismiss controls.
-- **Companions round out the Doing modes:** all composer tabs — including the Doing group (Listen, Watch, Read, Checkin, Play) — are always visible. With the Post Kinds for IndieWeb companion plugin active, those entries render as proper post kinds on your site and the media "Look it up" search works; without it they still publish, but as generic notes.
+- **Companions round out the Doing modes:** all composer tabs — including the Doing group (Listen, Watch, Read, Checkin, Play) — are always visible. With the Post Kinds for IndieWeb in Block Themes companion plugin active, those entries render as proper post kinds on your site and the media "Look it up" search works; without it they still publish, but as generic notes.
 - **Encryption key notice:** if you plan to store API keys or connect external accounts, wp-admin may show a notice about configuring an Outpost encryption key. Sensitive settings can't be saved until the key is set up — see [Settings](/outpost/settings/).
 - **Managed hosting:** some managed WordPress hosts strip the authorization header from requests, which can break sign-in or lookups. See [Troubleshooting](/outpost/troubleshooting/) if posting fails after a successful sign-in.
 
