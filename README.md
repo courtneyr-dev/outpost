@@ -42,7 +42,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 |-----------|-------------|
 | [Micropub](https://wordpress.org/plugins/micropub/) (David Shanske) | **Required.** Server endpoint. |
 | [IndieAuth](https://wordpress.org/plugins/indieauth/) | Auth provider. Falls back to application passwords. |
-| [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Listen / Watch / Read / Checkin / Play / Follow modes. |
+| [Post Kinds for IndieWeb in Block Themes](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Listen / Watch / Read / Checkin / Play / Follow modes. |
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |

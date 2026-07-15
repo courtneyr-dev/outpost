@@ -35,7 +35,7 @@ Yes. In Chrome, accept the install banner, or open the browser menu and choose *
 
 ## Do I need Post Kinds for the Listen, Watch, Read, Checkin, and Play modes?
 
-The modes themselves are built in and always visible. But with the Post Kinds for IndieWeb companion plugin active, those entries render as proper post kinds on your site (without it they publish as generic notes) and the media "Look it up" search works — Outpost detects companions at runtime, no reconfiguration needed. The lookup also needs API keys configured under Post Kinds → API Connections.
+The modes themselves are built in and always visible. But with the Post Kinds for IndieWeb in Block Themes companion plugin active, those entries render as proper post kinds on your site (without it they publish as generic notes) and the media "Look it up" search works — Outpost detects companions at runtime, no reconfiguration needed. The lookup also needs API keys configured under Post Kinds → API Connections.
 
 ## Can I write long posts in Outpost?
 

@@ -40,7 +40,7 @@ Faster paths so you don't paste URLs by hand:
 
 ## Log something you're listening to, watching, or reading
 
-Works best with the Post Kinds for IndieWeb companion plugin: the "Look it up" search requires it, and without it these entries publish as generic notes instead of proper post kinds.
+Works best with the Post Kinds for IndieWeb in Block Themes companion plugin: the "Look it up" search requires it, and without it these entries publish as generic notes instead of proper post kinds.
 
 1. Switch to the Listen, Watch, Read, Checkin, or Play mode.
 2. Use the "Look it up" search to find the album, film, book, venue, or game — it fills the title, creator, and cover art from Post Kinds' lookup services (MusicBrainz, TMDB, Open Library, Foursquare/Nominatim, BoardGameGeek/RAWG). Watch mode has a Movie/TV toggle.

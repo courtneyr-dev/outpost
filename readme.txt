@@ -41,7 +41,7 @@ Long-form documentation — installation, settings, common tasks, troubleshootin
 
 Optional companions light up extra features when active:
 
-* **Post Kinds for IndieWeb** — powers the "Look it up" media search and renders Listen/Watch/Read/Checkin/Play entries as proper post kinds. Without it, those entries publish as generic notes.
+* **Post Kinds for IndieWeb in Block Themes** — powers the "Look it up" media search and renders Listen/Watch/Read/Checkin/Play entries as proper post kinds. Without it, those entries publish as generic notes.
 * **Post Formats for Block Themes** — post format selector and auto-detection.
 * **Link Extension for XFN** — XFN relationship picker on reply targets.
 * **Syndication Links** — destinations auto-populate the syndication chips.
