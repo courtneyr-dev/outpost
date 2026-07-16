@@ -159,10 +159,18 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
 
+= 1.0.0 =
+* First stable release, prepared for the WordPress.org plugin directory.
+* PWA composer at `/post` with Note, Reply, Like, Repost, Bookmark, RSVP, Follow, Listen, Watch, Read, Checkin, Play, Photo, and Article modes.
+* One-tap POSSE syndication chips, including Bridgy, Telegraph, and newsletter destinations (Beehiiv, Buttondown, Kit, write.as).
+* Offline draft queue, home-screen install, share-sheet posting (Android Web Share Target; iOS via Shortcut).
+* OAuth connections for life-tracking services (Notion, Oura, WHOOP, Polar, Ride With GPS, Ravelry) with libsodium-encrypted credential storage.
+* Bookmarklet generator, appearance token editor with live preview, and companion-plugin detection.
+
 = 0.1.0 =
-* Initial scaffold (Session A0). Plugin bootstrap, requirements check, Micropub status admin notice. PWA shell, composer modes, and companion adapters land in subsequent sessions.
+* Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
 
-= 0.1.0 =
-Initial release.
+= 1.0.0 =
+First stable release.

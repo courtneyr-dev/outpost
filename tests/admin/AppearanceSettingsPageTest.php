@@ -159,6 +159,14 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 			static fn ( $thing ): bool => $thing instanceof \WP_Error
 		);
 		WP_Mock::userFunction( 'screen_reader_text' )->andReturn( '' );
+		WP_Mock::userFunction( 'wp_script_is' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_register_script' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_enqueue_script' )->andReturn( null );
+		WP_Mock::userFunction( 'wp_add_inline_script' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_style_is' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_register_style' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_enqueue_style' )->andReturn( null );
+		WP_Mock::userFunction( 'wp_add_inline_style' )->andReturn( true );
 
 		Outpost_Theme_Json_Reader::set_reader_for_tests( static fn () => null );
 	}

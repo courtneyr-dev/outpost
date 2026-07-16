@@ -379,7 +379,9 @@ final class Outpost_Appearance_Settings_Page {
 		$styles     = self::preview_static_styles();
 		$body       = self::preview_body_html();
 		$lang       = function_exists( 'get_bloginfo' ) ? (string) get_bloginfo( 'language' ) : 'en-US';
-		$preview    = '<!doctype html>'
+		// These <style> tags belong to the iframe's srcdoc document, not
+		// the parent admin page, so the enqueue APIs cannot reach them.
+		$preview = '<!doctype html>'
 			. '<html lang="' . esc_attr( $lang ) . '">'
 			. '<head>'
 			. '<meta charset="utf-8">'
@@ -509,8 +511,9 @@ final class Outpost_Appearance_Settings_Page {
 	private static function render_inline_script(): void {
 		// Minimal vanilla JS: watch form inputs, rebuild the iframe's
 		// preview HTML whenever a value changes. No bundler, no
-		// dependencies. Inline and printed via wp_print_inline_script_tag
-		// when available (WP 5.7+); falls back to a plain <script> block.
+		// dependencies. Attached to a src-less handle so it prints
+		// through the WordPress script API (in the admin footer, after
+		// the form and iframe markup it reads).
 		$script = <<<'JS'
 		(function () {
 			var iframe = document.querySelector('.outpost-appearance-preview');
@@ -578,20 +581,27 @@ final class Outpost_Appearance_Settings_Page {
 			form.addEventListener('change', refreshIframe);
 		})();
 JS;
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $script is a hardcoded heredoc with no user input.
-		echo '<script>' . $script . '</script>';
+		if ( ! wp_script_is( 'outpost-appearance-preview', 'registered' ) ) {
+			wp_register_script( 'outpost-appearance-preview', false, array(), OUTPOST_VERSION, true );
+		}
+		wp_enqueue_script( 'outpost-appearance-preview' );
+		wp_add_inline_script( 'outpost-appearance-preview', $script );
 	}
 
 	private static function render_inline_styles(): void {
 		// Settings page chrome only — nothing about the composer paint.
-		echo '<style>'
-			. '.outpost-appearance-source-badge { font-size: 0.85em; padding: 2px 6px; margin-left: 8px; border-radius: 3px; background: #f0f0f1; color: #50575e; vertical-align: middle; }'
+		$css = '.outpost-appearance-source-badge { font-size: 0.85em; padding: 2px 6px; margin-left: 8px; border-radius: 3px; background: #f0f0f1; color: #50575e; vertical-align: middle; }'
 			. '.outpost-appearance-source-badge--override { background: #d4f0e0; color: #1a5f3f; }'
 			. '.outpost-appearance-warning { background: #fff8e5; border-left: 4px solid #d4901a; padding: 8px 12px; margin: 8px 0; }'
 			. '.outpost-appearance-bypass { display: block; margin-top: 4px; }'
 			. '.outpost-appearance-mode__option { display: inline-block; margin-right: 16px; }'
 			. '.outpost-appearance-preview-controls { margin: 12px 0; }'
-			. '.outpost-appearance-preview-controls label { margin-right: 12px; }'
-			. '</style>';
+			. '.outpost-appearance-preview-controls label { margin-right: 12px; }';
+
+		if ( ! wp_style_is( 'outpost-appearance-inline', 'registered' ) ) {
+			wp_register_style( 'outpost-appearance-inline', false, array(), OUTPOST_VERSION );
+		}
+		wp_enqueue_style( 'outpost-appearance-inline' );
+		wp_add_inline_style( 'outpost-appearance-inline', $css );
 	}
 }
