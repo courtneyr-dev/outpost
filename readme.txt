@@ -108,10 +108,15 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
 
 * **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the brid.gy or fed.brid.gy endpoint you configured. Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
 * **Telegraph (a Telegram service)** — when the Telegraph chip is enabled, the post's content is sent to api.telegra.ph to create the syndicated copy. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
+* **Beehiiv** — newsletter destination; when configured with an API key and enabled on a post, the post's content is sent to api.beehiiv.com. [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy).
+* **Buttondown** — newsletter destination; sends the post's content to api.buttondown.email when enabled. [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy).
+* **Kit (formerly ConvertKit)** — newsletter destination; sends the post's content to api.convertkit.com when enabled. [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy).
+* **write.as** — blog destination; sends the post's content to the write.as API when enabled. [Platform guidelines](https://write.as/guidelines), [Privacy](https://write.as/privacy).
 
 = Reply context and link previews =
 
-* **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page once to build the preview (title, image, summary). Only the URL you pasted is requested, from whatever site it points to.
+* **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page (and, where available, its feed or oEmbed endpoint) once to build the preview (title, image, summary). Only the URL you pasted and endpoints it advertises are requested, from whatever site it points to.
+* **Apple iTunes Search API** — when the URL you paste is a music.apple.com link, the track or album metadata for the preview is fetched from itunes.apple.com with the item's ID. [Terms](https://www.apple.com/legal/internet-services/itunes/), [Privacy](https://www.apple.com/legal/privacy/).
 * **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
 
 = Geocoding =
