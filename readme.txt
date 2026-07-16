@@ -82,7 +82,7 @@ Yes, for composing. Drafts written offline queue in your browser's IndexedDB and
 
 = What sends data where? =
 
-Posts go to your own site through Micropub. Syndication sends post content only to destinations you configure (for example the Bridgy service for Mastodon and Bluesky). Media search and URL previews fetch metadata from the relevant services. Life-tracking services (Oura, WHOOP, Polar, Ride With GPS, Ravelry, Notion) are contacted only after you connect them under OAuth Connections. Details in the [privacy and data doc](https://github.com/courtneyr-dev/outpost/blob/main/docs/privacy-and-data.md).
+Posts go to your own site through Micropub. Every other connection is listed, service by service, in the External services section below, and in more detail in the [privacy and data doc](https://github.com/courtneyr-dev/outpost/blob/main/docs/privacy-and-data.md).
 
 = Does Outpost require Jetpack? =
 
@@ -99,6 +99,39 @@ The Outpost admin page generates one bookmarklet per post kind, embedded with yo
 = Does Outpost replace the block editor for long-form? =
 
 No. The Article mode hands off to `/wp-admin/post-new.php`. Outpost is for fast, phone-sized posts; the block editor remains the right tool for long-form.
+
+== External services ==
+
+Outpost publishes to your own WordPress site through the Micropub plugin. It contacts the services below only for the specific feature named; nothing is sent until you use that feature. Each entry lists what is sent, when, and the service's terms and privacy policy.
+
+= Syndication (per post, only for chips you leave enabled) =
+
+* **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the brid.gy or fed.brid.gy endpoint you configured. Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
+* **Telegraph (a Telegram service)** — when the Telegraph chip is enabled, the post's content is sent to api.telegra.ph to create the syndicated copy. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
+
+= Reply context and link previews =
+
+* **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page once to build the preview (title, image, summary). Only the URL you pasted is requested, from whatever site it points to.
+* **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
+
+= Geocoding =
+
+* **Nominatim (OpenStreetMap Foundation)** — the check-in location search sends your search text to nominatim.openstreetmap.org to find matching places, only when you search for a location. [Usage policy](https://operations.osmfoundation.org/policies/nominatim/), [Privacy](https://wiki.osmfoundation.org/wiki/Privacy_Policy).
+
+= Connected life-tracking accounts (only after you connect them under Outpost → OAuth Connections) =
+
+Connecting an account stores an encrypted token on your site. Afterwards, Outpost contacts that service only to fetch your recent activity for prefilling posts and to maintain the connection (token refresh or revocation).
+
+* **Notion** — [Terms and privacy](https://www.notion.com/terms).
+* **Oura** — [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
+* **WHOOP** — [Terms](https://www.whoop.com/us/en/termsofuse/), [Privacy](https://www.whoop.com/us/en/privacy/).
+* **Polar (Flow / AccessLink)** — [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
+* **Ride With GPS** — [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
+* **Ravelry** — [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
+
+= Inbound only (no data sent) =
+
+* **IndieAuth sign-in** — authentication happens between your browser and your own site's IndieAuth endpoint (from the required IndieAuth plugin). Outpost sends nothing to third parties to sign you in.
 
 == Screenshots ==
 
