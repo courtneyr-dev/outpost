@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
+
+The server-side mf2 preview endpoint (`POST /wp-json/outpost/v1/preview`) accepted any request that merely carried an `Authorization: Bearer <anything>` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could send `Authorization: Bearer x` and drive arbitrary server-originated fetches of external hosts (an open fetch/preview proxy and reachability probe). `wp_safe_remote_get` still blocked private/loopback targets, but the auth gate itself was bypassable. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation (restoring a header-stripped token from the Micropub-spec body first, for GoDaddy) and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the fetcher either. Six new regression tests reproduce the exploit and guard the legitimate bearer/cookie editor paths.
+
+OUTPOST_VERSION: 0.1.114 → 0.1.115.
+
 ### Fixed (Streaming listens no longer duplicate the album art below the card)
 
 Posting a listen with both a streaming URL (Spotify/YouTube/Apple Music…) and a looked-up album returned a clean player card — plus the lookup's cover art duplicated in a stray gallery beneath it (once as the remote image, once sideloaded). Post Kinds oEmbeds the streaming URL into a player that already shows the artwork, so the composer now suppresses the separately looked-up cover when the target is a recognized streaming host. Non-streaming targets keep the cover as before. The Spotify player itself is gated by a site's cookie-consent tooling, not by Outpost.
