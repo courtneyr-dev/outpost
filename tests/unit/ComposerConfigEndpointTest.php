@@ -22,6 +22,10 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function tearDown(): void {
+		unset(
+			$_SERVER['HTTP_AUTHORIZATION'],
+			$_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+		);
 		WP_Mock::tearDown();
 	}
 
@@ -44,6 +48,29 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( false )
 			->reply( false );
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+	}
+
+	public function test_permission_check_denies_anonymous_bearer_presence(): void {
+		// Regression for the composer-config bearer-bypass recon finding.
+		// An anonymous attacker sends `Authorization: Bearer x` (an
+		// unvalidated, throwaway token). No cookie user, no cap, and the
+		// IndieAuth plugin never translates the bogus bearer to a WP user.
+		// Presence of the header alone must NOT authorize the request —
+		// otherwise the payload (companion map, Bridgy host map, taxonomy
+		// terms, site settings) leaks to unauthenticated callers.
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		// Filter is a passthrough so the assertion reflects the raw
+		// permission decision, not a filtered override.
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
+			static fn( $tag, $value ) => $value
+		);
+
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
