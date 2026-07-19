@@ -269,20 +269,18 @@ final class Outpost_Composer_Config_Endpoint {
 		// public WP endpoint, but the aggregate makes plugin-version
 		// reconnaissance trivial for an unauthenticated attacker (which
 		// `show_in_index => false` was already designed to prevent).
-		// Three auth paths accepted:
+		// Two auth paths accepted — both require a resolved WordPress user,
+		// so the mere presence of an unvalidated `Authorization: Bearer`
+		// header never authorizes the request:
 		//   1. `current_user_can('edit_posts')` — standard cap check
 		//      (cookie auth or IndieAuth-translated bearer).
 		//   2. `is_user_logged_in()` — any logged-in user; some IndieAuth
 		//      builds set the user without passing through edit_posts.
-		//   3. `has_bearer_header()` — bearer present but not yet
-		//      translated to WP_User. Acceptable because the payload is
-		//      non-mutating and rate-limited.
 		// Sites that need anonymous access (rare but supported for
 		// build-time pre-fetching) can opt back in via the
 		// `outpost_composer_config_permission` filter.
 		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+			|| is_user_logged_in();
 		/**
 		 * Override the composer-config permission decision.
 		 *
@@ -292,22 +290,6 @@ final class Outpost_Composer_Config_Endpoint {
 	}
 
 	/**
-	 * True when the incoming request has an `Authorization: Bearer ...`
-	 * header. Used as a third permission path when the IndieAuth
-	 * plugin's `determine_current_user` filter doesn't cover our route
-	 * (the bearer reaches the endpoint but isn't translated to a WP
-	 * user, so `is_user_logged_in()` returns false).
-	 *
-	 * Security trade-off: we don't validate the bearer ourselves —
-	 * just accept its presence. The composer-config payload is
-	 * non-sensitive (companion plugin status, public taxonomy terms,
-	 * site settings). If the bearer is invalid the user can't post
-	 * via Micropub anyway, so reading the config gets them nothing
-	 * useful. Filter `outpost_composer_config_permission` for stricter
-	 * sites.
-	 */
-
-	/**
 	 * Per-user rate limit check. Returns true if the user is over
 	 * quota; the handler responds 429 in that case.
 	 *
@@ -315,24 +297,6 @@ final class Outpost_Composer_Config_Endpoint {
 	 * endpoint. Uses a fixed-1-minute window (no sliding window) which
 	 * is good enough for this use case and cheap.
 	 */
-	/**
-	 * Bearer-header presence check. Mirrors the pattern used by
-	 * Outpost_Preview_Endpoint and Outpost_Geocode_Endpoint: accept the
-	 * `Authorization: Bearer …` header (or the standard apache rewrite
-	 * relay for hosts where mod_rewrite drops it) without locally
-	 * validating the token. Validation is left to whatever
-	 * `determine_current_user` filter the IndieAuth plugin (or a custom
-	 * site config) registers; if no filter recognizes the bearer, the
-	 * caller is still rate-limited and the response carries no PII.
-	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
-		}
-		return false;
-	}
-
 	private static function is_rate_limited(): bool {
 		// Prefer user-id keying when available (logged-in user); fall
 		// back to IP-keying for anonymous requests. IP-keying isn't
