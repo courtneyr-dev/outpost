@@ -124,23 +124,15 @@ final class Outpost_Geocode_Endpoint {
 	 * Bearer-header presence check. Same trade-off as preview: the rate
 	 * limiter and external API guard the surface area, so we accept a bearer
 	 * header without local validation.
+	 *
+	 * A token is only ever read from the Authorization header — never from the
+	 * query string. Accepting `?access_token=`/`?_o_token=` turned the endpoint
+	 * into an anonymous open proxy to Nominatim and leaked the token through
+	 * access logs, CDN cache keys, and browser history.
 	 */
 	private static function has_bearer_header(): bool {
 		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
-		}
-		// Query-string fallback for managed-WP hosts that strip Authorization.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
-			return true;
-		}
-		// Also accept the spec-compliant `access_token` parameter.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['access_token'] ) && is_string( $_GET['access_token'] ) ) {
-			return true;
-		}
-		return false;
+		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**
