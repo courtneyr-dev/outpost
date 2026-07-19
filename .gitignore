@@ -110,3 +110,7 @@ wp-includes/
 # Both files are ephemeral status logs for Courtney's morning review; never committed.
 .overnight-progress.md
 .overnight-questions.md
+
+# Docs site build output (docs/ is an Astro Starlight project)
+docs/dist/
+docs/.astro/

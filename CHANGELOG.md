@@ -7,11 +7,21 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
+### Security (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
 
-The server-side mf2 preview endpoint (`POST /wp-json/outpost/v1/preview`) accepted any request that merely carried an `Authorization: Bearer <anything>` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could send `Authorization: Bearer x` and drive arbitrary server-originated fetches of external hosts (an open fetch/preview proxy and reachability probe). `wp_safe_remote_get` still blocked private/loopback targets, but the auth gate itself was bypassable. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation (restoring a header-stripped token from the Micropub-spec body first, for GoDaddy) and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the fetcher either. Six new regression tests reproduce the exploit and guard the legitimate bearer/cookie editor paths.
+The server-side mf2 preview endpoint (`POST /wp-json/outpost/v1/preview`) accepted any request that merely carried an `Authorization: Bearer` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could send `Authorization: ****** and drive arbitrary server-originated fetches of external hosts (an open fetch/preview proxy and reachability probe). `wp_safe_remote_get` still blocked private/loopback targets, but the auth gate itself was bypassable. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation (restoring a header-stripped token from the Micropub-spec body first, for GoDaddy) and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the fetcher either. Six new regression tests reproduce the exploit and guard the legitimate bearer/cookie editor paths.
 
-OUTPOST_VERSION: 0.1.114 → 0.1.115.
+### Security (Telegraph tokens now encrypted at rest)
+
+Telegraph access tokens move from plain user meta into the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) — the last credential the plugin still stored unencrypted. Tokens written by earlier versions migrate automatically on first use; the plaintext copy is deleted only after the encrypted write succeeds. Unit-tested (encrypted read, migration, no plaintext residue).
+
+### Fixed (phantom-post investigation closed — root cause upstream)
+
+The 0.1.107 "phantom post" reports (Follow/Eat/Drink/Weather said "Posted" while creating nothing) are explained: Micropub 2.5.0 and earlier answered failed post inserts with a success status and no Location header, and the composer correctly treated the 2xx as success. Micropub 2.5.1 (released 2026-07-08) returns the real error code, which the composer already surfaces via its existing error path. Outpost now shows a dismissible admin notice when the active Micropub plugin predates 2.5.1, and the composer keeps its hedged "check your site" copy for success responses without a Location.
+
+## [1.0.0] - 2026-07-09
+
+First stable release. Rolls up the 0.1.x pre-release line; the entries below through 0.1.114 describe the work that landed in it. Release-readiness pass: Plugin Check (plugin_repo + security) clean on the distribution, WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+.
 
 ### Fixed (Streaming listens no longer duplicate the album art below the card)
 

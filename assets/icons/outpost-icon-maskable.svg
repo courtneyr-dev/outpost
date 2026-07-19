@@ -1,9 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Outpost">
-  <title>Outpost</title>
-  <!-- Maskable variant: full-bleed background + smaller graphic in the
-       center 40% safe zone so Android adaptive-icon masks don't clip
-       the visual. -->
-  <rect width="192" height="192" fill="#241c4a"/>
-  <circle cx="96" cy="96" r="36" fill="none" stroke="#fb8500" stroke-width="11"/>
-  <circle cx="96" cy="96" r="10" fill="#fb8500"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Outpost">
+  <title>Outpost — fingerpost (maskable)</title>
+  <!-- Maskable variant: full-bleed background + the fingerpost scaled into
+       the center safe zone so adaptive-icon masks don't clip the planks. -->
+  <rect width="256" height="256" fill="#2a4a39"/>
+  <g transform="translate(35.84 35.84) scale(0.72)">
+    <rect x="121" y="44" width="14" height="164" fill="#faf6ec"/>
+    <rect x="97" y="200" width="62" height="12" fill="#faf6ec"/>
+    <path d="M 52 66 L 168 66 L 192 81 L 168 96 L 52 96 Z" fill="#faf6ec"/>
+    <path d="M 204 116 L 88 116 L 64 131 L 88 146 L 204 146 Z" fill="#a87a3e"/>
+  </g>
 </svg>

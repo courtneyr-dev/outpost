@@ -8,7 +8,21 @@
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built for WordPress 6.5+ / 7.0 development branch.
 
-**Status:** Pre-release, [v0.1.4](https://github.com/courtneyr-dev/outpost/releases/tag/v0.1.4) — first functional end-to-end version. Sign in via IndieAuth, post a note via Micropub, see the new post URL. Composer modes (Reply, Photo, Article, Listen group) land in Phase C.
+**Status:** version 1.0.0, prepared for release (2026-07-09 readiness audit: Plugin Check clean). Not yet listed on WordPress.org — install from GitHub.
+
+## User documentation
+
+**User documentation:** [Read the complete Outpost documentation](https://courtneyr-dev.github.io/outpost/)
+
+Key pages:
+
+- [Installation](https://courtneyr-dev.github.io/outpost/installation/) — GitHub install plus the required IndieAuth and Micropub plugins.
+- [Getting started](https://courtneyr-dev.github.io/outpost/getting-started/) — sign in, post a note from your phone, install to your home screen.
+- [Settings](https://courtneyr-dev.github.io/outpost/settings/) — composer defaults, API keys, appearance, OAuth connections.
+- [Troubleshooting](https://courtneyr-dev.github.io/outpost/troubleshooting/) — managed-host auth issues, offline queue, dependency notices.
+- [Privacy and data](https://courtneyr-dev.github.io/outpost/privacy-and-data/) — what's stored and which services are contacted.
+
+The docs site builds from [`docs/`](docs/) with Astro Starlight — see [docs/MAINTAINING.md](docs/MAINTAINING.md) to update it.
 
 ## What this is
 
@@ -28,7 +42,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 |-----------|-------------|
 | [Micropub](https://wordpress.org/plugins/micropub/) (David Shanske) | **Required.** Server endpoint. |
 | [IndieAuth](https://wordpress.org/plugins/indieauth/) | Auth provider. Falls back to application passwords. |
-| [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Listen / Watch / Read / Checkin / Play / Follow modes. |
+| [Post Kinds for IndieWeb in Block Themes](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Listen / Watch / Read / Checkin / Play / Follow modes. |
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |
@@ -86,6 +100,12 @@ Outpost is being built across ~40 small, atomic sessions, each scoped to a speci
 - **H — Settings and onboarding**
 - **I — Distribution** (WordPress.org submission)
 - **J — Documentation and launch**
+
+## Support
+
+- Questions and bug reports: [GitHub issues](https://github.com/courtneyr-dev/outpost/issues).
+- Security vulnerabilities: follow [`SECURITY.md`](SECURITY.md) — don't open a public issue.
+- Contributions: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 

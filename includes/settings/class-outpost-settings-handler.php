@@ -84,6 +84,7 @@ final class Outpost_Settings_Handler {
 
 		$fields = Outpost_Settings_Registry::get_fields( $tab_id );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitize_and_encrypt() below sanitizes every field per its registered type before persistence.
 		$submitted = isset( $_POST['outpost_settings'] ) && is_array( $_POST['outpost_settings'] )
 			? wp_unslash( $_POST['outpost_settings'] )
 			: array();

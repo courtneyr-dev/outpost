@@ -124,28 +124,15 @@ final class Outpost_Geocode_Endpoint {
 	 * Bearer-header presence check. Same trade-off as preview: the rate
 	 * limiter and external API guard the surface area, so we accept a bearer
 	 * header without local validation.
+	 *
+	 * A token is only ever read from the Authorization header — never from the
+	 * query string. Accepting `?access_token=`/`?_o_token=` turned the endpoint
+	 * into an anonymous open proxy to Nominatim and leaked the token through
+	 * access logs, CDN cache keys, and browser history.
 	 */
 	private static function has_bearer_header(): bool {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-		}
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
-		}
-		// Query-string fallback for managed-WP hosts that strip Authorization.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['_o_token'] ) && is_string( $_GET['_o_token'] ) ) {
-			return true;
-		}
-		// Also accept the spec-compliant `access_token` parameter.
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! empty( $_GET['access_token'] ) && is_string( $_GET['access_token'] ) ) {
-			return true;
-		}
-		return false;
+		$header = Outpost_Request_Headers::authorization();
+		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**
@@ -246,7 +233,7 @@ final class Outpost_Geocode_Endpoint {
 		// `uniqid()` per call would defeat rate limiting entirely. The
 		// secondary counter is the safety net: even if a filter sidesteps
 		// the primary, the actual IP from the TCP layer still rate-limits.
-		$remote_ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
+		$remote_ip    = isset( $_SERVER['REMOTE_ADDR'] ) ? Outpost_Request_Headers::server_string( 'REMOTE_ADDR' ) : '0.0.0.0';
 		$remote_key   = 'outpost_geocode_rl_remote_' . md5( $remote_ip );
 		$remote_count = (int) get_transient( $remote_key );
 		// Secondary cap is the higher of the two limits times a small
@@ -283,7 +270,7 @@ final class Outpost_Geocode_Endpoint {
 	 * different resolution path (e.g., a custom Varnish setup).
 	 */
 	private static function client_ip(): string {
-		$default = (string) ( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+		$default = Outpost_Request_Headers::server_string( 'REMOTE_ADDR', '0.0.0.0' );
 
 		$trust_proxy = defined( 'OUTPOST_TRUST_FORWARDED_HEADERS' )
 			&& OUTPOST_TRUST_FORWARDED_HEADERS;
@@ -291,9 +278,9 @@ final class Outpost_Geocode_Endpoint {
 		if ( $trust_proxy ) {
 			// phpcs:disable WordPress.Security.ValidatedSanitizedInput
 			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-				$default = (string) $_SERVER['HTTP_CF_CONNECTING_IP'];
+				$default = Outpost_Request_Headers::server_string( 'HTTP_CF_CONNECTING_IP' );
 			} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-				$chain = (string) $_SERVER['HTTP_X_FORWARDED_FOR'];
+				$chain = Outpost_Request_Headers::server_string( 'HTTP_X_FORWARDED_FOR' );
 				$first = trim( explode( ',', $chain )[0] );
 				if ( '' !== $first ) {
 					$default = $first;

@@ -32,10 +32,6 @@ async function flush(): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function radios(): HTMLInputElement[] {
-	return Array.from(root.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
-}
-
 function title_text(): string | null {
 	return root.querySelector('.outpost-card__title')?.textContent ?? null;
 }
