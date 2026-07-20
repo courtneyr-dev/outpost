@@ -162,6 +162,7 @@ final class Outpost_Manual_Share_Pending_Capture_Detector {
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- indexed lookup required; result set is small.
 				'meta_query'     => array(
 					array(
 						'key'     => 'outpost_manual_share_log',

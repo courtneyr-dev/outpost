@@ -143,6 +143,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( empty( $_SERVER['HTTP_AUTHORIZATION'] ) && empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
 		}
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
 		$user_id = (int) apply_filters( 'determine_current_user', false );
 		if ( $user_id > 0 ) {
 			wp_set_current_user( $user_id );
@@ -156,9 +157,11 @@ final class Outpost_Geocode_Endpoint {
 	private static function bearer_token(): string {
 		$header = '';
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
+			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
 		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
+			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		}
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
