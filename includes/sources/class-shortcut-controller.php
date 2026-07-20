@@ -144,15 +144,7 @@ final class Outpost_Shortcut_Controller {
 	 * @return bool
 	 */
 	private static function is_authenticated(): bool {
-		return is_user_logged_in() || self::has_bearer_header();
-	}
-
-	/**
-	 * @return bool
-	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
+		return is_user_logged_in();
 	}
 
 	/**
