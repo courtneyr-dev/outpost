@@ -20,8 +20,8 @@
  *
  *   - `show_in_index => false` keeps these out of the public REST
  *     listing (defense against credentials-discovery scanning).
- *   - Permission accepts cookie / `edit_posts` cap / bearer presence
- *     at the route level + per-post `edit_post` check at the handler.
+ *   - Permission requires `edit_posts` after bearer-token validation at
+ *     the route level + per-post `edit_post` check at the handler.
  *   - URL validation lives in {@see Outpost_Manual_Share_Syndication_Writeback};
  *     no fetch of the pasted URL (no SSRF surface beyond what
  *     wp_http_validate_url already blocks during validation).
@@ -38,6 +38,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Syndication_Capture_Controller {
+	use Outpost_Bearer_Auth;
 
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PENDING   = '/manual-share/pending';
@@ -95,15 +96,15 @@ final class Outpost_Syndication_Capture_Controller {
 	}
 
 	/**
-	 * Permission callback. Same shape as the other manual-share
-	 * endpoints — cookie / edit_posts cap / bearer presence.
+	 * Permission callback. Validates bearer tokens before checking the
+	 * edit_posts capability.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the syndication-capture endpoint permission decision.
 		 *
@@ -118,11 +119,6 @@ final class Outpost_Syndication_Capture_Controller {
 			);
 		}
 		return true;
-	}
-
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**

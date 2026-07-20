@@ -18,9 +18,9 @@
  *
  *   - `show_in_index => false` — keeps the route out of `/wp-json/`'s
  *     public listing. Defends against credentials-discovery scanning.
- *   - Permission callback accepts cookie / `edit_posts` cap / bearer
- *     token presence. Static metadata only — no SSRF surface, no
- *     external requests, no rate limiting needed.
+ *   - Permission callback requires `edit_posts` after bearer-token
+ *     validation. Static metadata only — no SSRF surface, no external
+ *     requests, no rate limiting needed.
  *   - Filterable via `outpost_syndicate_targets_permission`.
  *
  * Mode validation is fail-OPEN: an unknown mode returns every detected
@@ -40,6 +40,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Syndicate_Targets_Endpoint {
+	use Outpost_Bearer_Auth;
 
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PATH      = '/syndicate-targets';
@@ -74,15 +75,15 @@ final class Outpost_Syndicate_Targets_Endpoint {
 	}
 
 	/**
-	 * Permission callback. Same shape as the preview endpoint —
-	 * cookie / edit_posts cap / bearer presence. Filterable.
+	 * Permission callback. Validates bearer tokens before checking the
+	 * edit_posts capability. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the syndicate-targets endpoint permission decision.
 		 *
@@ -97,15 +98,6 @@ final class Outpost_Syndicate_Targets_Endpoint {
 			);
 		}
 		return true;
-	}
-
-	/**
-	 * Bearer-header presence check. Pattern shared with preview /
-	 * composer-config / geocode endpoints.
-	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**

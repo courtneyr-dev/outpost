@@ -25,6 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Manual_Share_Status_Controller {
+	use Outpost_Bearer_Auth;
 
 	private const ROUTE_NAMESPACE       = 'outpost/v1';
 	private const ROUTE_STATUS          = '/manual-share/status/(?P<post_id>\d+)';
@@ -109,9 +110,9 @@ final class Outpost_Manual_Share_Status_Controller {
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the manual-share status endpoint permission decision.
 		 *
@@ -126,11 +127,6 @@ final class Outpost_Manual_Share_Status_Controller {
 			);
 		}
 		return true;
-	}
-
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**

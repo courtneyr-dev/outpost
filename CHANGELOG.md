@@ -10,6 +10,11 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Security (Geocode endpoint no longer honors an unvalidated bearer header — anonymous Nominatim proxy closed)
 
 The geocode endpoint (`GET /wp-json/outpost/v1/geocode`) accepted any request that merely carried an `Authorization: Bearer` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could use the endpoint as an open proxy to Nominatim. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the geocoder either. Regression tests reproduce the bypass and guard the legitimate bearer and cookie editor paths.
+### Security (Validated bearer authentication consolidated across remaining REST endpoints)
+
+Manual-share, manual-share-status, syndicate-targets, and syndication-capture now use one shared helper that resolves header or body bearer tokens through `determine_current_user` before gating solely on `current_user_can( 'edit_posts' )`. Media-lookup keeps its route-specific body-token reinjection filter and now uses the same capability-only gate. Bare bearer headers and unvalidated body tokens no longer authorize any of these five endpoints.
+
+OUTPOST_VERSION: 1.0.0 → 1.0.1.
 
 ### Security (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
 
