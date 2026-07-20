@@ -7,14 +7,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-20
+
+First stable release. Rolls up the 0.1.x pre-release line (entries through 0.1.114 below) plus the pre-launch security hardening. WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+. Plugin Check (plugin_repo + security) clean on the distribution.
+
 ### Security (Geocode endpoint no longer honors an unvalidated bearer header — anonymous Nominatim proxy closed)
 
 The geocode endpoint (`GET /wp-json/outpost/v1/geocode`) accepted any request that merely carried an `Authorization: Bearer` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could use the endpoint as an open proxy to Nominatim. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the geocoder either. Regression tests reproduce the bypass and guard the legitimate bearer and cookie editor paths.
 ### Security (Validated bearer authentication consolidated across remaining REST endpoints)
 
 Manual-share, manual-share-status, syndicate-targets, and syndication-capture now use one shared helper that resolves header or body bearer tokens through `determine_current_user` before gating solely on `current_user_can( 'edit_posts' )`. Media-lookup keeps its route-specific body-token reinjection filter and now uses the same capability-only gate. Bare bearer headers and unvalidated body tokens no longer authorize any of these five endpoints.
-
-OUTPOST_VERSION: 1.0.0 → 1.0.1.
 
 ### Security (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
 
@@ -30,10 +32,6 @@ Telegraph access tokens move from plain user meta into the encrypted credentials
 ### Fixed (phantom-post investigation closed — root cause upstream)
 
 The 0.1.107 "phantom post" reports (Follow/Eat/Drink/Weather said "Posted" while creating nothing) are explained: Micropub 2.5.0 and earlier answered failed post inserts with a success status and no Location header, and the composer correctly treated the 2xx as success. Micropub 2.5.1 (released 2026-07-08) returns the real error code, which the composer already surfaces via its existing error path. Outpost now shows a dismissible admin notice when the active Micropub plugin predates 2.5.1, and the composer keeps its hedged "check your site" copy for success responses without a Location.
-
-## [1.0.0] - 2026-07-09
-
-First stable release. Rolls up the 0.1.x pre-release line; the entries below through 0.1.114 describe the work that landed in it. Release-readiness pass: Plugin Check (plugin_repo + security) clean on the distribution, WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+.
 
 ### Fixed (Streaming listens no longer duplicate the album art below the card)
 
