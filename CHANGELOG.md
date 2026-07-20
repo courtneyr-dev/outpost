@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security (Preview endpoint no longer honors an unvalidated bearer header — anonymous SSRF closed)
+
+The server-side mf2 preview endpoint (`POST /wp-json/outpost/v1/preview`) accepted any request that merely carried an `Authorization: Bearer` header — or an `access_token` in the body — without validating the token against a real user. An anonymous caller could send `Authorization: ****** and drive arbitrary server-originated fetches of external hosts (an open fetch/preview proxy and reachability probe). `wp_safe_remote_get` still blocked private/loopback targets, but the auth gate itself was bypassable. The permission callback now treats the bearer token as an input to authentication, not an allow-leg: it hands the token to IndieAuth's `determine_current_user` validation (restoring a header-stripped token from the Micropub-spec body first, for GoDaddy) and gates solely on `current_user_can('edit_posts')` against the resolved user. A bogus token resolves to no user and is rejected with 401. The `is_user_logged_in()` and bearer-presence OR-legs are gone, so a logged-in non-editor no longer opens the fetcher either. Six new regression tests reproduce the exploit and guard the legitimate bearer/cookie editor paths.
+
 ### Security (Telegraph tokens now encrypted at rest)
 
 Telegraph access tokens move from plain user meta into the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) — the last credential the plugin still stored unencrypted. Tokens written by earlier versions migrate automatically on first use; the plaintext copy is deleted only after the encrypted write succeeds. Unit-tested (encrypted read, migration, no plaintext residue).

@@ -100,26 +100,23 @@ final class Outpost_Preview_Endpoint {
 	/**
 	 * Permission callback for the preview endpoint.
 	 *
-	 * Two auth paths accepted:
-	 *
-	 *   1. `current_user_can('edit_posts')` — standard cap check
-	 *      (cookie auth or IndieAuth bearer when the plugin's filter
-	 *      covers /wp-json/outpost/*).
-	 *   2. `is_user_logged_in()` — any logged-in user. Some IndieAuth
-	 *      plugin builds translate the bearer to user_id but don't
-	 *      pass `edit_posts` cap through; this fallback catches them.
-	 *      Preview output is rate-limited (30 req/min/user) and only
-	 *      returns sanitized HTML from URLs the user explicitly
-	 *      pasted, so opening to non-edit_posts users is safe.
+	 * `current_user_can('edit_posts')` is the sole gate. A bearer token
+	 * (Authorization header, or the Micropub body fallback on hosts that
+	 * strip the header) is not an allow-leg on its own — it is only an input
+	 * to authentication: we hand it to IndieAuth's `determine_current_user`
+	 * validation and re-check the capability against the resolved user. Mere
+	 * presence of a `Bearer` header is NOT authentication (a bogus
+	 * `Authorization: Bearer x` from an anonymous caller resolves to no user
+	 * and is rejected).
 	 *
 	 * Filterable via `outpost_preview_permission` for site admins.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the preview-endpoint permission decision.
 		 *
@@ -137,37 +134,70 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
-	 * Bearer-header presence check. See ComposerConfigEndpoint for the
-	 * security trade-off rationale — preview is rate-limited and the
-	 * SSRF defenses already gate which URLs can be fetched, so accepting
-	 * a bearer header without local validation is acceptable.
+	 * Resolve a bearer token to a real WP user before the capability check.
+	 *
+	 * Delegates validation to the `determine_current_user` filter (the same
+	 * hook IndieAuth's plugin uses to authenticate bearer tokens), so an
+	 * unvalidated token can never authorize the request. On managed-WP hosts
+	 * that strip the Authorization header (GoDaddy), the Micropub-spec body
+	 * `access_token` is restored to the header first so IndieAuth can read it.
 	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
+	private static function authenticate_bearer_token(): void {
+		if ( is_user_logged_in() ) {
+			return;
 		}
-		// Spec-compliant body fallback for managed-WP hosts that strip the
-		// Authorization header (GoDaddy's Apache config drops
-		// HTTP_AUTHORIZATION before PHP sees it). The Micropub spec accepts
-		// access_token in the request body. Bodies don't appear in access
-		// logs, browser history, or CDN cache keys, unlike query strings.
-		// Bearer-token auth path; nonces don't apply here.
+		$token = self::bearer_token();
+		if ( '' === $token ) {
+			return;
+		}
+		// Restore a stripped Authorization header so IndieAuth's
+		// determine_current_user callback can read and validate the token.
+		if ( empty( $_SERVER['HTTP_AUTHORIZATION'] ) && empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		}
+		$user_id = (int) apply_filters( 'determine_current_user', false );
+		if ( $user_id > 0 ) {
+			wp_set_current_user( $user_id );
+		}
+	}
+
+	/**
+	 * Extract the bearer token from the Authorization header, or the
+	 * Micropub-spec `access_token` request body on hosts that strip the
+	 * header. Returns '' when no token is present.
+	 *
+	 * Bodies don't appear in access logs, browser history, or CDN cache
+	 * keys, unlike query strings, so the body fallback is spec-compliant
+	 * and leak-safe.
+	 */
+	private static function bearer_token(): string {
+		$header = '';
+		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+		}
+		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
+			return $matches[1];
+		}
+		// Bearer-token auth path; nonces don't apply to token-authenticated
+		// requests, and managed-WP hosts strip the header so the token rides
+		// in the body.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
 		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
 		if ( null === $body_token ) {
 			$raw = file_get_contents( 'php://input' );
 			if ( false !== $raw && '' !== $raw ) {
 				$decoded = json_decode( $raw, true );
-				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) ) {
-					$body_token = $decoded['access_token'];
+				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
+					$body_token = sanitize_text_field( $decoded['access_token'] );
 				}
 			}
 		}
 		if ( is_string( $body_token ) && '' !== $body_token ) {
-			return true;
+			return $body_token;
 		}
-		return false;
+		return '';
 	}
 
 	/**
