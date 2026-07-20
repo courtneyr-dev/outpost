@@ -17,6 +17,7 @@ namespace Outpost\Tests\Unit;
 use Outpost_Syndicate_Targets_Endpoint;
 use Outpost_Companion_Registry;
 use Outpost_ActivityPub_Adapter;
+use WP_Error;
 use WP_Mock;
 use WP_REST_Request;
 
@@ -37,6 +38,46 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 	public function tearDown(): void {
 		WP_Mock::tearDown();
 		Outpost_Companion_Registry::reset_for_tests();
+		unset(
+			$_SERVER['HTTP_AUTHORIZATION'],
+			$_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+		);
+	}
+
+	/**
+	 * @param int|false $determine_user User resolved by bearer validation.
+	 */
+	private function mock_filters( $determine_user ): void {
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
+			static function ( $hook, $value ) use ( $determine_user ) {
+				if ( 'determine_current_user' === $hook ) {
+					return $determine_user;
+				}
+				return $value;
+			}
+		);
+	}
+
+	public function test_permission_rejects_unvalidated_bearer_header(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		$this->mock_filters( false );
+
+		$result = Outpost_Syndicate_Targets_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_allows_validated_bearer_editor(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		$this->mock_filters( 42 );
+
+		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission() );
 	}
 
 	private function make_request( ?string $mode ): WP_REST_Request {

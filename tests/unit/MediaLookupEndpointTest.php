@@ -468,25 +468,36 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 401, $data['status'] );
 	}
 
-	public function test_permission_granted_for_edit_posts(): void {
+	public function test_permission_rejects_unvalidated_bearer_header(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
+		WP_Mock::userFunction( 'rest_do_request' )->never();
+
+		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_allows_validated_editor(): void {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
 	}
 
-	public function test_permission_granted_for_body_access_token(): void {
-		// GoDaddy strips Authorization; the token rides in the POST body.
-		$_POST['access_token'] = 'secret-token'; // outpost-lint:fixture-credential
+	public function test_permission_rejects_unvalidated_body_access_token(): void {
+		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing(
-			static fn( $v ) => is_string( $v ) ? trim( $v ) : $v
-		);
-		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
+		WP_Mock::userFunction( 'rest_do_request' )->never();
 
-		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
+		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
 
 	// --- GoDaddy header reinjection (determine_current_user shim) -----------

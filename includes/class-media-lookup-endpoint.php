@@ -32,8 +32,8 @@
  * return results once their keys are set). It is NOT an error — the client
  * surfaces it as a friendly hint.
  *
- * Permission callback mirrors `Outpost_Preview_Endpoint` /
- * `Outpost_Geocode_Endpoint`: bearer-or-cookie, `show_in_index => false`.
+ * Permission callback requires `edit_posts` after WordPress resolves the
+ * bearer token, with `show_in_index => false`.
  *
  * @package Outpost
  */
@@ -179,15 +179,13 @@ final class Outpost_Media_Lookup_Endpoint {
 	}
 
 	/**
-	 * Permission callback. Mirrors preview/geocode: bearer-or-cookie, with a
-	 * filter override for site admins who want to lock it down.
+	 * Permission callback. Requires the edit_posts capability, with a filter
+	 * override for site admins who want to lock it down.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the media-lookup permission decision.
 		 *
@@ -202,23 +200,6 @@ final class Outpost_Media_Lookup_Endpoint {
 			);
 		}
 		return true;
-	}
-
-	/**
-	 * Bearer-presence check. Same trade-off as preview: the endpoint is
-	 * rate-limited and only proxies read-only lookups, so accepting a bearer
-	 * without local validation is acceptable. Reads the header first, then
-	 * the request body (`access_token`) for managed-WP hosts that strip the
-	 * Authorization header.
-	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+\S+/i', $header ) ) {
-			return true;
-		}
-		// Spec-compliant body fallback (GoDaddy strips HTTP_AUTHORIZATION).
-		// Bodies don't leak through access logs / history / CDN cache keys.
-		return '' !== self::body_access_token();
 	}
 
 	/**

@@ -93,7 +93,47 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::tearDown();
 		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
 		Outpost_Companion_Registry::reset_for_tests();
-		unset( $_SERVER['HTTP_USER_AGENT'] );
+		unset(
+			$_SERVER['HTTP_AUTHORIZATION'],
+			$_SERVER['REDIRECT_HTTP_AUTHORIZATION'],
+			$_SERVER['HTTP_USER_AGENT']
+		);
+	}
+
+	/**
+	 * @param int|false $determine_user User resolved by bearer validation.
+	 */
+	private function mock_filters( $determine_user ): void {
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
+			static function ( $hook, $value ) use ( $determine_user ) {
+				if ( 'determine_current_user' === $hook ) {
+					return $determine_user;
+				}
+				return $value;
+			}
+		);
+	}
+
+	public function test_permission_rejects_unvalidated_bearer_header(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		$this->user_can_edit_post        = false;
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		$this->mock_filters( false );
+
+		$result = Outpost_Manual_Share_Controller::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+		$this->assertSame( array(), $this->meta_store );
+	}
+
+	public function test_permission_allows_validated_bearer_editor(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		$this->mock_filters( 42 );
+
+		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission() );
 	}
 
 	/**
