@@ -210,6 +210,40 @@ final class ShareTargetDispatchTest extends TestCase {
 	}
 
 	/**
+	 * Test 2b: a bare `Authorization: Bearer x` header no longer authorizes.
+	 * Before the fix, is_authenticated() ORed in has_bearer_header() (mere
+	 * presence), so an anonymous POST carrying any Bearer header bypassed the
+	 * gate. Asserts absence of side effects — no redirect, no prefill transient.
+	 *
+	 * @test
+	 */
+	public function post_with_unresolved_bearer_header_is_blocked(): void {
+		wp_set_current_user( 0 );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		$_SERVER['REQUEST_METHOD']     = 'POST';
+		$_POST['url']                  = self::EXAMPLE_URL;
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		unset( $_SERVER['HTTP_AUTHORIZATION'] );
+
+		$this->assertEmpty(
+			$this->captured_redirects,
+			'A bare Bearer header must not authorize: no redirect should be issued.'
+		);
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$transient_count = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
+		);
+		$this->assertSame(
+			0,
+			$transient_count,
+			'A bare Bearer header must not enqueue a prefill transient.'
+		);
+	}
+
+	/**
 	 * Test 3: POST with title + text but no url falls through to the
 	 * share-text-only branch — Note mode pre-filled with title + text,
 	 * no source URL.

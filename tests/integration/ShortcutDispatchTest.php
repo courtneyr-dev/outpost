@@ -231,6 +231,28 @@ final class ShortcutDispatchTest extends TestCase {
 	}
 
 	/**
+	 * Test 3b: a bare `Authorization: Bearer x` header no longer authorizes.
+	 * Before the fix, is_authenticated() ORed in has_bearer_header() (mere
+	 * presence), so an anonymous POST with any Bearer header bypassed the gate.
+	 *
+	 * @test
+	 */
+	public function post_with_unresolved_bearer_header_is_blocked(): void {
+		wp_set_current_user( 0 );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+
+		$body         = wp_json_encode( array( 'url' => self::EXAMPLE_URL ) );
+		$redirect_url = $this->dispatch_shortcut( 'POST', $body );
+
+		unset( $_SERVER['HTTP_AUTHORIZATION'] );
+
+		$this->assertNull(
+			$redirect_url,
+			'A bare Bearer header must not authorize shortcut dispatch: no redirect should be issued.'
+		);
+	}
+
+	/**
 	 * Test 4: Malformed (non-JSON) body returns 400. Per Rule 2,
 	 * asserts NO redirect AND NO transient — gates fire before dispatch.
 	 *
