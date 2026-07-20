@@ -13,7 +13,7 @@
  *
  *   - `show_in_index => false` keeps the route out of `/wp-json/`'s
  *     public listing.
- *   - Permission accepts cookie / `edit_posts` cap / bearer presence.
+ *   - Permission requires `edit_posts` after bearer-token validation.
  *   - No SSRF surface, no external requests, no rate limiting needed
  *     in F9 — F10/F11 may add rate limiting once real intents fire.
  *
@@ -39,6 +39,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Manual_Share_Controller {
+	use Outpost_Bearer_Auth;
 
 	private const ROUTE_NAMESPACE   = 'outpost/v1';
 	private const ROUTE_INTENT_PATH = '/manual-share/intent';
@@ -144,15 +145,15 @@ final class Outpost_Manual_Share_Controller {
 	}
 
 	/**
-	 * Permission callback. Same shape as syndicate-targets / preview
-	 * endpoints — cookie / edit_posts cap / bearer presence. Filterable.
+	 * Permission callback. Validates bearer tokens before checking the
+	 * edit_posts capability. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the manual-share intent endpoint permission decision.
 		 *
@@ -167,15 +168,6 @@ final class Outpost_Manual_Share_Controller {
 			);
 		}
 		return true;
-	}
-
-	/**
-	 * Bearer-header presence check. Pattern shared with preview /
-	 * composer-config / syndicate-targets / geocode endpoints.
-	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
 	}
 
 	/**
