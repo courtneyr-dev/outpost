@@ -7,10 +7,10 @@
  * lookup goes through Outpost's server proxy which handles caching, rate
  * limiting, and identification.
  *
- * Request shape: GET with `q` query parameter. Auth follows the same
- * belt-and-suspenders pattern as Micropub posting — bearer in the
- * Authorization header AND the spec-aligned access_token query parameter so
- * managed-WP hosts that strip the header still see the bearer.
+ * Request shape: POST with `q` and `access_token` form fields. Auth follows
+ * the same pattern as media lookup — bearer in the Authorization header and
+ * request body so managed-WP hosts that strip the header still see the token
+ * without exposing it in the URL.
  */
 
 export interface GeocodeResult {
@@ -68,20 +68,21 @@ export async function geocode(
 ): Promise<GeocodeResponse> {
 	const base = env.location.origin || '';
 	const url = new URL('/wp-json/outpost/v1/geocode', base || 'http://localhost');
-	url.searchParams.set('q', params.query);
-	// access_token is the spec-aligned fallback for hosts that strip the
-	// Authorization header. Cheap insurance, identical to micropub.ts pattern.
-	url.searchParams.set('access_token', params.accessToken);
+	const body = new URLSearchParams();
+	body.append('q', params.query);
+	body.append('access_token', params.accessToken);
 
 	let response: Response;
 	try {
 		response = await env.fetch(url.toString(), {
-			method: 'GET',
+			method: 'POST',
 			headers: {
 				Accept: 'application/json',
 				Authorization: 'Bearer ' + params.accessToken,
+				'Content-Type': 'application/x-www-form-urlencoded',
 			},
 			credentials: 'omit',
+			body: body.toString(),
 		});
 	} catch (err) {
 		throw new GeocodeError(

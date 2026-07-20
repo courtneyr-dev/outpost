@@ -80,7 +80,7 @@ final class Outpost_Geocode_Endpoint {
 			self::ROUTE_NAMESPACE,
 			self::ROUTE_PATH,
 			array(
-				'methods'             => 'GET',
+				'methods'             => 'POST',
 				'callback'            => array( self::class, 'handle_request' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'show_in_index'       => false,
