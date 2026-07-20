@@ -161,6 +161,20 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 		return $value;
 	}
 }
+if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
+	// Mirrors WordPress core: strings 'false'/'0' are false, everything else
+	// casts to bool. The common sanitizers (sanitize_key/sanitize_text_field)
+	// come from the mocking layer, but this REST helper does not.
+	function rest_sanitize_boolean( $value ): bool {
+		if ( is_string( $value ) ) {
+			$value = strtolower( $value );
+			if ( in_array( $value, array( 'false', '0' ), true ) ) {
+				return false;
+			}
+		}
+		return (bool) $value;
+	}
+}
 if ( ! function_exists( 'wp_parse_url' ) ) {
 	function wp_parse_url( string $url, int $component = -1 ) {
 		// WordPress's wp_parse_url is a thin wrapper around parse_url with
