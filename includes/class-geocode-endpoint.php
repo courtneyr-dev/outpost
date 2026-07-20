@@ -42,9 +42,10 @@ final class Outpost_Geocode_Endpoint {
 	 * aggressively." */
 	private const RATE_LIMIT_PER_MINUTE_AUTHED = 20;
 
-	/** Rate limit for the bearer-presence-only path (no validated cap). Lower
-	 * than the authed limit because the bearer is unverified; this throttles
-	 * abuse if the endpoint URL leaks. Auth-marathon trade-off acknowledged. */
+	/** Rate limit for callers admitted without a WordPress session — only
+	 * reachable when a site's `outpost_geocode_permission` filter loosens the
+	 * default `current_user_can('edit_posts')` gate. Lower than the authed
+	 * limit as a defense-in-depth throttle. */
 	private const RATE_LIMIT_PER_MINUTE_UNAUTHED = 5;
 
 	/** HTTP request timeout in seconds. Matches the preview-endpoint default;
@@ -101,9 +102,9 @@ final class Outpost_Geocode_Endpoint {
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission() {
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in()
-			|| self::has_bearer_header();
+		self::authenticate_bearer_token();
+
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the geocode-endpoint permission decision.
 		 *
@@ -121,18 +122,65 @@ final class Outpost_Geocode_Endpoint {
 	}
 
 	/**
-	 * Bearer-header presence check. Same trade-off as preview: the rate
-	 * limiter and external API guard the surface area, so we accept a bearer
-	 * header without local validation.
-	 *
-	 * A token is only ever read from the Authorization header — never from the
-	 * query string. Accepting `?access_token=`/`?_o_token=` turned the endpoint
-	 * into an anonymous open proxy to Nominatim and leaked the token through
-	 * access logs, CDN cache keys, and browser history.
+	 * Validate a bearer token (Authorization header or, on managed-WP hosts
+	 * that strip the header, the request body) into a real WordPress user
+	 * before the permission check runs. Mirrors the preview endpoint: mere
+	 * presence of a bearer never authorizes — the token must resolve to a user
+	 * via IndieAuth's determine_current_user, and current_user_can('edit_posts')
+	 * is the sole gate. A token is never read from the query string (that turned
+	 * the endpoint into an anonymous open proxy and leaked the token).
 	 */
-	private static function has_bearer_header(): bool {
-		$header = Outpost_Request_Headers::authorization();
-		return '' !== $header && 1 === preg_match( '/^\s*Bearer\s+\S+/i', $header );
+	private static function authenticate_bearer_token(): void {
+		if ( is_user_logged_in() ) {
+			return;
+		}
+		$token = self::bearer_token();
+		if ( '' === $token ) {
+			return;
+		}
+		// Restore a stripped Authorization header so IndieAuth's
+		// determine_current_user callback can read and validate the token.
+		if ( empty( $_SERVER['HTTP_AUTHORIZATION'] ) && empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		}
+		$user_id = (int) apply_filters( 'determine_current_user', false );
+		if ( $user_id > 0 ) {
+			wp_set_current_user( $user_id );
+		}
+	}
+
+	/**
+	 * The bearer token from the Authorization header, or (on hosts that strip
+	 * it) the `access_token` in a form-encoded or JSON request body. '' when absent.
+	 */
+	private static function bearer_token(): string {
+		$header = '';
+		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['HTTP_AUTHORIZATION'];
+		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$header = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+		}
+		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
+			return $matches[1];
+		}
+		// Bearer-token auth path; nonces don't apply to token-authenticated
+		// requests, and managed-WP hosts strip the header so the token rides
+		// in the body.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
+		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
+		if ( null === $body_token ) {
+			$raw = file_get_contents( 'php://input' );
+			if ( false !== $raw && '' !== $raw ) {
+				$decoded = json_decode( $raw, true );
+				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
+					$body_token = sanitize_text_field( $decoded['access_token'] );
+				}
+			}
+		}
+		if ( is_string( $body_token ) && '' !== $body_token ) {
+			return $body_token;
+		}
+		return '';
 	}
 
 	/**
@@ -195,13 +243,10 @@ final class Outpost_Geocode_Endpoint {
 	/**
 	 * Per-caller rate limit.
 	 *
-	 * Authenticated callers (cookie or validated session) get the higher
-	 * `RATE_LIMIT_PER_MINUTE_AUTHED`. Bearer-only callers (the auth-marathon
-	 * trade-off accepted in `has_bearer_header`) get the lower
-	 * `RATE_LIMIT_PER_MINUTE_UNAUTHED` — they can call but not at scale.
-	 * Anonymous callers (no cap, no bearer present at all) shouldn't reach
-	 * here because `check_permission` rejects them, but defensively we
-	 * apply the unauthed rate too.
+	 * Authenticated callers (cookie or a bearer resolved to a real user) get
+	 * the higher `RATE_LIMIT_PER_MINUTE_AUTHED`. Callers without an active
+	 * WordPress user shouldn't reach here because `check_permission` rejects
+	 * them, but defensively we apply `RATE_LIMIT_PER_MINUTE_UNAUTHED` too.
 	 *
 	 * @return true|WP_Error true on success; WP_Error 429 when exceeded.
 	 */

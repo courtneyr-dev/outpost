@@ -35,6 +35,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		unset(
 			$_GET['access_token'],
 			$_GET['_o_token'],
+			$_POST['access_token'],
 			$_SERVER['HTTP_AUTHORIZATION'],
 			$_SERVER['REDIRECT_HTTP_AUTHORIZATION']
 		);
@@ -51,6 +52,25 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
 			static fn( $tag, $value ) => $value
+		);
+	}
+
+	/**
+	 * Register apply_filters so the permission callback can call the
+	 * `determine_current_user` and `outpost_geocode_permission` hooks.
+	 *
+	 * @param int|false $determine_user Value IndieAuth's determine_current_user
+	 *                                  resolves the bearer token to. `false`
+	 *                                  simulates an invalid/rejected token.
+	 */
+	private function mock_filters( $determine_user ): void {
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
+			static function ( $hook, $value ) use ( $determine_user ) {
+				if ( 'determine_current_user' === $hook ) {
+					return $determine_user;
+				}
+				return $value;
+			}
 		);
 	}
 
@@ -99,32 +119,85 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * Surgical guard: removing the query-string branches must not break the
-	 * legitimate cookie/capability path.
+	 * Regression: the reported anonymous-open-proxy auth bypass.
+	 *
+	 * An unauthenticated caller presenting a syntactically-valid but
+	 * bogus `Authorization: Bearer x` header must NOT pass the permission
+	 * gate. Before the fix, bearer-header *presence* alone returned true,
+	 * opening the server-side fetcher to anonymous callers.
 	 */
-	public function test_permission_granted_for_edit_posts(): void {
+	public function test_check_permission_rejects_unvalidated_bearer_header(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		// IndieAuth rejects the bogus token: determine_current_user resolves nobody.
+		$this->mock_filters( false );
+
+		$result = Outpost_Geocode_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * Regression: same bypass via the Micropub body-token fallback.
+	 *
+	 * `{"access_token":"x", ...}` in the body must also be validated, not
+	 * accepted on presence.
+	 */
+	public function test_check_permission_rejects_unvalidated_body_token(): void {
+		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		$this->mock_filters( false );
+
+		$result = Outpost_Geocode_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * A valid bearer token that IndieAuth resolves to an editor is allowed —
+	 * the fix must not break the legitimate PWA flow.
+	 */
+	public function test_check_permission_allows_validated_bearer_editor(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		// determine_current_user validates the token to user 42, who can edit_posts.
+		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
-		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
-			static fn( $tag, $value ) => $value
-		);
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission() );
 	}
 
 	/**
-	 * Surgical guard: a real Authorization: Bearer header still authorizes.
-	 * Only the query-string acceptance is removed, not the header path.
+	 * A cookie-authenticated editor (no bearer) is allowed.
 	 */
-	public function test_permission_granted_for_real_bearer_header(): void {
-		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer live-token'; // outpost-lint:fixture-credential
-		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
-			static fn( $tag, $value ) => $value
-		);
+	public function test_check_permission_allows_cookie_editor(): void {
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		$this->mock_filters( false );
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission() );
+	}
+
+	/**
+	 * A logged-in non-editor (e.g. subscriber, no bearer) is now rejected —
+	 * the dropped is_user_logged_in() OR-leg no longer opens the fetcher to
+	 * every authenticated user.
+	 */
+	public function test_check_permission_rejects_logged_in_non_editor(): void {
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		$this->mock_filters( false );
+
+		$result = Outpost_Geocode_Endpoint::check_permission();
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
 }
