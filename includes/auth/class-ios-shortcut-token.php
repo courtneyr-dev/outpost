@@ -142,7 +142,9 @@ final class Outpost_IOS_Shortcut_Token {
 		}
 		$query   = new \WP_User_Query(
 			array(
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- indexed lookup required; result set is small.
 				'meta_key'   => self::META_KEY,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- indexed lookup required; result set is small.
 				'meta_value' => $presented,
 				'number'     => 1,
 				'fields'     => array( 'ID' ),
