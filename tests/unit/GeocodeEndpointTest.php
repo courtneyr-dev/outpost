@@ -75,7 +75,31 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * The proven exploit: GET /geocode?q=Berlin&access_token=x from an
+	 * The geocode route accepts POST requests so credentials can stay in the
+	 * request body instead of the URL.
+	 */
+	public function test_register_route_uses_post(): void {
+		$registered_args = array();
+		WP_Mock::userFunction(
+			'register_rest_route',
+			array(
+				'times'  => 1,
+				'return' => static function ( $namespace, $route, $args ) use ( &$registered_args ): bool {
+					$registered_args = $args;
+					return true;
+				},
+			)
+		);
+
+		Outpost_Geocode_Endpoint::register_route();
+
+		$this->assertSame( 'POST', $registered_args['methods'] ?? null );
+		$this->assertArrayHasKey( 'q', $registered_args['args'] ?? array() );
+		$this->assertTrue( $registered_args['args']['q']['required'] ?? false );
+	}
+
+	/**
+	 * The proven exploit: /geocode?q=Berlin&access_token=x from an
 	 * anonymous caller. A query-string token must be rejected with 401.
 	 */
 	public function test_permission_denied_for_query_string_access_token(): void {
