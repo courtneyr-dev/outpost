@@ -145,9 +145,12 @@ export function MorePanel(props: MorePanelProps) {
 	}, [bridgy_target?.uid]);
 
 	// Lazy-load syndication targets when the panel knows the endpoint.
+	// `syndication_status` must NOT be a dependency here: setting it to
+	// 'loading' inside the effect would re-run the effect, whose cleanup
+	// flips `cancelled` and drops the in-flight response — the section
+	// would stay stuck in 'loading' and never render a single target.
 	useEffect(() => {
 		if (!micropubEndpoint) return;
-		if (syndication_status !== 'idle') return;
 		let cancelled = false;
 		setSyndicationStatus('loading');
 		discover_syndication_targets(micropubEndpoint, token.accessToken, micropubEnv)
@@ -163,7 +166,7 @@ export function MorePanel(props: MorePanelProps) {
 		return (): void => {
 			cancelled = true;
 		};
-	}, [micropubEndpoint, syndication_status, token.accessToken, micropubEnv]);
+	}, [micropubEndpoint, token.accessToken, micropubEnv]);
 
 	// New-term input state — typed name, separate from values until the
 	// user explicitly taps "Add" so accidental typing doesn't create
