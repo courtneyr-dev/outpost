@@ -2,8 +2,10 @@
 	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
 	"steps": [
 		{
-			"step": "login",
-			"username": "admin"
+			"step": "defineWpConfigConsts",
+			"consts": {
+				"OUTPOST_ENCRYPTION_KEY": "outpost-playground-screenshot-32"
+			}
 		},
 		{
 			"step": "installPlugin",
@@ -18,6 +20,24 @@
 				"resource": "wordpress.org/plugins",
 				"slug": "micropub"
 			}
+		},
+		{
+			"step": "mkdir",
+			"path": "/wordpress/wp-content/mu-plugins"
+		},
+		{
+			"step": "writeFile",
+			"path": "/wordpress/wp-content/mu-plugins/outpost-screenshot-helpers.php",
+			"data": "<?php\n/**\n * Disposable-Playground helper for the docs screenshot harness ONLY.\n *\n * - Lets the server-side mf2 preview endpoint fetch this site's own\n *   loopback URL (wp_safe_remote_get blocks 127.0.0.1 by default).\n * - Drops the CSP upgrade-insecure-requests directive because the\n *   throwaway Playground serves plain http; the upgrade would break\n *   every same-origin fetch the composer makes.\n * - Relaxes the IndieAuth plugin's `me` validation so the flow can run\n *   against the Playground's ip:port origin (the plugin rejects IP\n *   hosts and ports, which every real site has no reason to relax).\n *\n * Never ship this outside the throwaway Playground instance.\n */\nadd_filter( 'http_request_host_is_external', '__return_true' );\nadd_filter(\n\t'outpost_csp',\n\tstatic function ( $csp ) {\n\t\treturn array_values( array_diff( (array) $csp, array( 'upgrade-insecure-requests' ) ) );\n\t}\n);\nadd_filter(\n\t'rest_endpoints',\n\tstatic function ( $endpoints ) {\n\t\tforeach ( $endpoints as $route => $handlers ) {\n\t\t\tif ( 0 !== strpos( $route, '/indieauth/1.0' ) || ! is_array( $handlers ) ) {\n\t\t\t\tcontinue;\n\t\t\t}\n\t\t\tforeach ( $handlers as $key => $handler ) {\n\t\t\t\tif ( ! is_array( $handler ) || empty( $handler['args']['me'] ) ) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n\t\t\t\t$endpoints[ $route ][ $key ]['args']['me']['validate_callback'] = static function ( $value ) {\n\t\t\t\t\treturn (bool) wp_parse_url( (string) $value, PHP_URL_HOST );\n\t\t\t\t};\n\t\t\t}\n\t\t}\n\t\treturn $endpoints;\n\t},\n\t20\n);\n"
+		},
+		{
+			"step": "writeFile",
+			"path": "/wordpress/wp-content/mu-plugins/outpost-screenshot-no-updates.php",
+			"data": "<?php\n/**\n * Disposable-Playground helper: short-circuit core/plugin/theme update\n * checks. Playground's PHP cannot reliably reach api.wordpress.org, so\n * the checks block admin page loads while they retry. Screenshot runs\n * never need update data.\n *\n * Never ship this outside the throwaway Playground instance.\n */\n$outpost_screenshot_no_updates = static function () {\n\treturn (object) array(\n\t\t'last_checked' => time(),\n\t\t'response'     => array(),\n\t\t'translations' => array(),\n\t);\n};\nadd_filter( 'pre_site_transient_update_core', $outpost_screenshot_no_updates );\nadd_filter( 'pre_site_transient_update_plugins', $outpost_screenshot_no_updates );\nadd_filter( 'pre_site_transient_update_themes', $outpost_screenshot_no_updates );\n"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require_once '/wordpress/wp-load.php'; $entry = function ( $platform, $hours_ago, $completed, $silo_url ) { return array( 'id' => wp_generate_uuid4(), 'version' => 1, 'platform_id' => $platform, 'fired_at' => gmdate( 'c', time() - $hours_ago * HOUR_IN_SECONDS ), 'strategy' => 'navigator_share', 'outcome' => 'fired', 'completed_at' => $completed ? gmdate( 'c', time() - ( $hours_ago - 1 ) * HOUR_IN_SECONDS ) : null, 'silo_url' => $completed ? $silo_url : null ); }; $p1 = wp_insert_post( array( 'post_title' => 'Sunset over the lake', 'post_content' => 'Golden hour from the dock tonight.', 'post_status' => 'publish', 'post_author' => 1 ) ); update_post_meta( $p1, 'outpost_manual_share_log', array( $entry( 'instagram-feed', 26, true, 'https://www.instagram.com/p/example123/' ), $entry( 'facebook', 26, true, 'https://www.facebook.com/example/posts/456' ) ) ); $p2 = wp_insert_post( array( 'post_title' => 'Field notes from the trail', 'post_content' => 'Twelve miles, two waterfalls, one very muddy dog.', 'post_status' => 'publish', 'post_author' => 1 ) ); update_post_meta( $p2, 'outpost_manual_share_log', array( $entry( 'x-twitter', 5, true, 'https://x.com/example/status/789' ), $entry( 'linkedin', 5, false, null ) ) ); $p3 = wp_insert_post( array( 'post_title' => 'Weekend ride recap', 'post_content' => 'Forty miles on the greenway before the rain rolled in.', 'post_status' => 'publish', 'post_author' => 1 ) ); update_post_meta( $p3, 'outpost_manual_share_log', array( $entry( 'threads', 2, false, null ) ) ); update_option( 'outpost_screenshot_seed_ids', array( 'complete' => $p1, 'partial' => $p2, 'pending' => $p3 ) ); wp_insert_post( array( 'post_title' => 'Announcing the summer reading club', 'post_content' => 'Six books, twelve weeks, one very opinionated discussion thread. Join us starting the first week of July.', 'post_status' => 'publish', 'post_author' => 1, 'post_name' => 'summer-reading-club' ) );"
 		}
 	]
 }

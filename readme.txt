@@ -145,6 +145,8 @@ Connecting an account stores an encrypted token on your site. Afterwards, Outpos
 3. OAuth Connections — connect life-tracking providers such as Notion, Polar Flow, Oura, Ride With GPS, Ravelry, and WHOOP.
 4. Appearance settings — day/night mode and per-token color overrides, with automatic contrast adjustment.
 5. The Outpost iOS Shortcut Bridge — site URL, per-user token, and connection status for share-sheet posting from iPhone.
+6. Note mode on a phone, signed in — write a note and pick syndication targets before posting.
+7. The composer offline — posts made without a connection wait in the queue until you reconnect.
 
 == Credits ==
 
