@@ -19,6 +19,8 @@ These are site-wide defaults; each user can override them at post time from the 
 | Bridgy auto-suggest | When a Reply or Doing target URL's host matches a known silo, pre-check the matching Bridgy publish target. Bridgy is a bridge service that syndicates posts to networks like Mastodon and Bluesky. Turn off if you prefer explicit syndication only. | On |
 | Auto Post-Format inference | Sets the WordPress post format automatically from the post's content signals (likes become link format, photos become image or gallery, and so on). Turn off if you prefer manual format selection. | On |
 
+![Composer defaults form with Default Post variant, Bridgy auto-suggest, and Auto Post-Format inference fields](../../assets/screenshots/admin-settings-composer-defaults.png)
+
 ## Outpost Settings (multi-tab page)
 
 **Location:** wp-admin → Outpost (the second Outpost menu) → "Outpost Settings" page. Requires `manage_options`.

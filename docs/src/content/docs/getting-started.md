@@ -15,7 +15,7 @@ https://your-site.example/post/
 
 Expected result: the Outpost composer loads — a mobile-first posting screen, not your theme's regular page layout. If you instead see a setup page naming a missing plugin, activate that plugin and reload (see [Troubleshooting](/outpost/troubleshooting/)).
 
-(Screenshot planned: see [screenshot inventory](/outpost/screenshots/).)
+![Outpost composer sign-in screen asking for your site address](../../assets/screenshots/frontend-composer-signin.png)
 
 ## 2. Sign in with IndieAuth
 
@@ -29,6 +29,8 @@ Expected result: the composer shows its posting modes and you're ready to write.
 2. Type a short post.
 3. If you use syndication destinations, chips for each configured destination appear enabled by default — tap any chip to turn it off for this post.
 4. Tap post.
+
+![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
 
 Expected result: a success message with a link to the new post on your site. Open it to confirm the note published.
 

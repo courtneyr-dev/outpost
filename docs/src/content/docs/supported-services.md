@@ -51,6 +51,8 @@ With an API key configured, these destinations receive a copy of your WordPress 
 
 Social-network syndication (Mastodon, Bluesky, and other silos) goes through [Bridgy](https://brid.gy/) rather than per-service adapters — the composer's syndication chips control it.
 
+![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+
 ## Other integrations
 
 | Service | What it does |

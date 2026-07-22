@@ -30,6 +30,12 @@ Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` 
 
 It works standalone with the [Micropub plugin](https://wordpress.org/plugins/micropub/) (required) and lights up additional capabilities when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
+| ![Outpost composer on a phone showing Note mode with a text field and syndication chips](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode showing the pasted target URL context](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a queued draft badge](docs/src/assets/screenshots/frontend-offline-queue.png) |
+|---|---|---|
+| Note mode with syndication chips | Reply mode with the target's context | Offline, with a queued draft |
+
+More screens in the [screenshot gallery](https://courtneyr-dev.github.io/outpost/screenshots/).
+
 ## Why this exists
 
 Mobile posting on a self-hosted WordPress site in 2026 is broken unless you accept Jetpack auth, which is a non-starter for IndieWeb-aligned users. Outpost replaces the mobile composer with a real PWA served from your own domain, using Micropub as the API and IndieAuth for browser-side auth.

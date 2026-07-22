@@ -10,6 +10,8 @@ Outpost is not yet listed on WordPress.org — the `outpost` slug is unclaimed a
   3. `screenshot-3.png` — OAuth Connections provider list (from `admin-oauth-connections.png`)
   4. `screenshot-4.png` — Appearance settings with contrast adjustment (from `admin-appearance-settings.png`)
   5. `screenshot-5.png` — iOS Shortcut Bridge settings (from `admin-ios-shortcut.png`)
+  6. `screenshot-6.png` — Note mode signed in, syndication chips open (from `frontend-composer-note-mode.png`)
+  7. `screenshot-7.png` — offline banner with a queued draft (from `frontend-offline-queue.png`)
 - `blueprints/blueprint.json` — Playground blueprint for the directory's Live Preview feature. See `docs/playground.md` for how to test it locally.
 
 Screenshots regenerate with `npm run screenshots:docs` (see `scripts/capture-docs-screenshots.cjs`); re-copy from `docs/assets/screenshots/` after regenerating and keep the readme.txt captions in sync.

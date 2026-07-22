@@ -13,11 +13,15 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 4. Review the syndication chips: configured destinations are on by default; tap to turn any off.
 5. Tap post and follow the link in the success message to your new post.
 
+![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+
 ## Reply to (or like, repost, bookmark) a page
 
 1. In the composer, switch to the Reply group and pick the response type: Reply, Like, Repost, or Bookmark.
 2. Paste the URL you're responding to. The composer shows the target's context.
 3. Add your commentary (Reply and Bookmark), then post. The published post links back to the source with the right microformats (in-reply-to, like-of, repost-of).
+
+![Reply mode showing the pasted target URL context and syndication chips](../../assets/screenshots/frontend-composer-reply-mode.png)
 
 Faster paths so you don't paste URLs by hand:
 
@@ -38,6 +42,8 @@ Faster paths so you don't paste URLs by hand:
 3. Enter alt text — it's required; the post won't submit without a description of the image.
 4. Add any caption text and post.
 
+![Photo mode with an uploaded image and the required alt text field](../../assets/screenshots/frontend-composer-photo-mode.png)
+
 ## Log something you're listening to, watching, or reading
 
 Works best with the Post Kinds for IndieWeb in Block Themes companion plugin: the "Look it up" search requires it, and without it these entries publish as generic notes instead of proper post kinds.
@@ -57,14 +63,20 @@ Choose the Article variant in the composer. Outpost hands off to the block edito
 1. Go to wp-admin → Outpost (first menu) and scroll to the Settings section.
 2. Set "Default Post variant" (Article, Note, Status, Aside, or Quote) and save. See [Settings](/outpost/settings/).
 
+![Composer defaults form with Default Post variant, Bridgy auto-suggest, and Auto Post-Format inference fields](../../assets/screenshots/admin-settings-composer-defaults.png)
+
 ## Confirm a post syndicated
 
 - On the post itself, syndicated copies appear as links appended to the content ("Also on …" style `u-syndication` links).
 - In wp-admin → Posts, Outpost adds a syndication status column to the post list.
 
+![Posts list showing the Outpost syndication status column](../../assets/screenshots/admin-syndication-column.png)
+
 ## Post while offline
 
 Just post — if the network is down, the draft queues on your device and Outpost submits it automatically when the connection returns. The queue shows pending entries with retry and dismiss controls. Note that signing out doesn't clear the queue; queued entries from a stale session will fail with an authorization error you can dismiss.
+
+![Composer showing the offline connection banner and a queued draft badge](../../assets/screenshots/frontend-offline-queue.png)
 
 ## Connect a life-tracking service
 
