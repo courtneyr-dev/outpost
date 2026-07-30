@@ -7,7 +7,7 @@
 /tests
 /bin
 /docs
-/pwa/src
+/pwa
 /src
 /styles/src
 /.wordpress-org
@@ -20,6 +20,7 @@
 .session-progress.md
 .prettierrc.js
 .eslintrc.json
+eslint.config.js
 .wp-env.json
 .nvmrc
 phpcs.xml.dist
