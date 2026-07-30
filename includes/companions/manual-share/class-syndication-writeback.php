@@ -88,13 +88,13 @@ final class Outpost_Manual_Share_Syndication_Writeback {
 		if ( '' === $trimmed ) {
 			return new WP_Error(
 				'empty_url',
-				__( 'Please paste a URL.', 'outpost' )
+				__( 'Please paste a URL.', 'outpost-mobile-publishing' )
 			);
 		}
 		if ( strlen( $trimmed ) > self::URL_MAX_LENGTH ) {
 			return new WP_Error(
 				'url_too_long',
-				__( 'URL is too long.', 'outpost' )
+				__( 'URL is too long.', 'outpost-mobile-publishing' )
 			);
 		}
 
@@ -102,7 +102,7 @@ final class Outpost_Manual_Share_Syndication_Writeback {
 		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
 			return new WP_Error(
 				'malformed_url',
-				__( 'That doesn\'t look like a complete URL.', 'outpost' )
+				__( 'That doesn\'t look like a complete URL.', 'outpost-mobile-publishing' )
 			);
 		}
 
@@ -110,7 +110,7 @@ final class Outpost_Manual_Share_Syndication_Writeback {
 		if ( 'http' !== $scheme && 'https' !== $scheme ) {
 			return new WP_Error(
 				'invalid_scheme',
-				__( 'Only http and https URLs are accepted.', 'outpost' )
+				__( 'Only http and https URLs are accepted.', 'outpost-mobile-publishing' )
 			);
 		}
 
@@ -121,7 +121,7 @@ final class Outpost_Manual_Share_Syndication_Writeback {
 		if ( false === wp_http_validate_url( $trimmed ) ) {
 			return new WP_Error(
 				'unsafe_url',
-				__( 'That URL points at a private or local network address.', 'outpost' )
+				__( 'That URL points at a private or local network address.', 'outpost-mobile-publishing' )
 			);
 		}
 

@@ -122,7 +122,7 @@ final class Outpost_Manual_Share_Status_Controller {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost manual-share status requires an authenticated user.', 'outpost' ),
+				__( 'Outpost manual-share status requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -138,10 +138,10 @@ final class Outpost_Manual_Share_Status_Controller {
 	public static function handle_status_request( $request ) {
 		$post_id = (int) $request->get_param( 'post_id' );
 		if ( $post_id <= 0 ) {
-			return new WP_Error( 'invalid_post_id', __( 'A positive post_id is required.', 'outpost' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_post_id', __( 'A positive post_id is required.', 'outpost-mobile-publishing' ), array( 'status' => 400 ) );
 		}
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return new WP_Error( 'rest_forbidden_post', __( 'You do not have permission to view this post\'s syndication.', 'outpost' ), array( 'status' => 403 ) );
+			return new WP_Error( 'rest_forbidden_post', __( 'You do not have permission to view this post\'s syndication.', 'outpost-mobile-publishing' ), array( 'status' => 403 ) );
 		}
 
 		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
@@ -169,7 +169,7 @@ final class Outpost_Manual_Share_Status_Controller {
 		unset( $request );
 		$user_id = get_current_user_id();
 		if ( $user_id <= 0 ) {
-			return new WP_Error( 'rest_forbidden', __( 'You must be logged in.', 'outpost' ), array( 'status' => 401 ) );
+			return new WP_Error( 'rest_forbidden', __( 'You must be logged in.', 'outpost-mobile-publishing' ), array( 'status' => 401 ) );
 		}
 
 		$pending = Outpost_Manual_Share_Pending_Capture_Detector::pending_for_user( $user_id );
@@ -214,21 +214,21 @@ final class Outpost_Manual_Share_Status_Controller {
 		$until_raw        = $request->get_param( 'until' );
 
 		if ( $post_id <= 0 ) {
-			return new WP_Error( 'invalid_post_id', __( 'A positive post_id is required.', 'outpost' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_post_id', __( 'A positive post_id is required.', 'outpost-mobile-publishing' ), array( 'status' => 400 ) );
 		}
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return new WP_Error( 'rest_forbidden_post', __( 'You do not have permission to update this post\'s syndication.', 'outpost' ), array( 'status' => 403 ) );
+			return new WP_Error( 'rest_forbidden_post', __( 'You do not have permission to update this post\'s syndication.', 'outpost-mobile-publishing' ), array( 'status' => 403 ) );
 		}
 
 		$audit_log_id = is_string( $audit_log_id_raw ) ? trim( $audit_log_id_raw ) : '';
 		if ( '' === $audit_log_id ) {
-			return new WP_Error( 'invalid_audit_log_id', __( 'audit_log_id is required.', 'outpost' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_audit_log_id', __( 'audit_log_id is required.', 'outpost-mobile-publishing' ), array( 'status' => 400 ) );
 		}
 
 		$until_str = is_string( $until_raw ) ? trim( $until_raw ) : '';
 		$resolved  = Outpost_Manual_Share_Reminder_Manager::resolve_until( $until_str );
 		if ( null === $resolved ) {
-			return new WP_Error( 'invalid_until', __( 'Invalid snooze duration. Use a SNOOZE_* duration or a valid date/time string.', 'outpost' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_until', __( 'Invalid snooze duration. Use a SNOOZE_* duration or a valid date/time string.', 'outpost-mobile-publishing' ), array( 'status' => 400 ) );
 		}
 
 		$updated = Outpost_Manual_Share_Audit_Log::update_entry(
@@ -237,7 +237,7 @@ final class Outpost_Manual_Share_Status_Controller {
 			array( 'reminder_dismissed_until' => $resolved )
 		);
 		if ( ! $updated ) {
-			return new WP_Error( 'audit_log_entry_not_found', __( 'No matching audit log entry.', 'outpost' ), array( 'status' => 404 ) );
+			return new WP_Error( 'audit_log_entry_not_found', __( 'No matching audit log entry.', 'outpost-mobile-publishing' ), array( 'status' => 404 ) );
 		}
 
 		return new WP_REST_Response(
@@ -260,12 +260,12 @@ final class Outpost_Manual_Share_Status_Controller {
 	public static function handle_snooze_all_request( $request ) {
 		$user_id = get_current_user_id();
 		if ( $user_id <= 0 ) {
-			return new WP_Error( 'rest_forbidden', __( 'You must be logged in.', 'outpost' ), array( 'status' => 401 ) );
+			return new WP_Error( 'rest_forbidden', __( 'You must be logged in.', 'outpost-mobile-publishing' ), array( 'status' => 401 ) );
 		}
 		if ( ! Outpost_Manual_Share_Reminder_Manager::can_snooze_all( $user_id ) ) {
 			return new WP_Error(
 				'rate_limited',
-				__( 'Snooze-all was used recently; try again in a few minutes.', 'outpost' ),
+				__( 'Snooze-all was used recently; try again in a few minutes.', 'outpost-mobile-publishing' ),
 				array(
 					'status'      => 429,
 					'retry_after' => 300,
@@ -277,7 +277,7 @@ final class Outpost_Manual_Share_Status_Controller {
 		$until_str = is_string( $until_raw ) ? trim( $until_raw ) : '';
 		$resolved  = Outpost_Manual_Share_Reminder_Manager::resolve_until( $until_str );
 		if ( null === $resolved ) {
-			return new WP_Error( 'invalid_until', __( 'Invalid snooze duration.', 'outpost' ), array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_until', __( 'Invalid snooze duration.', 'outpost-mobile-publishing' ), array( 'status' => 400 ) );
 		}
 
 		$pending = Outpost_Manual_Share_Pending_Capture_Detector::pending_for_user( $user_id );

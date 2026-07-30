@@ -67,19 +67,19 @@ final class Outpost_Settings_Handler {
 	public static function handle_save( string $tab_id, array $tab_config ): void {
 		$tab_id = sanitize_key( $tab_id );
 		if ( '' === $tab_id ) {
-			wp_die( esc_html__( 'Invalid settings tab.', 'outpost' ), '', array( 'response' => 400 ) );
+			wp_die( esc_html__( 'Invalid settings tab.', 'outpost-mobile-publishing' ), '', array( 'response' => 400 ) );
 		}
 
 		$capability = isset( $tab_config['capability'] ) ? (string) $tab_config['capability'] : 'manage_options';
 		if ( ! current_user_can( $capability ) ) {
-			wp_die( esc_html__( 'You do not have permission to update these settings.', 'outpost' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to update these settings.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 
 		$nonce = isset( $_POST[ self::NONCE_FIELD ] )
 			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_FIELD ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::nonce_action( $tab_id ) ) ) {
-			wp_die( esc_html__( 'Security check failed. Please reload and try again.', 'outpost' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'Security check failed. Please reload and try again.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 
 		$fields = Outpost_Settings_Registry::get_fields( $tab_id );

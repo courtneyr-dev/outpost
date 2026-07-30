@@ -55,7 +55,7 @@ final class Outpost_OAuth_Provider_Ravelry extends Outpost_OAuth_Provider_Base {
 	}
 
 	public function label(): string {
-		return __( 'Ravelry', 'outpost' );
+		return __( 'Ravelry', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {

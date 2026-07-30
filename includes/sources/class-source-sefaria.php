@@ -32,7 +32,7 @@ final class Outpost_Source_Sefaria extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Sefaria', 'outpost' ),
+			'label'            => __( 'Sefaria', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'sefaria.org', 'www.sefaria.org' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'quote',
@@ -52,7 +52,7 @@ final class Outpost_Source_Sefaria extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'quote', 'scripture' ),
 			'caveats'          => array(
-				__( 'Sefaria texts are CC0 / CC-BY / CC-BY-SA depending on the work. The og_tags adapter cannot detect which license applies; the docs page recommends a generic "Source: Sefaria.org" attribution. License-aware attribution arrives with G10b.', 'outpost' ),
+				__( 'Sefaria texts are CC0 / CC-BY / CC-BY-SA depending on the work. The og_tags adapter cannot detect which license applies; the docs page recommends a generic "Source: Sefaria.org" attribution. License-aware attribution arrives with G10b.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

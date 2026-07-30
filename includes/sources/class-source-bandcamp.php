@@ -34,7 +34,7 @@ final class Outpost_Source_Bandcamp extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Bandcamp', 'outpost' ),
+			'label'            => __( 'Bandcamp', 'outpost-mobile-publishing' ),
 			// Suffix wildcard claims every artist subdomain. Apex
 			// `bandcamp.com` falls through to Source_Unknown.
 			'host_patterns'    => array( '*.bandcamp.com' ),

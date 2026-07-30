@@ -1,4 +1,4 @@
-=== Outpost ===
+=== Outpost Mobile Publishing ===
 
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
@@ -74,7 +74,7 @@ In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install
 
 = Does it work on managed hosts? =
 
-Mostly, with one known pitfall: some managed hosts strip the Authorization header that Micropub sign-in depends on. Outpost ships workarounds for the cases found so far (GoDaddy), but if sign-in loops or posting fails with an auth error, see the [troubleshooting guide](https://github.com/courtneyr-dev/outpost/blob/main/docs/troubleshooting.md).
+Mostly, with one known pitfall: some managed hosts strip the Authorization header that Micropub sign-in depends on. Outpost ships workarounds for the cases found so far (GoDaddy), but if sign-in loops or posting fails with an auth error, see the [troubleshooting guide](https://courtneyr-dev.github.io/outpost/troubleshooting/).
 
 = Does Outpost work offline? =
 
@@ -82,7 +82,7 @@ Yes, for composing. Drafts written offline queue in your browser's IndexedDB and
 
 = What sends data where? =
 
-Posts go to your own site through Micropub. Every other connection is listed, service by service, in the External services section below, and in more detail in the [privacy and data doc](https://github.com/courtneyr-dev/outpost/blob/main/docs/privacy-and-data.md).
+Posts go to your own site through Micropub. Every other connection is listed, service by service, in the External services section below, and in more detail in the [privacy and data doc](https://courtneyr-dev.github.io/outpost/privacy-and-data/).
 
 = Does Outpost require Jetpack? =
 
@@ -116,6 +116,11 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
 = Reply context and link previews =
 
 * **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page (and, where available, its feed or oEmbed endpoint) once to build the preview (title, image, summary). Only the URL you pasted and endpoints it advertises are requested, from whatever site it points to.
+* **Named oEmbed providers** — for four hosts, Outpost skips discovery and requests a known oEmbed endpoint directly, sending only the URL you pasted. This happens once per pasted link, and only for that host:
+    * **Vimeo** — vimeo.com/api/oembed.json. [Terms](https://vimeo.com/terms), [Privacy](https://vimeo.com/privacy).
+    * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
+    * **Spotify** — open.spotify.com/oembed. [Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/).
+    * **SoundCloud** — soundcloud.com/oembed. [Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy).
 * **Apple iTunes Search API** — when the URL you paste is a music.apple.com link, the track or album metadata for the preview is fetched from itunes.apple.com with the item's ID. [Terms](https://www.apple.com/legal/internet-services/itunes/), [Privacy](https://www.apple.com/legal/privacy/).
 * **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
 

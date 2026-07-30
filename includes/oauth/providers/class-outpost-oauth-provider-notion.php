@@ -40,7 +40,7 @@ final class Outpost_OAuth_Provider_Notion extends Outpost_OAuth_Provider_Base {
 	}
 
 	public function label(): string {
-		return __( 'Notion', 'outpost' );
+		return __( 'Notion', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {

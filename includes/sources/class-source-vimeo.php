@@ -30,7 +30,7 @@ final class Outpost_Source_Vimeo extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Vimeo', 'outpost' ),
+			'label'            => __( 'Vimeo', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'vimeo.com', 'player.vimeo.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'watch',

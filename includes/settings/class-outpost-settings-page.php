@@ -41,8 +41,8 @@ final class Outpost_Settings_Page {
 	 */
 	public static function add_menu_page(): void {
 		add_menu_page(
-			__( 'Outpost', 'outpost' ),
-			__( 'Outpost', 'outpost' ),
+			__( 'Outpost', 'outpost-mobile-publishing' ),
+			__( 'Outpost', 'outpost-mobile-publishing' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( __CLASS__, 'render' ),
@@ -76,7 +76,7 @@ final class Outpost_Settings_Page {
 	 */
 	public static function render(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to view these settings.', 'outpost' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to view these settings.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 
 		$tabs       = Outpost_Settings_Registry::get_tabs();
@@ -84,23 +84,23 @@ final class Outpost_Settings_Page {
 		$tab_config = $tabs[ $active_tab ] ?? null;
 
 		if ( null === $tab_config ) {
-			echo '<div class="wrap"><h1>' . esc_html__( 'Outpost Settings', 'outpost' ) . '</h1>';
-			echo '<p>' . esc_html__( 'No settings tabs are registered.', 'outpost' ) . '</p></div>';
+			echo '<div class="wrap"><h1>' . esc_html__( 'Outpost Settings', 'outpost-mobile-publishing' ) . '</h1>';
+			echo '<p>' . esc_html__( 'No settings tabs are registered.', 'outpost-mobile-publishing' ) . '</p></div>';
 			return;
 		}
 
 		// Per-tab capability gate.
 		$capability = isset( $tab_config['capability'] ) ? (string) $tab_config['capability'] : 'manage_options';
 		if ( ! current_user_can( $capability ) ) {
-			wp_die( esc_html__( 'You do not have permission to view this settings tab.', 'outpost' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to view this settings tab.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Outpost Settings', 'outpost' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Outpost Settings', 'outpost-mobile-publishing' ) . '</h1>';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( isset( $_GET['settings-updated'] ) && 'true' === $_GET['settings-updated'] ) {
 			echo '<div class="notice notice-success is-dismissible"><p>'
-				. esc_html__( 'Settings saved.', 'outpost' )
+				. esc_html__( 'Settings saved.', 'outpost-mobile-publishing' )
 				. '</p></div>';
 		}
 		self::render_tab_nav( $tabs, $active_tab );
@@ -109,7 +109,7 @@ final class Outpost_Settings_Page {
 		if ( is_callable( $tab_config['callback'] ) ) {
 			call_user_func( $tab_config['callback'], $active_tab );
 		} else {
-			echo '<p>' . esc_html__( 'Tab callback is not callable.', 'outpost' ) . '</p>';
+			echo '<p>' . esc_html__( 'Tab callback is not callable.', 'outpost-mobile-publishing' ) . '</p>';
 		}
 		echo '</div>';
 		echo '</div>';
@@ -124,7 +124,7 @@ final class Outpost_Settings_Page {
 	 * @param string                            $active_tab Active tab id.
 	 */
 	private static function render_tab_nav( array $tabs, string $active_tab ): void {
-		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'Outpost settings tabs', 'outpost' ) . '">';
+		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'Outpost settings tabs', 'outpost-mobile-publishing' ) . '">';
 		foreach ( $tabs as $tab_id => $config ) {
 			$capability = isset( $config['capability'] ) ? (string) $config['capability'] : 'manage_options';
 			if ( ! current_user_can( $capability ) ) {
@@ -165,7 +165,7 @@ final class Outpost_Settings_Page {
 		}
 
 		if ( empty( $fields ) ) {
-			echo '<p>' . esc_html__( 'No settings registered for this tab yet. Concrete platforms add fields in follow-up updates.', 'outpost' ) . '</p>';
+			echo '<p>' . esc_html__( 'No settings registered for this tab yet. Concrete platforms add fields in follow-up updates.', 'outpost-mobile-publishing' ) . '</p>';
 			return;
 		}
 
@@ -183,7 +183,7 @@ final class Outpost_Settings_Page {
 				|| Outpost_Encryption_Key_Resolver::option_value_exists();
 			if ( ! $key_resolvable ) {
 				echo '<div class="notice notice-error"><p>'
-					. esc_html__( 'Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set.', 'outpost' )
+					. esc_html__( 'Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set.', 'outpost-mobile-publishing' )
 					. '</p></div>';
 				return;
 			}
@@ -200,7 +200,7 @@ final class Outpost_Settings_Page {
 			Outpost_Settings_Fields::render( $field_id, $config, $values[ $field_id ] ?? ( $config['default'] ?? '' ) );
 		}
 		echo '</tbody></table>';
-		submit_button( __( 'Save settings', 'outpost' ) );
+		submit_button( __( 'Save settings', 'outpost-mobile-publishing' ) );
 		echo '</form>';
 	}
 }

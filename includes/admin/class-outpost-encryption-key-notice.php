@@ -77,13 +77,13 @@ final class Outpost_Encryption_Key_Notice {
 		echo '<p>';
 		echo esc_html__(
 			'Outpost: Your encryption key is stored in the database. For best security, move it to wp-config.php.',
-			'outpost'
+			'outpost-mobile-publishing'
 		);
 		echo ' <a href="' . esc_url( $docs_url ) . '" target="_blank" rel="noopener">';
-		echo esc_html__( 'Show instructions →', 'outpost' );
+		echo esc_html__( 'Show instructions →', 'outpost-mobile-publishing' );
 		echo '</a>';
 		echo ' <a href="' . esc_url( $dismiss_url ) . '" style="margin-left:0.5em;">';
-		echo esc_html__( 'Dismiss', 'outpost' );
+		echo esc_html__( 'Dismiss', 'outpost-mobile-publishing' );
 		echo '</a>';
 		echo '</p>';
 		echo '</div>';

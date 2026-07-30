@@ -50,7 +50,7 @@ final class Outpost_Settings_Registry {
 	public static function get_tabs(): array {
 		$default_tabs = array(
 			'api_keys' => array(
-				'label'      => __( 'API Keys', 'outpost' ),
+				'label'      => __( 'API Keys', 'outpost-mobile-publishing' ),
 				'callback'   => array( 'Outpost_Settings_Tab_Api_Keys', 'render' ),
 				'capability' => 'manage_options',
 			),

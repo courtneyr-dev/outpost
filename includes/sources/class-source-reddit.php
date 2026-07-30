@@ -50,7 +50,7 @@ final class Outpost_Source_Reddit extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Reddit', 'outpost' ),
+			'label'            => __( 'Reddit', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array_merge( self::COMMENT_HOSTS, self::SHORT_HOSTS ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'bookmark',

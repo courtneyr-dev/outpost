@@ -50,7 +50,7 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Notion', 'outpost' ),
+			'label'            => __( 'Notion', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'notion.so', 'www.notion.so', '*.notion.site' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'bookmark',
@@ -67,8 +67,8 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 			'auth_required'    => true,
 			'tags_default'     => array( 'bookmark' ),
 			'caveats'          => array(
-				__( 'The user must share the Notion page with the Outpost integration in Notion (••• menu → Add connections → Outpost). Notion 404s on pages not shared with the integration.', 'outpost' ),
-				__( 'Notion access tokens do not currently expire (per Notion docs). If the token is rejected, reconnect via Settings → OAuth.', 'outpost' ),
+				__( 'The user must share the Notion page with the Outpost integration in Notion (••• menu → Add connections → Outpost). Notion 404s on pages not shared with the integration.', 'outpost-mobile-publishing' ),
+				__( 'Notion access tokens do not currently expire (per Notion docs). If the token is rejected, reconnect via Settings → OAuth.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );
@@ -136,7 +136,7 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 		if ( null === $page_id ) {
 			return new \WP_Error(
 				'outpost_notion_invalid_url',
-				__( 'No Notion page ID found in URL.', 'outpost' )
+				__( 'No Notion page ID found in URL.', 'outpost-mobile-publishing' )
 			);
 		}
 		$cache_key = self::CACHE_PREFIX . $page_id;
@@ -149,7 +149,7 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 		if ( null === $creds || empty( $creds['access_token'] ) ) {
 			return new \WP_Error(
 				'outpost_notion_not_connected',
-				__( 'Notion is not connected. Connect via Settings → OAuth.', 'outpost' )
+				__( 'Notion is not connected. Connect via Settings → OAuth.', 'outpost-mobile-publishing' )
 			);
 		}
 		$token = (string) $creds['access_token'];
@@ -200,20 +200,20 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 		if ( 404 === $status ) {
 			return new \WP_Error(
 				'outpost_notion_page_not_shared',
-				__( 'This Notion page has not been shared with Outpost. In Notion, click the ••• menu on the page → Add connections → Outpost.', 'outpost' )
+				__( 'This Notion page has not been shared with Outpost. In Notion, click the ••• menu on the page → Add connections → Outpost.', 'outpost-mobile-publishing' )
 			);
 		}
 		if ( 401 === $status || 403 === $status ) {
 			return new \WP_Error(
 				'outpost_notion_unauthorized',
-				__( 'Notion rejected the access token. Reconnect Notion in Settings → OAuth.', 'outpost' )
+				__( 'Notion rejected the access token. Reconnect Notion in Settings → OAuth.', 'outpost-mobile-publishing' )
 			);
 		}
 		if ( $status < 200 || $status >= 300 ) {
 			return new \WP_Error(
 				'outpost_notion_http',
 				/* translators: %d: HTTP status */
-				sprintf( __( 'Notion API HTTP %d', 'outpost' ), $status ),
+				sprintf( __( 'Notion API HTTP %d', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => $status )
 			);
 		}
@@ -222,7 +222,7 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 		if ( ! is_array( $decoded ) ) {
 			return new \WP_Error(
 				'outpost_notion_parse',
-				__( 'Notion API returned non-JSON.', 'outpost' )
+				__( 'Notion API returned non-JSON.', 'outpost-mobile-publishing' )
 			);
 		}
 		return $decoded;

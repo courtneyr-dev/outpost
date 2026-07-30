@@ -59,7 +59,7 @@ final class Outpost_Share_Target_Controller {
 		// a preview does require auth.
 		if ( ! self::is_authenticated() ) {
 			self::send_status( 401 );
-			self::send_text( __( 'Outpost share-target requires an authenticated user.', 'outpost' ) );
+			self::send_text( __( 'Outpost share-target requires an authenticated user.', 'outpost-mobile-publishing' ) );
 			Outpost_PWA_Shell::halt();
 			return;
 		}

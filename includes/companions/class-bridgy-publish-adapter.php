@@ -42,7 +42,7 @@ final class Outpost_Bridgy_Publish_Adapter extends Outpost_Companion_Base {
 	 * Manual_Share).
 	 */
 	public function file(): string {
-		return defined( 'OUTPOST_PLUGIN_BASENAME' ) ? (string) OUTPOST_PLUGIN_BASENAME : 'outpost/outpost.php';
+		return defined( 'OUTPOST_PLUGIN_BASENAME' ) ? (string) OUTPOST_PLUGIN_BASENAME : 'outpost-mobile-publishing/outpost.php';
 	}
 
 	/**

@@ -105,7 +105,7 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 			'status'      => 'stub',
 			'message'     => sprintf(
 				/* translators: %s: platform id (e.g. "instagram-feed"). */
-				__( 'Manual share intent firing is not yet implemented for this platform (desktop). Will fire intent for platform: %s', 'outpost' ),
+				__( 'Manual share intent firing is not yet implemented for this platform (desktop). Will fire intent for platform: %s', 'outpost-mobile-publishing' ),
 				$platform_id
 			),
 			'platform_id' => $platform_id,

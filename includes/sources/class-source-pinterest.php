@@ -42,7 +42,7 @@ final class Outpost_Source_Pinterest extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Pinterest', 'outpost' ),
+			'label'            => __( 'Pinterest', 'outpost-mobile-publishing' ),
 			'host_patterns'    => self::PIN_HOSTS,
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'bookmark',

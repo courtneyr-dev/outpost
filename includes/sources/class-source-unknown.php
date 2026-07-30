@@ -63,7 +63,7 @@ final class Outpost_Source_Unknown extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps = array(
 			'id'               => self::ID,
-			'label'            => __( 'Generic URL', 'outpost' ),
+			'label'            => __( 'Generic URL', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( '*' ),
 			'ambiguity'        => 'ambiguous',
 			'mode'             => null,
@@ -82,7 +82,7 @@ final class Outpost_Source_Unknown extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array(),
 			'caveats'          => array(
-				__( 'No specific source adapter detected; best-effort OG extraction only.', 'outpost' ),
+				__( 'No specific source adapter detected; best-effort OG extraction only.', 'outpost-mobile-publishing' ),
 			),
 		);
 		/**

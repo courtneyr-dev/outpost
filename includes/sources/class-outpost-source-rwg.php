@@ -66,7 +66,7 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Ride With GPS', 'outpost' ),
+			'label'            => __( 'Ride With GPS', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'ridewithgps.com', 'www.ridewithgps.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'workout',
@@ -83,8 +83,8 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 			'auth_required'    => true,
 			'tags_default'     => array( 'cycling' ),
 			'caveats'          => array(
-				__( 'Private trips and routes ("friends" or "private" visibility) are not surfaced even when the connected user has access.', 'outpost' ),
-				__( 'The connected Ride With GPS account must be the owner or have read access to the trip or route.', 'outpost' ),
+				__( 'Private trips and routes ("friends" or "private" visibility) are not surfaced even when the connected user has access.', 'outpost-mobile-publishing' ),
+				__( 'The connected Ride With GPS account must be the owner or have read access to the trip or route.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );
@@ -196,7 +196,7 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 	 * @return array<string,mixed>
 	 */
 	private static function project_trip( array $trip, string $source_url ): array {
-		$name             = isset( $trip['name'] ) ? (string) $trip['name'] : __( 'Ride', 'outpost' );
+		$name             = isset( $trip['name'] ) ? (string) $trip['name'] : __( 'Ride', 'outpost-mobile-publishing' );
 		$distance_meters  = isset( $trip['distance'] ) ? (float) $trip['distance'] : 0.0;
 		$elevation_gain_m = isset( $trip['elevation_gain'] ) ? (float) $trip['elevation_gain'] : 0.0;
 		$description      = isset( $trip['description'] ) ? (string) $trip['description'] : '';
@@ -244,14 +244,14 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 	 * @return array<string,mixed>
 	 */
 	private static function project_route( array $route, string $source_url ): array {
-		$name             = isset( $route['name'] ) ? (string) $route['name'] : __( 'Route', 'outpost' );
+		$name             = isset( $route['name'] ) ? (string) $route['name'] : __( 'Route', 'outpost-mobile-publishing' );
 		$distance_meters  = isset( $route['distance'] ) ? (float) $route['distance'] : 0.0;
 		$elevation_gain_m = isset( $route['elevation_gain'] ) ? (float) $route['elevation_gain'] : 0.0;
 		$description      = isset( $route['description'] ) ? (string) $route['description'] : '';
 
 		$summary = sprintf(
 			/* translators: 1: distance summary, 2: elevation summary. */
-			__( 'Planned route: %1$s, %2$s', 'outpost' ),
+			__( 'Planned route: %1$s, %2$s', 'outpost-mobile-publishing' ),
 			self::format_distance( $distance_meters ),
 			self::format_elevation( $elevation_gain_m )
 		);
@@ -343,7 +343,7 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 	private static function format_summary_line( float $distance_meters, float $elevation_meters ): string {
 		return sprintf(
 			/* translators: 1: distance summary (metric + imperial), 2: elevation summary. */
-			__( 'Ride With GPS — %1$s, %2$s elevation gain', 'outpost' ),
+			__( 'Ride With GPS — %1$s, %2$s elevation gain', 'outpost-mobile-publishing' ),
 			self::format_distance( $distance_meters ),
 			self::format_elevation( $elevation_meters )
 		);
@@ -354,7 +354,7 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 		$miles = round( ( $meters / 1000 ) * 0.621371, 1 );
 		return sprintf(
 			/* translators: 1: distance in km, 2: distance in miles. */
-			__( '%1$s km / %2$s mi', 'outpost' ),
+			__( '%1$s km / %2$s mi', 'outpost-mobile-publishing' ),
 			(string) $km,
 			(string) $miles
 		);
@@ -364,7 +364,7 @@ final class Outpost_Source_Rwg extends Outpost_Source_Base {
 		$feet = (int) round( $meters * 3.28084 );
 		return sprintf(
 			/* translators: 1: elevation in m, 2: elevation in ft. */
-			__( '%1$d m / %2$d ft', 'outpost' ),
+			__( '%1$d m / %2$d ft', 'outpost-mobile-publishing' ),
 			(int) round( $meters ),
 			$feet
 		);

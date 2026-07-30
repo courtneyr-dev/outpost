@@ -95,14 +95,14 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error(
 				'outpost_ios_shortcut_unauthorized',
-				__( 'Authentication required.', 'outpost' ),
+				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new \WP_Error(
 				'outpost_ios_shortcut_forbidden',
-				__( 'You do not have permission to use the iOS Shortcut bridge.', 'outpost' ),
+				__( 'You do not have permission to use the iOS Shortcut bridge.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -131,7 +131,7 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 		if ( null === $resolved ) {
 			return new \WP_Error(
 				'outpost_ios_shortcut_no_url',
-				__( 'No URL detected in payload.', 'outpost' ),
+				__( 'No URL detected in payload.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}

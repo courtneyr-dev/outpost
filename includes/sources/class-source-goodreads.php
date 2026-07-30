@@ -40,7 +40,7 @@ final class Outpost_Source_Goodreads extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Goodreads', 'outpost' ),
+			'label'            => __( 'Goodreads', 'outpost-mobile-publishing' ),
 			'host_patterns'    => self::CLAIMED_HOSTS,
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'read',

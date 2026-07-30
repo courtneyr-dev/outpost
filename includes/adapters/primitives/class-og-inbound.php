@@ -114,7 +114,7 @@ final class Outpost_Og_Inbound {
 		if ( '' === $url || false === wp_http_validate_url( $url ) ) {
 			return new WP_Error(
 				'outpost_og_invalid_url',
-				__( 'Invalid or unsupported URL.', 'outpost' ),
+				__( 'Invalid or unsupported URL.', 'outpost-mobile-publishing' ),
 				array( 'url' => $url )
 			);
 		}
@@ -145,7 +145,7 @@ final class Outpost_Og_Inbound {
 			return new WP_Error(
 				'outpost_og_fetch_failed',
 				/* translators: %s: error message from wp_remote_get */
-				sprintf( __( 'OG fetch failed: %s', 'outpost' ), $response->get_error_message() ),
+				sprintf( __( 'OG fetch failed: %s', 'outpost-mobile-publishing' ), $response->get_error_message() ),
 				array( 'url' => $url )
 			);
 		}
@@ -155,7 +155,7 @@ final class Outpost_Og_Inbound {
 			return new WP_Error(
 				'outpost_og_fetch_failed',
 				/* translators: %d: HTTP status code */
-				sprintf( __( 'OG fetch returned HTTP %d.', 'outpost' ), $status ),
+				sprintf( __( 'OG fetch returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
 				array(
 					'url'    => $url,
 					'status' => $status,
@@ -167,7 +167,7 @@ final class Outpost_Og_Inbound {
 		if ( '' === $body ) {
 			return new WP_Error(
 				'outpost_og_parse_failed',
-				__( 'OG fetch returned empty body.', 'outpost' ),
+				__( 'OG fetch returned empty body.', 'outpost-mobile-publishing' ),
 				array( 'url' => $url )
 			);
 		}

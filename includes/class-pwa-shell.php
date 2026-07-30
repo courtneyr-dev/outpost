@@ -164,12 +164,12 @@ final class Outpost_PWA_Shell {
 			);
 			$action_label = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Install %s', 'outpost' ),
+				__( 'Install %s', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 			$message = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Outpost needs the %s plugin before it can run. Install it from WordPress.org to continue.', 'outpost' ),
+				__( 'Outpost needs the %s plugin before it can run. Install it from WordPress.org to continue.', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 		} else {
@@ -179,12 +179,12 @@ final class Outpost_PWA_Shell {
 			);
 			$action_label = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Activate %s', 'outpost' ),
+				__( 'Activate %s', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 			$message = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost' ),
+				__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 		}
@@ -196,7 +196,7 @@ final class Outpost_PWA_Shell {
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-	<title><?php echo esc_html( __( 'Outpost setup', 'outpost' ) ); ?></title>
+	<title><?php echo esc_html( __( 'Outpost setup', 'outpost-mobile-publishing' ) ); ?></title>
 	<style>
 		body.outpost-install-prompt {
 			max-width: 36rem;
@@ -239,27 +239,27 @@ final class Outpost_PWA_Shell {
 <body class="outpost-install-prompt" data-outpost-blocker="<?php echo esc_attr( $blocker ); ?>">
 	<main>
 		<section class="outpost-onboarding" aria-labelledby="outpost-onboarding-title">
-			<h1 id="outpost-onboarding-title"><?php echo esc_html( __( 'Welcome to Outpost', 'outpost' ) ); ?></h1>
+			<h1 id="outpost-onboarding-title"><?php echo esc_html( __( 'Welcome to Outpost', 'outpost-mobile-publishing' ) ); ?></h1>
 			<p>
 				<?php
 				echo esc_html__(
 					'Outpost is a mobile-first composer for posting to your own WordPress site, built on the IndieWeb specs (Micropub, IndieAuth, microformats2). It only writes posts — not Pages or custom post types — and it leaves the visual paint to your active theme.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
 			<p>
-				<strong><?php echo esc_html__( 'POSSE', 'outpost' ); ?></strong>
+				<strong><?php echo esc_html__( 'POSSE', 'outpost-mobile-publishing' ); ?></strong>
 				<?php
 				echo esc_html__(
 					' — Publish (on your) Own Site, Syndicate Elsewhere. Your domain stays the canonical source; copies go to Mastodon, Twitter / X, Bluesky, or wherever your audience is.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
 		</section>
 
-		<h2><?php echo esc_html( __( 'One more step', 'outpost' ) ); ?></h2>
+		<h2><?php echo esc_html( __( 'One more step', 'outpost-mobile-publishing' ) ); ?></h2>
 		<p><?php echo esc_html( $message ); ?></p>
 		<p>
 			<a class="outpost-install-prompt__action" href="<?php echo esc_url( $action_url ); ?>"><?php echo esc_html( $action_label ); ?></a>
@@ -278,7 +278,7 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		$message = sprintf(
 			/* translators: 1: minimum WP version, 2: minimum PHP version. */
-			__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost' ),
+			__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost-mobile-publishing' ),
 			OUTPOST_MIN_WP,
 			OUTPOST_MIN_PHP
 		);
@@ -288,11 +288,11 @@ final class Outpost_PWA_Shell {
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-	<title><?php echo esc_html( __( 'Outpost setup', 'outpost' ) ); ?></title>
+	<title><?php echo esc_html( __( 'Outpost setup', 'outpost-mobile-publishing' ) ); ?></title>
 </head>
 <body class="outpost-install-prompt outpost-install-prompt--host-unmet">
 	<main>
-		<h1><?php echo esc_html( __( 'Server requirements', 'outpost' ) ); ?></h1>
+		<h1><?php echo esc_html( __( 'Server requirements', 'outpost-mobile-publishing' ) ); ?></h1>
 		<p><?php echo esc_html( $message ); ?></p>
 	</main>
 </body>

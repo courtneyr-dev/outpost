@@ -41,7 +41,7 @@ final class Outpost_Source_Bluesky extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Bluesky', 'outpost' ),
+			'label'            => __( 'Bluesky', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'bsky.app' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'reply',

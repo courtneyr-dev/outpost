@@ -96,7 +96,7 @@ final class Outpost_POSSE_Content_Transformer {
 		}
 		return sprintf(
 			'<p><small>%1$s <a href="%2$s">%2$s</a>.</small></p>',
-			esc_html__( 'This post originally appeared on', 'outpost' ),
+			esc_html__( 'This post originally appeared on', 'outpost-mobile-publishing' ),
 			$safe
 		);
 	}
@@ -112,7 +112,7 @@ final class Outpost_POSSE_Content_Transformer {
 		}
 		return sprintf(
 			'*%1$s [%2$s](%2$s).*',
-			__( 'This post originally appeared on', 'outpost' ),
+			__( 'This post originally appeared on', 'outpost-mobile-publishing' ),
 			$wp_url
 		);
 	}

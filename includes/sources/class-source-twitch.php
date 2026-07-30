@@ -39,7 +39,7 @@ final class Outpost_Source_Twitch extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Twitch', 'outpost' ),
+			'label'            => __( 'Twitch', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array(
 				'twitch.tv',
 				'www.twitch.tv',
@@ -63,7 +63,7 @@ final class Outpost_Source_Twitch extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'watch', 'twitch' ),
 			'caveats'          => array(
-				__( 'OG-only extraction. Game name, viewer count, and other Helix-API fields are not pulled (would require embedded credentials).', 'outpost' ),
+				__( 'OG-only extraction. Game name, viewer count, and other Helix-API fields are not pulled (would require embedded credentials).', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

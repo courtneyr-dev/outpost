@@ -74,7 +74,7 @@ final class Outpost_OAuth_Provider_Polar extends Outpost_OAuth_Provider_Base {
 	}
 
 	public function label(): string {
-		return __( 'Polar Flow', 'outpost' );
+		return __( 'Polar Flow', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {
@@ -262,7 +262,7 @@ final class Outpost_OAuth_Provider_Polar extends Outpost_OAuth_Provider_Base {
 		return new \WP_Error(
 			'outpost_polar_registration_failed',
 			/* translators: %d: HTTP status */
-			sprintf( __( 'Polar AccessLink user registration failed (HTTP %d).', 'outpost' ), $status ),
+			sprintf( __( 'Polar AccessLink user registration failed (HTTP %d).', 'outpost-mobile-publishing' ), $status ),
 			array( 'status' => $status )
 		);
 	}

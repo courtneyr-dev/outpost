@@ -86,14 +86,14 @@ final class Outpost_Settings {
 
 		add_settings_section(
 			'outpost_settings_main',
-			__( 'Composer defaults', 'outpost' ),
+			__( 'Composer defaults', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_section_intro' ),
 			'outpost-settings'
 		);
 
 		add_settings_field(
 			'default_post_variant',
-			__( 'Default Post variant', 'outpost' ),
+			__( 'Default Post variant', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_default_variant_field' ),
 			'outpost-settings',
 			'outpost_settings_main'
@@ -101,7 +101,7 @@ final class Outpost_Settings {
 
 		add_settings_field(
 			'bridgy_auto_suggest',
-			__( 'Bridgy auto-suggest', 'outpost' ),
+			__( 'Bridgy auto-suggest', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_bridgy_field' ),
 			'outpost-settings',
 			'outpost_settings_main'
@@ -109,7 +109,7 @@ final class Outpost_Settings {
 
 		add_settings_field(
 			'default_post_format_inference',
-			__( 'Auto Post-Format inference', 'outpost' ),
+			__( 'Auto Post-Format inference', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_inference_field' ),
 			'outpost-settings',
 			'outpost_settings_main'
@@ -141,7 +141,7 @@ final class Outpost_Settings {
 	public static function render_section_intro(): void {
 		echo '<p>' . esc_html__(
 			'Site-wide defaults the Outpost composer respects. Each user can override at post time from the More options panel.',
-			'outpost'
+			'outpost-mobile-publishing'
 		) . '</p>';
 	}
 
@@ -149,11 +149,11 @@ final class Outpost_Settings {
 		$settings = self::get();
 		$current  = (string) $settings['default_post_variant'];
 		$options  = array(
-			'article' => __( 'Article (title + body)', 'outpost' ),
-			'note'    => __( 'Note (auto-format from content length)', 'outpost' ),
-			'status'  => __( 'Status (forces the Status post format)', 'outpost' ),
-			'aside'   => __( 'Aside (forces the Aside post format)', 'outpost' ),
-			'quote'   => __( 'Quote (forces the Quote post format)', 'outpost' ),
+			'article' => __( 'Article (title + body)', 'outpost-mobile-publishing' ),
+			'note'    => __( 'Note (auto-format from content length)', 'outpost-mobile-publishing' ),
+			'status'  => __( 'Status (forces the Status post format)', 'outpost-mobile-publishing' ),
+			'aside'   => __( 'Aside (forces the Aside post format)', 'outpost-mobile-publishing' ),
+			'quote'   => __( 'Quote (forces the Quote post format)', 'outpost-mobile-publishing' ),
 		);
 		echo '<select name="' . esc_attr( self::OPTION_NAME ) . '[default_post_variant]" id="default_post_variant">';
 		foreach ( $options as $value => $label ) {
@@ -167,7 +167,7 @@ final class Outpost_Settings {
 		echo '</select>';
 		echo '<p class="description">' . esc_html__(
 			'The variant the Post tab opens to on every fresh composer load.',
-			'outpost'
+			'outpost-mobile-publishing'
 		) . '</p>';
 	}
 
@@ -180,7 +180,7 @@ final class Outpost_Settings {
 			checked( $checked, true, false ),
 			esc_html__(
 				'When the Reply / Doing target URL host matches a known silo, pre-check the matching Bridgy publish target.',
-				'outpost'
+				'outpost-mobile-publishing'
 			)
 		);
 	}
@@ -194,7 +194,7 @@ final class Outpost_Settings {
 			checked( $checked, true, false ),
 			esc_html__(
 				'Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only.',
-				'outpost'
+				'outpost-mobile-publishing'
 			)
 		);
 	}

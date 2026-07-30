@@ -39,7 +39,7 @@ final class Outpost_Source_AppleMusic extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Apple Music', 'outpost' ),
+			'label'            => __( 'Apple Music', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'music.apple.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'listen',

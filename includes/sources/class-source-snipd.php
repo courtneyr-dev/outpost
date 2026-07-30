@@ -58,7 +58,7 @@ final class Outpost_Source_Snipd extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Snipd', 'outpost' ),
+			'label'            => __( 'Snipd', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( self::SHARE_HOST ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'listen',

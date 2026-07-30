@@ -34,7 +34,7 @@ final class Outpost_Source_ApplePodcasts extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Apple Podcasts', 'outpost' ),
+			'label'            => __( 'Apple Podcasts', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'podcasts.apple.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'listen',

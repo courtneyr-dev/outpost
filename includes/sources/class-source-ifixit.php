@@ -48,7 +48,7 @@ final class Outpost_Source_Ifixit extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'iFixit', 'outpost' ),
+			'label'            => __( 'iFixit', 'outpost-mobile-publishing' ),
 			'host_patterns'    => self::CLAIMED_HOSTS,
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'bookmark',
@@ -68,8 +68,8 @@ final class Outpost_Source_Ifixit extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'bookmark', 'repair' ),
 			'caveats'          => array(
-				__( 'iFixit guides are CC BY-NC-SA. Render attribution like "Source: iFixit (CC BY-NC-SA)" alongside the captured content. Filterable via outpost_ifixit_attribution_html for users with custom rendering needs; removing attribution may violate the license.', 'outpost' ),
-				__( 'Full API integration (tools, parts, time-required, difficulty as structured fields) arrives with G14b once the F-phase api_json extractor lands. v1 ships og_tags only.', 'outpost' ),
+				__( 'iFixit guides are CC BY-NC-SA. Render attribution like "Source: iFixit (CC BY-NC-SA)" alongside the captured content. Filterable via outpost_ifixit_attribution_html for users with custom rendering needs; removing attribution may violate the license.', 'outpost-mobile-publishing' ),
+				__( 'Full API integration (tools, parts, time-required, difficulty as structured fields) arrives with G14b once the F-phase api_json extractor lands. v1 ships og_tags only.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );
@@ -113,7 +113,7 @@ final class Outpost_Source_Ifixit extends Outpost_Source_Base {
 			'<p class="outpost-ifixit-attribution">%s</p>',
 			sprintf(
 				/* translators: %s: iFixit guide URL */
-				esc_html__( 'Source: %s (CC BY-NC-SA)', 'outpost' ),
+				esc_html__( 'Source: %s (CC BY-NC-SA)', 'outpost-mobile-publishing' ),
 				'<a href="' . esc_url( $source_url ) . '">iFixit</a>'
 			)
 		);

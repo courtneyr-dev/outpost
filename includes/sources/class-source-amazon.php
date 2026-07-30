@@ -86,7 +86,7 @@ final class Outpost_Source_Amazon extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Amazon', 'outpost' ),
+			'label'            => __( 'Amazon', 'outpost-mobile-publishing' ),
 			// Stored host_patterns shape is "exact host" per Source_Base
 			// validate_pattern; we match each region via matches_url
 			// since we want suffix matching across region TLDs.
@@ -111,8 +111,8 @@ final class Outpost_Source_Amazon extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'bookmark', 'product' ),
 			'caveats'          => array(
-				__( 'Best-effort OG extraction. Amazon blocks some automated fetches; some product pages may yield empty results.', 'outpost' ),
-				__( 'Affiliate / tracking query parameters are stripped from the recorded URL.', 'outpost' ),
+				__( 'Best-effort OG extraction. Amazon blocks some automated fetches; some product pages may yield empty results.', 'outpost-mobile-publishing' ),
+				__( 'Affiliate / tracking query parameters are stripped from the recorded URL.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

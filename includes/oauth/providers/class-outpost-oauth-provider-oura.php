@@ -55,7 +55,7 @@ final class Outpost_OAuth_Provider_Oura extends Outpost_OAuth_Provider_Base {
 	}
 
 	public function label(): string {
-		return __( 'Oura', 'outpost' );
+		return __( 'Oura', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {

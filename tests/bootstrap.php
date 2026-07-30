@@ -57,7 +57,7 @@ if ( ! function_exists( 'plugin_dir_url' ) ) {
 }
 if ( ! function_exists( 'plugin_basename' ) ) {
 	function plugin_basename( string $file ): string {
-		return 'outpost/outpost.php';
+		return 'outpost-mobile-publishing/outpost.php';
 	}
 }
 if ( ! function_exists( 'add_query_arg' ) ) {

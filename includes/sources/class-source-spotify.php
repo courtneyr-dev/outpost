@@ -84,7 +84,7 @@ final class Outpost_Source_Spotify extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps = array(
 			'id'               => self::ID,
-			'label'            => __( 'Spotify', 'outpost' ),
+			'label'            => __( 'Spotify', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array(
 				'open.spotify.com',
 				'spotify.link',

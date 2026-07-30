@@ -210,7 +210,7 @@ abstract class Outpost_OAuth_Provider_Base {
 			return new \WP_Error(
 				'outpost_oauth_token_failed',
 				/* translators: %d: HTTP status */
-				sprintf( __( 'OAuth token exchange failed (HTTP %d).', 'outpost' ), $status ),
+				sprintf( __( 'OAuth token exchange failed (HTTP %d).', 'outpost-mobile-publishing' ), $status ),
 				array(
 					'status' => $status,
 					'body'   => $body,
@@ -220,7 +220,7 @@ abstract class Outpost_OAuth_Provider_Base {
 		if ( empty( $decoded['access_token'] ) ) {
 			return new \WP_Error(
 				'outpost_oauth_token_missing',
-				__( 'OAuth token endpoint returned no access_token.', 'outpost' )
+				__( 'OAuth token endpoint returned no access_token.', 'outpost-mobile-publishing' )
 			);
 		}
 		return $decoded;
@@ -309,7 +309,7 @@ abstract class Outpost_OAuth_Provider_Base {
 		if ( ! is_array( $creds ) || empty( $creds['refresh_token'] ) ) {
 			return new \WP_Error(
 				'outpost_oauth_no_refresh_token',
-				__( 'No refresh_token stored — reconnect this provider.', 'outpost' )
+				__( 'No refresh_token stored — reconnect this provider.', 'outpost-mobile-publishing' )
 			);
 		}
 		$body     = array(
@@ -365,7 +365,7 @@ abstract class Outpost_OAuth_Provider_Base {
 		unset( $user_id );
 		return new \WP_Error(
 			'outpost_oauth_verify_not_implemented',
-			__( 'This provider does not implement connection verification.', 'outpost' )
+			__( 'This provider does not implement connection verification.', 'outpost-mobile-publishing' )
 		);
 	}
 

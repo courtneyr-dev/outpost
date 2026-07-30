@@ -32,7 +32,7 @@ final class Outpost_Source_SuttaCentral extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'SuttaCentral', 'outpost' ),
+			'label'            => __( 'SuttaCentral', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'suttacentral.net' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'quote',
@@ -52,7 +52,7 @@ final class Outpost_Source_SuttaCentral extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'quote', 'scripture' ),
 			'caveats'          => array(
-				__( 'SuttaCentral texts are mostly CC0 (Bhikkhu Sujato translations). The og_tags adapter cannot detect translator metadata; the docs page recommends a generic "Source: SuttaCentral.net" attribution. Translator-aware attribution arrives with G10b.', 'outpost' ),
+				__( 'SuttaCentral texts are mostly CC0 (Bhikkhu Sujato translations). The og_tags adapter cannot detect translator metadata; the docs page recommends a generic "Source: SuttaCentral.net" attribution. Translator-aware attribution arrives with G10b.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

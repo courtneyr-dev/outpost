@@ -278,7 +278,7 @@ final class Outpost_OAuth_Controller {
 			return new \WP_Error(
 				'outpost_oauth_unknown_provider',
 				/* translators: %s: provider id */
-				sprintf( __( 'Unknown OAuth provider: %s', 'outpost' ), $id ),
+				sprintf( __( 'Unknown OAuth provider: %s', 'outpost-mobile-publishing' ), $id ),
 				array( 'status' => 404 )
 			);
 		}

@@ -96,7 +96,7 @@ final class Outpost_Fetch_Recent_Polar {
 			$providers = array();
 		}
 		$providers[ self::PROVIDER_ID ] = array(
-			'label'          => __( 'Polar Flow', 'outpost' ),
+			'label'          => __( 'Polar Flow', 'outpost-mobile-publishing' ),
 			'callback'       => array( __CLASS__, 'fetch_items' ),
 			'capability'     => 'publish_posts',
 			'oauth_provider' => self::PROVIDER_ID,
@@ -248,7 +248,7 @@ final class Outpost_Fetch_Recent_Polar {
 		if ( '' !== $sport && $distance_km > 0 ) {
 			$title = sprintf(
 				/* translators: 1: sport name, 2: distance in km. */
-				__( 'Training — %1$s, %2$s km', 'outpost' ),
+				__( 'Training — %1$s, %2$s km', 'outpost-mobile-publishing' ),
 				$sport,
 				(string) $distance_km
 			);
@@ -257,17 +257,17 @@ final class Outpost_Fetch_Recent_Polar {
 			$title        = $duration_min > 0
 				? sprintf(
 					/* translators: 1: sport name, 2: duration in minutes. */
-					__( 'Training — %1$s, %2$d min', 'outpost' ),
+					__( 'Training — %1$s, %2$d min', 'outpost-mobile-publishing' ),
 					$sport,
 					$duration_min
 				)
 				: sprintf(
 					/* translators: %s: sport name. */
-					__( 'Training — %s', 'outpost' ),
+					__( 'Training — %s', 'outpost-mobile-publishing' ),
 					$sport
 				);
 		} else {
-			$title = __( 'Training', 'outpost' );
+			$title = __( 'Training', 'outpost-mobile-publishing' );
 		}
 
 		$content = '<p>' . esc_html( $title ) . '</p>';

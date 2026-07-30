@@ -39,8 +39,8 @@ final class Outpost_OAuth_Settings_Page {
 	public static function register_menu(): void {
 		add_submenu_page(
 			self::PARENT_SLUG,
-			__( 'OAuth Connections', 'outpost' ),
-			__( 'OAuth Connections', 'outpost' ),
+			__( 'OAuth Connections', 'outpost-mobile-publishing' ),
+			__( 'OAuth Connections', 'outpost-mobile-publishing' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( __CLASS__, 'render' )
@@ -49,17 +49,17 @@ final class Outpost_OAuth_Settings_Page {
 
 	public static function render(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost' ) );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost-mobile-publishing' ) );
 		}
 
 		echo '<div class="wrap outpost-oauth-wrap">';
-		echo '<h1>' . esc_html__( 'Outpost OAuth Connections', 'outpost' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Outpost OAuth Connections', 'outpost-mobile-publishing' ) . '</h1>';
 
 		self::maybe_render_status_notice();
 
 		$providers = self::registered_providers();
 		if ( empty( $providers ) ) {
-			echo '<p>' . esc_html__( 'No OAuth providers are registered.', 'outpost' ) . '</p>';
+			echo '<p>' . esc_html__( 'No OAuth providers are registered.', 'outpost-mobile-publishing' ) . '</p>';
 			echo '</div>';
 			return;
 		}
@@ -67,9 +67,9 @@ final class Outpost_OAuth_Settings_Page {
 		$user_id = (int) get_current_user_id();
 		echo '<table class="widefat striped" style="max-width:48rem">';
 		echo '<thead><tr>';
-		echo '<th>' . esc_html__( 'Provider', 'outpost' ) . '</th>';
-		echo '<th>' . esc_html__( 'Status', 'outpost' ) . '</th>';
-		echo '<th>' . esc_html__( 'Action', 'outpost' ) . '</th>';
+		echo '<th>' . esc_html__( 'Provider', 'outpost-mobile-publishing' ) . '</th>';
+		echo '<th>' . esc_html__( 'Status', 'outpost-mobile-publishing' ) . '</th>';
+		echo '<th>' . esc_html__( 'Action', 'outpost-mobile-publishing' ) . '</th>';
 		echo '</tr></thead><tbody>';
 		foreach ( $providers as $provider ) {
 			$id           = $provider->id();
@@ -85,8 +85,8 @@ final class Outpost_OAuth_Settings_Page {
 			echo '<tr>';
 			echo '<td>' . esc_html( $provider->label() ) . '</td>';
 			echo '<td>' . ( $is_connected
-				? '<strong>' . esc_html__( 'Connected', 'outpost' ) . '</strong>'
-				: esc_html__( 'Not connected', 'outpost' ) ) . '</td>';
+				? '<strong>' . esc_html__( 'Connected', 'outpost-mobile-publishing' ) . '</strong>'
+				: esc_html__( 'Not connected', 'outpost-mobile-publishing' ) ) . '</td>';
 			echo '<td>';
 			if ( $is_connected ) {
 				// Working Disconnect form. The whole visible button is
@@ -101,7 +101,7 @@ final class Outpost_OAuth_Settings_Page {
 					. esc_html(
 						sprintf(
 							/* translators: %s: provider label */
-							__( 'Disconnect %s', 'outpost' ),
+							__( 'Disconnect %s', 'outpost-mobile-publishing' ),
 							$provider->label()
 						)
 					)
@@ -112,7 +112,7 @@ final class Outpost_OAuth_Settings_Page {
 				echo esc_html(
 					sprintf(
 						/* translators: %s: provider label */
-						__( 'Connect %s', 'outpost' ),
+						__( 'Connect %s', 'outpost-mobile-publishing' ),
 						$provider->label()
 					)
 				);
@@ -140,27 +140,27 @@ final class Outpost_OAuth_Settings_Page {
 		switch ( $status ) {
 			case 'connected':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s connected successfully.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s connected successfully.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			case 'state_invalid':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s connection failed: state parameter mismatch. Try again.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s connection failed: state parameter mismatch. Try again.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			case 'no_code':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s connection failed: no authorization code received.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s connection failed: no authorization code received.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			case 'exchange_failed':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s connection failed during token exchange.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s connection failed during token exchange.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			case 'persist_failed':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s connected with the provider but credential storage failed. Check site error logs.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s connected with the provider but credential storage failed. Check site error logs.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			case 'disconnected':
 				/* translators: %s: provider label */
-				$message = sprintf( __( '%s disconnected.', 'outpost' ), $provider );
+				$message = sprintf( __( '%s disconnected.', 'outpost-mobile-publishing' ), $provider );
 				break;
 			default:
 				return;
@@ -193,7 +193,7 @@ final class Outpost_OAuth_Settings_Page {
 	 */
 	public static function handle_disconnect_post(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to disconnect OAuth providers.', 'outpost' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to disconnect OAuth providers.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 		$provider_id = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( (string) $_POST['provider'] ) ) : '';
 		check_admin_referer( 'outpost_oauth_disconnect_' . $provider_id, '_outpost_disconnect_nonce' );

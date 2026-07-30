@@ -55,7 +55,7 @@ final class Outpost_Apple_Music_Adapter {
 		if ( null === $identity ) {
 			return new WP_Error(
 				'outpost_apple_music_invalid_url',
-				__( 'URL is not an Apple Music album, song, or playlist URL.', 'outpost' ),
+				__( 'URL is not an Apple Music album, song, or playlist URL.', 'outpost-mobile-publishing' ),
 				array( 'url' => $url )
 			);
 		}
@@ -156,7 +156,7 @@ final class Outpost_Apple_Music_Adapter {
 		if ( $status < 200 || $status >= 300 ) {
 			return new WP_Error(
 				'outpost_itunes_lookup_http',
-				sprintf( /* translators: %d: HTTP status */ __( 'iTunes Lookup HTTP %d.', 'outpost' ), $status ),
+				sprintf( /* translators: %d: HTTP status */ __( 'iTunes Lookup HTTP %d.', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => $status )
 			);
 		}
@@ -165,7 +165,7 @@ final class Outpost_Apple_Music_Adapter {
 		if ( ! is_array( $decoded ) || empty( $decoded['results'][0] ) || ! is_array( $decoded['results'][0] ) ) {
 			return new WP_Error(
 				'outpost_itunes_lookup_empty',
-				__( 'iTunes Lookup returned no results.', 'outpost' )
+				__( 'iTunes Lookup returned no results.', 'outpost-mobile-publishing' )
 			);
 		}
 		return self::shape_itunes_result( $decoded['results'][0] );
