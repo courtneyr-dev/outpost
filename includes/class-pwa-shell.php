@@ -55,22 +55,15 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		$entry_url = Outpost_PWA_Assets::entry_url();
 		$css_urls  = Outpost_PWA_Assets::entry_css_urls();
-		// Append `?ver=OUTPOST_VERSION` to bundle CSS + JS URLs as a
-		// cache-bust against Cloudflare/managed-WP edge caches that may
-		// Vite content-hashes the JS + CSS filenames already, so each build
-		// gets a unique URL the browser/CDN can cache forever. The previous
-		// `?ver=OUTPOST_VERSION` query was redundant — and worse, every
-		// version bump (Outpost has shipped 58+ in active development) was
-		// re-fetching the same content. Drop the version query for hashed
-		// bundle assets. The token-css link below still uses ?ver= because
-		// `outpost-tokens.css` is server-rendered with a stable filename.
-		$entry_url_versioned = $entry_url;
-		// Outpost shell IS the entire HTML document, not an enrichment of WP's
-		// page template — template_redirect priority 1 + self::halt() bypasses
-		// wp_head/wp_footer entirely. wp_enqueue_style/script can't reach this
-		// rendering path. The <link rel="stylesheet"> and <script type="module">
-		// tags below are intentional inline outputs.
-		// phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet, WordPress.WP.EnqueuedResources.NonEnqueuedScript
+		// The shell IS the whole HTML document, not an enrichment of WP's page
+		// template — template_redirect priority 1 + self::halt() means wp_head
+		// and wp_footer never run. Assets still go through the enqueue API;
+		// they're printed below with WP_Styles/WP_Scripts::do_items() against
+		// an explicit handle list. do_items() with handles prints only those
+		// items, unlike wp_print_styles(), which would drag the theme's and
+		// every other plugin's queue into a document whose entire contract is
+		// that nothing else paints it.
+		list( $style_handles, $script_handles ) = self::register_shell_assets( $entry_url, $css_urls );
 		?><!doctype html>
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
@@ -80,37 +73,20 @@ final class Outpost_PWA_Shell {
 	<link rel="manifest" href="/post/manifest.json">
 	<link rel="icon" type="image/svg+xml" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg' ); ?>">
 	<link rel="apple-touch-icon" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'assets/icons/apple-touch-icon.png' ); ?>">
-		<?php if ( null !== $entry_url_versioned ) : ?>
-	<link rel="modulepreload" href="<?php echo esc_url( $entry_url_versioned ); ?>">
+		<?php if ( null !== $entry_url ) : ?>
+	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
 		<?php endif; ?>
 	<meta name="theme-color" content="#2a4a39">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-	<style>
-		/* Critical layout — reserves space before the bundled CSS loads,
-			prevents CLS when JS mounts the .outpost-app class onto #outpost-root.
-			Layout primitives only (no paint) per the Hard Contract.
-			padding-top reserves room for the iOS status bar in standalone
-			mode (apple-mobile-web-app-status-bar-style: black-translucent
-			puts content under the bar). */
-		body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }
-		#outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }
-	</style>
-	<link rel="stylesheet" href="<?php echo esc_url( OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css?ver=' . OUTPOST_VERSION ); ?>">
-		<?php
-		// CSS files are content-hashed by Vite — no version-query
-		// needed. See $entry_url_versioned comment above.
-		foreach ( $css_urls as $css_url ) :
-			?>
-	<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
-		<?php endforeach; ?>
+		<?php wp_styles()->do_items( $style_handles ); ?>
 </head>
 <body class="outpost-composer-shell">
 	<main id="outpost-root" data-outpost-route="composer"></main>
-		<?php if ( null !== $entry_url_versioned ) : ?>
-	<script type="module" src="<?php echo esc_url( $entry_url_versioned ); ?>"></script>
-		<?php endif; ?>
+		<?php
+		wp_scripts()->do_items( $script_handles );
+		?>
 		<?php
 		// SW registration moved into the bundled JS (pwa/src/index.tsx). The
 		// inline script approach used a per-request CSP nonce that breaks under
@@ -120,8 +96,146 @@ final class Outpost_PWA_Shell {
 </body>
 </html>
 		<?php
-		// phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet, WordPress.WP.EnqueuedResources.NonEnqueuedScript
 		self::halt();
+	}
+
+	/**
+	 * Register the shell's styles and the app bundle, and return the handles
+	 * to print.
+	 *
+	 * Registration (not enqueueing) is deliberate: nothing here goes through
+	 * wp_head, so the global queue is irrelevant. do_items() prints a
+	 * registered item whether or not it's in the queue, which keeps the
+	 * shell's asset list explicit while still giving other code the normal
+	 * wp_styles()/wp_scripts() handles to filter or deregister.
+	 *
+	 * @param string|null           $entry_url Module entry URL, or null when unbuilt.
+	 * @param array<int|string, string> $css_urls  Bundle stylesheet URLs.
+	 * @return array{0: string[], 1: string[]} Style handles, script handles.
+	 */
+	private static function register_shell_assets( ?string $entry_url, array $css_urls ): array {
+		$style_handles = array( 'outpost-shell-critical', 'outpost-tokens' );
+
+		wp_register_style( 'outpost-shell-critical', false, array(), OUTPOST_VERSION );
+		wp_add_inline_style( 'outpost-shell-critical', self::critical_css() );
+
+		// Server-rendered with a stable filename, so it needs the version query
+		// as a cache-bust. The bundle assets below don't — Vite content-hashes
+		// their filenames, so `null` keeps ?ver= off URLs that are already
+		// unique per build and can be cached forever.
+		wp_register_style(
+			'outpost-tokens',
+			OUTPOST_PLUGIN_URL . 'styles/outpost-tokens.css',
+			array(),
+			OUTPOST_VERSION
+		);
+
+		foreach ( array_values( $css_urls ) as $index => $css_url ) {
+			$handle          = 'outpost-app-' . (string) $index;
+			$style_handles[] = $handle;
+			// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- Vite content-hashes the filename; a version query would be redundant and re-fetch identical bytes on every release.
+			wp_register_style( $handle, $css_url, array(), null );
+		}
+
+		$script_handles = array();
+		if ( null !== $entry_url ) {
+			$script_handles[] = 'outpost-app';
+			// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- Vite content-hashes the filename; see the note above.
+			wp_register_script( 'outpost-app', $entry_url, array(), null, true );
+			add_filter( 'script_loader_tag', array( self::class, 'filter_app_script_tag' ), 10, 2 );
+		}
+
+		return array( $style_handles, $script_handles );
+	}
+
+	/**
+	 * Critical layout CSS.
+	 *
+	 * Reserves space before the bundled CSS loads so mounting the .outpost-app
+	 * class onto #outpost-root doesn't shift layout. Layout primitives only —
+	 * no paint — per the Hard Contract. padding-top reserves the iOS status
+	 * bar in standalone mode, where black-translucent puts content under it.
+	 */
+	private static function critical_css(): string {
+		return 'body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }'
+			. ' #outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }';
+	}
+
+	/**
+	 * Register the install-prompt page's stylesheet.
+	 *
+	 * Same standalone-document situation as the composer shell: no wp_head, so
+	 * the styles are registered here and printed with do_items() against an
+	 * explicit handle rather than echoed as a raw <style> block.
+	 */
+	private static function register_install_prompt_assets(): void {
+		wp_register_style( 'outpost-install-prompt', false, array(), OUTPOST_VERSION );
+		wp_add_inline_style( 'outpost-install-prompt', self::install_prompt_css() );
+	}
+
+	/** Standalone page styling for the dependency install prompt. */
+	private static function install_prompt_css(): string {
+		return '
+			body.outpost-install-prompt {
+				max-width: 36rem;
+				margin: 2rem auto;
+				padding: 1.5rem;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				line-height: 1.55;
+				color: #023047;
+			}
+			.outpost-onboarding {
+				background: #e6f1f7;
+				border: 1px solid #126782;
+				border-radius: 0.5rem;
+				padding: 1.25rem;
+				margin-block-end: 1.5rem;
+			}
+			.outpost-onboarding h1 {
+				margin: 0 0 0.5rem;
+				font-size: 1.4rem;
+			}
+			.outpost-onboarding p {
+				margin: 0.5rem 0;
+			}
+			.outpost-install-prompt__action {
+				display: inline-block;
+				padding: 0.625rem 1.25rem;
+				background: #2a4a39;
+				color: #faf6ec;
+				border-radius: 0.5rem;
+				text-decoration: none;
+				font-weight: 600;
+			}
+			.outpost-install-prompt__skip {
+				color: #647baf;
+				text-decoration: underline;
+				margin-inline-start: 1rem;
+			}
+		';
+	}
+
+	/**
+	 * Render the app bundle as an ES module.
+	 *
+	 * The bundle is Vite output using import syntax, so it has to load as
+	 * type="module"; WP_Scripts emits a classic script tag by default.
+	 *
+	 * @param string $tag    Script tag markup.
+	 * @param string $handle Script handle.
+	 */
+	public static function filter_app_script_tag( string $tag, string $handle ): string {
+		if ( 'outpost-app' !== $handle ) {
+			return $tag;
+		}
+
+		// Mutate the tag WP_Scripts already built rather than composing one, so
+		// any attributes core adds survive. The type swap has to drop core's
+		// text/javascript first; a tag carrying both types is invalid.
+		$tag = str_replace( " type='text/javascript'", '', $tag );
+		$tag = str_replace( ' type="text/javascript"', '', $tag );
+
+		return str_replace( '<script ', '<script type="module" ', $tag );
 	}
 
 	/**
@@ -133,6 +247,7 @@ final class Outpost_PWA_Shell {
 	 * if a future filter renames a blocker on one surface, the other follows.
 	 */
 	public static function render_install_prompt(): void {
+		self::register_install_prompt_assets();
 		$blocker = Outpost_Companion_Detector::first_unsatisfied();
 
 		// Possible reasons render_install_prompt() was called with a satisfied
@@ -164,12 +279,12 @@ final class Outpost_PWA_Shell {
 			);
 			$action_label = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Install %s', 'outpost' ),
+				__( 'Install %s', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 			$message = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Outpost needs the %s plugin before it can run. Install it from WordPress.org to continue.', 'outpost' ),
+				__( 'Outpost needs the %s plugin before it can run. Install it from WordPress.org to continue.', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 		} else {
@@ -179,12 +294,12 @@ final class Outpost_PWA_Shell {
 			);
 			$action_label = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Activate %s', 'outpost' ),
+				__( 'Activate %s', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 			$message = sprintf(
 				/* translators: %s: plugin name. */
-				__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost' ),
+				__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost-mobile-publishing' ),
 				$presentation['label']
 			);
 		}
@@ -196,70 +311,33 @@ final class Outpost_PWA_Shell {
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-	<title><?php echo esc_html( __( 'Outpost setup', 'outpost' ) ); ?></title>
-	<style>
-		body.outpost-install-prompt {
-			max-width: 36rem;
-			margin: 2rem auto;
-			padding: 1.5rem;
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-			line-height: 1.55;
-			color: #023047;
-		}
-		.outpost-onboarding {
-			background: #e6f1f7;
-			border: 1px solid #126782;
-			border-radius: 0.5rem;
-			padding: 1.25rem;
-			margin-block-end: 1.5rem;
-		}
-		.outpost-onboarding h1 {
-			margin: 0 0 0.5rem;
-			font-size: 1.4rem;
-		}
-		.outpost-onboarding p {
-			margin: 0.5rem 0;
-		}
-		.outpost-install-prompt__action {
-			display: inline-block;
-			padding: 0.625rem 1.25rem;
-			background: #2a4a39;
-			color: #faf6ec;
-			border-radius: 0.5rem;
-			text-decoration: none;
-			font-weight: 600;
-		}
-		.outpost-install-prompt__skip {
-			color: #647baf;
-			text-decoration: underline;
-			margin-inline-start: 1rem;
-		}
-	</style>
+	<title><?php echo esc_html( __( 'Outpost setup', 'outpost-mobile-publishing' ) ); ?></title>
+		<?php wp_styles()->do_items( array( 'outpost-install-prompt' ) ); ?>
 </head>
 <body class="outpost-install-prompt" data-outpost-blocker="<?php echo esc_attr( $blocker ); ?>">
 	<main>
 		<section class="outpost-onboarding" aria-labelledby="outpost-onboarding-title">
-			<h1 id="outpost-onboarding-title"><?php echo esc_html( __( 'Welcome to Outpost', 'outpost' ) ); ?></h1>
+			<h1 id="outpost-onboarding-title"><?php echo esc_html( __( 'Welcome to Outpost', 'outpost-mobile-publishing' ) ); ?></h1>
 			<p>
 				<?php
 				echo esc_html__(
 					'Outpost is a mobile-first composer for posting to your own WordPress site, built on the IndieWeb specs (Micropub, IndieAuth, microformats2). It only writes posts — not Pages or custom post types — and it leaves the visual paint to your active theme.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
 			<p>
-				<strong><?php echo esc_html__( 'POSSE', 'outpost' ); ?></strong>
+				<strong><?php echo esc_html__( 'POSSE', 'outpost-mobile-publishing' ); ?></strong>
 				<?php
 				echo esc_html__(
 					' — Publish (on your) Own Site, Syndicate Elsewhere. Your domain stays the canonical source; copies go to Mastodon, Twitter / X, Bluesky, or wherever your audience is.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
 		</section>
 
-		<h2><?php echo esc_html( __( 'One more step', 'outpost' ) ); ?></h2>
+		<h2><?php echo esc_html( __( 'One more step', 'outpost-mobile-publishing' ) ); ?></h2>
 		<p><?php echo esc_html( $message ); ?></p>
 		<p>
 			<a class="outpost-install-prompt__action" href="<?php echo esc_url( $action_url ); ?>"><?php echo esc_html( $action_label ); ?></a>
@@ -278,7 +356,7 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		$message = sprintf(
 			/* translators: 1: minimum WP version, 2: minimum PHP version. */
-			__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost' ),
+			__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost-mobile-publishing' ),
 			OUTPOST_MIN_WP,
 			OUTPOST_MIN_PHP
 		);
@@ -288,11 +366,17 @@ final class Outpost_PWA_Shell {
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-	<title><?php echo esc_html( __( 'Outpost setup', 'outpost' ) ); ?></title>
+	<title><?php echo esc_html( __( 'Outpost setup', 'outpost-mobile-publishing' ) ); ?></title>
+		<?php
+		// Registered by render_install_prompt(), the only caller. The body
+		// carries outpost-install-prompt, so it needs those rules; before this
+		// the fallback rendered unstyled.
+		wp_styles()->do_items( array( 'outpost-install-prompt' ) );
+		?>
 </head>
 <body class="outpost-install-prompt outpost-install-prompt--host-unmet">
 	<main>
-		<h1><?php echo esc_html( __( 'Server requirements', 'outpost' ) ); ?></h1>
+		<h1><?php echo esc_html( __( 'Server requirements', 'outpost-mobile-publishing' ) ); ?></h1>
 		<p><?php echo esc_html( $message ); ?></p>
 	</main>
 </body>

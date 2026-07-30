@@ -133,7 +133,7 @@ final class Outpost_Manual_Share_Platform_Registry {
 		return array(
 			array(
 				'id'             => 'instagram-feed',
-				'label'          => __( 'Instagram', 'outpost' ),
+				'label'          => __( 'Instagram', 'outpost-mobile-publishing' ),
 				'icon'           => 'instagram',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -151,12 +151,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => null,
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'Caption is copied to clipboard; paste in app.', 'outpost' ),
+					__( 'Caption is copied to clipboard; paste in app.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'instagram-stories',
-				'label'          => __( 'Instagram Stories', 'outpost' ),
+				'label'          => __( 'Instagram Stories', 'outpost-mobile-publishing' ),
 				'icon'           => 'instagram-stories',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -172,12 +172,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => null,
 				'after_share'    => 'mark_done',
 				'caveats'        => array(
-					__( 'Stories cannot accept captions via intent; type in app after share.', 'outpost' ),
+					__( 'Stories cannot accept captions via intent; type in app after share.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'facebook',
-				'label'          => __( 'Facebook', 'outpost' ),
+				'label'          => __( 'Facebook', 'outpost-mobile-publishing' ),
 				'icon'           => 'facebook',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -193,12 +193,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => 'https://www.facebook.com/sharer.php?u=@source_url',
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'Facebook ignores EXTRA_TEXT in shares since 2014; caption is copied to clipboard for manual paste.', 'outpost' ),
+					__( 'Facebook ignores EXTRA_TEXT in shares since 2014; caption is copied to clipboard for manual paste.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'x-twitter',
-				'label'          => __( 'X', 'outpost' ),
+				'label'          => __( 'X', 'outpost-mobile-publishing' ),
 				'icon'           => 'x-twitter',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -215,12 +215,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => 'https://twitter.com/intent/tweet?text=@caption_encoded',
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'On iOS the caption arrives via web intent; the image attaches separately from the share sheet.', 'outpost' ),
+					__( 'On iOS the caption arrives via web intent; the image attaches separately from the share sheet.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'linkedin',
-				'label'          => __( 'LinkedIn', 'outpost' ),
+				'label'          => __( 'LinkedIn', 'outpost-mobile-publishing' ),
 				'icon'           => 'linkedin',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -237,12 +237,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => null,
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'On iOS the caption goes to clipboard; paste it into the LinkedIn share dialog.', 'outpost' ),
+					__( 'On iOS the caption goes to clipboard; paste it into the LinkedIn share dialog.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'threads',
-				'label'          => __( 'Threads', 'outpost' ),
+				'label'          => __( 'Threads', 'outpost-mobile-publishing' ),
 				'icon'           => 'threads',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image', 'video' ),
@@ -262,7 +262,7 @@ final class Outpost_Manual_Share_Platform_Registry {
 			),
 			array(
 				'id'             => 'tiktok',
-				'label'          => __( 'TikTok', 'outpost' ),
+				'label'          => __( 'TikTok', 'outpost-mobile-publishing' ),
 				'icon'           => 'tiktok',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'video' ),
@@ -278,12 +278,12 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => null,
 				'after_share'    => 'mark_done',
 				'caveats'        => array(
-					__( 'TikTok ignores caption intents; copy/paste in the app.', 'outpost' ),
+					__( 'TikTok ignores caption intents; copy/paste in the app.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'             => 'pinterest',
-				'label'          => __( 'Pinterest', 'outpost' ),
+				'label'          => __( 'Pinterest', 'outpost-mobile-publishing' ),
 				'icon'           => 'pinterest',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image' ),
@@ -303,7 +303,7 @@ final class Outpost_Manual_Share_Platform_Registry {
 			),
 			array(
 				'id'             => 'reddit-manual',
-				'label'          => __( 'Reddit (manual)', 'outpost' ),
+				'label'          => __( 'Reddit (manual)', 'outpost-mobile-publishing' ),
 				'icon'           => 'reddit',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image' ),
@@ -320,13 +320,13 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => 'https://www.reddit.com/submit?url=@source_url&title=@caption_encoded',
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'Pick the subreddit in the app after the share intent fires. Bridgy Publish is the preferred route when configured.', 'outpost' ),
+					__( 'Pick the subreddit in the app after the share intent fires. Bridgy Publish is the preferred route when configured.', 'outpost-mobile-publishing' ),
 				),
 				'prefers_bridgy' => true,
 			),
 			array(
 				'id'             => 'flickr-manual',
-				'label'          => __( 'Flickr (manual)', 'outpost' ),
+				'label'          => __( 'Flickr (manual)', 'outpost-mobile-publishing' ),
 				'icon'           => 'flickr',
 				'accepts_modes'  => array( 'photo', 'gallery' ),
 				'accepts_media'  => array( 'image' ),
@@ -342,7 +342,7 @@ final class Outpost_Manual_Share_Platform_Registry {
 				'web_intent_url' => null,
 				'after_share'    => 'prompt_for_silo_url',
 				'caveats'        => array(
-					__( 'Caption is copied to clipboard; paste in app. Bridgy Publish is the preferred route when configured.', 'outpost' ),
+					__( 'Caption is copied to clipboard; paste in app. Bridgy Publish is the preferred route when configured.', 'outpost-mobile-publishing' ),
 				),
 				'prefers_bridgy' => true,
 			),

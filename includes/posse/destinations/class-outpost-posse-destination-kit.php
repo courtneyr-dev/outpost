@@ -39,7 +39,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 	}
 
 	public function label(): string {
-		return __( 'Kit', 'outpost' );
+		return __( 'Kit', 'outpost-mobile-publishing' );
 	}
 
 	public function provider_id(): string {
@@ -50,14 +50,14 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 		$settings = self::read_settings();
 
 		if ( ! $settings['enabled'] ) {
-			return self::failure_result( __( 'Kit syndication is disabled in settings.', 'outpost' ), false );
+			return self::failure_result( __( 'Kit syndication is disabled in settings.', 'outpost-mobile-publishing' ), false );
 		}
 		if ( '' === $settings['api_secret'] ) {
-			return self::failure_result( __( 'Kit API secret missing.', 'outpost' ), false );
+			return self::failure_result( __( 'Kit API secret missing.', 'outpost-mobile-publishing' ), false );
 		}
 		$post = get_post( $post_id );
 		if ( null === $post ) {
-			return self::failure_result( __( 'Post not found.', 'outpost' ), false );
+			return self::failure_result( __( 'Post not found.', 'outpost-mobile-publishing' ), false );
 		}
 
 		$payload = array(
@@ -66,7 +66,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 			'content'     => Outpost_POSSE_Content_Transformer::to_html_with_canonical( $post_id ),
 			'description' => sprintf(
 				/* translators: %s: WordPress post permalink */
-				__( 'Syndicated from %s', 'outpost' ),
+				__( 'Syndicated from %s', 'outpost-mobile-publishing' ),
 				(string) get_permalink( $post_id )
 			),
 		);
@@ -88,7 +88,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 			return self::failure_result(
 				sprintf(
 					/* translators: %s: error message */
-					__( 'Kit request failed: %s', 'outpost' ),
+					__( 'Kit request failed: %s', 'outpost-mobile-publishing' ),
 					$response->get_error_message()
 				),
 				true
@@ -113,7 +113,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 				}
 			}
 			if ( '' === $syndication_url ) {
-				return self::failure_result( __( 'Kit accepted the broadcast but returned no identifier.', 'outpost' ), false );
+				return self::failure_result( __( 'Kit accepted the broadcast but returned no identifier.', 'outpost-mobile-publishing' ), false );
 			}
 			return self::success_result( $syndication_url );
 		}
@@ -121,7 +121,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 		return self::failure_result(
 			sprintf(
 				/* translators: 1: HTTP status code, 2: response body */
-				__( 'Kit returned HTTP %1$d: %2$s', 'outpost' ),
+				__( 'Kit returned HTTP %1$d: %2$s', 'outpost-mobile-publishing' ),
 				$status,
 				wp_strip_all_tags( $body )
 			),
@@ -150,19 +150,19 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 	 */
 	public static function register_settings_fields( array $fields ): array {
 		$fields['kit_enabled']    = array(
-			'label'       => __( 'Syndicate to Kit', 'outpost' ),
+			'label'       => __( 'Syndicate to Kit', 'outpost-mobile-publishing' ),
 			'type'        => 'checkbox',
 			'sensitive'   => false,
-			'description' => __( 'When checked, published posts fan out as Kit broadcast drafts.', 'outpost' ),
+			'description' => __( 'When checked, published posts fan out as Kit broadcast drafts.', 'outpost-mobile-publishing' ),
 			'default'     => false,
 		);
 		$fields['kit_api_secret'] = array(
-			'label'       => __( 'Kit API secret (v3)', 'outpost' ),
+			'label'       => __( 'Kit API secret (v3)', 'outpost-mobile-publishing' ),
 			'type'        => 'password',
 			'sensitive'   => true,
 			'description' => __(
 				'Kit account → Settings → Advanced → API. Use the API Secret (not the API Key) — broadcast creation requires the secret. Stored encrypted. Kit OAuth v4 connection arrives in the next release; this v3 path stays supported alongside it.',
-				'outpost'
+				'outpost-mobile-publishing'
 			),
 			'default'     => '',
 		);

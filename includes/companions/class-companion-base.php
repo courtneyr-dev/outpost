@@ -127,14 +127,14 @@ abstract class Outpost_Companion_Base {
 	 *
 	 *     [
 	 *         'id'              => 'activitypub',                          // stable machine ID
-	 *         'label'           => __( 'Fediverse', 'outpost' ),           // i18n display name
+	 *         'label'           => __( 'Fediverse', 'outpost-mobile-publishing' ),           // i18n display name
 	 *         'detected'        => true,                                   // sibling-plugin presence
 	 *         'accepts_modes'   => [ 'note', 'photo', ... ],               // composer modes accepted
 	 *         'accepts_media'   => [ 'image', 'video', 'audio' ],          // media kinds accepted
 	 *         'max_attachments' => null,                                   // null = no companion-side limit
 	 *         'alt_passthrough' => true,                                   // image alt text propagates
 	 *         'char_limit'      => null,                                   // null = no companion-side limit
-	 *         'caveats'         => [ __( 'Bluesky via Bridgy Fed has stricter limits.', 'outpost' ) ],
+	 *         'caveats'         => [ __( 'Bluesky via Bridgy Fed has stricter limits.', 'outpost-mobile-publishing' ) ],
 	 *         'requires_auth'   => false,                                  // user must connect creds first?
 	 *     ]
 	 *

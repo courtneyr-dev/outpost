@@ -77,7 +77,7 @@ final class Outpost_Fetch_Recent_Oura {
 			$providers = array();
 		}
 		$providers[ self::PROVIDER_ID ] = array(
-			'label'          => __( 'Oura', 'outpost' ),
+			'label'          => __( 'Oura', 'outpost-mobile-publishing' ),
 			'callback'       => array( __CLASS__, 'fetch_items' ),
 			'capability'     => 'publish_posts',
 			'oauth_provider' => self::PROVIDER_ID,
@@ -165,7 +165,7 @@ final class Outpost_Fetch_Recent_Oura {
 	 * @return array<string,mixed>
 	 */
 	public static function map_workout_item( array $workout ): array {
-		$activity    = isset( $workout['activity'] ) ? ucfirst( str_replace( '_', ' ', (string) $workout['activity'] ) ) : __( 'Workout', 'outpost' );
+		$activity    = isset( $workout['activity'] ) ? ucfirst( str_replace( '_', ' ', (string) $workout['activity'] ) ) : __( 'Workout', 'outpost-mobile-publishing' );
 		$distance_m  = isset( $workout['distance'] ) ? (float) $workout['distance'] : 0.0;
 		$distance_km = $distance_m > 0 ? round( $distance_m / 1000, 1 ) : 0.0;
 		$kcal        = isset( $workout['calories'] ) ? (int) round( (float) $workout['calories'] ) : 0;
@@ -176,13 +176,13 @@ final class Outpost_Fetch_Recent_Oura {
 		$title = $distance_km > 0
 			? sprintf(
 				/* translators: 1: activity name, 2: distance in km. */
-				__( 'Workout — %1$s, %2$s km', 'outpost' ),
+				__( 'Workout — %1$s, %2$s km', 'outpost-mobile-publishing' ),
 				$activity,
 				(string) $distance_km
 			)
 			: sprintf(
 				/* translators: %s: activity name. */
-				__( 'Workout — %s', 'outpost' ),
+				__( 'Workout — %s', 'outpost-mobile-publishing' ),
 				$activity
 			);
 
@@ -193,14 +193,14 @@ final class Outpost_Fetch_Recent_Oura {
 		if ( $duration_m > 0 ) {
 			$subtitle_parts[] = sprintf(
 				/* translators: %d: duration in minutes. */
-				__( '%d min', 'outpost' ),
+				__( '%d min', 'outpost-mobile-publishing' ),
 				$duration_m
 			);
 		}
 		if ( $kcal > 0 ) {
 			$subtitle_parts[] = sprintf(
 				/* translators: %d: calories. */
-				__( '%d kcal', 'outpost' ),
+				__( '%d kcal', 'outpost-mobile-publishing' ),
 				$kcal
 			);
 		}
@@ -245,22 +245,22 @@ final class Outpost_Fetch_Recent_Oura {
 
 		$title = sprintf(
 			/* translators: %s: date. */
-			__( 'Sleep — %s', 'outpost' ),
-			'' !== $day ? $day : __( 'recent', 'outpost' )
+			__( 'Sleep — %s', 'outpost-mobile-publishing' ),
+			'' !== $day ? $day : __( 'recent', 'outpost-mobile-publishing' )
 		);
 
 		$subtitle_parts = array();
 		if ( $hours > 0 ) {
 			$subtitle_parts[] = sprintf(
 				/* translators: %s: hours of sleep. */
-				__( '%s hours', 'outpost' ),
+				__( '%s hours', 'outpost-mobile-publishing' ),
 				(string) $hours
 			);
 		}
 		if ( $score > 0 ) {
 			$subtitle_parts[] = sprintf(
 				/* translators: %d: sleep score. */
-				__( 'score: %d', 'outpost' ),
+				__( 'score: %d', 'outpost-mobile-publishing' ),
 				$score
 			);
 		}

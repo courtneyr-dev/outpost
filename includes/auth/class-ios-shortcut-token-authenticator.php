@@ -99,7 +99,7 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 		if ( ! self::request_targets_shortcut_endpoint() ) {
 			return new \WP_Error(
 				'outpost_ios_shortcut_token_out_of_scope',
-				__( 'This token is scoped to the iOS Shortcut endpoint and cannot authenticate other requests.', 'outpost' ),
+				__( 'This token is scoped to the iOS Shortcut endpoint and cannot authenticate other requests.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}

@@ -114,7 +114,7 @@ final class Outpost_Syndication_Capture_Controller {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost syndication capture requires an authenticated user.', 'outpost' ),
+				__( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -133,7 +133,7 @@ final class Outpost_Syndication_Capture_Controller {
 		if ( $user_id <= 0 ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You must be logged in.', 'outpost' ),
+				__( 'You must be logged in.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -165,14 +165,14 @@ final class Outpost_Syndication_Capture_Controller {
 		if ( $post_id <= 0 ) {
 			return new WP_Error(
 				'invalid_post_id',
-				__( 'A positive post_id is required.', 'outpost' ),
+				__( 'A positive post_id is required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden_post',
-				__( 'You do not have permission to update syndication for this post.', 'outpost' ),
+				__( 'You do not have permission to update syndication for this post.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -181,7 +181,7 @@ final class Outpost_Syndication_Capture_Controller {
 		if ( '' === $audit_log_id ) {
 			return new WP_Error(
 				'invalid_audit_log_id',
-				__( 'audit_log_id is required.', 'outpost' ),
+				__( 'audit_log_id is required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -202,7 +202,7 @@ final class Outpost_Syndication_Capture_Controller {
 		if ( null === $entry ) {
 			return new WP_Error(
 				'audit_log_entry_not_found',
-				__( 'No matching audit log entry. The PWA may have stale state.', 'outpost' ),
+				__( 'No matching audit log entry. The PWA may have stale state.', 'outpost-mobile-publishing' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -222,7 +222,7 @@ final class Outpost_Syndication_Capture_Controller {
 					'silo_url'    => $silo_url,
 					'message'     => sprintf(
 						/* translators: %1$s: platform id; %2$s: pasted URL host. */
-						__( 'This URL\'s domain doesn\'t match the expected %1$s domain. Confirm the URL is correct, then resubmit with confirm_mismatch=true.', 'outpost' ),
+						__( 'This URL\'s domain doesn\'t match the expected %1$s domain. Confirm the URL is correct, then resubmit with confirm_mismatch=true.', 'outpost-mobile-publishing' ),
 						$platform_id
 					),
 				),

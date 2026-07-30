@@ -103,7 +103,7 @@ final class Outpost_Pending_Syndication_Notice {
 						'This post has %d pending syndication.',
 						'This post has %d pending syndications.',
 						$count,
-						'outpost'
+						'outpost-mobile-publishing'
 					);
 					printf( esc_html( $message ), (int) $count );
 					?>
@@ -131,9 +131,9 @@ final class Outpost_Pending_Syndication_Notice {
 				<?php endforeach; ?>
 			</ul>
 			<p>
-				<?php esc_html_e( 'Open the Outpost composer to paste the silo URLs and complete syndication.', 'outpost' ); ?>
+				<?php esc_html_e( 'Open the Outpost composer to paste the silo URLs and complete syndication.', 'outpost-mobile-publishing' ); ?>
 				<a href="<?php echo esc_url( home_url( '/post/' ) ); ?>" class="outpost-pending-syndication-notice__detail-link">
-					<?php esc_html_e( 'View detail', 'outpost' ); ?>
+					<?php esc_html_e( 'View detail', 'outpost-mobile-publishing' ); ?>
 				</a>
 			</p>
 		</div>
@@ -175,7 +175,7 @@ final class Outpost_Pending_Syndication_Notice {
 		}
 		return sprintf(
 			/* translators: %s: human time diff (e.g. "2 hours"). */
-			__( 'fired %s ago', 'outpost' ),
+			__( 'fired %s ago', 'outpost-mobile-publishing' ),
 			human_time_diff( $ts, time() )
 		);
 	}

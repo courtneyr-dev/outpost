@@ -30,7 +30,7 @@ final class Outpost_Source_SoundCloud extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'SoundCloud', 'outpost' ),
+			'label'            => __( 'SoundCloud', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'soundcloud.com', 'on.soundcloud.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'listen',

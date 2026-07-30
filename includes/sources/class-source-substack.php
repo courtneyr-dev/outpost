@@ -33,7 +33,7 @@ final class Outpost_Source_Substack extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Substack', 'outpost' ),
+			'label'            => __( 'Substack', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( '*.substack.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'read',

@@ -112,7 +112,7 @@ final class Outpost_Media_Lookup_Endpoint {
 			return $user;
 		}
 		// Header present (host didn't strip it) — nothing to restore.
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) || ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+		if ( '' !== Outpost_Request_Headers::authorization() ) {
 			return $user;
 		}
 		$token = self::body_access_token();
@@ -195,7 +195,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost media lookup requires an authenticated user.', 'outpost' ),
+				__( 'Outpost media lookup requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -220,7 +220,7 @@ final class Outpost_Media_Lookup_Endpoint {
 				'invalid_query',
 				sprintf(
 					/* translators: 1: minimum length, 2: maximum length */
-					__( 'Search query must be between %1$d and %2$d characters.', 'outpost' ),
+					__( 'Search query must be between %1$d and %2$d characters.', 'outpost-mobile-publishing' ),
 					self::QUERY_MIN_LENGTH,
 					self::QUERY_MAX_LENGTH
 				),
@@ -232,7 +232,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( null === $category ) {
 			return new WP_Error(
 				'invalid_kind',
-				__( 'Unknown lookup kind.', 'outpost' ),
+				__( 'Unknown lookup kind.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -242,7 +242,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( 'active' !== Outpost_Companion_Detector::is_post_kinds_active() ) {
 			return new WP_Error(
 				'post_kinds_inactive',
-				__( 'Post Kinds for IndieWeb must be active to look up media.', 'outpost' ),
+				__( 'Post Kinds for IndieWeb must be active to look up media.', 'outpost-mobile-publishing' ),
 				array( 'status' => 501 )
 			);
 		}
@@ -263,7 +263,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error(
 				'lookup_failed',
-				__( 'The metadata lookup service could not be reached.', 'outpost' ),
+				__( 'The metadata lookup service could not be reached.', 'outpost-mobile-publishing' ),
 				array( 'status' => 502 )
 			);
 		}
@@ -278,7 +278,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( 401 === $status || 403 === $status ) {
 			return new WP_Error(
 				'unauthorized',
-				__( 'The lookup was not authorized. Sign out and back in to refresh your token.', 'outpost' ),
+				__( 'The lookup was not authorized. Sign out and back in to refresh your token.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -295,7 +295,7 @@ final class Outpost_Media_Lookup_Endpoint {
 			}
 			return new WP_Error(
 				'lookup_failed',
-				__( 'The metadata lookup service returned an error.', 'outpost' ),
+				__( 'The metadata lookup service returned an error.', 'outpost-mobile-publishing' ),
 				array( 'status' => 502 )
 			);
 		}
@@ -390,7 +390,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
 			return new WP_Error(
 				'rate_limited',
-				__( 'Too many lookups. Try again in a minute.', 'outpost' ),
+				__( 'Too many lookups. Try again in a minute.', 'outpost-mobile-publishing' ),
 				array(
 					'status'     => 429,
 					'retryAfter' => 60,

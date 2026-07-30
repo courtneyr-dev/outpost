@@ -59,48 +59,169 @@ final class Outpost_Admin_Page {
 		),
 	);
 
+	/**
+	 * Hook suffix returned by add_menu_page, used to scope asset loading to
+	 * this screen. Null until admin_menu has run.
+	 */
+	private static ?string $hook_suffix = null;
+
 	public static function register(): void {
 		add_action( 'admin_menu', array( self::class, 'register_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_assets' ) );
 	}
 
 	public static function register_menu(): void {
-		add_menu_page(
-			__( 'Outpost', 'outpost' ),
-			__( 'Outpost', 'outpost' ),
+		$suffix = add_menu_page(
+			__( 'Outpost', 'outpost-mobile-publishing' ),
+			__( 'Outpost', 'outpost-mobile-publishing' ),
 			'manage_options',
 			self::MENU_SLUG,
 			array( self::class, 'render_page' ),
 			'dashicons-share-alt2',
 			76
 		);
+
+		self::$hook_suffix = ( is_string( $suffix ) && '' !== $suffix ) ? $suffix : null;
+	}
+
+	/**
+	 * Register this screen's CSS and JS through the enqueue API.
+	 *
+	 * Both are inline-only: the CSS is a few dozen layout rules and the JS is
+	 * one copy-to-clipboard delegate, so neither earns a separate HTTP
+	 * request. Registering with a `false` src and attaching via
+	 * wp_add_inline_style/wp_add_inline_script keeps them inside the
+	 * dependency system — other plugins can dequeue or filter them, and they
+	 * print in the documented order — instead of being echoed mid-markup.
+	 *
+	 * @param string $hook_suffix Current admin screen.
+	 */
+	public static function enqueue_assets( string $hook_suffix ): void {
+		if ( null === self::$hook_suffix || $hook_suffix !== self::$hook_suffix ) {
+			return;
+		}
+
+		wp_register_style( 'outpost-admin-page', false, array(), OUTPOST_VERSION );
+		wp_enqueue_style( 'outpost-admin-page' );
+		wp_add_inline_style( 'outpost-admin-page', self::inline_css() );
+
+		wp_register_script( 'outpost-admin-page', false, array(), OUTPOST_VERSION, true );
+		wp_enqueue_script( 'outpost-admin-page' );
+		wp_add_inline_script( 'outpost-admin-page', self::inline_js() );
+	}
+
+	/** Layout rules for the bookmarklet grid and step list. */
+	private static function inline_css(): string {
+		return '
+			.outpost-admin__steps,
+			.outpost-admin__platform-list {
+				max-width: 60em;
+				line-height: 1.6;
+			}
+			.outpost-admin__bookmarklets {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(min(100%, 22em), 1fr));
+				gap: 1rem;
+				margin: 1rem 0 1.5rem;
+			}
+			.outpost-admin__bookmarklet {
+				padding: 1rem;
+			}
+			.outpost-admin__bookmarklet-title {
+				margin: 0 0 0.5rem;
+				font-size: 1.05rem;
+			}
+			.outpost-admin__bookmarklet-desc {
+				margin: 0 0 0.75rem;
+			}
+			.outpost-admin__bookmarklet-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				align-items: center;
+				margin: 0;
+			}
+			.outpost-admin__drag-handle {
+				min-height: 44px;
+				display: inline-flex;
+				align-items: center;
+			}
+			.outpost-admin__bookmarklet-details {
+				flex-basis: 100%;
+			}
+			.outpost-admin__bookmarklet-details summary {
+				cursor: pointer;
+				padding: 0.5rem 0;
+			}
+			@media (max-width: 600px) {
+				.outpost-admin__bookmarklet-actions .button {
+					width: 100%;
+				}
+			}
+		';
+	}
+
+	/** Copy-to-clipboard delegate for the bookmarklet and share-target fields. */
+	private static function inline_js(): string {
+		return '
+			( function () {
+				document.addEventListener( "click", function ( event ) {
+					var trigger = event.target && event.target.closest && event.target.closest( "[data-outpost-copy-source]" );
+					if ( ! trigger ) return;
+					var sourceId = trigger.getAttribute( "data-outpost-copy-source" );
+					var source = document.getElementById( sourceId );
+					if ( ! source ) return;
+					event.preventDefault();
+					var text = source.value;
+					var done = function () {
+						var original = trigger.textContent;
+						trigger.textContent = "' . esc_js( __( 'Copied!', 'outpost-mobile-publishing' ) ) . '";
+						setTimeout( function () {
+							trigger.textContent = original;
+						}, 1500 );
+					};
+					if ( navigator.clipboard && navigator.clipboard.writeText ) {
+						navigator.clipboard.writeText( text ).then( done, function () {
+							source.select();
+							document.execCommand( "copy" );
+							done();
+						} );
+					} else {
+						source.select();
+						document.execCommand( "copy" );
+						done();
+					}
+				} );
+			} )();
+		';
 	}
 
 	public static function render_page(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost' ) );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost-mobile-publishing' ) );
 		}
 
 		$composer_url = home_url( '/post/' );
 		$share_target = home_url( '/post/share-target' );
 		?>
 		<div class="wrap outpost-admin">
-			<h1><?php echo esc_html__( 'Outpost', 'outpost' ); ?></h1>
+			<h1><?php echo esc_html__( 'Outpost', 'outpost-mobile-publishing' ); ?></h1>
 			<p>
 				<?php
 				printf(
 					/* translators: %s: composer URL */
-					esc_html__( 'Composer lives at %s. Sign in there with IndieAuth, then start posting.', 'outpost' ),
+					esc_html__( 'Composer lives at %s. Sign in there with IndieAuth, then start posting.', 'outpost-mobile-publishing' ),
 					'<code><a href="' . esc_url( $composer_url ) . '">' . esc_html( $composer_url ) . '</a></code>'
 				);
 				?>
 			</p>
 
-			<h2><?php echo esc_html__( 'On your phone (recommended)', 'outpost' ); ?></h2>
+			<h2><?php echo esc_html__( 'On your phone (recommended)', 'outpost-mobile-publishing' ); ?></h2>
 			<p>
 				<?php
 				echo esc_html__(
 					'On mobile the share sheet beats bookmarklets. Install Outpost once, then any app with a Share button can send pages straight to the composer.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
@@ -109,26 +230,26 @@ final class Outpost_Admin_Page {
 					<?php
 					printf(
 						/* translators: %s: composer URL link */
-						esc_html__( 'Open %s in Safari (iPhone) or Chrome (Android).', 'outpost' ),
+						esc_html__( 'Open %s in Safari (iPhone) or Chrome (Android).', 'outpost-mobile-publishing' ),
 						'<a href="' . esc_url( $composer_url ) . '">' . esc_html( $composer_url ) . '</a>'
 					);
 					?>
 				</li>
 				<li>
-					<strong><?php echo esc_html__( 'iPhone:', 'outpost' ); ?></strong>
+					<strong><?php echo esc_html__( 'iPhone:', 'outpost-mobile-publishing' ); ?></strong>
 					<?php
 					echo esc_html__(
 						'tap the Share button, scroll, tap "Add to Home Screen." Outpost appears as an app icon.',
-						'outpost'
+						'outpost-mobile-publishing'
 					);
 					?>
 				</li>
 				<li>
-					<strong><?php echo esc_html__( 'Android:', 'outpost' ); ?></strong>
+					<strong><?php echo esc_html__( 'Android:', 'outpost-mobile-publishing' ); ?></strong>
 					<?php
 					echo esc_html__(
 						'tap the menu (⋮), then "Install app" or "Add to Home screen."',
-						'outpost'
+						'outpost-mobile-publishing'
 					);
 					?>
 				</li>
@@ -136,18 +257,18 @@ final class Outpost_Admin_Page {
 					<?php
 					echo esc_html__(
 						'On any web page, tap Share → Outpost. The composer opens with the page URL and title pre-filled.',
-						'outpost'
+						'outpost-mobile-publishing'
 					);
 					?>
 				</li>
 			</ol>
 
-			<h2><?php echo esc_html__( 'Bookmarklets', 'outpost' ); ?></h2>
+			<h2><?php echo esc_html__( 'Bookmarklets', 'outpost-mobile-publishing' ); ?></h2>
 			<p>
 				<?php
 				echo esc_html__(
 					'Pick a Reply variant. On desktop, drag the button to your bookmarks bar. On mobile, long-press the button and choose "Add Bookmark." Tap the saved bookmark from any page to compose a reply against that page.',
-					'outpost'
+					'outpost-mobile-publishing'
 				);
 				?>
 			</p>
@@ -167,7 +288,7 @@ final class Outpost_Admin_Page {
 						<h3 id="outpost-bookmarklet-heading-<?php echo esc_attr( $variant ); ?>" class="outpost-admin__bookmarklet-title">
 							<?php
 							/* translators: %s: variant label, e.g. "Reply" */
-							echo esc_html( sprintf( __( 'Outpost: %s', 'outpost' ), $label ) );
+							echo esc_html( sprintf( __( 'Outpost: %s', 'outpost-mobile-publishing' ), $label ) );
 							?>
 						</h3>
 						<p class="outpost-admin__bookmarklet-desc">
@@ -181,7 +302,7 @@ final class Outpost_Admin_Page {
 							>
 								<?php
 								/* translators: %s: variant label, e.g. "Reply" */
-								echo esc_html( sprintf( __( 'Drag or long-press: %s', 'outpost' ), $label ) );
+								echo esc_html( sprintf( __( 'Drag or long-press: %s', 'outpost-mobile-publishing' ), $label ) );
 								?>
 							</a>
 							<button
@@ -189,10 +310,10 @@ final class Outpost_Admin_Page {
 								class="button"
 								data-outpost-copy-source="<?php echo esc_attr( $source_id ); ?>"
 							>
-								<?php echo esc_html__( 'Copy source', 'outpost' ); ?>
+								<?php echo esc_html__( 'Copy source', 'outpost-mobile-publishing' ); ?>
 							</button>
 							<details class="outpost-admin__bookmarklet-details">
-								<summary><?php echo esc_html__( 'Show source', 'outpost' ); ?></summary>
+								<summary><?php echo esc_html__( 'Show source', 'outpost-mobile-publishing' ); ?></summary>
 								<textarea
 									readonly
 									rows="3"
@@ -206,107 +327,29 @@ final class Outpost_Admin_Page {
 				<?php endforeach; ?>
 			</div>
 
-			<h3><?php echo esc_html__( 'How it works', 'outpost' ); ?></h3>
+			<h3><?php echo esc_html__( 'How it works', 'outpost-mobile-publishing' ); ?></h3>
 			<ul class="outpost-admin__platform-list">
 				<li>
-					<strong><?php echo esc_html__( 'Desktop:', 'outpost' ); ?></strong>
-					<?php echo esc_html__( 'drag the colored button to your bookmarks bar. Click it from any page.', 'outpost' ); ?>
+					<strong><?php echo esc_html__( 'Desktop:', 'outpost-mobile-publishing' ); ?></strong>
+					<?php echo esc_html__( 'drag the colored button to your bookmarks bar. Click it from any page.', 'outpost-mobile-publishing' ); ?>
 				</li>
 				<li>
-					<strong><?php echo esc_html__( 'iPhone Safari:', 'outpost' ); ?></strong>
-					<?php echo esc_html__( 'long-press the button, choose "Add Bookmark." Later, tap the bookmarks icon, find the saved bookmark, tap to run on the current page.', 'outpost' ); ?>
+					<strong><?php echo esc_html__( 'iPhone Safari:', 'outpost-mobile-publishing' ); ?></strong>
+					<?php echo esc_html__( 'long-press the button, choose "Add Bookmark." Later, tap the bookmarks icon, find the saved bookmark, tap to run on the current page.', 'outpost-mobile-publishing' ); ?>
 				</li>
 				<li>
-					<strong><?php echo esc_html__( 'Android Chrome:', 'outpost' ); ?></strong>
-					<?php echo esc_html__( 'long-press the button, choose "Copy link," then save it as a bookmark from the menu.', 'outpost' ); ?>
+					<strong><?php echo esc_html__( 'Android Chrome:', 'outpost-mobile-publishing' ); ?></strong>
+					<?php echo esc_html__( 'long-press the button, choose "Copy link," then save it as a bookmark from the menu.', 'outpost-mobile-publishing' ); ?>
 				</li>
 				<li>
-					<?php echo esc_html__( 'Either way, the page URL, title, and any text you had selected get sent to Outpost with the right variant pre-selected.', 'outpost' ); ?>
+					<?php echo esc_html__( 'Either way, the page URL, title, and any text you had selected get sent to Outpost with the right variant pre-selected.', 'outpost-mobile-publishing' ); ?>
 				</li>
 			</ul>
 
-			<style>
-				.outpost-admin__steps,
-				.outpost-admin__platform-list {
-					max-width: 60em;
-					line-height: 1.6;
-				}
-				.outpost-admin__bookmarklets {
-					display: grid;
-					grid-template-columns: repeat(auto-fill, minmax(min(100%, 22em), 1fr));
-					gap: 1rem;
-					margin: 1rem 0 1.5rem;
-				}
-				.outpost-admin__bookmarklet {
-					padding: 1rem;
-				}
-				.outpost-admin__bookmarklet-title {
-					margin: 0 0 0.5rem;
-					font-size: 1.05rem;
-				}
-				.outpost-admin__bookmarklet-desc {
-					margin: 0 0 0.75rem;
-				}
-				.outpost-admin__bookmarklet-actions {
-					display: flex;
-					flex-wrap: wrap;
-					gap: 0.5rem;
-					align-items: center;
-					margin: 0;
-				}
-				.outpost-admin__drag-handle {
-					min-height: 44px;
-					display: inline-flex;
-					align-items: center;
-				}
-				.outpost-admin__bookmarklet-details {
-					flex-basis: 100%;
-				}
-				.outpost-admin__bookmarklet-details summary {
-					cursor: pointer;
-					padding: 0.5rem 0;
-				}
-				@media (max-width: 600px) {
-					.outpost-admin__bookmarklet-actions .button {
-						width: 100%;
-					}
-				}
-			</style>
-			<script>
-				( function () {
-					document.addEventListener( 'click', function ( event ) {
-						var trigger = event.target && event.target.closest && event.target.closest( '[data-outpost-copy-source]' );
-						if ( ! trigger ) return;
-						var sourceId = trigger.getAttribute( 'data-outpost-copy-source' );
-						var source = document.getElementById( sourceId );
-						if ( ! source ) return;
-						event.preventDefault();
-						var text = source.value;
-						var done = function () {
-							var original = trigger.textContent;
-							trigger.textContent = '<?php echo esc_js( __( 'Copied!', 'outpost' ) ); ?>';
-							setTimeout( function () {
-								trigger.textContent = original;
-							}, 1500 );
-						};
-						if ( navigator.clipboard && navigator.clipboard.writeText ) {
-							navigator.clipboard.writeText( text ).then( done, function () {
-								source.select();
-								document.execCommand( 'copy' );
-								done();
-							} );
-						} else {
-							source.select();
-							document.execCommand( 'copy' );
-							done();
-						}
-					} );
-				} )();
-			</script>
 
 			<hr style="margin: 2rem 0;" />
 
-			<h2><?php echo esc_html__( 'Settings', 'outpost' ); ?></h2>
+			<h2><?php echo esc_html__( 'Settings', 'outpost-mobile-publishing' ); ?></h2>
 			<?php Outpost_Settings::render_form(); ?>
 		</div>
 		<?php

@@ -80,14 +80,14 @@ final class Outpost_Appearance_REST_Controller {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error(
 				'outpost_appearance_unauthorized',
-				__( 'Authentication required.', 'outpost' ),
+				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new \WP_Error(
 				'outpost_appearance_forbidden',
-				__( 'You do not have permission to manage appearance preferences.', 'outpost' ),
+				__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -110,7 +110,7 @@ final class Outpost_Appearance_REST_Controller {
 		if ( $user_id <= 0 ) {
 			return new \WP_Error(
 				'outpost_appearance_no_user',
-				__( 'Authentication required.', 'outpost' ),
+				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -160,7 +160,7 @@ final class Outpost_Appearance_REST_Controller {
 		if ( $user_id <= 0 ) {
 			return new \WP_Error(
 				'outpost_appearance_no_user',
-				__( 'Authentication required.', 'outpost' ),
+				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -172,7 +172,7 @@ final class Outpost_Appearance_REST_Controller {
 		if ( ! is_array( $body ) ) {
 			return new \WP_Error(
 				'outpost_appearance_invalid_body',
-				__( 'Request body must be a JSON object.', 'outpost' ),
+				__( 'Request body must be a JSON object.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -187,7 +187,7 @@ final class Outpost_Appearance_REST_Controller {
 				if ( ! $saved ) {
 					return new \WP_Error(
 						'outpost_appearance_invalid_mode',
-						__( 'Invalid mode_preference value.', 'outpost' ),
+						__( 'Invalid mode_preference value.', 'outpost-mobile-publishing' ),
 						array( 'status' => 400 )
 					);
 				}
@@ -263,7 +263,7 @@ final class Outpost_Appearance_REST_Controller {
 						'outpost_appearance_invalid_color_slug',
 						sprintf(
 							/* translators: %s: rejected token slug. */
-							__( 'Invalid color token slug: %s', 'outpost' ),
+							__( 'Invalid color token slug: %s', 'outpost-mobile-publishing' ),
 							$slug
 						),
 						array( 'status' => 400 )
@@ -279,7 +279,7 @@ final class Outpost_Appearance_REST_Controller {
 						'outpost_appearance_invalid_color_value',
 						sprintf(
 							/* translators: 1: token slug, 2: rejected value. */
-							__( 'Invalid color value for %1$s: %2$s', 'outpost' ),
+							__( 'Invalid color value for %1$s: %2$s', 'outpost-mobile-publishing' ),
 							$slug,
 							$value
 						),
@@ -297,7 +297,7 @@ final class Outpost_Appearance_REST_Controller {
 						'outpost_appearance_invalid_font_slug',
 						sprintf(
 							/* translators: %s: rejected token slug. */
-							__( 'Invalid font token slug: %s', 'outpost' ),
+							__( 'Invalid font token slug: %s', 'outpost-mobile-publishing' ),
 							$slug
 						),
 						array( 'status' => 400 )
@@ -313,7 +313,7 @@ final class Outpost_Appearance_REST_Controller {
 						'outpost_appearance_invalid_font_value',
 						sprintf(
 							/* translators: 1: token slug, 2: rejected value. */
-							__( 'Invalid font value for %1$s: %2$s', 'outpost' ),
+							__( 'Invalid font value for %1$s: %2$s', 'outpost-mobile-publishing' ),
 							$slug,
 							$value
 						),
@@ -336,7 +336,7 @@ final class Outpost_Appearance_REST_Controller {
 		if ( ! is_array( $value ) ) {
 			return new \WP_Error(
 				'outpost_appearance_invalid_bypass',
-				__( 'bypass_contrast must be a list of token slugs.', 'outpost' ),
+				__( 'bypass_contrast must be a list of token slugs.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}

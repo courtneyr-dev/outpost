@@ -126,7 +126,7 @@ final class Outpost_Preview_Endpoint {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost preview requires an authenticated user.', 'outpost' ),
+				__( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -152,7 +152,7 @@ final class Outpost_Preview_Endpoint {
 		}
 		// Restore a stripped Authorization header so IndieAuth's
 		// determine_current_user callback can read and validate the token.
-		if ( empty( $_SERVER['HTTP_AUTHORIZATION'] ) && empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+		if ( '' === Outpost_Request_Headers::authorization() ) {
 			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
 		}
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
@@ -172,14 +172,7 @@ final class Outpost_Preview_Endpoint {
 	 * and leak-safe.
 	 */
 	private static function bearer_token(): string {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
 		}
@@ -268,7 +261,7 @@ final class Outpost_Preview_Endpoint {
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error(
 				'fetch_failed',
-				__( 'Could not fetch the target URL.', 'outpost' ),
+				__( 'Could not fetch the target URL.', 'outpost-mobile-publishing' ),
 				array(
 					'status' => 502,
 					'detail' => $response->get_error_message(),
@@ -281,7 +274,7 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'fetch_failed',
 				/* translators: %d: HTTP status code */
-				sprintf( __( 'Target URL returned HTTP %d.', 'outpost' ), $status ),
+				sprintf( __( 'Target URL returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => 502 )
 			);
 		}
@@ -290,7 +283,7 @@ final class Outpost_Preview_Endpoint {
 		if ( ! self::content_type_is_allowed( $content_type ) ) {
 			return new WP_Error(
 				'unsupported_content_type',
-				__( 'Target URL did not return HTML.', 'outpost' ),
+				__( 'Target URL did not return HTML.', 'outpost-mobile-publishing' ),
 				array(
 					'status'      => 415,
 					'contentType' => $content_type,
@@ -302,7 +295,7 @@ final class Outpost_Preview_Endpoint {
 		if ( strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
 			return new WP_Error(
 				'response_too_large',
-				__( 'Target URL response exceeded the 5 MB cap.', 'outpost' ),
+				__( 'Target URL response exceeded the 5 MB cap.', 'outpost-mobile-publishing' ),
 				array( 'status' => 413 )
 			);
 		}
@@ -399,7 +392,7 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'unknown_extractor',
 				/* translators: %s: extractor type id */
-				sprintf( __( 'Source declares an unrecognized extractor type: %s', 'outpost' ), $extractor_id ),
+				sprintf( __( 'Source declares an unrecognized extractor type: %s', 'outpost-mobile-publishing' ), $extractor_id ),
 				array( 'status' => 500 )
 			);
 		}
@@ -411,7 +404,7 @@ final class Outpost_Preview_Endpoint {
 		} catch ( \InvalidArgumentException $e ) {
 			return new WP_Error(
 				'invalid_recipe',
-				__( 'Source recipe is invalid for the requested URL.', 'outpost' ),
+				__( 'Source recipe is invalid for the requested URL.', 'outpost-mobile-publishing' ),
 				array(
 					'status' => 500,
 					'detail' => $e->getMessage(),
@@ -435,7 +428,7 @@ final class Outpost_Preview_Endpoint {
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error(
 				'fetch_failed',
-				__( 'Could not fetch the source URL through the extractor.', 'outpost' ),
+				__( 'Could not fetch the source URL through the extractor.', 'outpost-mobile-publishing' ),
 				array(
 					'status' => 502,
 					'detail' => $response->get_error_message(),
@@ -448,7 +441,7 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'fetch_failed',
 				/* translators: %d: HTTP status code */
-				sprintf( __( 'Source URL returned HTTP %d.', 'outpost' ), $status ),
+				sprintf( __( 'Source URL returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => 502 )
 			);
 		}
@@ -458,7 +451,7 @@ final class Outpost_Preview_Endpoint {
 		if ( ! self::content_type_matches( $content_type, $expected ) ) {
 			return new WP_Error(
 				'unsupported_content_type',
-				__( 'Source response content type is not one of the extractor accepted types.', 'outpost' ),
+				__( 'Source response content type is not one of the extractor accepted types.', 'outpost-mobile-publishing' ),
 				array(
 					'status'      => 415,
 					'contentType' => $content_type,
@@ -471,7 +464,7 @@ final class Outpost_Preview_Endpoint {
 		if ( strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
 			return new WP_Error(
 				'response_too_large',
-				__( 'Source response exceeded the 5 MB cap.', 'outpost' ),
+				__( 'Source response exceeded the 5 MB cap.', 'outpost-mobile-publishing' ),
 				array( 'status' => 413 )
 			);
 		}
@@ -482,13 +475,13 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'extractor_not_implemented',
 				/* translators: %s: extractor type id */
-				sprintf( __( 'Extractor "%s" is not yet implemented in this build.', 'outpost' ), $e->extractor_id ),
+				sprintf( __( 'Extractor "%s" is not yet implemented in this build.', 'outpost-mobile-publishing' ), $e->extractor_id ),
 				array( 'status' => 501 )
 			);
 		} catch ( \RuntimeException $e ) {
 			return new WP_Error(
 				'extractor_failed',
-				__( 'Extractor failed to parse the source response.', 'outpost' ),
+				__( 'Extractor failed to parse the source response.', 'outpost-mobile-publishing' ),
 				array(
 					'status' => 502,
 					'detail' => $e->getMessage(),
@@ -741,7 +734,7 @@ final class Outpost_Preview_Endpoint {
 		if ( '' === trim( $url ) ) {
 			return new WP_Error(
 				'invalid_url',
-				__( 'A url is required.', 'outpost' ),
+				__( 'A url is required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -750,7 +743,7 @@ final class Outpost_Preview_Endpoint {
 		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) ) {
 			return new WP_Error(
 				'invalid_url',
-				__( 'The url could not be parsed.', 'outpost' ),
+				__( 'The url could not be parsed.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -760,7 +753,7 @@ final class Outpost_Preview_Endpoint {
 		if ( ! in_array( strtolower( (string) $parts['scheme'] ), self::ALLOWED_SCHEMES, true ) ) {
 			return new WP_Error(
 				'invalid_scheme',
-				__( 'Only http and https URLs are allowed.', 'outpost' ),
+				__( 'Only http and https URLs are allowed.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -768,7 +761,7 @@ final class Outpost_Preview_Endpoint {
 		if ( empty( $parts['host'] ) ) {
 			return new WP_Error(
 				'invalid_url',
-				__( 'The URL must include a host.', 'outpost' ),
+				__( 'The URL must include a host.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -794,7 +787,7 @@ final class Outpost_Preview_Endpoint {
 		if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
 			return new WP_Error(
 				'rate_limited',
-				__( 'Too many preview requests. Try again in a minute.', 'outpost' ),
+				__( 'Too many preview requests. Try again in a minute.', 'outpost-mobile-publishing' ),
 				array(
 					'status'     => 429,
 					'retryAfter' => 60,

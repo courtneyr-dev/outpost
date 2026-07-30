@@ -38,7 +38,7 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 	}
 
 	public function label(): string {
-		return __( 'write.as', 'outpost' );
+		return __( 'write.as', 'outpost-mobile-publishing' );
 	}
 
 	public function provider_id(): string {
@@ -49,14 +49,14 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 		$settings = self::read_settings();
 
 		if ( ! $settings['enabled'] ) {
-			return self::failure_result( __( 'write.as syndication is disabled in settings.', 'outpost' ), false );
+			return self::failure_result( __( 'write.as syndication is disabled in settings.', 'outpost-mobile-publishing' ), false );
 		}
 		if ( '' === $settings['api_token'] ) {
-			return self::failure_result( __( 'write.as API token missing.', 'outpost' ), false );
+			return self::failure_result( __( 'write.as API token missing.', 'outpost-mobile-publishing' ), false );
 		}
 		$post = get_post( $post_id );
 		if ( null === $post ) {
-			return self::failure_result( __( 'Post not found.', 'outpost' ), false );
+			return self::failure_result( __( 'Post not found.', 'outpost-mobile-publishing' ), false );
 		}
 
 		$endpoint = '' === $settings['collection']
@@ -86,7 +86,7 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 			return self::failure_result(
 				sprintf(
 					/* translators: %s: error message */
-					__( 'write.as request failed: %s', 'outpost' ),
+					__( 'write.as request failed: %s', 'outpost-mobile-publishing' ),
 					$response->get_error_message()
 				),
 				true
@@ -106,7 +106,7 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 				}
 			}
 			if ( '' === $syndication_url ) {
-				return self::failure_result( __( 'write.as accepted the post but returned no URL.', 'outpost' ), false );
+				return self::failure_result( __( 'write.as accepted the post but returned no URL.', 'outpost-mobile-publishing' ), false );
 			}
 			return self::success_result( $syndication_url );
 		}
@@ -114,7 +114,7 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 		return self::failure_result(
 			sprintf(
 				/* translators: 1: HTTP status code, 2: response body */
-				__( 'write.as returned HTTP %1$d: %2$s', 'outpost' ),
+				__( 'write.as returned HTTP %1$d: %2$s', 'outpost-mobile-publishing' ),
 				$status,
 				wp_strip_all_tags( $body )
 			),
@@ -143,24 +143,24 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 	 */
 	public static function register_settings_fields( array $fields ): array {
 		$fields['write_as_enabled']    = array(
-			'label'       => __( 'Syndicate to write.as', 'outpost' ),
+			'label'       => __( 'Syndicate to write.as', 'outpost-mobile-publishing' ),
 			'type'        => 'checkbox',
 			'sensitive'   => false,
-			'description' => __( 'When checked, published posts fan out to write.as.', 'outpost' ),
+			'description' => __( 'When checked, published posts fan out to write.as.', 'outpost-mobile-publishing' ),
 			'default'     => false,
 		);
 		$fields['write_as_api_token']  = array(
-			'label'       => __( 'write.as API token', 'outpost' ),
+			'label'       => __( 'write.as API token', 'outpost-mobile-publishing' ),
 			'type'        => 'password',
 			'sensitive'   => true,
-			'description' => __( 'write.as → Settings → Get API token. Stored encrypted.', 'outpost' ),
+			'description' => __( 'write.as → Settings → Get API token. Stored encrypted.', 'outpost-mobile-publishing' ),
 			'default'     => '',
 		);
 		$fields['write_as_collection'] = array(
-			'label'       => __( 'write.as collection alias (optional)', 'outpost' ),
+			'label'       => __( 'write.as collection alias (optional)', 'outpost-mobile-publishing' ),
 			'type'        => 'text',
 			'sensitive'   => false,
-			'description' => __( 'The collection (blog) alias posts should publish into. Leave blank to publish standalone posts owned by your account.', 'outpost' ),
+			'description' => __( 'The collection (blog) alias posts should publish into. Leave blank to publish standalone posts owned by your account.', 'outpost-mobile-publishing' ),
 			'default'     => '',
 		);
 		return $fields;

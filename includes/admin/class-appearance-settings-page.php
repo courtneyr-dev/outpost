@@ -49,8 +49,8 @@ final class Outpost_Appearance_Settings_Page {
 	public static function register_menu(): void {
 		add_submenu_page(
 			self::PARENT_SLUG,
-			__( 'Appearance', 'outpost' ),
-			__( 'Appearance', 'outpost' ),
+			__( 'Appearance', 'outpost-mobile-publishing' ),
+			__( 'Appearance', 'outpost-mobile-publishing' ),
 			'edit_posts',
 			self::PAGE_SLUG,
 			array( self::class, 'render' )
@@ -59,7 +59,7 @@ final class Outpost_Appearance_Settings_Page {
 
 	public static function render(): void {
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost' ) );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'outpost-mobile-publishing' ) );
 		}
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = Outpost_Mode_Controller::get_mode( $user_id );
@@ -68,19 +68,19 @@ final class Outpost_Appearance_Settings_Page {
 
 		?>
 		<div class="wrap outpost-appearance-wrap">
-			<h1><?php esc_html_e( 'Outpost Appearance', 'outpost' ); ?></h1>
+			<h1><?php esc_html_e( 'Outpost Appearance', 'outpost-mobile-publishing' ); ?></h1>
 
 			<?php self::render_admin_notice(); ?>
 
-			<p><?php esc_html_e( 'Customize how the Outpost composer paints itself. Color and font defaults inherit from your active theme; you can override any individual token below. Day/night mode is a per-user preference — two contributors on the same site can have different settings.', 'outpost' ); ?></p>
+			<p><?php esc_html_e( 'Customize how the Outpost composer paints itself. Color and font defaults inherit from your active theme; you can override any individual token below. Day/night mode is a per-user preference — two contributors on the same site can have different settings.', 'outpost-mobile-publishing' ); ?></p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="outpost-appearance-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ACTION ); ?>">
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 
-				<h2><?php esc_html_e( 'Mode', 'outpost' ); ?></h2>
+				<h2><?php esc_html_e( 'Mode', 'outpost-mobile-publishing' ); ?></h2>
 				<fieldset class="outpost-appearance-mode">
-					<legend class="screen-reader-text"><?php esc_html_e( 'Day / night mode preference', 'outpost' ); ?></legend>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Day / night mode preference', 'outpost-mobile-publishing' ); ?></legend>
 					<?php foreach ( self::mode_options() as $value => $label ) : ?>
 						<label class="outpost-appearance-mode__option">
 							<input
@@ -95,27 +95,27 @@ final class Outpost_Appearance_Settings_Page {
 				</fieldset>
 
 				<?php
-				self::render_mode_fields( 'day', __( 'Day mode', 'outpost' ), $day );
-				self::render_mode_fields( 'night', __( 'Night mode', 'outpost' ), $night );
+				self::render_mode_fields( 'day', __( 'Day mode', 'outpost-mobile-publishing' ), $day );
+				self::render_mode_fields( 'night', __( 'Night mode', 'outpost-mobile-publishing' ), $night );
 				?>
 
-				<h2><?php esc_html_e( 'Live preview', 'outpost' ); ?></h2>
-				<p class="description"><?php esc_html_e( 'Reflects unsaved values. Switch the preview between day and night to verify both modes before saving.', 'outpost' ); ?></p>
+				<h2><?php esc_html_e( 'Live preview', 'outpost-mobile-publishing' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Reflects unsaved values. Switch the preview between day and night to verify both modes before saving.', 'outpost-mobile-publishing' ); ?></p>
 
 				<div class="outpost-appearance-preview-controls">
 					<label>
 						<input type="radio" name="preview_mode" value="day" checked>
-						<?php esc_html_e( 'Day preview', 'outpost' ); ?>
+						<?php esc_html_e( 'Day preview', 'outpost-mobile-publishing' ); ?>
 					</label>
 					<label>
 						<input type="radio" name="preview_mode" value="night">
-						<?php esc_html_e( 'Night preview', 'outpost' ); ?>
+						<?php esc_html_e( 'Night preview', 'outpost-mobile-publishing' ); ?>
 					</label>
 				</div>
 
 				<iframe
 					class="outpost-appearance-preview"
-					title="<?php esc_attr_e( 'Outpost composer preview', 'outpost' ); ?>"
+					title="<?php esc_attr_e( 'Outpost composer preview', 'outpost-mobile-publishing' ); ?>"
 					sandbox="allow-same-origin"
 					srcdoc="<?php echo esc_attr( self::build_preview_html( $day, 'day' ) ); ?>"
 					data-day-tokens="<?php echo esc_attr( wp_json_encode( $day ) ); ?>"
@@ -125,7 +125,7 @@ final class Outpost_Appearance_Settings_Page {
 
 				<p class="submit">
 					<button type="submit" class="button button-primary">
-						<?php esc_html_e( 'Save appearance settings', 'outpost' ); ?>
+						<?php esc_html_e( 'Save appearance settings', 'outpost-mobile-publishing' ); ?>
 					</button>
 				</p>
 			</form>
@@ -194,10 +194,10 @@ final class Outpost_Appearance_Settings_Page {
 			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_NAME ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
-			wp_die( esc_html__( 'Security check failed.', 'outpost' ) );
+			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
 		}
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost' ) );
+			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ) );
 		}
 	}
 
@@ -210,13 +210,13 @@ final class Outpost_Appearance_Settings_Page {
 		<table class="form-table outpost-appearance-mode-fields" role="presentation" data-mode="<?php echo esc_attr( $mode_key ); ?>">
 			<tbody>
 				<tr>
-					<th colspan="2"><h3 style="margin:0;"><?php esc_html_e( 'Colors', 'outpost' ); ?></h3></th>
+					<th colspan="2"><h3 style="margin:0;"><?php esc_html_e( 'Colors', 'outpost-mobile-publishing' ); ?></h3></th>
 				</tr>
 				<?php foreach ( self::color_field_labels() as $slug => $field_label ) : ?>
 					<?php self::render_color_row( $mode_key, $slug, $field_label, $resolved ); ?>
 				<?php endforeach; ?>
 				<tr>
-					<th colspan="2"><h3 style="margin:0;"><?php esc_html_e( 'Fonts', 'outpost' ); ?></h3></th>
+					<th colspan="2"><h3 style="margin:0;"><?php esc_html_e( 'Fonts', 'outpost-mobile-publishing' ); ?></h3></th>
 				</tr>
 				<?php foreach ( self::font_field_labels() as $slug => $field_label ) : ?>
 					<?php self::render_font_row( $mode_key, $slug, $field_label, $resolved ); ?>
@@ -256,11 +256,11 @@ final class Outpost_Appearance_Settings_Page {
 				</span>
 				<?php if ( is_array( $adjusted ) ) : ?>
 					<p class="outpost-appearance-warning">
-						<strong><?php esc_html_e( 'Contrast adjustment applied.', 'outpost' ); ?></strong>
+						<strong><?php esc_html_e( 'Contrast adjustment applied.', 'outpost-mobile-publishing' ); ?></strong>
 						<?php
 						printf(
 							/* translators: 1: original color hex, 2: adjusted hex, 3: ratio before, 4: ratio after. */
-							esc_html__( 'Your %1$s rendered at %3$s:1 against the surface; auto-adjusted to %2$s for %4$s:1.', 'outpost' ),
+							esc_html__( 'Your %1$s rendered at %3$s:1 against the surface; auto-adjusted to %2$s for %4$s:1.', 'outpost-mobile-publishing' ),
 							esc_html( (string) ( $adjusted['original'] ?? '' ) ),
 							esc_html( (string) ( $adjusted['applied'] ?? '' ) ),
 							esc_html( (string) round( (float) ( $adjusted['ratio_before'] ?? 0 ), 2 ) ),
@@ -274,7 +274,7 @@ final class Outpost_Appearance_Settings_Page {
 								value="1"
 								<?php checked( self::is_bypassed( $slug ) ); ?>
 							>
-							<?php esc_html_e( 'Override anyway (keep my color, accept the lower contrast)', 'outpost' ); ?>
+							<?php esc_html_e( 'Override anyway (keep my color, accept the lower contrast)', 'outpost-mobile-publishing' ); ?>
 						</label>
 					</p>
 				<?php endif; ?>
@@ -311,7 +311,7 @@ final class Outpost_Appearance_Settings_Page {
 					<?php echo esc_html( self::source_label( $source ) ); ?>
 				</span>
 				<p class="description">
-					<?php esc_html_e( 'Paste a CSS font-family value. Outpost picks up custom fonts your theme already loads — installing fonts is your theme\'s job.', 'outpost' ); ?>
+					<?php esc_html_e( 'Paste a CSS font-family value. Outpost picks up custom fonts your theme already loads — installing fonts is your theme\'s job.', 'outpost-mobile-publishing' ); ?>
 				</p>
 			</td>
 		</tr>
@@ -325,7 +325,7 @@ final class Outpost_Appearance_Settings_Page {
 			case 'saved':
 				printf(
 					'<div class="notice notice-success is-dismissible"><p>%s</p></div>',
-					esc_html__( 'Appearance settings saved.', 'outpost' )
+					esc_html__( 'Appearance settings saved.', 'outpost-mobile-publishing' )
 				);
 				break;
 			case 'error':
@@ -333,7 +333,7 @@ final class Outpost_Appearance_Settings_Page {
 				$message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['message'] ) ) : '';
 				printf(
 					'<div class="notice notice-error is-dismissible"><p>%s</p></div>',
-					esc_html( '' === $message ? __( 'Save failed.', 'outpost' ) : $message )
+					esc_html( '' === $message ? __( 'Save failed.', 'outpost-mobile-publishing' ) : $message )
 				);
 				break;
 		}
@@ -432,43 +432,43 @@ final class Outpost_Appearance_Settings_Page {
 	/** @return array<string,string> */
 	private static function mode_options(): array {
 		return array(
-			Outpost_Mode_Controller::MODE_SYSTEM => __( 'Match system', 'outpost' ),
-			Outpost_Mode_Controller::MODE_DAY    => __( 'Always day', 'outpost' ),
-			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Always night', 'outpost' ),
+			Outpost_Mode_Controller::MODE_SYSTEM => __( 'Match system', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_DAY    => __( 'Always day', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Always night', 'outpost-mobile-publishing' ),
 		);
 	}
 
 	/** @return array<string,string> */
 	private static function color_field_labels(): array {
 		return array(
-			'bg'             => __( 'Background', 'outpost' ),
-			'surface'        => __( 'Surface', 'outpost' ),
-			'text'           => __( 'Text', 'outpost' ),
-			'text_secondary' => __( 'Text (secondary)', 'outpost' ),
-			'accent'         => __( 'Accent (primary)', 'outpost' ),
-			'accent_2'       => __( 'Accent (second)', 'outpost' ),
-			'border'         => __( 'Border', 'outpost' ),
+			'bg'             => __( 'Background', 'outpost-mobile-publishing' ),
+			'surface'        => __( 'Surface', 'outpost-mobile-publishing' ),
+			'text'           => __( 'Text', 'outpost-mobile-publishing' ),
+			'text_secondary' => __( 'Text (secondary)', 'outpost-mobile-publishing' ),
+			'accent'         => __( 'Accent (primary)', 'outpost-mobile-publishing' ),
+			'accent_2'       => __( 'Accent (second)', 'outpost-mobile-publishing' ),
+			'border'         => __( 'Border', 'outpost-mobile-publishing' ),
 		);
 	}
 
 	/** @return array<string,string> */
 	private static function font_field_labels(): array {
 		return array(
-			'body'      => __( 'Body font', 'outpost' ),
-			'display'   => __( 'Display font (headings)', 'outpost' ),
-			'monospace' => __( 'Monospace (URL fields)', 'outpost' ),
+			'body'      => __( 'Body font', 'outpost-mobile-publishing' ),
+			'display'   => __( 'Display font (headings)', 'outpost-mobile-publishing' ),
+			'monospace' => __( 'Monospace (URL fields)', 'outpost-mobile-publishing' ),
 		);
 	}
 
 	private static function source_label( string $source ): string {
 		switch ( $source ) {
 			case 'override':
-				return __( 'overridden', 'outpost' );
+				return __( 'overridden', 'outpost-mobile-publishing' );
 			case 'theme':
-				return __( 'from theme', 'outpost' );
+				return __( 'from theme', 'outpost-mobile-publishing' );
 			case 'default':
 			default:
-				return __( 'default', 'outpost' );
+				return __( 'default', 'outpost-mobile-publishing' );
 		}
 	}
 

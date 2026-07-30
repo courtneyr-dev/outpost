@@ -164,7 +164,7 @@ final class Outpost_Composite_Inbound {
 		if ( null === $primary_result ) {
 			return new WP_Error(
 				'outpost_composite_all_failed',
-				__( 'All composite sources failed.', 'outpost' ),
+				__( 'All composite sources failed.', 'outpost-mobile-publishing' ),
 				array(
 					'url'  => $url,
 					'meta' => $meta,
@@ -215,7 +215,7 @@ final class Outpost_Composite_Inbound {
 		if ( empty( $sources ) ) {
 			return new WP_Error(
 				'outpost_composite_empty_sources',
-				__( 'Source list is empty.', 'outpost' )
+				__( 'Source list is empty.', 'outpost-mobile-publishing' )
 			);
 		}
 		$out = array();
@@ -224,7 +224,7 @@ final class Outpost_Composite_Inbound {
 				return new WP_Error(
 					'outpost_composite_invalid_source',
 					/* translators: %d: source index */
-					sprintf( __( 'Source at index %d is not an array.', 'outpost' ), $i )
+					sprintf( __( 'Source at index %d is not an array.', 'outpost-mobile-publishing' ), $i )
 				);
 			}
 			$id   = isset( $source['id'] ) ? (string) $source['id'] : '';
@@ -233,21 +233,21 @@ final class Outpost_Composite_Inbound {
 				return new WP_Error(
 					'outpost_composite_invalid_source',
 					/* translators: %d: source index */
-					sprintf( __( 'Source at index %d missing id or role.', 'outpost' ), $i )
+					sprintf( __( 'Source at index %d missing id or role.', 'outpost-mobile-publishing' ), $i )
 				);
 			}
 			if ( ! in_array( $role, array( 'primary', 'fallback', 'enrich' ), true ) ) {
 				return new WP_Error(
 					'outpost_composite_invalid_role',
 					/* translators: %s: role string */
-					sprintf( __( 'Invalid role: %s', 'outpost' ), $role )
+					sprintf( __( 'Invalid role: %s', 'outpost-mobile-publishing' ), $role )
 				);
 			}
 			if ( ! isset( $source['callback'] ) || ! is_callable( $source['callback'] ) ) {
 				return new WP_Error(
 					'outpost_composite_invalid_callback',
 					/* translators: %s: source id */
-					sprintf( __( 'Source %s callback is not callable.', 'outpost' ), $id )
+					sprintf( __( 'Source %s callback is not callable.', 'outpost-mobile-publishing' ), $id )
 				);
 			}
 			$source['timeout'] = isset( $source['timeout'] ) ? (int) $source['timeout'] : self::DEFAULT_SOURCE_TIMEOUT;
@@ -312,7 +312,7 @@ final class Outpost_Composite_Inbound {
 			$result = new WP_Error(
 				'outpost_composite_source_returned_invalid',
 				/* translators: %s: source id */
-				sprintf( __( 'Source %s returned non-array, non-WP_Error value.', 'outpost' ), $source['id'] )
+				sprintf( __( 'Source %s returned non-array, non-WP_Error value.', 'outpost-mobile-publishing' ), $source['id'] )
 			);
 		}
 		return array(

@@ -114,7 +114,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost geocode requires an authenticated user.', 'outpost' ),
+				__( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -140,7 +140,7 @@ final class Outpost_Geocode_Endpoint {
 		}
 		// Restore a stripped Authorization header so IndieAuth's
 		// determine_current_user callback can read and validate the token.
-		if ( empty( $_SERVER['HTTP_AUTHORIZATION'] ) && empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+		if ( '' === Outpost_Request_Headers::authorization() ) {
 			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
 		}
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
@@ -155,14 +155,7 @@ final class Outpost_Geocode_Endpoint {
 	 * it) the `access_token` in a form-encoded or JSON request body. '' when absent.
 	 */
 	private static function bearer_token(): string {
-		$header = '';
-		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
-			$header = (string) wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] );
-		} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- bearer token is validated via IndieAuth determine_current_user, not stored/echoed; sanitizing would corrupt it.
-			$header = (string) wp_unslash( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		}
+		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
 		}
@@ -202,7 +195,7 @@ final class Outpost_Geocode_Endpoint {
 				'invalid_query',
 				sprintf(
 					/* translators: 1: minimum length, 2: maximum length */
-					__( 'Search query must be between %1$d and %2$d characters.', 'outpost' ),
+					__( 'Search query must be between %1$d and %2$d characters.', 'outpost-mobile-publishing' ),
 					self::QUERY_MIN_LENGTH,
 					self::QUERY_MAX_LENGTH
 				),
@@ -266,7 +259,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( $count >= $limit ) {
 			return new WP_Error(
 				'rate_limited',
-				__( 'Too many geocode requests. Try again in a minute.', 'outpost' ),
+				__( 'Too many geocode requests. Try again in a minute.', 'outpost-mobile-publishing' ),
 				array(
 					'status'     => 429,
 					'retryAfter' => 60,
@@ -291,7 +284,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( $remote_count >= $remote_cap ) {
 			return new WP_Error(
 				'rate_limited',
-				__( 'Too many geocode requests from this network. Try again in a minute.', 'outpost' ),
+				__( 'Too many geocode requests from this network. Try again in a minute.', 'outpost-mobile-publishing' ),
 				array(
 					'status'     => 429,
 					'retryAfter' => 60,
@@ -408,7 +401,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error(
 				'geocode_failed',
-				__( 'Could not reach the geocoding service.', 'outpost' ),
+				__( 'Could not reach the geocoding service.', 'outpost-mobile-publishing' ),
 				array(
 					'status' => 502,
 					'detail' => $response->get_error_message(),
@@ -421,7 +414,7 @@ final class Outpost_Geocode_Endpoint {
 			return new WP_Error(
 				'geocode_failed',
 				/* translators: %d: HTTP status code */
-				sprintf( __( 'Geocoding service returned HTTP %d.', 'outpost' ), $status ),
+				sprintf( __( 'Geocoding service returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => 502 )
 			);
 		}
@@ -431,7 +424,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( ! is_array( $decoded ) ) {
 			return new WP_Error(
 				'geocode_failed',
-				__( 'Geocoding service returned invalid JSON.', 'outpost' ),
+				__( 'Geocoding service returned invalid JSON.', 'outpost-mobile-publishing' ),
 				array( 'status' => 502 )
 			);
 		}

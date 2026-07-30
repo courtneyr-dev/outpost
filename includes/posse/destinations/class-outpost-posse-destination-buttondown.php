@@ -40,7 +40,7 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 	}
 
 	public function label(): string {
-		return __( 'Buttondown', 'outpost' );
+		return __( 'Buttondown', 'outpost-mobile-publishing' );
 	}
 
 	public function provider_id(): string {
@@ -51,14 +51,14 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 		$settings = self::read_settings();
 
 		if ( ! $settings['enabled'] ) {
-			return self::failure_result( __( 'Buttondown syndication is disabled in settings.', 'outpost' ), false );
+			return self::failure_result( __( 'Buttondown syndication is disabled in settings.', 'outpost-mobile-publishing' ), false );
 		}
 		if ( '' === $settings['api_key'] ) {
-			return self::failure_result( __( 'Buttondown API key missing.', 'outpost' ), false );
+			return self::failure_result( __( 'Buttondown API key missing.', 'outpost-mobile-publishing' ), false );
 		}
 		$post = get_post( $post_id );
 		if ( null === $post ) {
-			return self::failure_result( __( 'Post not found.', 'outpost' ), false );
+			return self::failure_result( __( 'Post not found.', 'outpost-mobile-publishing' ), false );
 		}
 
 		$payload = array(
@@ -86,7 +86,7 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 			return self::failure_result(
 				sprintf(
 					/* translators: %s: error message */
-					__( 'Buttondown request failed: %s', 'outpost' ),
+					__( 'Buttondown request failed: %s', 'outpost-mobile-publishing' ),
 					$response->get_error_message()
 				),
 				true
@@ -103,7 +103,7 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 				$syndication_url = (string) ( $json['web_url'] ?? $json['absolute_url'] ?? $json['permalink'] ?? '' );
 			}
 			if ( '' === $syndication_url ) {
-				return self::failure_result( __( 'Buttondown accepted the email but returned no URL.', 'outpost' ), false );
+				return self::failure_result( __( 'Buttondown accepted the email but returned no URL.', 'outpost-mobile-publishing' ), false );
 			}
 			return self::success_result( $syndication_url );
 		}
@@ -111,7 +111,7 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 		return self::failure_result(
 			sprintf(
 				/* translators: 1: HTTP status code, 2: response body */
-				__( 'Buttondown returned HTTP %1$d: %2$s', 'outpost' ),
+				__( 'Buttondown returned HTTP %1$d: %2$s', 'outpost-mobile-publishing' ),
 				$status,
 				wp_strip_all_tags( $body )
 			),
@@ -140,24 +140,24 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 	 */
 	public static function register_settings_fields( array $fields ): array {
 		$fields['buttondown_enabled']       = array(
-			'label'       => __( 'Syndicate to Buttondown', 'outpost' ),
+			'label'       => __( 'Syndicate to Buttondown', 'outpost-mobile-publishing' ),
 			'type'        => 'checkbox',
 			'sensitive'   => false,
-			'description' => __( 'When checked, published posts fan out as Buttondown emails.', 'outpost' ),
+			'description' => __( 'When checked, published posts fan out as Buttondown emails.', 'outpost-mobile-publishing' ),
 			'default'     => false,
 		);
 		$fields['buttondown_api_key']       = array(
-			'label'       => __( 'Buttondown API key', 'outpost' ),
+			'label'       => __( 'Buttondown API key', 'outpost-mobile-publishing' ),
 			'type'        => 'password',
 			'sensitive'   => true,
-			'description' => __( 'Buttondown → Settings → API. Stored encrypted.', 'outpost' ),
+			'description' => __( 'Buttondown → Settings → API. Stored encrypted.', 'outpost-mobile-publishing' ),
 			'default'     => '',
 		);
 		$fields['buttondown_send_as_draft'] = array(
-			'label'       => __( 'Send as draft for manual review', 'outpost' ),
+			'label'       => __( 'Send as draft for manual review', 'outpost-mobile-publishing' ),
 			'type'        => 'checkbox',
 			'sensitive'   => false,
-			'description' => __( 'When checked, fan-out copies land as drafts in Buttondown so you can review before sending.', 'outpost' ),
+			'description' => __( 'When checked, fan-out copies land as drafts in Buttondown so you can review before sending.', 'outpost-mobile-publishing' ),
 			'default'     => false,
 		);
 		return $fields;

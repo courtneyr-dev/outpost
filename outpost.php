@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Outpost
+ * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
  * Version:           1.0.0
@@ -11,7 +11,7 @@
  * Author URI:        https://courtneyr.dev
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       outpost
+ * Text Domain:       outpost-mobile-publishing
  * Domain Path:       /languages
  *
  * @package Outpost
@@ -600,12 +600,12 @@ function outpost_render_dependency_notice( string $plugin_label, string $plugin_
 		);
 		$action_label = sprintf(
 			/* translators: %s: plugin name. */
-			__( 'Activate %s', 'outpost' ),
+			__( 'Activate %s', 'outpost-mobile-publishing' ),
 			$plugin_label
 		);
 		$message = sprintf(
 			/* translators: %s: plugin name. */
-			__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost' ),
+			__( 'Outpost needs the %s plugin to be activated before the composer can run.', 'outpost-mobile-publishing' ),
 			$plugin_label
 		);
 	} else {
@@ -615,12 +615,12 @@ function outpost_render_dependency_notice( string $plugin_label, string $plugin_
 		);
 		$action_label = sprintf(
 			/* translators: %s: plugin name. */
-			__( 'Install %s', 'outpost' ),
+			__( 'Install %s', 'outpost-mobile-publishing' ),
 			$plugin_label
 		);
 		$message = sprintf(
 			/* translators: %s: plugin name. */
-			__( 'Outpost requires the %s plugin. Install it from WordPress.org to continue.', 'outpost' ),
+			__( 'Outpost requires the %s plugin. Install it from WordPress.org to continue.', 'outpost-mobile-publishing' ),
 			$plugin_label
 		);
 	}
@@ -659,7 +659,7 @@ function outpost_render_admin_notices(): void {
 			esc_html(
 				sprintf(
 					/* translators: 1: minimum WP version, 2: minimum PHP version. */
-					__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost' ),
+					__( 'Outpost requires WordPress %1$s or newer and PHP %2$s or newer.', 'outpost-mobile-publishing' ),
 					OUTPOST_MIN_WP,
 					OUTPOST_MIN_PHP
 				)
@@ -720,7 +720,7 @@ function outpost_render_micropub_version_advisory(): void {
 		esc_html(
 			sprintf(
 				/* translators: %s: installed Micropub plugin version. */
-				__( 'Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead.', 'outpost' ),
+				__( 'Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead.', 'outpost-mobile-publishing' ),
 				(string) MICROPUB_PLUGIN_VERSION
 			)
 		)

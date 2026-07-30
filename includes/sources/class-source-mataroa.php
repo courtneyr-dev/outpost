@@ -30,7 +30,7 @@ final class Outpost_Source_Mataroa extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Mataroa', 'outpost' ),
+			'label'            => __( 'Mataroa', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( '*.mataroa.blog' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'read',

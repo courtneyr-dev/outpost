@@ -61,7 +61,7 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Ravelry', 'outpost' ),
+			'label'            => __( 'Ravelry', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'ravelry.com', 'www.ravelry.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'note',
@@ -78,8 +78,8 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 			'auth_required'    => true,
 			'tags_default'     => array( 'fiber-arts' ),
 			'caveats'          => array(
-				__( 'Private projects are not surfaced even when the connected user has access.', 'outpost' ),
-				__( 'The connected Ravelry account must have read access to the pattern or project.', 'outpost' ),
+				__( 'Private projects are not surfaced even when the connected user has access.', 'outpost-mobile-publishing' ),
+				__( 'The connected Ravelry account must have read access to the pattern or project.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );
@@ -238,7 +238,7 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 	 * @return array<string,mixed>
 	 */
 	private static function project_pattern( array $pattern, string $source_url ): array {
-		$name        = isset( $pattern['name'] ) ? (string) $pattern['name'] : __( 'Pattern', 'outpost' );
+		$name        = isset( $pattern['name'] ) ? (string) $pattern['name'] : __( 'Pattern', 'outpost-mobile-publishing' );
 		$designer    = self::extract_designer_name( $pattern );
 		$photo_url   = self::extract_primary_photo_url( $pattern );
 		$gauge_str   = self::format_gauge( $pattern );
@@ -248,23 +248,23 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 
 		$lines = array();
 		if ( '' !== $gauge_str ) {
-			$lines[] = '<dt>' . esc_html__( 'Gauge', 'outpost' ) . '</dt><dd>' . esc_html( $gauge_str ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Gauge', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $gauge_str ) . '</dd>';
 		}
 		if ( '' !== $yardage_str ) {
-			$lines[] = '<dt>' . esc_html__( 'Yardage', 'outpost' ) . '</dt><dd>' . esc_html( $yardage_str ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Yardage', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $yardage_str ) . '</dd>';
 		}
 		if ( '' !== $needles ) {
-			$lines[] = '<dt>' . esc_html__( 'Needles / hooks', 'outpost' ) . '</dt><dd>' . esc_html( $needles ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Needles / hooks', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $needles ) . '</dd>';
 		}
 		if ( '' !== $fibers ) {
-			$lines[] = '<dt>' . esc_html__( 'Fiber', 'outpost' ) . '</dt><dd>' . esc_html( $fibers ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Fiber', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $fibers ) . '</dd>';
 		}
 
 		$header = '' === $designer
-			? sprintf( /* translators: %s: pattern name. */ esc_html__( 'Pattern: %s', 'outpost' ), esc_html( $name ) )
+			? sprintf( /* translators: %s: pattern name. */ esc_html__( 'Pattern: %s', 'outpost-mobile-publishing' ), esc_html( $name ) )
 			: sprintf(
 				/* translators: 1: pattern name, 2: designer name. */
-				esc_html__( 'Pattern: %1$s by %2$s', 'outpost' ),
+				esc_html__( 'Pattern: %1$s by %2$s', 'outpost-mobile-publishing' ),
 				esc_html( $name ),
 				esc_html( $designer )
 			);
@@ -306,7 +306,7 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 	 * @return array<string,mixed>
 	 */
 	private static function project_project( array $project, string $source_url ): array {
-		$name      = isset( $project['name'] ) ? (string) $project['name'] : __( 'Project', 'outpost' );
+		$name      = isset( $project['name'] ) ? (string) $project['name'] : __( 'Project', 'outpost-mobile-publishing' );
 		$status    = isset( $project['status_name'] ) ? (string) $project['status_name'] : '';
 		$photo_url = self::extract_primary_photo_url( $project );
 		$started   = isset( $project['started'] ) ? (string) $project['started'] : '';
@@ -314,18 +314,18 @@ final class Outpost_Source_Ravelry extends Outpost_Source_Base {
 
 		$lines = array();
 		if ( '' !== $status ) {
-			$lines[] = '<dt>' . esc_html__( 'Status', 'outpost' ) . '</dt><dd>' . esc_html( $status ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Status', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $status ) . '</dd>';
 		}
 		if ( '' !== $started ) {
-			$lines[] = '<dt>' . esc_html__( 'Started', 'outpost' ) . '</dt><dd>' . esc_html( $started ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Started', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $started ) . '</dd>';
 		}
 		if ( '' !== $completed ) {
-			$lines[] = '<dt>' . esc_html__( 'Completed', 'outpost' ) . '</dt><dd>' . esc_html( $completed ) . '</dd>';
+			$lines[] = '<dt>' . esc_html__( 'Completed', 'outpost-mobile-publishing' ) . '</dt><dd>' . esc_html( $completed ) . '</dd>';
 		}
 
 		$content = '<p>' . sprintf(
 			/* translators: %s: project name. */
-			esc_html__( 'Project: %s', 'outpost' ),
+			esc_html__( 'Project: %s', 'outpost-mobile-publishing' ),
 			esc_html( $name )
 		) . '</p>';
 		if ( ! empty( $lines ) ) {

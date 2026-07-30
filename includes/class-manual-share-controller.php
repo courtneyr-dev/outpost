@@ -163,7 +163,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost' ),
+				__( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}
@@ -190,7 +190,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( $post_id <= 0 ) {
 			return new WP_Error(
 				'invalid_post_id',
-				__( 'Manual-share intent requires a positive integer post_id.', 'outpost' ),
+				__( 'Manual-share intent requires a positive integer post_id.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -199,7 +199,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( '' === $platform_id ) {
 			return new WP_Error(
 				'invalid_platform_id',
-				__( 'Manual-share intent requires a platform_id string.', 'outpost' ),
+				__( 'Manual-share intent requires a platform_id string.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -214,7 +214,7 @@ final class Outpost_Manual_Share_Controller {
 				'unknown_platform_id',
 				sprintf(
 					/* translators: %s: platform id supplied by the client. */
-					__( 'Unknown manual-share platform: %s', 'outpost' ),
+					__( 'Unknown manual-share platform: %s', 'outpost-mobile-publishing' ),
 					$platform_id
 				),
 				array(
@@ -231,7 +231,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden_post',
-				__( 'You do not have permission to share this post.', 'outpost' ),
+				__( 'You do not have permission to share this post.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -248,7 +248,7 @@ final class Outpost_Manual_Share_Controller {
 			// unreachable in practice; keep the guard for type safety.
 			return new WP_Error(
 				'unknown_platform_id',
-				__( 'Manual-share platform lookup failed.', 'outpost' ),
+				__( 'Manual-share platform lookup failed.', 'outpost-mobile-publishing' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -305,7 +305,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( $post_id <= 0 ) {
 			return new WP_Error(
 				'invalid_post_id',
-				__( 'Manual-share telemetry requires a positive integer post_id.', 'outpost' ),
+				__( 'Manual-share telemetry requires a positive integer post_id.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -313,7 +313,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden_post',
-				__( 'You do not have permission to update telemetry for this post.', 'outpost' ),
+				__( 'You do not have permission to update telemetry for this post.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -322,7 +322,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( '' === $audit_log_id ) {
 			return new WP_Error(
 				'invalid_audit_log_id',
-				__( 'Manual-share telemetry requires the audit_log_id from the original intent payload.', 'outpost' ),
+				__( 'Manual-share telemetry requires the audit_log_id from the original intent payload.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -336,7 +336,7 @@ final class Outpost_Manual_Share_Controller {
 		if ( ! $updated ) {
 			return new WP_Error(
 				'audit_log_entry_not_found',
-				__( 'Manual-share telemetry could not match an audit log entry. The PWA may have stale state.', 'outpost' ),
+				__( 'Manual-share telemetry could not match an audit log entry. The PWA may have stale state.', 'outpost-mobile-publishing' ),
 				array( 'status' => 404 )
 			);
 		}

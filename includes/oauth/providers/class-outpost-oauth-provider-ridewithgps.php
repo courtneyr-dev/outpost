@@ -50,7 +50,7 @@ final class Outpost_OAuth_Provider_Ridewithgps extends Outpost_OAuth_Provider_Ba
 	}
 
 	public function label(): string {
-		return __( 'Ride With GPS', 'outpost' );
+		return __( 'Ride With GPS', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {

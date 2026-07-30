@@ -93,7 +93,7 @@ final class Outpost_Syndicate_Targets_Endpoint {
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost syndication targets require an authenticated user.', 'outpost' ),
+				__( 'Outpost syndication targets require an authenticated user.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
 			);
 		}

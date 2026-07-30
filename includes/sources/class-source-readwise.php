@@ -46,7 +46,7 @@ final class Outpost_Source_Readwise extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Readwise', 'outpost' ),
+			'label'            => __( 'Readwise', 'outpost-mobile-publishing' ),
 			'host_patterns'    => self::CLAIMED_HOSTS,
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'bookmark',
@@ -65,7 +65,7 @@ final class Outpost_Source_Readwise extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'bookmark', 'quote' ),
 			'caveats'          => array(
-				__( 'Anonymous OG path. Authenticated highlight-pull (BYO Readwise token) is a separate optional sync feature.', 'outpost' ),
+				__( 'Anonymous OG path. Authenticated highlight-pull (BYO Readwise token) is a separate optional sync feature.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

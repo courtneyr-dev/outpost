@@ -94,7 +94,7 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 		return array(
 			array(
 				'id'            => 'bridgy-mastodon',
-				'label'         => __( 'Mastodon (via Bridgy)', 'outpost' ),
+				'label'         => __( 'Mastodon (via Bridgy)', 'outpost-mobile-publishing' ),
 				'icon'          => 'mastodon',
 				'silo_id'       => 'mastodon',
 				'bridgy_url'    => 'https://brid.gy/publish/mastodon',
@@ -110,12 +110,12 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 				),
 				'accepts_media' => array( 'image', 'video', 'audio' ),
 				'caveats'       => array(
-					__( 'Posts route through brid.gy; first-time setup at brid.gy is required.', 'outpost' ),
+					__( 'Posts route through brid.gy; first-time setup at brid.gy is required.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'            => 'bridgy-bluesky',
-				'label'         => __( 'Bluesky (via Bridgy)', 'outpost' ),
+				'label'         => __( 'Bluesky (via Bridgy)', 'outpost-mobile-publishing' ),
 				'icon'          => 'bluesky',
 				'silo_id'       => 'bluesky',
 				'bridgy_url'    => 'https://brid.gy/publish/bluesky',
@@ -130,12 +130,12 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 				),
 				'accepts_media' => array( 'image', 'video' ),
 				'caveats'       => array(
-					__( 'Bluesky has 1MB / ~1000px image limits and 60s video cap. Outpost does not auto-resize for Bluesky in this release.', 'outpost' ),
+					__( 'Bluesky has 1MB / ~1000px image limits and 60s video cap. Outpost does not auto-resize for Bluesky in this release.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'            => 'bridgy-flickr',
-				'label'         => __( 'Flickr (via Bridgy)', 'outpost' ),
+				'label'         => __( 'Flickr (via Bridgy)', 'outpost-mobile-publishing' ),
 				'icon'          => 'flickr',
 				'silo_id'       => 'flickr',
 				'bridgy_url'    => 'https://brid.gy/publish/flickr',
@@ -150,7 +150,7 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 			),
 			array(
 				'id'            => 'bridgy-github',
-				'label'         => __( 'GitHub (via Bridgy)', 'outpost' ),
+				'label'         => __( 'GitHub (via Bridgy)', 'outpost-mobile-publishing' ),
 				'icon'          => 'github',
 				'silo_id'       => 'github',
 				'bridgy_url'    => 'https://brid.gy/publish/github',
@@ -161,12 +161,12 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 				),
 				'accepts_media' => array(),
 				'caveats'       => array(
-					__( 'GitHub posts work for issue comments, repo stars (likes), and creating issues from posts. Photos reference the hosted image; GitHub does not host uploaded binaries.', 'outpost' ),
+					__( 'GitHub posts work for issue comments, repo stars (likes), and creating issues from posts. Photos reference the hosted image; GitHub does not host uploaded binaries.', 'outpost-mobile-publishing' ),
 				),
 			),
 			array(
 				'id'            => 'bridgy-reddit',
-				'label'         => __( 'Reddit (via Bridgy)', 'outpost' ),
+				'label'         => __( 'Reddit (via Bridgy)', 'outpost-mobile-publishing' ),
 				'icon'          => 'reddit',
 				'silo_id'       => 'reddit',
 				'bridgy_url'    => 'https://brid.gy/publish/reddit',
@@ -178,7 +178,7 @@ final class Outpost_Bridgy_Publish_Silo_Registry {
 				),
 				'accepts_media' => array(),
 				'caveats'       => array(
-					__( 'Reddit posts go to the subreddit linked at brid.gy; configure subreddit at brid.gy.', 'outpost' ),
+					__( 'Reddit posts go to the subreddit linked at brid.gy; configure subreddit at brid.gy.', 'outpost-mobile-publishing' ),
 				),
 			),
 		);

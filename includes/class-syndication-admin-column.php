@@ -46,7 +46,7 @@ final class Outpost_Syndication_Admin_Column {
 	 * @return array<string,string>
 	 */
 	public static function add_column( array $columns ): array {
-		$columns[ self::COLUMN_KEY ] = __( 'Syndication', 'outpost' );
+		$columns[ self::COLUMN_KEY ] = __( 'Syndication', 'outpost-mobile-publishing' );
 		return $columns;
 	}
 
@@ -96,31 +96,31 @@ final class Outpost_Syndication_Admin_Column {
 			case 'complete':
 				return sprintf(
 					/* translators: %d: total syndicated platforms. */
-					__( 'Syndication complete: %d platforms', 'outpost' ),
+					__( 'Syndication complete: %d platforms', 'outpost-mobile-publishing' ),
 					$summary['total']
 				);
 			case 'partial':
 				return sprintf(
 					/* translators: %1$d: completed; %2$d: total. */
-					__( 'Syndication partial: %1$d of %2$d completed', 'outpost' ),
+					__( 'Syndication partial: %1$d of %2$d completed', 'outpost-mobile-publishing' ),
 					$summary['complete'],
 					$summary['total']
 				);
 			case 'pending':
 				return sprintf(
 					/* translators: %d: pending platforms. */
-					__( 'Syndication pending: %d platforms', 'outpost' ),
+					__( 'Syndication pending: %d platforms', 'outpost-mobile-publishing' ),
 					$summary['total']
 				);
 			case 'abandoned':
 				return sprintf(
 					/* translators: %d: abandoned platforms. */
-					__( 'Syndication abandoned: %d platforms', 'outpost' ),
+					__( 'Syndication abandoned: %d platforms', 'outpost-mobile-publishing' ),
 					$summary['total']
 				);
 			case 'no_syndication':
 			default:
-				return __( 'No syndication', 'outpost' );
+				return __( 'No syndication', 'outpost-mobile-publishing' );
 		}
 	}
 
@@ -141,8 +141,8 @@ final class Outpost_Syndication_Admin_Column {
 			return sprintf( '%1$d/%1$d', $summary['total'] );
 		}
 		if ( 'abandoned' === $status ) {
-			return __( 'abandoned', 'outpost' );
+			return __( 'abandoned', 'outpost-mobile-publishing' );
 		}
-		return __( 'none', 'outpost' );
+		return __( 'none', 'outpost-mobile-publishing' );
 	}
 }

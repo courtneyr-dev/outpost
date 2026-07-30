@@ -119,7 +119,7 @@ final class Outpost_ActivityPub_Adapter extends Outpost_Companion_Base {
 		}
 		$caps = array(
 			'id'              => self::ID,
-			'label'           => __( 'Fediverse (via ActivityPub plugin)', 'outpost' ),
+			'label'           => __( 'Fediverse (via ActivityPub plugin)', 'outpost-mobile-publishing' ),
 			'detected'        => true,
 			'accepts_modes'   => array(
 				'note',
@@ -141,8 +141,8 @@ final class Outpost_ActivityPub_Adapter extends Outpost_Companion_Base {
 			'alt_passthrough' => true,
 			'char_limit'      => null,
 			'caveats'         => array(
-				__( 'Bluesky reach via Bridgy Fed has stricter limits than other fediverse networks (about 10 MB per image, 1000 pixels maximum dimension, 300 graphemes per post).', 'outpost' ),
-				__( 'Photo alt text federates correctly only when Outpost is active alongside the ActivityPub plugin. Outpost\'s Micropub bridge writes alt text to the attachment image-alt meta key; without it, upstream Micropub plugins lose the alt text before federation reaches it.', 'outpost' ),
+				__( 'Bluesky reach via Bridgy Fed has stricter limits than other fediverse networks (about 10 MB per image, 1000 pixels maximum dimension, 300 graphemes per post).', 'outpost-mobile-publishing' ),
+				__( 'Photo alt text federates correctly only when Outpost is active alongside the ActivityPub plugin. Outpost\'s Micropub bridge writes alt text to the attachment image-alt meta key; without it, upstream Micropub plugins lose the alt text before federation reaches it.', 'outpost-mobile-publishing' ),
 			),
 			'requires_auth'   => false,
 		);

@@ -40,7 +40,7 @@ final class Outpost_Source_LastFm extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Last.fm', 'outpost' ),
+			'label'            => __( 'Last.fm', 'outpost-mobile-publishing' ),
 			'host_patterns'    => self::CLAIMED_HOSTS,
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'listen',

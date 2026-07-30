@@ -132,7 +132,7 @@ final class Outpost_Telegraph_Adapter {
 	public static function syndicate( \WP_Post $post ) {
 		$user_id = (int) $post->post_author;
 		if ( $user_id <= 0 ) {
-			return new \WP_Error( 'outpost_telegraph_no_author', __( 'Post has no author.', 'outpost' ) );
+			return new \WP_Error( 'outpost_telegraph_no_author', __( 'Post has no author.', 'outpost-mobile-publishing' ) );
 		}
 
 		$token = self::ensure_access_token( $user_id );
@@ -146,7 +146,7 @@ final class Outpost_Telegraph_Adapter {
 			$dom = array(
 				array(
 					'tag'      => 'p',
-					'children' => array( __( '(empty)', 'outpost' ) ),
+					'children' => array( __( '(empty)', 'outpost-mobile-publishing' ) ),
 				),
 			);
 		}
@@ -184,7 +184,7 @@ final class Outpost_Telegraph_Adapter {
 		}
 		$result = $parsed['result'] ?? array();
 		if ( ! is_array( $result ) || empty( $result['url'] ) ) {
-			return new \WP_Error( 'outpost_telegraph_no_url', __( 'Telegraph response missing URL.', 'outpost' ) );
+			return new \WP_Error( 'outpost_telegraph_no_url', __( 'Telegraph response missing URL.', 'outpost-mobile-publishing' ) );
 		}
 
 		update_post_meta( $post->ID, self::POST_URL_META, (string) $result['url'] );
@@ -243,11 +243,11 @@ final class Outpost_Telegraph_Adapter {
 		}
 		$result = $parsed['result'] ?? array();
 		if ( ! is_array( $result ) || empty( $result['access_token'] ) ) {
-			return new \WP_Error( 'outpost_telegraph_account_failed', __( 'Telegraph account creation returned no token.', 'outpost' ) );
+			return new \WP_Error( 'outpost_telegraph_account_failed', __( 'Telegraph account creation returned no token.', 'outpost-mobile-publishing' ) );
 		}
 		$token = (string) $result['access_token'];
 		if ( ! Outpost_Credentials_Store::set( self::CREDENTIALS_PROVIDER, array( 'access_token' => $token ), $user_id ) ) {
-			return new \WP_Error( 'outpost_telegraph_token_store_failed', __( 'Telegraph token could not be stored securely.', 'outpost' ) );
+			return new \WP_Error( 'outpost_telegraph_token_store_failed', __( 'Telegraph token could not be stored securely.', 'outpost-mobile-publishing' ) );
 		}
 		return $token;
 	}
@@ -450,7 +450,7 @@ final class Outpost_Telegraph_Adapter {
 			return new \WP_Error(
 				'outpost_telegraph_transport',
 				/* translators: %s: error message */
-				sprintf( __( 'Telegraph transport error: %s', 'outpost' ), $response->get_error_message() )
+				sprintf( __( 'Telegraph transport error: %s', 'outpost-mobile-publishing' ), $response->get_error_message() )
 			);
 		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
@@ -458,19 +458,19 @@ final class Outpost_Telegraph_Adapter {
 			return new \WP_Error(
 				'outpost_telegraph_http',
 				/* translators: %d: HTTP status */
-				sprintf( __( 'Telegraph HTTP %d', 'outpost' ), $status ),
+				sprintf( __( 'Telegraph HTTP %d', 'outpost-mobile-publishing' ), $status ),
 				array( 'status' => $status )
 			);
 		}
 		$body    = (string) wp_remote_retrieve_body( $response );
 		$decoded = json_decode( $body, true );
 		if ( ! is_array( $decoded ) ) {
-			return new \WP_Error( 'outpost_telegraph_parse', __( 'Telegraph returned non-JSON.', 'outpost' ) );
+			return new \WP_Error( 'outpost_telegraph_parse', __( 'Telegraph returned non-JSON.', 'outpost-mobile-publishing' ) );
 		}
 		if ( ! ( $decoded['ok'] ?? false ) ) {
 			return new \WP_Error(
 				'outpost_telegraph_api_error',
-				(string) ( $decoded['error'] ?? __( 'Telegraph API error.', 'outpost' ) )
+				(string) ( $decoded['error'] ?? __( 'Telegraph API error.', 'outpost-mobile-publishing' ) )
 			);
 		}
 		return $decoded;

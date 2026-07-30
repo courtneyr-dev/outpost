@@ -81,7 +81,7 @@ final class Outpost_Source_YouTube extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps = array(
 			'id'               => self::ID,
-			'label'            => __( 'YouTube', 'outpost' ),
+			'label'            => __( 'YouTube', 'outpost-mobile-publishing' ),
 			// Host_patterns kept host-only because Source_Base's
 			// path-prefix syntax requires trailing `/` which doesn't
 			// fit YouTube's `/watch` path. matches_url() below adds

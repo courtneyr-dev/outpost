@@ -162,7 +162,7 @@ final class Outpost_Fetch_Recent_REST {
 		if ( ! isset( $providers[ $provider_id ] ) ) {
 			return new \WP_Error(
 				'outpost_fetch_recent_unknown_provider',
-				__( 'Unknown fetch-recent provider.', 'outpost' ),
+				__( 'Unknown fetch-recent provider.', 'outpost-mobile-publishing' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -173,7 +173,7 @@ final class Outpost_Fetch_Recent_REST {
 		if ( ! current_user_can( $capability ) ) {
 			return new \WP_Error(
 				'outpost_fetch_recent_forbidden',
-				__( 'You do not have permission to use this picker.', 'outpost' ),
+				__( 'You do not have permission to use this picker.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -191,7 +191,7 @@ final class Outpost_Fetch_Recent_REST {
 					'reason'      => self::REASON_NOT_CONNECTED,
 					'message'     => sprintf(
 						/* translators: %s: provider label. */
-						__( 'Connect %s in OAuth settings before using this picker.', 'outpost' ),
+						__( 'Connect %s in OAuth settings before using this picker.', 'outpost-mobile-publishing' ),
 						(string) ( $config['label'] ?? $provider_id )
 					),
 				),
@@ -206,7 +206,7 @@ final class Outpost_Fetch_Recent_REST {
 				'transport_failed',
 				sprintf(
 					/* translators: 1: provider label, 2: error message. */
-					__( "Couldn't reach %1\$s right now: %2\$s", 'outpost' ),
+					__( "Couldn't reach %1\$s right now: %2\$s", 'outpost-mobile-publishing' ),
 					(string) ( $config['label'] ?? $provider_id ),
 					$e->getMessage()
 				),

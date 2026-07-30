@@ -38,7 +38,7 @@ final class Outpost_Source_Bear_Blog extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Bear Blog', 'outpost' ),
+			'label'            => __( 'Bear Blog', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( '*.bearblog.dev' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'read',

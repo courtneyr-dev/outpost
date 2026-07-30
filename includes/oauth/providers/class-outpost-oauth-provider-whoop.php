@@ -66,7 +66,7 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 	}
 
 	public function label(): string {
-		return __( 'WHOOP', 'outpost' );
+		return __( 'WHOOP', 'outpost-mobile-publishing' );
 	}
 
 	public function authorize_url(): string {

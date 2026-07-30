@@ -74,7 +74,7 @@ final class Outpost_Source_Mastodon extends Outpost_Source_Base {
 		// matcher accepts the suffix-wildcard forms below.
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Mastodon', 'outpost' ),
+			'label'            => __( 'Mastodon', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array(
 				'*.social',
 				'*.cloud',
@@ -99,7 +99,7 @@ final class Outpost_Source_Mastodon extends Outpost_Source_Base {
 			'auth_required'    => false,
 			'tags_default'     => array( 'reply' ),
 			'caveats'          => array(
-				__( 'Mastodon detection is heuristic; the outpost_mastodon_allowed_hosts filter extends recognition to instances whose TLDs do not match the default suffix patterns.', 'outpost' ),
+				__( 'Mastodon detection is heuristic; the outpost_mastodon_allowed_hosts filter extends recognition to instances whose TLDs do not match the default suffix patterns.', 'outpost-mobile-publishing' ),
 			),
 		);
 		$filtered = apply_filters( 'outpost_source_capabilities', $caps, self::ID );

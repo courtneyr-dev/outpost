@@ -81,7 +81,7 @@ final class Outpost_Sidebar_Assets {
 			true
 		);
 
-		wp_set_script_translations( self::HANDLE, 'outpost' );
+		wp_set_script_translations( self::HANDLE, 'outpost-mobile-publishing' );
 
 		$css_path = $plugin_dir . self::BUILD_CSS;
 		if ( is_readable( $css_path ) ) {

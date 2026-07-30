@@ -47,7 +47,7 @@ final class Outpost_Fetch_Recent_Test_Provider {
 			$providers = array();
 		}
 		$providers[ self::PROVIDER_ID ] = array(
-			'label'          => __( 'Test (sample data)', 'outpost' ),
+			'label'          => __( 'Test (sample data)', 'outpost-mobile-publishing' ),
 			'callback'       => array( __CLASS__, 'fetch_items' ),
 			'capability'     => 'edit_posts',
 			'oauth_provider' => null,
@@ -71,14 +71,14 @@ final class Outpost_Fetch_Recent_Test_Provider {
 		return array(
 			array(
 				'id'           => 'test-1',
-				'title'        => __( 'Sample workout: Running 5.2 miles', 'outpost' ),
-				'subtitle'     => __( '32 minutes, 478 kcal', 'outpost' ),
+				'title'        => __( 'Sample workout: Running 5.2 miles', 'outpost-mobile-publishing' ),
+				'subtitle'     => __( '32 minutes, 478 kcal', 'outpost-mobile-publishing' ),
 				'icon_url'     => null,
 				'fetched_at'   => gmdate( 'c', $now - ( 2 * $one_hour ) ),
 				'post_kind'    => 'workout',
 				'post_payload' => array(
-					'title'                  => __( 'Morning run', 'outpost' ),
-					'content'                => '<p>' . esc_html__( 'Sample running workout — 5.2 miles in 32 minutes, 478 kcal.', 'outpost' ) . '</p>',
+					'title'                  => __( 'Morning run', 'outpost-mobile-publishing' ),
+					'content'                => '<p>' . esc_html__( 'Sample running workout — 5.2 miles in 32 minutes, 478 kcal.', 'outpost-mobile-publishing' ) . '</p>',
 					'post_meta'              => array(
 						'_outpost_test_distance' => '5.2 miles',
 						'_outpost_test_duration' => '32 minutes',
@@ -88,28 +88,28 @@ final class Outpost_Fetch_Recent_Test_Provider {
 			),
 			array(
 				'id'           => 'test-2',
-				'title'        => __( 'Sample sleep session', 'outpost' ),
-				'subtitle'     => __( '7 hours 14 minutes, score 82', 'outpost' ),
+				'title'        => __( 'Sample sleep session', 'outpost-mobile-publishing' ),
+				'subtitle'     => __( '7 hours 14 minutes, score 82', 'outpost-mobile-publishing' ),
 				'icon_url'     => null,
 				'fetched_at'   => gmdate( 'c', $now - ( 14 * $one_hour ) ),
 				'post_kind'    => 'sleep',
 				'post_payload' => array(
-					'title'                  => __( 'Last night sleep', 'outpost' ),
-					'content'                => '<p>' . esc_html__( 'Sample sleep summary — 7h14m, score 82.', 'outpost' ) . '</p>',
+					'title'                  => __( 'Last night sleep', 'outpost-mobile-publishing' ),
+					'content'                => '<p>' . esc_html__( 'Sample sleep summary — 7h14m, score 82.', 'outpost-mobile-publishing' ) . '</p>',
 					'post_meta'              => array(),
 					'syndication_source_url' => null,
 				),
 			),
 			array(
 				'id'           => 'test-3',
-				'title'        => __( 'Sample reading session', 'outpost' ),
-				'subtitle'     => __( '20 minutes, 12 highlights', 'outpost' ),
+				'title'        => __( 'Sample reading session', 'outpost-mobile-publishing' ),
+				'subtitle'     => __( '20 minutes, 12 highlights', 'outpost-mobile-publishing' ),
 				'icon_url'     => null,
 				'fetched_at'   => gmdate( 'c', $now - ( 24 * $one_hour ) ),
 				'post_kind'    => 'read',
 				'post_payload' => array(
-					'title'                  => __( 'Reading: sample book', 'outpost' ),
-					'content'                => '<p>' . esc_html__( 'Sample reading session — 20 minutes, 12 highlights.', 'outpost' ) . '</p>',
+					'title'                  => __( 'Reading: sample book', 'outpost-mobile-publishing' ),
+					'content'                => '<p>' . esc_html__( 'Sample reading session — 20 minutes, 12 highlights.', 'outpost-mobile-publishing' ) . '</p>',
 					'post_meta'              => array(),
 					'syndication_source_url' => null,
 				),

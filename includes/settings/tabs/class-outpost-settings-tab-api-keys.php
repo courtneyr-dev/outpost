@@ -30,7 +30,7 @@ final class Outpost_Settings_Tab_Api_Keys {
 	public static function render( string $tab_id ): void {
 		$intro  = __(
 			'Some platforms (such as scripture sources or scholarly databases) use API keys instead of OAuth. Add keys here for the platforms you use.',
-			'outpost'
+			'outpost-mobile-publishing'
 		);
 		$fields = Outpost_Settings_Registry::get_fields( $tab_id );
 		Outpost_Settings_Page::render_tab_form( $tab_id, $fields, $intro );

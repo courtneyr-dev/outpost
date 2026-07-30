@@ -33,7 +33,7 @@ final class Outpost_Source_Medium extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'Medium', 'outpost' ),
+			'label'            => __( 'Medium', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array( 'medium.com', '*.medium.com' ),
 			'ambiguity'        => 'unambiguous',
 			'mode'             => 'read',

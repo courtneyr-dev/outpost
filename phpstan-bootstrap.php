@@ -28,7 +28,7 @@ if ( ! defined( 'OUTPOST_PLUGIN_URL' ) ) {
 	define( 'OUTPOST_PLUGIN_URL', 'http://example.test/wp-content/plugins/outpost/' );
 }
 if ( ! defined( 'OUTPOST_PLUGIN_BASENAME' ) ) {
-	define( 'OUTPOST_PLUGIN_BASENAME', 'outpost/outpost.php' );
+	define( 'OUTPOST_PLUGIN_BASENAME', 'outpost-mobile-publishing/outpost.php' );
 }
 if ( ! defined( 'OUTPOST_MIN_WP' ) ) {
 	define( 'OUTPOST_MIN_WP', '6.5' );

@@ -45,7 +45,7 @@ final class Outpost_Source_TikTok extends Outpost_Source_Base {
 	public function capabilities(): array {
 		$caps     = array(
 			'id'               => self::ID,
-			'label'            => __( 'TikTok', 'outpost' ),
+			'label'            => __( 'TikTok', 'outpost-mobile-publishing' ),
 			'host_patterns'    => array(
 				'tiktok.com',
 				'www.tiktok.com',

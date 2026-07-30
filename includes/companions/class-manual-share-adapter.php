@@ -52,7 +52,7 @@ final class Outpost_Manual_Share_Adapter extends Outpost_Companion_Base {
 	 * which is necessarily active when this code runs.
 	 */
 	public function file(): string {
-		return defined( 'OUTPOST_PLUGIN_BASENAME' ) ? (string) OUTPOST_PLUGIN_BASENAME : 'outpost/outpost.php';
+		return defined( 'OUTPOST_PLUGIN_BASENAME' ) ? (string) OUTPOST_PLUGIN_BASENAME : 'outpost-mobile-publishing/outpost.php';
 	}
 
 	/**

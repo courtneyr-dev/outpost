@@ -69,7 +69,7 @@ final class Outpost_Fetch_Recent_Whoop {
 			$providers = array();
 		}
 		$providers[ self::PROVIDER_ID ] = array(
-			'label'          => __( 'WHOOP', 'outpost' ),
+			'label'          => __( 'WHOOP', 'outpost-mobile-publishing' ),
 			'callback'       => array( __CLASS__, 'fetch_items' ),
 			'capability'     => 'publish_posts',
 			'oauth_provider' => self::PROVIDER_ID,
@@ -159,10 +159,10 @@ final class Outpost_Fetch_Recent_Whoop {
 		$title = $score_rounded > 0
 			? sprintf(
 				/* translators: %s: strain score (X.X). */
-				__( 'Cycle — Strain %s/21', 'outpost' ),
+				__( 'Cycle — Strain %s/21', 'outpost-mobile-publishing' ),
 				(string) $score_rounded
 			)
-			: __( 'Cycle', 'outpost' );
+			: __( 'Cycle', 'outpost-mobile-publishing' );
 
 		$content = '<p>' . esc_html( $title ) . '</p>';
 
@@ -201,13 +201,13 @@ final class Outpost_Fetch_Recent_Whoop {
 		$title = $score_int > 0
 			? sprintf(
 				/* translators: 1: date, 2: recovery percent. */
-				__( 'Recovery — %1$s, %2$d%%', 'outpost' ),
+				__( 'Recovery — %1$s, %2$d%%', 'outpost-mobile-publishing' ),
 				$day,
 				$score_int
 			)
 			: sprintf(
 				/* translators: %s: date. */
-				__( 'Recovery — %s', 'outpost' ),
+				__( 'Recovery — %s', 'outpost-mobile-publishing' ),
 				$day
 			);
 
