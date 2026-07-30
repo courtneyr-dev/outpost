@@ -60,6 +60,109 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 		return 'outpost-mobile-publishing/outpost.php';
 	}
 }
+
+// Minimal WP_Styles/WP_Scripts stand-ins. The PWA shell renders a standalone
+// document, so it registers assets and prints them with do_items() against an
+// explicit handle list instead of going through wp_head. These record what was
+// registered and emit one tag per handle, so a test can assert on the shell's
+// asset output rather than only on its body classes.
+if ( ! class_exists( 'Outpost_Test_Dependencies' ) ) {
+	class Outpost_Test_Dependencies {
+		/** @var array<string, string|false> handle => src */
+		public array $registered = array();
+
+		/** @var array<string, string> handle => inline payload */
+		public array $inline = array();
+
+		public string $tag_format = '<link rel="stylesheet" id="%1$s-css" href="%2$s">';
+
+		public string $inline_format = '<style id="%1$s-inline-css">%2$s</style>';
+
+		/** @param string|false $src */
+		public function add( string $handle, $src ): void {
+			$this->registered[ $handle ] = $src;
+		}
+
+		public function add_inline( string $handle, string $data ): void {
+			$this->inline[ $handle ] = ( $this->inline[ $handle ] ?? '' ) . $data;
+		}
+
+		/** @param string[]|false $handles */
+		public function do_items( $handles = false ): void {
+			$list = is_array( $handles ) ? $handles : array_keys( $this->registered );
+			foreach ( $list as $handle ) {
+				if ( ! array_key_exists( $handle, $this->registered ) ) {
+					continue;
+				}
+				$src = $this->registered[ $handle ];
+				if ( is_string( $src ) && '' !== $src ) {
+					printf( $this->tag_format, $handle, $src );
+				}
+				if ( isset( $this->inline[ $handle ] ) ) {
+					printf( $this->inline_format, $handle, $this->inline[ $handle ] );
+				}
+			}
+		}
+	}
+}
+if ( ! function_exists( 'wp_styles' ) ) {
+	function wp_styles(): Outpost_Test_Dependencies {
+		static $styles = null;
+		if ( null === $styles ) {
+			$styles = new Outpost_Test_Dependencies();
+		}
+		return $styles;
+	}
+}
+if ( ! function_exists( 'wp_scripts' ) ) {
+	function wp_scripts(): Outpost_Test_Dependencies {
+		static $scripts = null;
+		if ( null === $scripts ) {
+			$scripts                = new Outpost_Test_Dependencies();
+			$scripts->tag_format    = '<script src="%2$s" id="%1$s-js"></script>';
+			$scripts->inline_format = '<script id="%1$s-inline-js">%2$s</script>';
+		}
+		return $scripts;
+	}
+}
+if ( ! function_exists( 'wp_register_style' ) ) {
+	function wp_register_style( string $handle, $src = false, array $deps = array(), $ver = false ): bool {
+		wp_styles()->add( $handle, $src );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_register_script' ) ) {
+	function wp_register_script( string $handle, $src = false, array $deps = array(), $ver = false, bool $in_footer = false ): bool {
+		wp_scripts()->add( $handle, $src );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_add_inline_style' ) ) {
+	function wp_add_inline_style( string $handle, string $data ): bool {
+		wp_styles()->add_inline( $handle, $data );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_add_inline_script' ) ) {
+	function wp_add_inline_script( string $handle, string $data, string $position = 'after' ): bool {
+		wp_scripts()->add_inline( $handle, $data );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_enqueue_style' ) ) {
+	function wp_enqueue_style( string $handle, $src = '', array $deps = array(), $ver = false, string $media = 'all' ): void {
+		if ( is_string( $src ) && '' !== $src ) {
+			wp_styles()->add( $handle, $src );
+		}
+	}
+}
+if ( ! function_exists( 'wp_enqueue_script' ) ) {
+	function wp_enqueue_script( string $handle, $src = '', array $deps = array(), $ver = false, bool $in_footer = false ): void {
+		if ( is_string( $src ) && '' !== $src ) {
+			wp_scripts()->add( $handle, $src );
+		}
+	}
+}
 if ( ! function_exists( 'add_query_arg' ) ) {
 	function add_query_arg( ...$args ): string {
 		// Test stub. Real WP supports multiple call shapes; cover the

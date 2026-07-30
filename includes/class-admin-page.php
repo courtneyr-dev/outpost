@@ -59,12 +59,19 @@ final class Outpost_Admin_Page {
 		),
 	);
 
+	/**
+	 * Hook suffix returned by add_menu_page, used to scope asset loading to
+	 * this screen. Null until admin_menu has run.
+	 */
+	private static ?string $hook_suffix = null;
+
 	public static function register(): void {
 		add_action( 'admin_menu', array( self::class, 'register_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_assets' ) );
 	}
 
 	public static function register_menu(): void {
-		add_menu_page(
+		$suffix = add_menu_page(
 			__( 'Outpost', 'outpost-mobile-publishing' ),
 			__( 'Outpost', 'outpost-mobile-publishing' ),
 			'manage_options',
@@ -73,6 +80,120 @@ final class Outpost_Admin_Page {
 			'dashicons-share-alt2',
 			76
 		);
+
+		self::$hook_suffix = ( is_string( $suffix ) && '' !== $suffix ) ? $suffix : null;
+	}
+
+	/**
+	 * Register this screen's CSS and JS through the enqueue API.
+	 *
+	 * Both are inline-only: the CSS is a few dozen layout rules and the JS is
+	 * one copy-to-clipboard delegate, so neither earns a separate HTTP
+	 * request. Registering with a `false` src and attaching via
+	 * wp_add_inline_style/wp_add_inline_script keeps them inside the
+	 * dependency system — other plugins can dequeue or filter them, and they
+	 * print in the documented order — instead of being echoed mid-markup.
+	 *
+	 * @param string $hook_suffix Current admin screen.
+	 */
+	public static function enqueue_assets( string $hook_suffix ): void {
+		if ( null === self::$hook_suffix || $hook_suffix !== self::$hook_suffix ) {
+			return;
+		}
+
+		wp_register_style( 'outpost-admin-page', false, array(), OUTPOST_VERSION );
+		wp_enqueue_style( 'outpost-admin-page' );
+		wp_add_inline_style( 'outpost-admin-page', self::inline_css() );
+
+		wp_register_script( 'outpost-admin-page', false, array(), OUTPOST_VERSION, true );
+		wp_enqueue_script( 'outpost-admin-page' );
+		wp_add_inline_script( 'outpost-admin-page', self::inline_js() );
+	}
+
+	/** Layout rules for the bookmarklet grid and step list. */
+	private static function inline_css(): string {
+		return '
+			.outpost-admin__steps,
+			.outpost-admin__platform-list {
+				max-width: 60em;
+				line-height: 1.6;
+			}
+			.outpost-admin__bookmarklets {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(min(100%, 22em), 1fr));
+				gap: 1rem;
+				margin: 1rem 0 1.5rem;
+			}
+			.outpost-admin__bookmarklet {
+				padding: 1rem;
+			}
+			.outpost-admin__bookmarklet-title {
+				margin: 0 0 0.5rem;
+				font-size: 1.05rem;
+			}
+			.outpost-admin__bookmarklet-desc {
+				margin: 0 0 0.75rem;
+			}
+			.outpost-admin__bookmarklet-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				align-items: center;
+				margin: 0;
+			}
+			.outpost-admin__drag-handle {
+				min-height: 44px;
+				display: inline-flex;
+				align-items: center;
+			}
+			.outpost-admin__bookmarklet-details {
+				flex-basis: 100%;
+			}
+			.outpost-admin__bookmarklet-details summary {
+				cursor: pointer;
+				padding: 0.5rem 0;
+			}
+			@media (max-width: 600px) {
+				.outpost-admin__bookmarklet-actions .button {
+					width: 100%;
+				}
+			}
+		';
+	}
+
+	/** Copy-to-clipboard delegate for the bookmarklet and share-target fields. */
+	private static function inline_js(): string {
+		return '
+			( function () {
+				document.addEventListener( "click", function ( event ) {
+					var trigger = event.target && event.target.closest && event.target.closest( "[data-outpost-copy-source]" );
+					if ( ! trigger ) return;
+					var sourceId = trigger.getAttribute( "data-outpost-copy-source" );
+					var source = document.getElementById( sourceId );
+					if ( ! source ) return;
+					event.preventDefault();
+					var text = source.value;
+					var done = function () {
+						var original = trigger.textContent;
+						trigger.textContent = "' . esc_js( __( 'Copied!', 'outpost-mobile-publishing' ) ) . '";
+						setTimeout( function () {
+							trigger.textContent = original;
+						}, 1500 );
+					};
+					if ( navigator.clipboard && navigator.clipboard.writeText ) {
+						navigator.clipboard.writeText( text ).then( done, function () {
+							source.select();
+							document.execCommand( "copy" );
+							done();
+						} );
+					} else {
+						source.select();
+						document.execCommand( "copy" );
+						done();
+					}
+				} );
+			} )();
+		';
 	}
 
 	public static function render_page(): void {
@@ -225,84 +346,6 @@ final class Outpost_Admin_Page {
 				</li>
 			</ul>
 
-			<style>
-				.outpost-admin__steps,
-				.outpost-admin__platform-list {
-					max-width: 60em;
-					line-height: 1.6;
-				}
-				.outpost-admin__bookmarklets {
-					display: grid;
-					grid-template-columns: repeat(auto-fill, minmax(min(100%, 22em), 1fr));
-					gap: 1rem;
-					margin: 1rem 0 1.5rem;
-				}
-				.outpost-admin__bookmarklet {
-					padding: 1rem;
-				}
-				.outpost-admin__bookmarklet-title {
-					margin: 0 0 0.5rem;
-					font-size: 1.05rem;
-				}
-				.outpost-admin__bookmarklet-desc {
-					margin: 0 0 0.75rem;
-				}
-				.outpost-admin__bookmarklet-actions {
-					display: flex;
-					flex-wrap: wrap;
-					gap: 0.5rem;
-					align-items: center;
-					margin: 0;
-				}
-				.outpost-admin__drag-handle {
-					min-height: 44px;
-					display: inline-flex;
-					align-items: center;
-				}
-				.outpost-admin__bookmarklet-details {
-					flex-basis: 100%;
-				}
-				.outpost-admin__bookmarklet-details summary {
-					cursor: pointer;
-					padding: 0.5rem 0;
-				}
-				@media (max-width: 600px) {
-					.outpost-admin__bookmarklet-actions .button {
-						width: 100%;
-					}
-				}
-			</style>
-			<script>
-				( function () {
-					document.addEventListener( 'click', function ( event ) {
-						var trigger = event.target && event.target.closest && event.target.closest( '[data-outpost-copy-source]' );
-						if ( ! trigger ) return;
-						var sourceId = trigger.getAttribute( 'data-outpost-copy-source' );
-						var source = document.getElementById( sourceId );
-						if ( ! source ) return;
-						event.preventDefault();
-						var text = source.value;
-						var done = function () {
-							var original = trigger.textContent;
-							trigger.textContent = '<?php echo esc_js( __( 'Copied!', 'outpost-mobile-publishing' ) ); ?>';
-							setTimeout( function () {
-								trigger.textContent = original;
-							}, 1500 );
-						};
-						if ( navigator.clipboard && navigator.clipboard.writeText ) {
-							navigator.clipboard.writeText( text ).then( done, function () {
-								source.select();
-								document.execCommand( 'copy' );
-								done();
-							} );
-						} else {
-							source.select();
-							document.execCommand( 'copy' );
-							done();
-						}
-					} );
-				} )();
-			</script>
 
 			<hr style="margin: 2rem 0;" />
 
