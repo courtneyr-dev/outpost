@@ -39,7 +39,12 @@ define( 'OUTPOST_INDIEAUTH_PLUGIN_FILE', 'indieauth/indieauth.php' );
 define( 'OUTPOST_MICROPUB_PLUGIN_FILE', 'micropub/micropub.php' );
 
 // Optional companions (enable feature surfaces; never block the gate).
-define( 'OUTPOST_POST_KINDS_PLUGIN_FILE', 'post-kinds-for-indieweb/post-kinds-for-indieweb.php' );
+// Post Kinds: the repo is `post-kinds-for-indieweb` but its main file is
+// `post-kinds-for-indieweb-in-block-themes.php`, matching the plugin's own name.
+// Directory naming varies for plugins installed from GitHub rather than the
+// directory, so Outpost_Companion_Detector::status() also falls back to matching
+// on the main filename alone.
+define( 'OUTPOST_POST_KINDS_PLUGIN_FILE', 'post-kinds-for-indieweb/post-kinds-for-indieweb-in-block-themes.php' );
 define( 'OUTPOST_POST_FORMATS_PLUGIN_FILE', 'post-formats-for-block-themes/post-formats-for-block-themes.php' );
 define( 'OUTPOST_LINK_EXTENSION_XFN_PLUGIN_FILE', 'link-extension-for-xfn/link-extension-for-xfn.php' );
 define( 'OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE', 'syndication-links/syndication-links.php' );

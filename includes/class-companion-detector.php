@@ -58,7 +58,42 @@ final class Outpost_Companion_Detector {
 			return 'inactive';
 		}
 
+		// Companions installed from GitHub rather than the plugin directory land
+		// in whatever directory the user cloned or unzipped into, so the exact
+		// path above can miss a plugin that is present and active. Fall back to
+		// matching on the main filename, which is stable across directory names.
+		$resolved = self::resolve_by_basename( $plugin_file, $installed );
+		if ( null !== $resolved ) {
+			return is_plugin_active( $resolved ) ? 'active' : 'inactive';
+		}
+
 		return 'absent';
+	}
+
+	/**
+	 * Find an installed plugin whose main filename matches, ignoring its directory.
+	 *
+	 * Only matches on the filename, never on the directory, so two plugins that
+	 * happen to share a directory name cannot be confused for each other. Returns
+	 * the first match; a duplicate main filename across two directories is not a
+	 * configuration Outpost can meaningfully disambiguate.
+	 *
+	 * @since 0.1.1
+	 *
+	 * @param string               $plugin_file Expected `dir/file.php` path.
+	 * @param array<string, array> $installed   Result of get_plugins(), keyed by plugin file.
+	 * @return string|null Matching plugin file path, or null when nothing matches.
+	 */
+	private static function resolve_by_basename( string $plugin_file, array $installed ): ?string {
+		$wanted = basename( $plugin_file );
+
+		foreach ( array_keys( $installed ) as $candidate ) {
+			if ( basename( $candidate ) === $wanted ) {
+				return $candidate;
+			}
+		}
+
+		return null;
 	}
 
 	/**
