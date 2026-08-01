@@ -81,7 +81,7 @@ final class Outpost_Companion_Detector {
 	 * @since 0.1.1
 	 *
 	 * @param string               $plugin_file Expected `dir/file.php` path.
-	 * @param array<string, array> $installed   Result of get_plugins(), keyed by plugin file.
+	 * @param array<string, array<string, mixed>> $installed   Result of get_plugins(), keyed by plugin file.
 	 * @return string|null Matching plugin file path, or null when nothing matches.
 	 */
 	private static function resolve_by_basename( string $plugin_file, array $installed ): ?string {
