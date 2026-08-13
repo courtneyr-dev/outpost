@@ -1,6 +1,19 @@
 {
   "name": "outpost",
   "version": "1.0.0",
+  "files": [
+    "admin",
+    "assets",
+    "build",
+    "includes",
+    "languages",
+    "outpost.php",
+    "uninstall.php",
+    "readme.txt",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "description": "Mobile-first Progressive Web App composer for IndieWeb POSSE workflows.",
   "author": "Courtney Robertson <https://courtneyr.dev>",
   "license": "GPL-2.0-or-later",
@@ -35,6 +48,8 @@
     "wp-env:logs": "wp-env logs",
     "test:integration": "wp-env run tests-cli --env-cwd=wp-content/plugins/outpost composer test:integration",
     "build:wp": "wp-scripts build",
+    "build:all": "npm run build:wp && npm run build",
+    "plugin-zip": "wp-scripts plugin-zip",
     "start:wp": "wp-scripts start",
     "lint:wp": "wp-scripts lint-js src",
     "format:wp": "wp-scripts format src",
