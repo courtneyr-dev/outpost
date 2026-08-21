@@ -17,13 +17,14 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 
 **Who it's for:** WordPress site owners who want fast mobile posting on their own domain — micro-bloggers, POSSE practitioners, and life-loggers tracking what they listen to, watch, and read.
 
-**Composer modes:**
+**Composer modes** — every kind the Post Kinds companion registers is postable from the composer:
 
-* **Note** — a plain text post. Voice-input ready.
-* **Reply / Like / Repost / Bookmark / RSVP / Follow** — paste a URL (or use a bookmarklet from any page), add your response, post.
-* **Listen / Watch / Read / Checkin / Play** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG.
+* **Post** — Note, Status, Aside, Quote, and Article (long-form with a title). Voice-input ready.
+* **Reply / Like / Favorite / Repost / Bookmark / RSVP / Follow / Wishlist / Tag / Acquisition / Issue** — paste a URL (or use a bookmarklet from any page), add your response, post.
+* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG.
+* **Life: Mood / Weather / Sleep / Trip / Itinerary / Question** — quick personal-state entries with an optional note.
 * **Photo** — upload from your camera roll, with a required alt text field.
-* **Article** — hands off to the block editor for long-form work.
+* **Recipe** — title, ingredients, and steps, published as an h-recipe.
 
 The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet (Android's Web Share Target; on iOS via an Apple Shortcut).
 
@@ -41,7 +42,7 @@ Long-form documentation — installation, settings, common tasks, troubleshootin
 
 Optional companions light up extra features when active:
 
-* **Post Kinds for IndieWeb in Block Themes** — powers the "Look it up" media search and renders Listen/Watch/Read/Checkin/Play entries as proper post kinds. Without it, those entries publish as generic notes.
+* **Post Kinds for IndieWeb in Block Themes** — powers the "Look it up" media search and classifies every composer entry as its proper post kind (the composer names the kind explicitly when this companion is active, so ambiguous shapes like Issue and Jam land correctly). Without it, kind-shaped entries publish as generic notes.
 * **Post Formats for Block Themes** — post format selector and auto-detection.
 * **Link Extension for XFN** — XFN relationship picker on reply targets.
 * **Syndication Links** — destinations auto-populate the syndication chips.
@@ -98,7 +99,7 @@ The Outpost admin page generates one bookmarklet per post kind, embedded with yo
 
 = Does Outpost replace the block editor for long-form? =
 
-No. The Article mode hands off to `/wp-admin/post-new.php`. Outpost is for fast, phone-sized posts; the block editor remains the right tool for long-form.
+No. The Article variant publishes a titled post through Micropub like every other mode, but Outpost is built for fast, phone-sized posts — the block editor remains the right tool for serious long-form work, and anything posted from Outpost can be reopened there.
 
 == External services ==
 

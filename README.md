@@ -26,7 +26,20 @@ The docs site builds from [`docs/`](docs/) with Astro Starlight — see [docs/MA
 
 ## What this is
 
-Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` (configurable). It's optimised for the post shapes IndieWeb people actually publish — quick notes, replies, likes, photos, and life-tracking entries (listen, watch, read, checkin, play) — with one-tap syndication chips that default to **on** for every configured destination.
+Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` (configurable). It's optimised for the post shapes IndieWeb people actually publish — quick notes, replies, likes, photos, and life-tracking entries — with one-tap syndication chips that default to **on** for every configured destination.
+
+Every kind that [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-kinds-for-indieweb) registers is postable from the composer, grouped into six tabs:
+
+| Tab | Kinds |
+|---|---|
+| Post | note, status, aside, quote, article |
+| Reply | reply, like, favorite, repost, bookmark, RSVP, follow, wishlist, tag, acquisition, issue |
+| Photo | photo and galleries |
+| Doing | listen, watch, read, play, game, jam, checkin, eat, drink, exercise, craft, event, review, video, audio |
+| Life | mood, weather, sleep, trip, itinerary, question |
+| Recipe | recipe (h-recipe with ingredients and steps) |
+
+When the Post Kinds companion is active, the composer also names the kind explicitly on each Micropub post (a `pkiw-kind` vendor property), so property-ambiguous kinds — an issue is wire-identical to a reply — classify correctly. Other Micropub servers never receive the property.
 
 It works standalone with the [Micropub plugin](https://wordpress.org/plugins/micropub/) (required) and lights up additional capabilities when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
@@ -48,7 +61,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 |-----------|-------------|
 | [Micropub](https://wordpress.org/plugins/micropub/) (David Shanske) | **Required.** Server endpoint. |
 | [IndieAuth](https://wordpress.org/plugins/indieauth/) | Auth provider. Falls back to application passwords. |
-| [Post Kinds for IndieWeb in Block Themes](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Listen / Watch / Read / Checkin / Play / Follow modes. |
+| [Post Kinds for IndieWeb in Block Themes](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Kind classification for every composer entry (explicit `pkiw-kind` hint), media "Look it up" search, and card rendering. |
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |

@@ -33,9 +33,9 @@ Yes. The composer installs to the iOS home screen via Safari's "Add to Home Scre
 
 Yes. In Chrome, accept the install banner, or open the browser menu and choose **Install app** (or **Add to Home screen** on older versions). Once installed as a PWA, Outpost also registers as a share target — share any page from any app straight into the composer, no extra setup. That's one step simpler than iOS, which needs the Shortcut bridge for sharing.
 
-## Do I need Post Kinds for the Listen, Watch, Read, Checkin, and Play modes?
+## Do I need Post Kinds for the Doing and Life modes?
 
-The modes themselves are built in and always visible. But with the Post Kinds for IndieWeb in Block Themes companion plugin active, those entries render as proper post kinds on your site (without it they publish as generic notes) and the media "Look it up" search works — Outpost detects companions at runtime, no reconfiguration needed. The lookup also needs API keys configured under Post Kinds → API Connections.
+The modes themselves are built in and always visible — the composer covers every kind Post Kinds registers, from Listen and Watch through Craft, Event, Review, Sleep, and Question. But with the Post Kinds for IndieWeb in Block Themes companion plugin active, each entry is classified and rendered as its proper post kind on your site (without it they publish as generic notes) and the media "Look it up" search works — Outpost detects companions at runtime, no reconfiguration needed. When the companion is active, the composer also names the kind on each post explicitly, which is how look-alike shapes (an issue and a reply share the same properties) land as the right kind. The lookup also needs API keys configured under Post Kinds → API Connections.
 
 ## Can I write long posts in Outpost?
 
