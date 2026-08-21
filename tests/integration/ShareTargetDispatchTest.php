@@ -164,18 +164,17 @@ final class ShareTargetDispatchTest extends TestCase {
 	}
 
 	/**
-	 * Test 2: Unauthenticated POST is blocked by the controller's
-	 * `is_authenticated()` gate. Per assertion-discipline Rule 2, this
-	 * asserts ABSENCE OF SIDE EFFECTS — not just the 401 status — so
-	 * a TOCTOU regression (auth check moves after dispatch) is caught.
-	 *
-	 * Side effects gated by auth:
-	 *   - 303 redirect to composer (would be captured by wp_redirect filter)
-	 *   - Prefill transient written (would appear in wp_options)
+	 * Test 2: Unauthenticated POST dispatches (phones share without a WP
+	 * cookie — the PWA authenticates client-side via IndieAuth tokens in
+	 * IndexedDB, and an OS share navigation can't carry an Authorization
+	 * header), but the auth-gated side effect must NOT fire. Per
+	 * assertion-discipline Rule 2 this asserts ABSENCE OF THE GATED SIDE
+	 * EFFECT — no prefill transient — not just the redirect, so a TOCTOU
+	 * regression (auth check dropped from the enqueue path) is caught.
 	 *
 	 * @test
 	 */
-	public function post_unauthenticated_returns_401(): void {
+	public function post_unauthenticated_redirects_without_prefill(): void {
 		// Drop auth before calling. wp_set_current_user(0) clears the
 		// editor we set up in setUp() so is_authenticated() returns false.
 		wp_set_current_user( 0 );
@@ -184,18 +183,24 @@ final class ShareTargetDispatchTest extends TestCase {
 		$_POST['url']              = self::EXAMPLE_URL;
 		Outpost_Share_Target_Controller::handle_request();
 
-		// Side-effect absence assertion #1: no redirect issued.
-		// Auth gate fires → return at line 64 → dispatch + redirect never run.
-		$this->assertEmpty(
+		// The dispatch redirect is a pure same-origin computation and
+		// must survive without auth — this is the phone share-sheet path.
+		$this->assertCount(
+			1,
 			$this->captured_redirects,
-			'Auth gate must block dispatch: no redirect should be issued for unauthenticated requests. '
-			. 'A captured redirect here means is_authenticated() check was skipped or moved after dispatch.'
+			'Unauthenticated share must still dispatch: phones have no WP cookie and the redirect is side-effect-free.'
+		);
+		$this->assertSame( 303, $this->captured_redirects[0]['status'] );
+		$this->assertStringContainsString(
+			'/post/',
+			$this->captured_redirects[0]['url'],
+			'Dispatch must land on the composer, whose client-side auth takes over.'
 		);
 
-		// Side-effect absence assertion #2: no prefill transient written.
-		// Auth gate fires → enqueue_preview_transient() never called.
-		// Brute-force LIKE check because anonymous user has user_id=0
-		// which the transient key would include.
+		// Side-effect absence assertion: no prefill transient written.
+		// The warm-up spends the user's preview rate-limit budget, so it
+		// stays cookie-gated. Brute-force LIKE check because anonymous
+		// user has user_id=0 which the transient key would include.
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$transient_count = (int) $wpdb->get_var(
@@ -204,20 +209,22 @@ final class ShareTargetDispatchTest extends TestCase {
 		$this->assertSame(
 			0,
 			$transient_count,
-			'Auth gate must block prefill enqueue: no outpost_prefill_* transient should exist after '
-			. 'unauthenticated request. A nonzero count means the dispatch ran past the auth check.'
+			'Anonymous dispatch must not enqueue a prefill: no outpost_prefill_* transient should exist. '
+			. 'A nonzero count means the is_authenticated() gate was dropped from the enqueue path.'
 		);
 	}
 
 	/**
-	 * Test 2b: a bare `Authorization: Bearer x` header no longer authorizes.
-	 * Before the fix, is_authenticated() ORed in has_bearer_header() (mere
-	 * presence), so an anonymous POST carrying any Bearer header bypassed the
-	 * gate. Asserts absence of side effects — no redirect, no prefill transient.
+	 * Test 2b: a bare `Authorization: Bearer x` header still does not
+	 * authorize the prefill warm-up. Before the earlier fix,
+	 * is_authenticated() ORed in has_bearer_header() (mere presence), so
+	 * an anonymous POST carrying any Bearer header spent preview budget.
+	 * The dispatch redirect itself is auth-free (see test 2); the gated
+	 * side effect — the prefill transient — must stay absent.
 	 *
 	 * @test
 	 */
-	public function post_with_unresolved_bearer_header_is_blocked(): void {
+	public function post_with_unresolved_bearer_header_gets_no_prefill(): void {
 		wp_set_current_user( 0 );
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
 		$_SERVER['REQUEST_METHOD']     = 'POST';
@@ -227,9 +234,10 @@ final class ShareTargetDispatchTest extends TestCase {
 
 		unset( $_SERVER['HTTP_AUTHORIZATION'] );
 
-		$this->assertEmpty(
+		$this->assertCount(
+			1,
 			$this->captured_redirects,
-			'A bare Bearer header must not authorize: no redirect should be issued.'
+			'Dispatch is auth-free; the bearer header neither blocks nor authorizes it.'
 		);
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching

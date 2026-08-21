@@ -181,6 +181,36 @@ final class PWAShellTest extends TestCase {
 	}
 
 	/** @test */
+	public function render_manifest_ships_raster_icons_for_webapk_minting(): void {
+		WP_Mock::userFunction( 'home_url' )
+			->andReturnUsing( static fn( string $path = '' ): string => 'https://example.test' . $path );
+
+		ob_start();
+		Outpost_PWA_Shell::render_manifest();
+		$out = ob_get_clean();
+
+		$decoded = json_decode( $out, true );
+		$this->assertIsArray( $decoded );
+		$icons = $decoded['icons'];
+
+		// Android's WebAPK minting — the install path that puts a PWA into
+		// the system share sheet — needs fixed-size raster icons. Assert
+		// each raster entry independently (no OR-assertions): a 192 and a
+		// 512 with purpose "any", plus a 512 maskable.
+		$by_size_purpose = array();
+		foreach ( $icons as $icon ) {
+			$by_size_purpose[ $icon['sizes'] . '|' . $icon['purpose'] . '|' . $icon['type'] ] = $icon['src'];
+		}
+		$this->assertArrayHasKey( '192x192|any|image/png', $by_size_purpose, 'Manifest must ship a 192px raster icon.' );
+		$this->assertArrayHasKey( '512x512|any|image/png', $by_size_purpose, 'Manifest must ship a 512px raster icon.' );
+		$this->assertArrayHasKey( '512x512|maskable|image/png', $by_size_purpose, 'Manifest must ship a 512px maskable raster icon.' );
+
+		// The share_target contract the Android share sheet registers.
+		$this->assertSame( '/post/share-target', $decoded['share_target']['action'] );
+		$this->assertSame( 'GET', $decoded['share_target']['method'] );
+	}
+
+	/** @test */
 	public function render_service_worker_emits_javascript_with_post_scope_only(): void {
 		ob_start();
 		Outpost_PWA_Shell::render_service_worker();

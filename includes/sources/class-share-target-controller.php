@@ -13,10 +13,17 @@
  * `Outpost_PWA_Shell::render()` so direct navigation to /post/share-target
  * still loads the composer with its existing client-side fallback.
  *
- * Auth: requires a logged-in user OR a valid bearer token.
- * Unauthenticated requests get a 401 — the share-target endpoint is
- * a write surface (the dispatch can fire a B2 preview that consumes
- * the user's rate-limit budget).
+ * Auth: dispatch runs WITHOUT requiring a WordPress cookie session. On
+ * phones the PWA authenticates via IndieAuth bearer tokens in IndexedDB,
+ * and an OS-initiated share navigation cannot carry an Authorization
+ * header — so a cookie gate here 401'd every share fired from a phone's
+ * share sheet (desktop only worked when a wp-admin cookie happened to
+ * ride along). Dispatch itself is a pure same-origin redirect
+ * computation: no fetch fires, nothing is written. The one auth-gated
+ * side effect is the B2 preview transient warm-up (it spends the user's
+ * per-user preview rate-limit budget), which stays cookie-gated below
+ * and additionally self-guards inside enqueue_preview_transient().
+ * The composer the redirect lands on enforces its own client-side auth.
  *
  * @package Outpost
  */
@@ -53,17 +60,6 @@ final class Outpost_Share_Target_Controller {
 			return;
 		}
 
-		// Auth check happens AFTER URL extraction so the share-text-only
-		// fallback can still test "is there share data here?" without
-		// requiring auth — but actually issuing a redirect or enqueueing
-		// a preview does require auth.
-		if ( ! self::is_authenticated() ) {
-			self::send_status( 401 );
-			self::send_text( __( 'Outpost share-target requires an authenticated user.', 'outpost-mobile-publishing' ) );
-			Outpost_PWA_Shell::halt();
-			return;
-		}
-
 		if ( null === $url ) {
 			// Share-text-only: open Note mode with title + text pre-filled,
 			// no source URL.
@@ -74,7 +70,11 @@ final class Outpost_Share_Target_Controller {
 		$context  = self::build_context();
 		$decision = Outpost_Source_Detector::dispatch( $url, $context );
 
-		if ( 'auto' === $decision['route_type'] && ! empty( $decision['prefill_token'] ) ) {
+		// Preview warm-up is the only authenticated side effect: it spends
+		// the user's per-user preview rate-limit budget, so anonymous
+		// share navigations (phones — see the class docblock) skip it and
+		// the composer fetches the preview itself after sign-in.
+		if ( 'auto' === $decision['route_type'] && ! empty( $decision['prefill_token'] ) && self::is_authenticated() ) {
 			self::enqueue_preview_transient( $url, (string) $decision['prefill_token'], (string) $decision['source_id'] );
 		}
 
@@ -241,23 +241,15 @@ final class Outpost_Share_Target_Controller {
 	}
 
 	/**
-	 * Whether the current request is authenticated.
+	 * Whether the current request carries a WordPress cookie session.
+	 *
+	 * Gates only the preview-transient warm-up — never the dispatch
+	 * redirect (see the class docblock for the phone share-sheet flow).
 	 *
 	 * @return bool
 	 */
 	private static function is_authenticated(): bool {
 		return is_user_logged_in();
-	}
-
-	/**
-	 * Send an HTTP status header. Wrapped for testability.
-	 *
-	 * @param int $status HTTP status code.
-	 */
-	private static function send_status( int $status ): void {
-		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
-			status_header( $status );
-		}
 	}
 
 	/**
@@ -301,17 +293,5 @@ final class Outpost_Share_Target_Controller {
 			wp_safe_redirect( $url, 303 );
 		}
 		Outpost_PWA_Shell::halt();
-	}
-
-	/**
-	 * Emit a plain-text body for non-HTML responses.
-	 *
-	 * @param string $message Body text.
-	 */
-	private static function send_text( string $message ): void {
-		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
-			header( 'Content-Type: text/plain; charset=utf-8' );
-			echo esc_html( $message );
-		}
 	}
 }
