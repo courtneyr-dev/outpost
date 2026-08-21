@@ -5,7 +5,7 @@ description: "Gallery of Outpost's documented screens, plus capture specificatio
 
 The screens Outpost adds to WordPress, captured from a fresh install. Every screenshot has a text equivalent in the page that documents the task, so you never need the image to follow the instructions.
 
-Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The few that remain need a manual capture because they require connected providers or a real phone; their specifications are listed at the end of this page.
+Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running the Post Kinds companion, since they need a companion plugin and live lookup services. One capture is still outstanding; its specification and the reason are at the end of this page.
 
 ## Admin screens
 
@@ -41,6 +41,10 @@ The main **Outpost** admin page: per-variant bookmarklets and the phone install 
 
 The dependency notice when Micropub is deactivated: Outpost names the missing plugin and links the fix. See [Installation](/outpost/installation/).
 
+![Block editor with the Outpost sidebar showing the fetch-recent picker](../../assets/screenshots/editor-sidebar-fetch-recent.png)
+
+The Outpost sidebar in the block editor: **Add from connected platforms** opens a picker of your recent activity so you can pull a workout, sleep, or reading session into the post you're writing. The capture uses the built-in sample provider; with Oura, WHOOP, or Polar Flow connected, those appear alongside it. See [Supported services](/outpost/supported-services/).
+
 ## Composer
 
 ![Outpost composer sign-in screen asking for your site address](../../assets/screenshots/frontend-composer-signin.png)
@@ -63,15 +67,20 @@ Photo mode: every photo post asks for alt text before publishing. See [Common ta
 
 The composer offline: posts made offline wait in the queue until you reconnect. See [Common tasks](/outpost/common-tasks/).
 
+![Media lookup search results filling title, creator, and cover art](../../assets/screenshots/frontend-composer-media-lookup.png)
+
+Doing mode, Read variant: **Look it up** fills the details so you don't type them. Results come from the lookup services the Post Kinds companion provides — books from Open Library here. See [Common tasks → Log what you're reading](/outpost/common-tasks/).
+
+![Phone browser showing the Add to Home Screen prompt for the Outpost composer](../../assets/screenshots/frontend-pwa-install-prompt.png)
+
+Install the composer like an app. After your first post, Outpost offers the Add to Home Screen step for your browser — on iPhone it points at Safari's Share button; on Android it triggers the browser's own install prompt. See [Getting started](/outpost/getting-started/).
+
 ## Screenshots still needed
 
-These captures require connected providers, a real phone, or UI that hasn't shipped yet. Each row is the full specification for capturing it (viewport 1280×800 at 2x for admin screens, a phone-sized viewport for composer screens).
+One capture remains. The row below is its full specification (viewport 1280×800 at 2x for admin screens, a phone-sized viewport for composer screens).
 
 | Filename | Screen and state | What to highlight | Alt text | Caption |
 | --- | --- | --- | --- | --- |
-| frontend-composer-media-lookup.png | Composer, Watch/Listen mode, "Look it up" results shown (needs Post Kinds + API keys) | Search results filling title/creator/art | Media lookup search results filling title, creator, and cover art | "Look it up" fills media details so you don't type them. |
-| frontend-pwa-install-prompt.png | iOS Safari share sheet or Android install banner on `/post` | The Add to Home Screen action | Phone browser showing the Add to Home Screen action for the Outpost composer | Install the composer like an app from your browser's menu. |
 | admin-pending-syndication-capture.png | Pending-syndication reminder flow | The paste-URL field | Prompt asking whether the post was shared, with a field to paste the URL | Record the URL after sharing manually to a platform. |
-| editor-sidebar-fetch-recent.png | Block editor with the Outpost sidebar open (provider connected) | The fetch-recent picker | Block editor with the Outpost sidebar showing the fetch-recent picker | Pull a recent workout or sleep into the post you're writing. |
 
-Why these stay manual: the media lookup fetches from live provider APIs the disposable Playground can't reach; the install prompt only renders in a real phone browser; the fetch-recent picker needs a real OAuth provider connection; and the pending-syndication capture form isn't yet mounted in the composer, so there's no running UI to photograph.
+Why it stays manual: neither surface for this flow is reachable today. The composer-side capture form (`SyndicationCaptureForm`, inside `SyndicationDetailView`) is built and tested but nothing mounts it, so it doesn't render anywhere in the running app. The admin-side reminder (`Outpost_Pending_Syndication_Notice`) does emit its markup on the post editor screen, but WordPress places `admin_notices` output inside the block editor's no-JS fallback container, which is hidden whenever the editor loads — so nobody using the block editor ever sees it. Verified 2026-08-21 against WordPress 7.0 with a post carrying two pending entries: the detector returns them and the markup is present, with a computed height of 0 inside a `display: none` parent. That's tracked as a bug to fix before this screenshot can be taken honestly.
