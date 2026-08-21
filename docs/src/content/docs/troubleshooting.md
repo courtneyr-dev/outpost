@@ -53,6 +53,22 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Fix:** deactivate and reactivate Outpost (activation registers the rules), or re-save permalinks at Settings → Permalinks.
 
+## Sharing to Outpost from a phone shows a plain error page
+
+**Symptom:** sharing a page to Outpost from your phone's share sheet lands on a bare text page reading "Outpost share-target requires an authenticated user" instead of the composer.
+
+**Cause:** older Outpost versions required a WordPress login cookie on the share-target route. The installed app signs you in with IndieAuth tokens stored on the device, not a WordPress cookie, so shares from a phone could never pass that check — sharing only worked on a desktop browser that also happened to be logged in to wp-admin.
+
+**Fix:** update Outpost. Share dispatch no longer requires the cookie; the composer applies your normal sign-in after the share opens it. If you aren't signed in, the share data waits while you sign in and pre-fills afterward.
+
+## Outpost doesn't appear in the Android share sheet
+
+**Symptom:** the app is installed on Android, but sharing a page from another app never offers Outpost as a destination.
+
+**Cause:** Android only registers a web app as a share target when it installs as a full app (a WebAPK), and that install path needs the fixed-size PNG icons older Outpost versions didn't ship in the manifest — Android quietly fell back to a plain home-screen shortcut, which never receives shares.
+
+**Fix:** update Outpost, then remove the installed app and add it to your home screen again from Chrome so Android reinstalls it with share-target registration. On iOS, the share sheet works through the Outpost Shortcut instead (Settings → Outpost iOS Shortcut) — Safari has no share-target support for web apps.
+
 ## Stale composer after an update
 
 **Symptom:** after updating the plugin, the composer looks or behaves like the old version.
