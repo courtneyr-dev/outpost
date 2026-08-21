@@ -55,6 +55,12 @@ function variant_radios(): HTMLInputElement[] {
 	) as HTMLInputElement[];
 }
 
+function click_variant(value: string): void {
+	const radio = variant_radios().find((r) => r.value === value);
+	if (!radio) throw new Error('no variant radio for ' + value);
+	radio.click();
+}
+
 function rsvp_radios(): HTMLInputElement[] {
 	return Array.from(
 		root.querySelectorAll('input[name="outpost-rsvp-value"]'),
@@ -62,18 +68,20 @@ function rsvp_radios(): HTMLInputElement[] {
 }
 
 describe('ReplyMode variant picker', () => {
-	it('renders 9 variant radios in order', () => {
+	it('renders 11 variant radios in order', () => {
 		mount();
 		const values = variant_radios().map((r) => r.value);
 		expect(values).toEqual([
 			'reply',
 			'like',
+			'favorite',
 			'repost',
 			'bookmark',
 			'rsvp',
 			'follow',
 			'wishlist',
 			'tag',
+			'acquisition',
 			'issue',
 		]);
 	});
@@ -95,18 +103,24 @@ describe('ReplyMode variant picker', () => {
 	it('switching variant updates the submit button label', async () => {
 		mount();
 		expect(submit_button().textContent).toBe('Post reply');
-		variant_radios()[2]?.click(); // repost
+		click_variant('repost');
 		await flush();
 		expect(submit_button().textContent).toBe('Post repost');
-		variant_radios()[3]?.click(); // bookmark
+		click_variant('bookmark');
 		await flush();
 		expect(submit_button().textContent).toBe('Post bookmark');
-		variant_radios()[4]?.click(); // rsvp
+		click_variant('rsvp');
 		await flush();
 		expect(submit_button().textContent).toBe('Post RSVP');
-		variant_radios()[5]?.click(); // follow
+		click_variant('follow');
 		await flush();
 		expect(submit_button().textContent).toBe('Post follow');
+		click_variant('favorite');
+		await flush();
+		expect(submit_button().textContent).toBe('Post favorite');
+		click_variant('acquisition');
+		await flush();
+		expect(submit_button().textContent).toBe('Post acquisition');
 	});
 
 	it('Reply variant requires both URL and content for submit', async () => {
@@ -128,7 +142,7 @@ describe('ReplyMode variant picker', () => {
 	it('Like variant only requires URL (content optional)', async () => {
 		mount();
 		const url_input = input_for('outpost-reply-target') as HTMLInputElement;
-		variant_radios()[1]?.click(); // like
+		click_variant('like');
 		await flush();
 
 		set_value(url_input, 'https://example.test/post');
@@ -139,7 +153,7 @@ describe('ReplyMode variant picker', () => {
 	it('Follow variant only requires URL', async () => {
 		mount();
 		const url_input = input_for('outpost-reply-target') as HTMLInputElement;
-		variant_radios()[5]?.click(); // follow
+		click_variant('follow');
 		await flush();
 
 		set_value(url_input, 'https://example.test/profile');
@@ -153,34 +167,40 @@ describe('ReplyMode variant picker', () => {
 			root.querySelector('label[for="outpost-reply-target"]')?.textContent ?? null;
 
 		expect(label()).toBe('In reply to');
-		variant_radios()[1]?.click();
+		click_variant('like');
 		await flush();
 		expect(label()).toBe('Like of');
-		variant_radios()[2]?.click();
+		click_variant('favorite');
+		await flush();
+		expect(label()).toBe('Favorite of');
+		click_variant('repost');
 		await flush();
 		expect(label()).toBe('Repost of');
-		variant_radios()[3]?.click();
+		click_variant('bookmark');
 		await flush();
 		expect(label()).toBe('Bookmark of');
-		variant_radios()[4]?.click();
+		click_variant('rsvp');
 		await flush();
 		expect(label()).toBe('Event URL');
-		variant_radios()[5]?.click();
+		click_variant('follow');
 		await flush();
 		expect(label()).toBe('Person or feed URL');
+		click_variant('acquisition');
+		await flush();
+		expect(label()).toBe('Item URL');
 	});
 
 	it('shows the RSVP yes/no/maybe/interested picker only when RSVP is selected', async () => {
 		mount();
 		expect(rsvp_radios().length).toBe(0); // not visible on Reply
 
-		variant_radios()[4]?.click(); // rsvp
+		click_variant('rsvp');
 		await flush();
 		const values = rsvp_radios().map((r) => r.value);
 		expect(values).toEqual(['yes', 'no', 'maybe', 'interested']);
 		expect(rsvp_radios()[0]?.checked).toBe(true); // yes is default
 
-		variant_radios()[0]?.click(); // back to Reply
+		click_variant('reply');
 		await flush();
 		expect(rsvp_radios().length).toBe(0);
 	});

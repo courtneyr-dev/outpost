@@ -25,7 +25,7 @@ import {
 } from '../media-picker';
 import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
@@ -42,17 +42,18 @@ import {
 } from '../more-panel';
 
 /**
- * Listen group — life-tracking posts that point at media or places.
+ * Doing group — life-tracking posts that point at media, places, and
+ * activities.
  *
- * Five sub-modes under one tab, picked via radio:
- *   - Listen   → listen-of  (album/track URL)
- *   - Watch    → watch-of   (movie/show URL)
- *   - Read     → read-of    (book identifier URL)
- *   - Play     → play-of    (game URL)
- *   - Checkin  → location   (place URL or geo URI; place name optional)
- *
- * All five share the form shape: URL + optional content. Checkin adds an
- * optional Place name field that gets posted as `name`. None require text.
+ * Fifteen sub-modes under one tab, picked via radio. Three shapes:
+ *   - URL-anchored: Listen (listen-of), Watch (watch-of), Read (read-of),
+ *     Play/Game (play-of), Jam (jam-of), Review (item), Video (video),
+ *     Audio (audio) — target URL required, optional title/creator/rating.
+ *   - Person-primary: Eat (eat-of), Drink (drink-of), Exercise
+ *     (exercise), Craft (craft-of) — the what-was-it input is the primary
+ *     property, optional venue URL/geo pin as `location`.
+ *   - Composite: Checkin (location + place name) and Event (name +
+ *     start/end datetimes + optional venue).
  *
  * Companion gating: these post kinds are most useful when Post Kinds for
  * IndieWeb is active (it adds proper post-type rendering). Without Post
@@ -80,17 +81,27 @@ type Variant =
 	| 'checkin'
 	| 'eat'
 	| 'drink'
-	| 'exercise';
+	| 'exercise'
+	| 'craft'
+	| 'event'
+	| 'review'
+	| 'video'
+	| 'audio';
 
 type VariantProperty =
 	| 'listen-of'
+	| 'jam-of'
 	| 'watch-of'
 	| 'read-of'
 	| 'play-of'
 	| 'location'
 	| 'eat-of'
 	| 'drink-of'
-	| 'exercise';
+	| 'exercise'
+	| 'craft-of'
+	| 'item'
+	| 'video'
+	| 'audio';
 
 /**
  * Per-variant feature flags drive conditional rendering and submit-payload
@@ -100,6 +111,10 @@ type VariantProperty =
 interface VariantConfig {
 	label: string;
 	property: VariantProperty;
+	/** Post Kinds kind slug this variant maps to (sent as `pkiw-kind`
+	 *  when the Post Kinds companion is active). Game maps to `play` —
+	 *  it's a label difference, not a distinct kind. */
+	kind: PostKindSlug;
 	targetLabel: string;
 	contentLabel: string;
 	submitLabel: string;
@@ -118,6 +133,9 @@ interface VariantConfig {
 	hasTitle?: boolean;
 	/** Show the OpenStreetMap geocode lookup (Checkin and Eat/Drink). */
 	hasGeocode?: boolean;
+	/** Show the start / end datetime inputs (Event only). */
+	hasStart?: boolean;
+	hasEnd?: boolean;
 	/** Post Kinds metadata lookup category. When set, the mode shows the
 	 *  one-tap MediaLookup search that fills title/creator/cover from Post
 	 *  Kinds' lookup APIs. Eat/Drink/Exercise have no catalog to search. */
@@ -145,6 +163,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Listen',
 		property: 'listen-of',
 		targetLabel: 'Track or album URL',
+		kind: 'listen',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post listen',
 		targetRequired: true,
@@ -157,6 +176,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	watch: {
 		label: 'Watch',
 		property: 'watch-of',
+		kind: 'watch',
 		targetLabel: 'Movie or show URL',
 		contentLabel: 'Body (optional)',
 		submitLabel: 'Post watch',
@@ -170,6 +190,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	read: {
 		label: 'Read',
 		property: 'read-of',
+		kind: 'read',
 		targetLabel: 'Book URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post read',
@@ -187,6 +208,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Game URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post play',
+		kind: 'play',
 		targetRequired: true,
 		hasTitle: true,
 		hasRating: true,
@@ -201,17 +223,20 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Game URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post game',
+		kind: 'play',
 		targetRequired: true,
 		hasTitle: true,
 		hasRating: true,
 		lookup: 'game',
 	},
 	jam: {
-		// Same overlap as Game: Jam and Listen share listen-of, but the post
-		// kind label is "Jam" — used when sharing a single track you're
-		// currently into rather than logging an album you finished.
+		// A jam is a deliberate "this is my track right now" highlight,
+		// distinct from a listen log. Post Kinds' canonical property is
+		// `jam-of` (the jam card's u-jam-of); the pkiw-kind hint keeps
+		// classification correct either way.
 		label: 'Jam',
-		property: 'listen-of',
+		property: 'jam-of',
+		kind: 'jam',
 		targetLabel: 'Track URL',
 		contentLabel: 'Why this track?',
 		submitLabel: 'Post jam',
@@ -225,6 +250,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	checkin: {
 		label: 'Checkin',
 		property: 'location',
+		kind: 'checkin',
 		targetLabel: 'Location URL or geo:lat,lon',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post checkin',
@@ -241,6 +267,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		// content.
 		label: 'Eat',
 		property: 'eat-of',
+		kind: 'eat',
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post meal',
@@ -252,6 +279,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	drink: {
 		label: 'Drink',
 		property: 'drink-of',
+		kind: 'drink',
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post drink',
@@ -267,6 +295,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		// property; the optional location URL/geo URI maps to `location`.
 		label: 'Exercise',
 		property: 'exercise',
+		kind: 'exercise',
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'How did it feel? (optional)',
 		submitLabel: 'Post exercise',
@@ -274,6 +303,78 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		personLabel: 'What activity?',
 		personProperty: 'name', // routed to `exercise` via the eat/drink-shaped branch below
 		hasGeocode: true,
+	},
+	craft: {
+		// Post Kinds: `craft-of` — making something by hand (knitting,
+		// woodworking, 3D printing). The thing made is the primary input,
+		// same person-primary shape as Eat/Drink/Exercise; the optional
+		// URL is where it happened (or a geo: pin).
+		label: 'Craft',
+		property: 'craft-of',
+		kind: 'craft',
+		targetLabel: 'Location URL or geo:lat,lon (optional)',
+		contentLabel: 'Notes (optional)',
+		submitLabel: 'Post craft',
+		targetRequired: false,
+		personLabel: 'What did you make?',
+		personProperty: 'name', // routed to `craft-of` via the person-primary branch below
+		hasGeocode: true,
+	},
+	event: {
+		// Post Kinds event: h-entry with `name` (event name), `start`/`end`
+		// datetimes, and optional `location`. The property below only
+		// receives the optional venue URL/geo pin — the event branch in the
+		// submit handler owns the rest of the routing.
+		label: 'Event',
+		property: 'location',
+		kind: 'event',
+		targetLabel: 'Venue URL or geo:lat,lon (optional)',
+		contentLabel: 'Event details (optional)',
+		submitLabel: 'Post event',
+		targetRequired: false,
+		personLabel: 'Event name',
+		personProperty: 'name',
+		hasGeocode: true,
+		hasStart: true,
+		hasEnd: true,
+	},
+	review: {
+		// Post Kinds review: the reviewed item's URL rides in `item`
+		// (flattened h-review p-item), with `name` and a 1–5 `rating`.
+		label: 'Review',
+		property: 'item',
+		kind: 'review',
+		targetLabel: 'Item URL',
+		contentLabel: 'Your review',
+		submitLabel: 'Post review',
+		targetRequired: true,
+		hasTitle: true,
+		hasRating: true,
+	},
+	video: {
+		// Post Kinds video: a video-centric post. URL paste only (same
+		// contract as the snapshot variants' video field) — the URL is
+		// posted verbatim as the standard `video` property.
+		label: 'Video',
+		property: 'video',
+		kind: 'video',
+		targetLabel: 'Video URL',
+		contentLabel: 'Optional description',
+		submitLabel: 'Post video',
+		targetRequired: true,
+		hasTitle: true,
+	},
+	audio: {
+		// Post Kinds audio: an audio-centric post (voice memo, episode).
+		// URL paste only, posted verbatim as the standard `audio` property.
+		label: 'Audio',
+		property: 'audio',
+		kind: 'audio',
+		targetLabel: 'Audio URL',
+		contentLabel: 'Optional description',
+		submitLabel: 'Post audio',
+		targetRequired: true,
+		hasTitle: true,
 	},
 };
 
@@ -288,6 +389,11 @@ const VARIANT_ORDER: Variant[] = [
 	'eat',
 	'drink',
 	'exercise',
+	'craft',
+	'event',
+	'review',
+	'video',
+	'audio',
 ];
 
 type Status =
@@ -353,8 +459,10 @@ function post_format_for_variant(variant: Variant): string | null {
 	switch (variant) {
 		case 'listen':
 		case 'jam':
+		case 'audio':
 			return 'audio';
 		case 'watch':
+		case 'video':
 			return 'video';
 		default:
 			return null;
@@ -411,6 +519,11 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	const [person_name, setPersonName] = useState('');
 	const [watch_title, setWatchTitle] = useState('');
 	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>('');
+	// Event start/end — datetime-local values, submitted as h-event
+	// `start`/`end`. Only read by the event branch (gated on hasStart /
+	// hasEnd), so stale values never leak into other variants.
+	const [event_start, setEventStart] = useState('');
+	const [event_end, setEventEnd] = useState('');
 	const [rating, setRating] = useState('');
 	const [content, setContent] = useState(initial_share.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -608,7 +721,9 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				variant === 'checkin' ||
 				variant === 'eat' ||
 				variant === 'drink' ||
-				variant === 'exercise';
+				variant === 'exercise' ||
+				variant === 'craft' ||
+				variant === 'event';
 			const url_ok = accepts_geo
 				? is_safe_location_value(trimmed_url)
 				: is_safe_http_url(trimmed_url);
@@ -619,6 +734,14 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				setStatus({ kind: 'error', message });
 				return;
 			}
+		}
+
+		// Event datetime sanity: when both ends are set, end must not
+		// precede start. Values are datetime-local strings, which compare
+		// correctly as strings within the same format.
+		if ( config.hasStart && event_start && event_end && event_end < event_start ) {
+			setStatus({ kind: 'error', message: 'Event end must not be before its start.' });
+			return;
 		}
 
 		// Rating sanity: numeric, 1-5 inclusive. Empty is valid (no rating).
@@ -722,7 +845,23 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			//     (optional venue).
 			const base: HEntryProperties = {};
 
-			if (variant === 'eat' || variant === 'drink' || variant === 'exercise') {
+			if (variant === 'event') {
+				// Event: person input is the event name; optional URL is the
+				// venue (location); start/end ride as h-event datetimes. The
+				// pkiw-kind hint below is what classifies it server-side.
+				if (trimmed_person) {
+					base.name = trimmed_person;
+				}
+				if (trimmed_url) {
+					base.location = trimmed_url;
+				}
+				if (event_start) {
+					base.start = event_start;
+				}
+				if (event_end) {
+					base.end = event_end;
+				}
+			} else if (variant === 'eat' || variant === 'drink' || variant === 'exercise' || variant === 'craft') {
 				// Body-shaped variants: the personLabel input is the post's primary
 				// content (food / drink / activity), routed to config.property
 				// (`eat-of` / `drink-of` / `exercise`). Optional target_url goes
@@ -747,6 +886,14 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						base.author = trimmed_person;
 					}
 				}
+			}
+
+			// Explicit Post Kinds kind (vendor property) — resolves the
+			// property-ambiguous variants (game vs. play, jam, event) when
+			// the companion is active; other servers never see it.
+			const kind_hint = pkiw_kind_hint(composerConfig, config.kind);
+			if (kind_hint['pkiw-kind']) {
+				base['pkiw-kind'] = kind_hint['pkiw-kind'];
 			}
 
 			if (trimmed_content) {
@@ -1004,6 +1151,42 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 							}
 							disabled={submitting}
 							placeholder="e.g., The Bear S2E3"
+						/>
+					</>
+				)}
+
+				{config.hasStart && (
+					<>
+						<label class="outpost-label" for="outpost-listen-event-start">
+							Starts (optional)
+						</label>
+						<input
+							id="outpost-listen-event-start"
+							class="outpost-input"
+							type="datetime-local"
+							value={event_start}
+							onInput={(event): void =>
+								setEventStart((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+					</>
+				)}
+
+				{config.hasEnd && (
+					<>
+						<label class="outpost-label" for="outpost-listen-event-end">
+							Ends (optional)
+						</label>
+						<input
+							id="outpost-listen-event-end"
+							class="outpost-input"
+							type="datetime-local"
+							value={event_end}
+							onInput={(event): void =>
+								setEventEnd((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
 						/>
 					</>
 				)}

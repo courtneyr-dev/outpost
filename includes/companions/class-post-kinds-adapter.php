@@ -2,11 +2,13 @@
 /**
  * Post Kinds for IndieWeb adapter.
  *
- * Surfaces capability slugs for each Post Kind taxonomy term. The
- * composer's variant pickers (Reply tab's 6 variants, Doing tab's 5)
- * already expose these surfaces; the adapter just declares them so
- * code that asks "is post-kinds.listen supported?" gets the right
- * answer.
+ * Surfaces capability slugs for every Post Kind taxonomy term the
+ * composer can produce — one slug per kind in Post Kinds' default
+ * registry (class-taxonomy.php), spelled post-kinds.<kind-slug>. The
+ * composer's variant pickers expose these surfaces across the Post,
+ * Reply, Photo, Doing, Life, and Recipe tabs; the adapter declares
+ * them so code that asks "is post-kinds.listen supported?" gets the
+ * right answer.
  *
  * @package Outpost
  */
@@ -32,17 +34,44 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 	/** @return string[] */
 	public function feature_slugs(): array {
 		return array(
-			'post-kinds.listen',
-			'post-kinds.watch',
-			'post-kinds.read',
-			'post-kinds.play',
-			'post-kinds.checkin',
+			'post-kinds.note',
+			'post-kinds.article',
+			'post-kinds.reply',
 			'post-kinds.like',
 			'post-kinds.repost',
 			'post-kinds.bookmark',
 			'post-kinds.rsvp',
+			'post-kinds.checkin',
+			'post-kinds.listen',
+			'post-kinds.watch',
+			'post-kinds.read',
+			'post-kinds.event',
+			'post-kinds.photo',
+			'post-kinds.video',
+			'post-kinds.review',
+			'post-kinds.favorite',
+			'post-kinds.jam',
+			'post-kinds.wish',
+			'post-kinds.mood',
+			'post-kinds.acquisition',
+			'post-kinds.drink',
+			'post-kinds.eat',
+			'post-kinds.recipe',
+			'post-kinds.play',
+			'post-kinds.audio',
+			// `quote` matches Post Kinds' taxonomy slug — the earlier
+			// `post-kinds.quotation` spelling matched nothing real.
+			'post-kinds.quote',
+			'post-kinds.tag',
+			'post-kinds.weather',
+			'post-kinds.exercise',
+			'post-kinds.trip',
+			'post-kinds.itinerary',
 			'post-kinds.follow',
-			'post-kinds.quotation',
+			'post-kinds.issue',
+			'post-kinds.question',
+			'post-kinds.sleep',
+			'post-kinds.craft',
 		);
 	}
 }

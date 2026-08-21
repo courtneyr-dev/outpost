@@ -132,12 +132,49 @@ export interface HEntryProperties {
 	'eat-of'?: string;
 	/** Drink: name/description of beverage (Post Kinds: `drink-of`). */
 	'drink-of'?: string;
-	/** Wishlist target URL (Post Kinds: `wishlist-of`). */
-	'wishlist-of'?: string;
+	/** Wish target URL (Post Kinds: `wish-of` — canonical; replaces the
+	 *  earlier `wishlist-of` spelling, which the Post Kinds bridge keeps
+	 *  as a compat alias). */
+	'wish-of'?: string;
 	/** Tag target URL (Post Kinds: `tag-of`). */
 	'tag-of'?: string;
-	/** Issue target URL (Post Kinds: `issue-of`). */
-	'issue-of'?: string;
+	/** Jam track URL (Post Kinds: `jam-of` — a jam is a deliberate
+	 *  "this is my track right now" highlight, distinct from a listen log). */
+	'jam-of'?: string;
+	/** Favorite target URL (Post Kinds: `favorite-of`). */
+	'favorite-of'?: string;
+	/** Acquisition target URL or item name (Post Kinds: `acquisition-of`). */
+	'acquisition-of'?: string;
+	/** Craft: what was made — name or project URL (Post Kinds: `craft-of`). */
+	'craft-of'?: string;
+	/** Question: the question being asked (Post Kinds: `p-question`). */
+	question?: string;
+	/** Sleep: textual sleep log, e.g. duration or quality (Post Kinds: `p-sleep`). */
+	sleep?: string;
+	/** Trip: textual journey description (Post Kinds: `p-trip`). */
+	trip?: string;
+	/** Itinerary: scheduled trip legs as text (Post Kinds: `p-itinerary`). */
+	itinerary?: string;
+	/** Event start — ISO 8601 / datetime-local value (h-event `dt-start`). */
+	start?: string;
+	/** Event end — ISO 8601 / datetime-local value (h-event `dt-end`). */
+	end?: string;
+	/** Review: URL of the reviewed item (flattened h-review `p-item`). */
+	item?: string;
+	/**
+	 * Audio URL — same paste-only contract as `video`: submitted verbatim,
+	 * downstream rendering (Post Kinds, theme templates) decides embedding.
+	 */
+	audio?: string;
+	/**
+	 * Explicit Post Kinds kind slug (vendor property, mirrors the plugin's
+	 * `pkiw-promote`). Sent only when the Post Kinds companion is active —
+	 * see `pkiw_kind_hint()` in composer-config.ts. Lets property-ambiguous
+	 * kinds (issue vs. reply, content-only quote, game vs. play) classify
+	 * correctly; the receiving bridge validates and falls back to property
+	 * inference on unknown values.
+	 */
+	'pkiw-kind'?: string;
 	/** Recipe: list of ingredients (Schema.org / h-recipe `ingredient`). */
 	ingredient?: string[];
 	/** Recipe: list of instruction steps. */
