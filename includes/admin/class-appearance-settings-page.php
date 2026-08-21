@@ -371,26 +371,56 @@ final class Outpost_Appearance_Settings_Page {
 	 * @param array<string,mixed> $resolved
 	 */
 	public static function build_preview_html( array $resolved, string $mode ): string {
-		$tokens_css = Outpost_Token_Resolver::to_css( $resolved );
 		$root_class = 'outpost-mode-' . ( 'night' === $mode ? 'night' : 'day' );
-		$styles     = self::preview_static_styles();
 		$body       = self::preview_body_html();
 		$lang       = function_exists( 'get_bloginfo' ) ? (string) get_bloginfo( 'language' ) : 'en-US';
-		// These <style> tags belong to the iframe's srcdoc document, not
-		// the parent admin page, so the enqueue APIs cannot reach them.
-		$preview = '<!doctype html>'
+		$preview    = '<!doctype html>'
 			. '<html lang="' . esc_attr( $lang ) . '">'
 			. '<head>'
 			. '<meta charset="utf-8">'
 			. '<title>Outpost preview</title>'
-			. '<style id="outpost-preview-tokens">' . $tokens_css . '</style>'
-			. '<style id="outpost-preview-static">' . $styles . '</style>'
+			. self::preview_style_markup( Outpost_Token_Resolver::to_css( $resolved ), $mode )
 			. '</head>'
 			. '<body class="' . esc_attr( $root_class ) . '">'
 			. $body
 			. '</body>'
 			. '</html>';
 		return $preview;
+	}
+
+	/**
+	 * Build the srcdoc document's style markup through the enqueue API.
+	 *
+	 * The preview is a self-contained iframe srcdoc document, so its
+	 * styles can't ride the parent page's wp_head — instead they are
+	 * registered as inline styles and printed with do_items() against an
+	 * explicit handle list, the same standalone-document pattern the PWA
+	 * shell uses. Handles are per-mode because WP_Styles marks a handle
+	 * done after printing, and the day and night previews each need their
+	 * own token block.
+	 *
+	 * The live-update script in the parent page finds the printed token
+	 * block by its id prefix (style[id^="outpost-preview-tokens"]) and
+	 * rewrites its contents as the user edits — keep the handle names in
+	 * step with that selector.
+	 *
+	 * @param string $tokens_css Resolved --outpost-* token declarations.
+	 * @param string $mode       'day' or 'night'.
+	 * @return string The printed style tags for the srcdoc head.
+	 */
+	private static function preview_style_markup( string $tokens_css, string $mode ): string {
+		$suffix        = 'night' === $mode ? 'night' : 'day';
+		$tokens_handle = 'outpost-preview-tokens-' . $suffix;
+		$static_handle = 'outpost-preview-static-' . $suffix;
+
+		wp_register_style( $tokens_handle, false, array(), OUTPOST_VERSION );
+		wp_add_inline_style( $tokens_handle, $tokens_css );
+		wp_register_style( $static_handle, false, array(), OUTPOST_VERSION );
+		wp_add_inline_style( $static_handle, self::preview_static_styles() );
+
+		ob_start();
+		wp_styles()->do_items( array( $tokens_handle, $static_handle ) );
+		return (string) ob_get_clean();
 	}
 
 	private static function preview_static_styles(): string {
@@ -564,7 +594,7 @@ final class Outpost_Appearance_Settings_Page {
 				try {
 					var doc = iframe.contentDocument;
 					if (!doc) return;
-					var styleEl = doc.getElementById('outpost-preview-tokens');
+					var styleEl = doc.querySelector('style[id^="outpost-preview-tokens"]');
 					if (styleEl) {
 						styleEl.textContent = css;
 					}

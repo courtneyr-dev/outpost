@@ -334,16 +334,17 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function test_build_preview_html_inline_tokens_block_is_token_only(): void {
-		// The injected #outpost-preview-tokens block must only contain
+		// The injected token block — printed through the enqueue API, so
+		// its id carries WP's -inline-css suffix — must only contain
 		// `--outpost-*: value;` declarations between the braces.
 		$resolved = Outpost_Token_Resolver::resolve( $this->current_user_id, 'day' );
 		$html     = Outpost_Appearance_Settings_Page::build_preview_html( $resolved, 'day' );
 		$this->assertMatchesRegularExpression(
-			'/<style id="outpost-preview-tokens">\s*\.outpost-mode-day\s*\{/',
+			'/<style id=["\']outpost-preview-tokens-day-inline-css["\']>\s*\.outpost-mode-day\s*\{/',
 			$html
 		);
 		// Extract the block and assert each line inside is a custom-prop assignment.
-		preg_match( '/<style id="outpost-preview-tokens">(.*?)<\/style>/s', $html, $m );
+		preg_match( '/<style id=["\']outpost-preview-tokens-day-inline-css["\']>(.*?)<\/style>/s', $html, $m );
 		$this->assertNotEmpty( $m[1] ?? '' );
 		$inner = trim( $m[1] );
 		$inner = preg_replace( '/\.outpost-mode-day\s*\{|\}/', '', $inner );
