@@ -17,7 +17,7 @@ The suite plus its building blocks: IndieAuth signs you in, Micropub receives wh
 
 ![Outpost composer on a phone, signed in over IndieAuth, showing post style choices](../../assets/screenshots/suite-composer-note.png)
 
-The composer signed in against the demo site over IndieAuth. With Post Kinds active, the tab row grows the Listen/Watch/Read/Checkin group; with Post Formats active, the style you pick flows into format inference once the post lands.
+The composer signed in against the demo site over IndieAuth. The tab row is always the full set; with Post Kinds active, every entry — from a listen log to a craft, event, or review — lands classified as its proper kind, and with Post Formats active, the style you pick flows into format inference once the post lands.
 
 ## What arrives on your site
 

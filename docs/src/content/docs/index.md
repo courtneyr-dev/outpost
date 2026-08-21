@@ -23,7 +23,7 @@ Outpost is for WordPress site owners who want fast mobile posting without Jetpac
 
 If either required plugin is missing or inactive, Outpost shows an admin notice with an install link, and the `/post` page shows a setup prompt instead of the composer.
 
-Optional companion plugins light up extra features when active: Post Kinds for IndieWeb in Block Themes (media "Look it up" search and proper display for Listen/Watch/Read/Checkin/Play posts), Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast SEO, and ActivityPub.
+Optional companion plugins light up extra features when active: Post Kinds for IndieWeb in Block Themes (media "Look it up" search, plus kind classification and card display for every kind-shaped entry the composer posts — the composer covers all 36 of its kinds), Post Formats for Block Themes, Link Extension for XFN, Syndication Links, Yoast SEO, and ActivityPub.
 
 ## Is Outpost on WordPress.org?
 
