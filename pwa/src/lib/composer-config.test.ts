@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	fetch_composer_config,
+	pkiw_kind_hint,
 	ComposerConfigError,
 	type ComposerConfig,
 	type ComposerConfigEnvironment,
@@ -97,5 +98,33 @@ describe('fetch_composer_config', () => {
 		} catch (err) {
 			expect(err).toBeInstanceOf(ComposerConfigError);
 		}
+	});
+});
+
+describe('pkiw_kind_hint', () => {
+	it('returns the vendor property when Post Kinds is active', () => {
+		expect(pkiw_kind_hint(valid_config, 'jam')).toEqual({ 'pkiw-kind': 'jam' });
+	});
+
+	it('returns an empty object when Post Kinds is inactive', () => {
+		const inactive: ComposerConfig = {
+			...valid_config,
+			companions: { ...valid_config.companions, 'post-kinds': 'inactive' },
+		};
+		expect(pkiw_kind_hint(inactive, 'jam')).toEqual({});
+	});
+
+	it('returns an empty object when Post Kinds is absent', () => {
+		const absent: ComposerConfig = {
+			...valid_config,
+			companions: { ...valid_config.companions, 'post-kinds': 'absent' },
+		};
+		expect(pkiw_kind_hint(absent, 'issue')).toEqual({});
+	});
+
+	it('returns an empty object when the config never loaded', () => {
+		// Config fetch failure must not block posting — the hint simply
+		// drops and the receiving bridge falls back to property inference.
+		expect(pkiw_kind_hint(undefined, 'event')).toEqual({});
 	});
 });

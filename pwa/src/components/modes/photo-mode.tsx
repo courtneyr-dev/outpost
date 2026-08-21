@@ -9,7 +9,7 @@ import {
 } from '../../lib/micropub';
 import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
@@ -233,6 +233,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			const base = {
 				photo: photo_value,
 				'mp-photo-alt': alt_value,
+				...pkiw_kind_hint(composerConfig, 'photo'),
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(picked_location

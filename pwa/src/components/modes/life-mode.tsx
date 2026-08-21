@@ -7,10 +7,11 @@ import {
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
@@ -23,16 +24,18 @@ import {
 } from '../more-panel';
 
 /**
- * Life mode — content-only post kinds: Mood, Weather.
+ * Life mode — content-only post kinds: Mood, Weather, Sleep, Trip,
+ * Itinerary, Question.
  *
  * These post kinds don't reference an external URL; they're personal
- * statements about state of being. Distinct from the Doing tab (which is
- * activity-anchored, including Exercise) and from Note (which is a
- * generic thought-of-the-moment without a typed property).
+ * statements about state of being (or, for Question, a prompt for
+ * replies). Distinct from the Doing tab (which is activity-anchored,
+ * including Exercise) and from Note (which is a generic
+ * thought-of-the-moment without a typed property).
  *
- * Per Post Kinds:
- *   - Mood     → h-entry `mood` property = textual emotional state.
- *   - Weather  → h-entry `weather` property = textual conditions.
+ * Per Post Kinds, each variant maps its primary input to the h-entry
+ * property sharing its name: `mood`, `weather`, `sleep`, `trip`,
+ * `itinerary`, `question` (rendered as p-<property> in microformats2).
  *
  * Exercise used to live here but moved to the Doing tab (v0.1.63) — its
  * primary axis is activity-as-event with optional venue, so it shares
@@ -48,11 +51,11 @@ export interface LifeModeProps {
 	composerConfig?: ComposerConfig;
 }
 
-type Variant = 'mood' | 'weather';
+type Variant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
 interface VariantConfig {
 	label: string;
-	property: 'mood' | 'weather';
+	property: 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 	primaryLabel: string;
 	primaryPlaceholder: string;
 	contentLabel: string;
@@ -76,9 +79,50 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post weather',
 	},
+	sleep: {
+		// Post Kinds: h-entry `sleep` property (p-sleep) — a passive
+		// sleep-time log. Same primary + optional-context shape as Mood.
+		label: 'Sleep',
+		property: 'sleep',
+		primaryLabel: 'How did you sleep?',
+		primaryPlaceholder: 'e.g., 7h 40m, restless after 3am',
+		contentLabel: 'Notes (optional)',
+		submitLabel: 'Post sleep',
+	},
+	trip: {
+		// Post Kinds: h-entry `trip` property (p-trip) — a geographic
+		// journey from one place to another, described as text.
+		label: 'Trip',
+		property: 'trip',
+		primaryLabel: 'Where are you headed?',
+		primaryPlaceholder: 'e.g., Chicago to Detroit by train',
+		contentLabel: 'Notes (optional)',
+		submitLabel: 'Post trip',
+	},
+	itinerary: {
+		// Post Kinds: h-entry `itinerary` property (p-itinerary) — the
+		// scheduled legs of a trip (flights, trains, transit).
+		label: 'Itinerary',
+		property: 'itinerary',
+		primaryLabel: 'Legs',
+		primaryPlaceholder: 'e.g., ORD → DTW 9:05am, DTW → YYZ 1:20pm',
+		contentLabel: 'Notes (optional)',
+		submitLabel: 'Post itinerary',
+	},
+	question: {
+		// Post Kinds: h-entry `question` property (p-question) — a post
+		// soliciting answers or replies. The question itself is the
+		// primary value; details go in the optional body.
+		label: 'Question',
+		property: 'question',
+		primaryLabel: "What's your question?",
+		primaryPlaceholder: 'e.g., Best static-site host in 2026?',
+		contentLabel: 'Details (optional)',
+		submitLabel: 'Post question',
+	},
 };
 
-const VARIANT_ORDER: Variant[] = ['mood', 'weather'];
+const VARIANT_ORDER: Variant[] = ['mood', 'weather', 'sleep', 'trip', 'itinerary', 'question'];
 
 type Status =
 	| { kind: 'idle' }
@@ -88,11 +132,28 @@ type Status =
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
+/**
+ * Drain the share-target stash only when this Life tab is the intended
+ * target (F6 dispatch with mode=mood/weather/sleep/trip/itinerary/question).
+ * Mirrors the Note / Reply / Doing drain pattern so an unrelated tab never
+ * consumes it — and so a Life-tagged stash doesn't linger and re-apply.
+ */
+function consume_share_target_for_life(): { variant?: Variant; content?: string } {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'life') return {};
+	consume_share_target();
+	const out: { variant?: Variant; content?: string } = {};
+	if (data.lifeVariant) out.variant = data.lifeVariant;
+	if (data.content) out.content = data.content;
+	return out;
+}
+
 export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) {
-	const [variant, setVariant] = useState<Variant>('mood');
+	const initial_share = consume_share_target_for_life();
+	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'mood');
 	const [title, setTitle] = useState('');
 	const [primary_value, setPrimaryValue] = useState('');
-	const [content, setContent] = useState('');
+	const [content, setContent] = useState(initial_share.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
@@ -121,6 +182,9 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_primary,
+				// Life property names equal their Post Kinds kind slugs
+				// one-for-one, so the property doubles as the hint value.
+				...pkiw_kind_hint(composerConfig, config.property),
 				...(trimmed_title ? { name: trimmed_title } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(picked_location
