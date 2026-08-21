@@ -156,3 +156,64 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!v.siteSettings || typeof v.siteSettings !== 'object') return false;
 	return true;
 }
+
+/**
+ * Post Kinds kind slugs Outpost's composer variants map onto. Mirrors the
+ * `default_kinds` registry in Post Kinds for IndieWeb's class-taxonomy.php.
+ */
+export type PostKindSlug =
+	| 'note'
+	| 'article'
+	| 'reply'
+	| 'like'
+	| 'repost'
+	| 'bookmark'
+	| 'rsvp'
+	| 'checkin'
+	| 'listen'
+	| 'watch'
+	| 'read'
+	| 'event'
+	| 'photo'
+	| 'video'
+	| 'review'
+	| 'favorite'
+	| 'jam'
+	| 'wish'
+	| 'mood'
+	| 'acquisition'
+	| 'drink'
+	| 'eat'
+	| 'recipe'
+	| 'play'
+	| 'audio'
+	| 'quote'
+	| 'tag'
+	| 'weather'
+	| 'exercise'
+	| 'trip'
+	| 'itinerary'
+	| 'follow'
+	| 'issue'
+	| 'question'
+	| 'sleep'
+	| 'craft';
+
+/**
+ * Spreadable `pkiw-kind` hint for h-entry submissions.
+ *
+ * Returns the explicit-kind vendor property when the Post Kinds companion
+ * is active on the site, and an empty object otherwise — other Micropub
+ * servers should not receive a vendor property they can't act on. Usage:
+ *
+ *   const base: HEntryProperties = {
+ *     ...,
+ *     ...pkiw_kind_hint(composerConfig, 'jam'),
+ *   };
+ */
+export function pkiw_kind_hint(
+	config: ComposerConfig | undefined,
+	kind: PostKindSlug,
+): { 'pkiw-kind'?: string } {
+	return config?.companions['post-kinds'] === 'active' ? { 'pkiw-kind': kind } : {};
+}

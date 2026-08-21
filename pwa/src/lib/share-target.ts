@@ -23,9 +23,20 @@
  * the next launch should be a fresh composer.
  */
 
-export type ReplyVariant = 'reply' | 'like' | 'repost' | 'bookmark' | 'rsvp' | 'follow';
+export type ReplyVariant =
+	| 'reply'
+	| 'like'
+	| 'favorite'
+	| 'repost'
+	| 'bookmark'
+	| 'rsvp'
+	| 'follow'
+	| 'wishlist'
+	| 'tag'
+	| 'acquisition'
+	| 'issue';
 
-/** Doing-tab variants (the "listen" tab id renders ListenMode which carries 9 variants). */
+/** Doing-tab variants (the "listen" tab id renders ListenMode). */
 export type DoingVariant =
 	| 'listen'
 	| 'watch'
@@ -35,16 +46,27 @@ export type DoingVariant =
 	| 'jam'
 	| 'checkin'
 	| 'eat'
-	| 'drink';
+	| 'drink'
+	| 'exercise'
+	| 'craft'
+	| 'event'
+	| 'review'
+	| 'video'
+	| 'audio';
+
+/** Life-tab variants (content-only kinds rendered by LifeMode). */
+export type LifeVariant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
 export interface ShareTargetData {
-	tab: 'note' | 'reply' | 'photo' | 'listen';
+	tab: 'note' | 'reply' | 'photo' | 'listen' | 'life' | 'recipe';
 	/** Note tab variant — one of the 5 Post-tab variants. */
 	variant?: 'note' | 'article' | 'status' | 'aside' | 'quote';
 	/** Reply tab variant — one of the 6 Reply-tab variants. Set by E1 bookmarklets. */
 	replyVariant?: ReplyVariant;
 	/** Doing tab variant — set when the share-target dispatcher routes to Listen/Watch/Read/Play/etc. */
 	doingVariant?: DoingVariant;
+	/** Life tab variant — set when the dispatcher routes to Mood/Weather/Sleep/Trip/Itinerary/Question. */
+	lifeVariant?: LifeVariant;
 	title?: string;
 	content?: string;
 	url?: string;
@@ -57,10 +79,15 @@ export interface ShareTargetData {
 const REPLY_VARIANT_VALUES: ReplyVariant[] = [
 	'reply',
 	'like',
+	'favorite',
 	'repost',
 	'bookmark',
 	'rsvp',
 	'follow',
+	'wishlist',
+	'tag',
+	'acquisition',
+	'issue',
 ];
 
 const DOING_VARIANT_VALUES: DoingVariant[] = [
@@ -73,6 +100,21 @@ const DOING_VARIANT_VALUES: DoingVariant[] = [
 	'checkin',
 	'eat',
 	'drink',
+	'exercise',
+	'craft',
+	'event',
+	'review',
+	'video',
+	'audio',
+];
+
+const LIFE_VARIANT_VALUES: LifeVariant[] = [
+	'mood',
+	'weather',
+	'sleep',
+	'trip',
+	'itinerary',
+	'question',
 ];
 
 const KEY = 'outpost.share_target';
@@ -179,10 +221,32 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 		};
 	}
 
-	// Doing tab (rendered by ListenMode) covers 9 variants:
-	// listen / watch / read / play / game / jam / checkin / eat / drink.
-	// F7 (Spotify) emits mode=listen, F15 (YouTube) emits mode=watch,
-	// F16 (Goodreads / Readwise) emits mode=read, etc.
+	// Life tab (rendered by LifeMode): content-only kinds.
+	if (LIFE_VARIANT_VALUES.includes(mode as LifeVariant)) {
+		return {
+			tab: 'life',
+			lifeVariant: mode as LifeVariant,
+			...(text ? { content: text } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
+		};
+	}
+
+	// Recipe tab.
+	if (mode === 'recipe') {
+		return {
+			tab: 'recipe',
+			...(title ? { title } : {}),
+			...(text ? { content: text } : {}),
+			...(url ? { url } : {}),
+			...(source_id ? { sourceId: source_id } : {}),
+			...(cached_for ? { cachedFor: cached_for } : {}),
+		};
+	}
+
+	// Doing tab (rendered by ListenMode). F7 (Spotify) emits mode=listen,
+	// F15 (YouTube) emits mode=watch, F16 (Goodreads / Readwise) emits
+	// mode=read, etc.
 	if (DOING_VARIANT_VALUES.includes(mode as DoingVariant)) {
 		return {
 			tab: 'listen',

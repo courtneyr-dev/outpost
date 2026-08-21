@@ -7,7 +7,7 @@ import {
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
@@ -81,6 +81,10 @@ interface VariantConfig {
 	heading: string;
 	submitLabel: string;
 	postFormat: 'status' | 'aside' | 'standard' | 'quote' | null;
+	/** Post Kinds kind slug (sent as `pkiw-kind` when the companion is
+	 *  active). Status/Aside are post FORMATS of a note, so they map to
+	 *  the note kind. */
+	kind: PostKindSlug;
 	requiresTitle: boolean;
 	contentLabel: string;
 	contentRows: number;
@@ -92,6 +96,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		heading: 'Note',
 		submitLabel: 'Post note',
 		postFormat: null,
+		kind: 'note',
 		requiresTitle: false,
 		contentLabel: "What's on your mind?",
 		contentRows: 5,
@@ -101,6 +106,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		heading: 'Status',
 		submitLabel: 'Post status',
 		postFormat: 'status',
+		kind: 'note',
 		requiresTitle: false,
 		contentLabel: "What's happening?",
 		contentRows: 4,
@@ -110,6 +116,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		heading: 'Aside',
 		submitLabel: 'Post aside',
 		postFormat: 'aside',
+		kind: 'note',
 		requiresTitle: false,
 		contentLabel: 'Quick aside',
 		contentRows: 4,
@@ -119,6 +126,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		heading: 'Article',
 		submitLabel: 'Post article',
 		postFormat: 'standard',
+		kind: 'article',
 		requiresTitle: true,
 		contentLabel: 'Body',
 		contentRows: 12,
@@ -128,6 +136,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		heading: 'Quote',
 		submitLabel: 'Post quote',
 		postFormat: 'quote',
+		kind: 'quote',
 		requiresTitle: false,
 		contentLabel: 'Quote text',
 		contentRows: 5,
@@ -216,6 +225,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				content: trimmed_content,
+				...pkiw_kind_hint(composerConfig, config.kind),
 				// h-entry name (post_title) is now sent for ALL variants
 				// when filled, not just Article. Lets WordPress admin lists,
 				// search, and RSS treat the post as fully-titled even when

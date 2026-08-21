@@ -7,7 +7,7 @@ import {
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
@@ -142,6 +142,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			const base: HEntryProperties = {
 				name: trimmed_name,
 				ingredient: ingredients,
+				...pkiw_kind_hint(composerConfig, 'recipe'),
 				instructions,
 				...(trimmed_yield ? { yield: trimmed_yield } : {}),
 				...(iso_duration ? { duration: iso_duration } : {}),

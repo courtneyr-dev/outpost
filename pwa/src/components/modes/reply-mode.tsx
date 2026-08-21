@@ -9,7 +9,7 @@ import {
 import { fetch_preview, PreviewError, type PreviewResult } from '../../lib/preview';
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
-import type { ComposerConfig } from '../../lib/composer-config';
+import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
@@ -58,27 +58,33 @@ export interface ReplyModeProps {
 type Variant =
 	| 'reply'
 	| 'like'
+	| 'favorite'
 	| 'repost'
 	| 'bookmark'
 	| 'rsvp'
 	| 'follow'
 	| 'wishlist'
 	| 'tag'
+	| 'acquisition'
 	| 'issue';
 
 type VariantProperty =
 	| 'in-reply-to'
 	| 'like-of'
+	| 'favorite-of'
 	| 'repost-of'
 	| 'bookmark-of'
 	| 'follow-of'
-	| 'wishlist-of'
+	| 'wish-of'
 	| 'tag-of'
-	| 'issue-of';
+	| 'acquisition-of';
 
 interface VariantConfig {
 	label: string;
 	property: VariantProperty;
+	/** Post Kinds kind slug this variant maps to (sent as `pkiw-kind`
+	 *  when the Post Kinds companion is active). */
+	kind: PostKindSlug;
 	contentRequired: boolean;
 	targetLabel: string;
 	contentLabel: string;
@@ -90,6 +96,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	reply: {
 		label: 'Reply',
 		property: 'in-reply-to',
+		kind: 'reply',
 		contentRequired: true,
 		targetLabel: 'In reply to',
 		contentLabel: 'Your reply',
@@ -99,15 +106,29 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	like: {
 		label: 'Like',
 		property: 'like-of',
+		kind: 'like',
 		contentRequired: false,
 		targetLabel: 'Like of',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post like',
 		previewIntro: 'Liking:',
 	},
+	favorite: {
+		// Post Kinds: `favorite-of` — a starred/saved item. Same shape as
+		// Like; the kind expresses a stronger, deliberate keep-this signal.
+		label: 'Favorite',
+		property: 'favorite-of',
+		kind: 'favorite',
+		contentRequired: false,
+		targetLabel: 'Favorite of',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post favorite',
+		previewIntro: 'Favoriting:',
+	},
 	repost: {
 		label: 'Repost',
 		property: 'repost-of',
+		kind: 'repost',
 		contentRequired: false,
 		targetLabel: 'Repost of',
 		contentLabel: 'Optional commentary',
@@ -117,6 +138,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 	bookmark: {
 		label: 'Bookmark',
 		property: 'bookmark-of',
+		kind: 'bookmark',
 		contentRequired: false,
 		targetLabel: 'Bookmark of',
 		contentLabel: 'Optional note',
@@ -128,6 +150,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		// (yes/no/maybe/interested). Submit handler adds the rsvp value.
 		label: 'RSVP',
 		property: 'in-reply-to',
+		kind: 'rsvp',
 		contentRequired: false,
 		targetLabel: 'Event URL',
 		contentLabel: 'Optional note',
@@ -140,6 +163,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		// `follow-of` is the most common convention as of 2026.
 		label: 'Follow',
 		property: 'follow-of',
+		kind: 'follow',
 		contentRequired: false,
 		targetLabel: 'Person or feed URL',
 		contentLabel: 'Optional note',
@@ -147,10 +171,12 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		previewIntro: 'Following:',
 	},
 	wishlist: {
-		// Post Kinds: `wishlist-of` (item URL), with optional commentary.
-		// Same shape as Bookmark — only the post-kind label differs.
+		// Post Kinds: `wish-of` (item URL — the canonical property matching
+		// the wish card's u-wish-of; the earlier `wishlist-of` spelling
+		// survives as a bridge-side compat alias), optional commentary.
 		label: 'Wishlist',
-		property: 'wishlist-of',
+		property: 'wish-of',
+		kind: 'wish',
 		contentRequired: false,
 		targetLabel: 'Wishlist item URL',
 		contentLabel: 'Why you want it (optional)',
@@ -163,17 +189,35 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		// post itself surfaces under the tag taxonomy.
 		label: 'Tag',
 		property: 'tag-of',
+		kind: 'tag',
 		contentRequired: false,
 		targetLabel: 'URL to tag',
 		contentLabel: 'Optional note (use More options → Categories for tags)',
 		submitLabel: 'Post tag',
 		previewIntro: 'Tagging:',
 	},
+	acquisition: {
+		// Post Kinds: `acquisition-of` (URL of the item acquired / added to
+		// a collection). Bookmark-shaped; the kind carries the "I now own
+		// this" meaning.
+		label: 'Acquisition',
+		property: 'acquisition-of',
+		kind: 'acquisition',
+		contentRequired: false,
+		targetLabel: 'Item URL',
+		contentLabel: 'Optional note',
+		submitLabel: 'Post acquisition',
+		previewIntro: 'Acquired:',
+	},
 	issue: {
-		// Post Kinds: `issue-of` (URL of the project / page the issue is for).
-		// Body holds the issue description.
+		// An issue is a reply to a source-code repository, so it reuses
+		// `in-reply-to` (matching Post Kinds' microformats map — there is
+		// no dedicated issue-of property). Only the `pkiw-kind` hint
+		// distinguishes it from a plain reply, which is exactly why the
+		// hint exists. Body holds the issue description.
 		label: 'Issue',
-		property: 'issue-of',
+		property: 'in-reply-to',
+		kind: 'issue',
 		contentRequired: true,
 		targetLabel: 'Repository or project URL',
 		contentLabel: 'Issue description',
@@ -185,12 +229,14 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 const VARIANT_ORDER: Variant[] = [
 	'reply',
 	'like',
+	'favorite',
 	'repost',
 	'bookmark',
 	'rsvp',
 	'follow',
 	'wishlist',
 	'tag',
+	'acquisition',
 	'issue',
 ];
 
@@ -220,12 +266,9 @@ function consume_share_target_for_reply(): {
 	if (data.url) out.url = data.url;
 	if (data.title) out.title = data.title;
 	if (data.content) out.content = data.content;
-	if (
-		data.replyVariant &&
-		(['reply', 'like', 'repost', 'bookmark', 'rsvp', 'follow'] as Variant[]).includes(
-			data.replyVariant as Variant,
-		)
-	) {
+	// Runtime guard against stale sessionStorage payloads — the stash is
+	// JSON from a previous session and may predate the current variant set.
+	if (data.replyVariant && VARIANT_ORDER.includes(data.replyVariant as Variant)) {
 		out.variant = data.replyVariant as Variant;
 	}
 	return out;
@@ -298,6 +341,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
 				[config.property]: trimmed_url,
+				...pkiw_kind_hint(composerConfig, config.kind),
 				...(trimmed_title ? { name: trimmed_title } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(variant === 'rsvp' ? { rsvp: rsvp_value } : {}),
