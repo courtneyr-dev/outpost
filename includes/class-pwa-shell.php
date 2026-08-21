@@ -406,7 +406,29 @@ final class Outpost_PWA_Shell {
 			'orientation'      => 'any',
 			'background_color' => '#f5efe4',
 			'theme_color'      => '#2a4a39',
+			// Raster PNGs first: Android's WebAPK minting (the install path
+			// that registers a PWA into the system share sheet) needs fixed-
+			// size raster icons — an SVG-only manifest can fall back to a
+			// plain homescreen shortcut, which never gets share_target.
 			'icons'            => array(
+				array(
+					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-192.png',
+					'sizes'   => '192x192',
+					'type'    => 'image/png',
+					'purpose' => 'any',
+				),
+				array(
+					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-512.png',
+					'sizes'   => '512x512',
+					'type'    => 'image/png',
+					'purpose' => 'any',
+				),
+				array(
+					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-maskable-512.png',
+					'sizes'   => '512x512',
+					'type'    => 'image/png',
+					'purpose' => 'maskable',
+				),
 				array(
 					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon.svg',
 					'sizes'   => 'any',
