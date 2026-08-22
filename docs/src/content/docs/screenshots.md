@@ -5,7 +5,7 @@ description: "Gallery of Outpost's documented screens, plus capture specificatio
 
 The screens Outpost adds to WordPress, captured from a fresh install. Every screenshot has a text equivalent in the page that documents the task, so you never need the image to follow the instructions.
 
-Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. One capture is still outstanding; its specification and the reason are at the end of this page.
+Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. The pending-syndication capture also came from a local wp-env site, against a post seeded with two pending share entries. One capture is still outstanding; its specification and the reason are at the end of this page.
 
 ## Admin screens
 
@@ -36,6 +36,10 @@ The main **Outpost** admin page: per-variant bookmarklets and the phone install 
 ![Posts list showing the Outpost syndication status column](../../assets/screenshots/admin-syndication-column.png)
 
 **wp-admin → Posts** with the Outpost syndication status column: confirm where each post syndicated at a glance. See [Common tasks](/outpost/common-tasks/).
+
+![Editor notice listing the platforms a post was shared to that still need their URL recorded](../../assets/screenshots/admin-pending-syndication-capture.png)
+
+The pending-syndication reminder on the post editor screen: after you share a post by hand, Outpost names the platforms still missing their URL and links you to the composer to record them. See [Common tasks](/outpost/common-tasks/).
 
 ![Admin notice saying Outpost needs a required plugin, with an install link](../../assets/screenshots/admin-dependency-notice.png)
 
@@ -77,12 +81,8 @@ Install the composer like an app. After your first post, Outpost offers the Add 
 
 ## Screenshots still needed
 
-One capture remains. The row below is its full specification (viewport 1280×800 at 2x for admin screens, a phone-sized viewport for composer screens).
+One capture remains, and it is blocked on code rather than on tooling: the composer-side paste-URL form. `SyndicationCaptureForm`, inside `SyndicationDetailView`, is built and tested, but nothing mounts it — it doesn't render anywhere in the running app. The pending-syndication reminder above links to the composer, but the form it links to isn't there yet. The row below is its specification for when it is (a phone-sized viewport, as with the other composer captures).
 
 | Filename | Screen and state | What to highlight | Alt text | Caption |
 | --- | --- | --- | --- | --- |
-| admin-pending-syndication-capture.png | Post editor with a post carrying two pending manual shares | The reminder notice at the top of the editor, including its **Open the Outpost composer** action | Editor notice listing the platforms a post was shared to that still need their URL recorded | Outpost reminds you which manual shares still need their URL. |
-
-What changed: the admin-side reminder is now capturable. `Outpost_Pending_Syndication_Notice` used to hook only `admin_notices`, and WordPress prints that output inside the block editor's no-JS fallback container (`.wrap.hide-if-js.block-editor-no-js`), which is hidden whenever the editor loads — so nobody using the block editor ever saw it. It now also hooks `enqueue_block_editor_assets` and hands the same data to the editor bundle, which raises a `core/notices` notice; the classic editor keeps the `admin_notices` markup. Verified 2026-08-21 against wp-env with a post carrying two pending entries: the notice renders at 85px tall in `.components-editor-notices__dismissible`, and with the block editor disabled the classic markup renders at 132px inside a plain `.wrap`.
-
-What this capture can't show yet: the paste-URL field. The composer-side capture form (`SyndicationCaptureForm`, inside `SyndicationDetailView`) is built and tested but nothing mounts it, so it doesn't render anywhere in the running app. The reminder's action link points at the composer, but the form it links to isn't there. Capture the reminder now; revisit the paste-URL step once the detail view is mounted.
+| frontend-syndication-capture-form.png | Composer syndication detail view, one pending platform | The paste-URL field and its Save action | Form asking for the URL of a post that was shared manually to a platform | Record the URL after sharing manually, and Outpost adds it to the post. |
