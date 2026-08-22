@@ -487,6 +487,34 @@ function outpost_meets_requirements(): bool {
 }
 
 /**
+ * The Outpost fingerpost mark as an admin-menu icon.
+ *
+ * A signpost — upright, base, and two arms pointing opposite ways — drawn
+ * to match the plugin's own icon (assets/icons/outpost-icon.svg) and the
+ * documentation site's mark, reduced to one flat colour so it reads at the
+ * 20px the admin menu paints it at. Geometry is mirrored in the block
+ * editor's copy at src/icons/fingerpost.js; keep the two in step.
+ *
+ * WordPress renders a base64 SVG menu icon as an `<img>` and only varies
+ * its opacity between states, so the fill is the admin menu's own icon
+ * colour rather than `currentColor`, which an `<img>` cannot inherit.
+ *
+ * @since 1.0.1
+ *
+ * @return string A `data:image/svg+xml;base64,` URI for add_menu_page().
+ */
+function outpost_menu_icon(): string {
+	$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#a7aaad">'
+		. '<path d="M11 3h2v17h-2z"/>'
+		. '<path d="M8 20h8v2H8z"/>'
+		. '<path d="M4 5h12.5L20 7.25 16.5 9.5H4z"/>'
+		. '<path d="M20 12H7.5L4 14.25 7.5 16.5H20z"/>'
+		. '</svg>';
+
+	return 'data:image/svg+xml;base64,' . base64_encode( $svg ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Inline SVG for an admin menu icon; base64 is the format add_menu_page() requires.
+}
+
+/**
  * Detect the registration state of any companion plugin by its main file path.
  *
  * Thin shim around {@see Outpost_Companion_Detector::status()}. Kept as a

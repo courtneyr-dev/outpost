@@ -13,10 +13,10 @@
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/edit-post';
 import { Card, CardBody, PanelBody } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { share } from '@wordpress/icons';
 
 import './outpost-sidebar.scss';
 import { FetchRecentPanel } from './fetch-recent/fetch-recent-panel.js';
+import { fingerpost } from '../icons/fingerpost.js';
 
 /**
  * Render the Outpost PluginSidebar.
@@ -26,13 +26,13 @@ import { FetchRecentPanel } from './fetch-recent/fetch-recent-panel.js';
 export function OutpostSidebar() {
 	return (
 		<>
-			<PluginSidebarMoreMenuItem target="outpost-sidebar" icon={ share }>
+			<PluginSidebarMoreMenuItem target="outpost-sidebar" icon={ fingerpost }>
 				{ __( 'Outpost', 'outpost' ) }
 			</PluginSidebarMoreMenuItem>
 			<PluginSidebar
 				name="outpost-sidebar"
 				title={ __( 'Outpost', 'outpost' ) }
-				icon={ share }
+				icon={ fingerpost }
 			>
 				<PanelBody initialOpen>
 					<Card>

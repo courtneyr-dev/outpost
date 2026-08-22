@@ -77,7 +77,7 @@ final class Outpost_Admin_Page {
 			'manage_options',
 			self::MENU_SLUG,
 			array( self::class, 'render_page' ),
-			'dashicons-share-alt2',
+			outpost_menu_icon(),
 			76
 		);
 

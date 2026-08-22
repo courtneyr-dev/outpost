@@ -46,7 +46,7 @@ final class Outpost_Settings_Page {
 			'manage_options',
 			self::PAGE_SLUG,
 			array( __CLASS__, 'render' ),
-			'dashicons-share',
+			outpost_menu_icon(),
 			80
 		);
 	}
