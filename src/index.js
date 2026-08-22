@@ -11,8 +11,14 @@
 import { registerPlugin } from '@wordpress/plugins';
 import { OutpostSidebar } from './sidebar/outpost-sidebar.js';
 import { fingerpost } from './icons/fingerpost.js';
+import { registerPendingSyndicationNotice } from './editor-notices/pending-syndication-notice.js';
 
 registerPlugin( 'outpost-sidebar', {
 	render: OutpostSidebar,
 	icon: fingerpost,
 } );
+
+// Pending-syndication reminder. `admin_notices` output is buried in the
+// block editor's hidden no-JS container, so the reminder comes through
+// core/notices instead.
+registerPendingSyndicationNotice();
