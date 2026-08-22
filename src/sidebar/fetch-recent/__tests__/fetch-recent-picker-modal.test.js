@@ -7,6 +7,7 @@
 
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import apiFetch from '@wordpress/api-fetch';
 import { FetchRecentPickerModal } from '../fetch-recent-picker-modal';
 
 jest.mock( '@wordpress/components', () => ( {
@@ -39,7 +40,9 @@ jest.mock( '@wordpress/hooks', () => ( {
 	applyFilters: ( name, value ) => value,
 } ) );
 
-const apiFetch = require( '@wordpress/api-fetch' );
+// apiFetch is imported at the top; babel-jest hoists the jest.mock calls
+// above the imports, so the binding is already the mock by the time the
+// tests run.
 
 describe( 'FetchRecentPickerModal', () => {
 	beforeEach( () => {
