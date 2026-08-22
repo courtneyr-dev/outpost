@@ -499,7 +499,7 @@ function outpost_meets_requirements(): bool {
  * its opacity between states, so the fill is the admin menu's own icon
  * colour rather than `currentColor`, which an `<img>` cannot inherit.
  *
- * @since 1.0.1
+ * @since 1.0.0
  *
  * @return string A `data:image/svg+xml;base64,` URI for add_menu_page().
  */
