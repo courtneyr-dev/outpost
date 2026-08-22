@@ -775,9 +775,10 @@ function outpost_is_notice_screen(): bool {
 		return true;
 	}
 
-	// Outpost's own pages. Screen ids are built from the menu slug, so
-	// every one of them carries the plugin's prefix — `toplevel_page_outpost`,
-	// `outpost_page_outpost-oauth`, `settings_page_outpost-ios-shortcut`.
+	// Outpost's own pages. WordPress builds a screen id from the menu slug
+	// it was registered under, and every Outpost menu slug starts with the
+	// plugin name, so the prefix identifies them all — top-level pages and
+	// submenu pages alike, wherever they hang in the admin menu.
 	return str_contains( $screen->id, 'outpost' );
 }
 
