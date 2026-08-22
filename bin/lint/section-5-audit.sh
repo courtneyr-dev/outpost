@@ -34,7 +34,12 @@
 #
 #   B1: lines that contain `concepts/posse-outbound-may-2026.md` or
 #       `concepts/capture-inbound-may-2026.md` are exempt — research-doc
-#       citations are allowed to name handles by reference.
+#       citations are allowed to name handles by reference. The generated
+#       POT's `msgid "https://courtneyr.dev"` is also exempt: that string
+#       is the plugin header's own Author URI, which `wp i18n make-pot`
+#       copies into languages/. The same value is allowed in outpost.php
+#       (the root file is outside B1_PATHS), so flagging the POT that
+#       mirrors it is a false positive, not a leak.
 #   B2: the marker `outpost-lint:fixture-credential` exempts test
 #       fixtures that intentionally embed fake-but-real-shaped values.
 
@@ -104,7 +109,8 @@ check_b1() {
             safe_grep -rniE "$pattern" "${B1_PATHS[@]}" "${B1_BUILD_PATHS[@]}" \
                 "${EXCLUDE_PATTERNS[@]}" "${LINT_SELF_EXCLUDE[@]}" 2>/dev/null \
                 | safe_grep -v 'concepts/posse-outbound-may-2026.md' \
-                | safe_grep -v 'concepts/capture-inbound-may-2026.md'
+                | safe_grep -v 'concepts/capture-inbound-may-2026.md' \
+                | safe_grep -vE '\.pot:[0-9]+:msgid "https://courtneyr\.dev"'
         )"
         if [[ -n "$matches" ]]; then
             echo "B1: case-study token '$pattern' found:"
