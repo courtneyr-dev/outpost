@@ -115,6 +115,12 @@ jobs:
           npm run lint
           npm run lint:wp
 
+      - name: Distribution paths are shipped
+        # plugin-zip builds from package.json "files", not .distignore, so a
+        # runtime directory missing there 404s only in the packaged plugin.
+        # styles/ regressed exactly this way.
+        run: npm run check:dist
+
       - name: Editor bundle build keeps the PWA bundle
         # wp-scripts empties build/ before emit. Without the keep pattern in
         # webpack.config.js this deletes build/pwa/, the tracked composer
