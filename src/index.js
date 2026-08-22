@@ -9,10 +9,10 @@
  */
 
 import { registerPlugin } from '@wordpress/plugins';
-import { share } from '@wordpress/icons';
 import { OutpostSidebar } from './sidebar/outpost-sidebar.js';
+import { fingerpost } from './icons/fingerpost.js';
 
 registerPlugin( 'outpost-sidebar', {
 	render: OutpostSidebar,
-	icon: share,
+	icon: fingerpost,
 } );
