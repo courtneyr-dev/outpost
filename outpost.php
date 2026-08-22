@@ -686,6 +686,10 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
+	if ( ! outpost_is_notice_screen() ) {
+		return;
+	}
+
 	if ( ! outpost_meets_requirements() ) {
 		printf(
 			'<div class="notice notice-error"><p>%s</p></div>',
@@ -730,6 +734,52 @@ function outpost_render_admin_notices(): void {
 	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
+
+/**
+ * Whether the current admin screen should carry Outpost's setup notices.
+ *
+ * Guideline 11 asks that notices stay limited in scope. Outpost's
+ * dependency and requirements notices are actionable rather than
+ * promotional, but they have no business on unrelated screens, so they
+ * render in the two places someone would act on them:
+ *
+ *   - The Plugins and Add Plugins screens, where the missing plugin gets
+ *     installed or activated.
+ *   - Outpost's own screens, which are what the reader came to use and
+ *     which cannot work until the chain is satisfied.
+ *
+ * Everywhere else — the dashboard, the post editor, an unrelated
+ * plugin's settings — stays untouched.
+ *
+ * @since 1.0.0
+ *
+ * @return bool True when the notice belongs on this screen.
+ */
+function outpost_is_notice_screen(): bool {
+	if ( ! function_exists( 'get_current_screen' ) ) {
+		return false;
+	}
+
+	$screen = get_current_screen();
+	if ( ! $screen instanceof WP_Screen ) {
+		return false;
+	}
+
+	$plugin_screens = array(
+		'plugins',
+		'plugins-network',
+		'plugin-install',
+		'plugin-install-network',
+	);
+	if ( in_array( $screen->id, $plugin_screens, true ) ) {
+		return true;
+	}
+
+	// Outpost's own pages. Screen ids are built from the menu slug, so
+	// every one of them carries the plugin's prefix — `toplevel_page_outpost`,
+	// `outpost_page_outpost-oauth`, `settings_page_outpost-ios-shortcut`.
+	return str_contains( $screen->id, 'outpost' );
+}
 
 /**
  * Warn when the active Micropub plugin predates 2.5.1.

@@ -506,6 +506,19 @@ if ( ! class_exists( 'PFBT_Format_Detector' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_Screen' ) ) {
+	/**
+	 * Minimal WP_Screen stand-in.
+	 *
+	 * outpost_is_notice_screen() reads `->id` after an `instanceof` check, so
+	 * the stub only needs the class name and that one property.
+	 */
+	class WP_Screen {
+		/** @var string Screen id, e.g. `plugins` or `toplevel_page_outpost`. */
+		public string $id = '';
+	}
+}
+
 // Load the bootstrap. This pulls in the constant block, the detector class,
 // the companion-base class, and every procedural helper outpost.php defines.
 require_once dirname( __DIR__ ) . '/outpost.php';
