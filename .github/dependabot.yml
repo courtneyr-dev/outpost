@@ -1,0 +1,89 @@
+# Dependabot configuration.
+#
+# Grouping is the point of this file. Outpost's dependency surface is almost
+# entirely build- and test-time tooling: composer.json requires nothing but
+# php, package.json's dependencies block is empty, and the files field ships
+# build/ rather than node_modules. A vulnerability in that tooling is worth
+# fixing -- it can poison the bundle the build emits -- but it does not reach
+# a site running the plugin, so it does not deserve one alert and one pull
+# request per transitive package. Left ungrouped, a single npm advisory wave
+# produced 82 open alerts here.
+#
+# Each ecosystem gets one grouped PR per week for patch and minor bumps.
+# Majors stay ungrouped and separate, because those are the ones that break
+# builds (see the vitest 2 -> 4 attempt, which broke the Node-localStorage
+# shield in vitest.config.ts) and each deserves to be reviewed on its own.
+
+version: 2
+
+updates:
+  # Plugin build + test toolchain. Everything here is devDependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      wordpress-packages:
+        # @wordpress/* are externalized to the wp-* script handles core
+        # provides, so these change what we build against, never what ships.
+        # Majors excluded: bumping past the supported WordPress floor risks a
+        # runtime API mismatch.
+        patterns:
+          - '@wordpress/*'
+        update-types:
+          - minor
+          - patch
+      build-toolchain:
+        patterns:
+          - '*'
+        exclude-patterns:
+          - '@wordpress/*'
+        update-types:
+          - minor
+          - patch
+
+  # Astro documentation site, built to static HTML.
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      docs-toolchain:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # PHP dev tooling. composer.json requires no production packages, and
+  # vendor/ is gitignored, so nothing here is ever installed on a live site.
+  # phpunit is pinned to ^9.6 for WP_Mock's Mockery compatibility window --
+  # that constraint lives in composer.json and Dependabot cannot cross it.
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      php-toolchain:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  # Workflow actions, which run with repository credentials.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns:
+          - '*'
