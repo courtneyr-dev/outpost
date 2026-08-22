@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed (Pending-syndication reminder was invisible to every block-editor user)
+
+`Outpost_Pending_Syndication_Notice` hooked only `admin_notices`. WordPress prints that output inside `.wrap.hide-if-js.block-editor-no-js` — the no-JS fallback container — so on the post editor screen the reminder rendered with a computed height of 0 inside a `display: none` parent. It reached classic-editor users and nobody else.
+
+The notice now hooks `enqueue_block_editor_assets` as well, attaching the pending platforms as an inline payload on the editor bundle; the bundle raises a `core/notices` notice with a link to the composer. The classic-editor `admin_notices` markup is unchanged, and `maybe_render()` bails on block-editor screens rather than emitting markup nobody can see. Regression-tested in `tests/unit/PendingSyndicationNoticeTest.php`, which pins both surfaces.
+
 ## [1.0.0] - 2026-07-20
 
 First stable release. Rolls up the 0.1.x pre-release line (entries through 0.1.114 below) plus the pre-launch security hardening. WordPress floor 6.5, tested on WordPress 7.0.1, PHP 8.2+. Plugin Check (plugin_repo + security) clean on the distribution.
