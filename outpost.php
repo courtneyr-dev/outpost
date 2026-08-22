@@ -499,7 +499,7 @@ function outpost_meets_requirements(): bool {
  * its opacity between states, so the fill is the admin menu's own icon
  * colour rather than `currentColor`, which an `<img>` cannot inherit.
  *
- * @since 1.0.1
+ * @since 1.0.0
  *
  * @return string A `data:image/svg+xml;base64,` URI for add_menu_page().
  */
@@ -686,6 +686,10 @@ function outpost_render_admin_notices(): void {
 		return;
 	}
 
+	if ( ! outpost_is_notice_screen() ) {
+		return;
+	}
+
 	if ( ! outpost_meets_requirements() ) {
 		printf(
 			'<div class="notice notice-error"><p>%s</p></div>',
@@ -730,6 +734,53 @@ function outpost_render_admin_notices(): void {
 	);
 }
 add_action( 'admin_notices', 'outpost_render_admin_notices' );
+
+/**
+ * Whether the current admin screen should carry Outpost's setup notices.
+ *
+ * Guideline 11 asks that notices stay limited in scope. Outpost's
+ * dependency and requirements notices are actionable rather than
+ * promotional, but they have no business on unrelated screens, so they
+ * render in the two places someone would act on them:
+ *
+ *   - The Plugins and Add Plugins screens, where the missing plugin gets
+ *     installed or activated.
+ *   - Outpost's own screens, which are what the reader came to use and
+ *     which cannot work until the chain is satisfied.
+ *
+ * Everywhere else — the dashboard, the post editor, an unrelated
+ * plugin's settings — stays untouched.
+ *
+ * @since 1.0.0
+ *
+ * @return bool True when the notice belongs on this screen.
+ */
+function outpost_is_notice_screen(): bool {
+	if ( ! function_exists( 'get_current_screen' ) ) {
+		return false;
+	}
+
+	$screen = get_current_screen();
+	if ( ! $screen instanceof WP_Screen ) {
+		return false;
+	}
+
+	$plugin_screens = array(
+		'plugins',
+		'plugins-network',
+		'plugin-install',
+		'plugin-install-network',
+	);
+	if ( in_array( $screen->id, $plugin_screens, true ) ) {
+		return true;
+	}
+
+	// Outpost's own pages. WordPress builds a screen id from the menu slug
+	// it was registered under, and every Outpost menu slug starts with the
+	// plugin name, so the prefix identifies them all — top-level pages and
+	// submenu pages alike, wherever they hang in the admin menu.
+	return str_contains( $screen->id, 'outpost' );
+}
 
 /**
  * Warn when the active Micropub plugin predates 2.5.1.

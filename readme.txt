@@ -140,6 +140,21 @@ Connecting an account stores an encrypted token on your site. Afterwards, Outpos
 * **Ride With GPS** — [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
 * **Ravelry** — [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
 
+= Manual share (opens the service in your browser, only when you tap its chip) =
+
+These destinations have no posting API Outpost can use, so sharing to them is a handoff rather than a connection: tapping the chip opens the service's own share page (or its app, on a phone) with your post's link and text already filled in, and you finish the post there. **Your site never contacts these services** — no request is made from your server, and nothing is sent unless you tap the chip. What travels is what the share URL carries: your post's URL, its text, and for Pinterest the image URL.
+
+* **Facebook** — www.facebook.com/sharer.php. [Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/).
+* **X** — twitter.com/intent/tweet. [Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy).
+* **Threads** — www.threads.net/intent/post. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
+* **Pinterest** — www.pinterest.com/pin/create/button/. [Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy).
+* **Reddit** — www.reddit.com/submit. [Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy).
+* **LinkedIn** — the LinkedIn app, or www.linkedin.com to finish by hand. [Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy).
+* **Instagram** and **Instagram Stories** — the Instagram app on your phone; your photo is handed to it through the share sheet. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
+* **TikTok** — the TikTok app on your phone. [Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en).
+* **Flickr** — the Flickr app, or flickr.com to finish by hand. [Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy).
+* **Tumblr** — www.tumblr.com, offered as a manual fallback. [Terms](https://www.tumblr.com/policy/terms-of-service), [Privacy](https://www.tumblr.com/privacy/en).
+
 = Inbound only (no data sent) =
 
 * **IndieAuth sign-in** — authentication happens between your browser and your own site's IndieAuth endpoint (from the required IndieAuth plugin). Outpost sends nothing to third parties to sign you in.
