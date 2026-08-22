@@ -107,6 +107,24 @@ jobs:
       - name: Vitest unit suite
         run: npm test
 
+      - name: ESLint (composer PWA + block editor bundle)
+        # Covers src/ as well as pwa/src/. src/ went unlinted for a long
+        # stretch: the flat config had no block matching it, so every JSX
+        # file failed to parse and `lint:wp` was never run in CI to notice.
+        run: |
+          npm run lint
+          npm run lint:wp
+
+      - name: Editor bundle build keeps the PWA bundle
+        # wp-scripts empties build/ before emit. Without the keep pattern in
+        # webpack.config.js this deletes build/pwa/, the tracked composer
+        # bundle the deploy rsync ships. Assert it survives a standalone
+        # build:wp rather than trusting build order.
+        run: |
+          npm run build:wp
+          test -d build/pwa/assets || { echo "build:wp deleted build/pwa"; exit 1; }
+          git diff --exit-code --stat -- build/pwa || { echo "build:wp modified build/pwa"; exit 1; }
+
       - name: Vite production build smoke
         # Verifies the bundle assembles. Doesn't compare hashes — committed
         # build/pwa/ is what staging deploys reference; CI rebuilds for

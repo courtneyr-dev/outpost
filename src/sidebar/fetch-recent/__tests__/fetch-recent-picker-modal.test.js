@@ -5,7 +5,7 @@
  * Insert flow is exercised via the dispatch/createBlock mock.
  */
 
-import { render, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { FetchRecentPickerModal } from '../fetch-recent-picker-modal';
 
