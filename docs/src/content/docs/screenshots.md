@@ -5,7 +5,7 @@ description: "Gallery of Outpost's documented screens, plus capture specificatio
 
 The screens Outpost adds to WordPress, captured from a fresh install. Every screenshot has a text equivalent in the page that documents the task, so you never need the image to follow the instructions.
 
-Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running the Post Kinds companion, since they need a companion plugin and live lookup services. One capture is still outstanding; its specification and the reason are at the end of this page.
+Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. One capture is still outstanding; its specification and the reason are at the end of this page.
 
 ## Admin screens
 

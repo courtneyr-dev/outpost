@@ -17,7 +17,7 @@ Outpost needs two plugins from the WordPress.org directory, activated in this or
 1. **IndieAuth** — go to Plugins → Add New, search for "IndieAuth" (by Matthias Pfefferle and David Shanske), install, and activate. This is the sign-in layer; Micropub requires it.
 2. **Micropub** — same screen, search for "Micropub" (by David Shanske), install, and activate. This is the publishing endpoint Outpost posts through.
 
-If you skip either one, Outpost stays inert: administrators see a notice such as "Outpost needs the IndieAuth plugin" with an install or activate link, and visiting `/post` shows a setup prompt naming the missing plugin instead of the composer.
+If you skip either one, Outpost stays inert: administrators see a notice such as "Outpost needs the IndieAuth plugin" with an install or activate link, and visiting `/post` shows a setup prompt naming the missing plugin instead of the composer. That notice appears on the Plugins and Add Plugins screens and on Outpost's own pages — the places you would fix it — rather than following you around the rest of wp-admin.
 
 ## Step 2: Install Outpost from GitHub
 
@@ -36,7 +36,7 @@ git clone https://github.com/courtneyr-dev/outpost.git
 2. In wp-admin, go to Plugins → Add New → Upload Plugin.
 3. Choose the ZIP and click Install Now.
 
-Note: GitHub's "Download ZIP" produces a folder named `outpost-main`. The plugin works from that folder, but if you later switch to a git clone or release ZIP the folder name will differ and WordPress will treat it as a separate plugin. Renaming the folder to `outpost` before uploading keeps things tidy.
+Note: GitHub's "Download ZIP" produces a folder named `outpost-main`. The plugin works from that folder, but if you later switch to a git clone or release ZIP the folder name will differ and WordPress will treat it as a separate plugin. Renaming the folder to `outpost-mobile-publishing` before uploading keeps things tidy, and matches the name the plugin uses in the WordPress.org directory.
 
 ## Step 3: Activate
 
