@@ -2,12 +2,13 @@
 
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
-Tested up to:      7.0
+Tested up to:      7.1
 Stable tag:        1.0.0
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
 Requires PHP:      8.2
+Requires Plugins:  indieauth, micropub
 
 Post notes, replies, photos, and life-tracking entries to your WordPress site from your phone, with one-tap POSSE syndication.
 
@@ -36,18 +37,33 @@ Long-form documentation — installation, settings, common tasks, troubleshootin
 
 == Requirements ==
 
-* WordPress 6.5 or newer, PHP 8.2 or newer.
-* The [IndieAuth plugin](https://wordpress.org/plugins/indieauth/) (required — Micropub itself requires it).
-* The [Micropub plugin](https://wordpress.org/plugins/micropub/) (required — the publishing endpoint).
+WordPress 6.5 or newer, PHP 8.2 or newer.
 
-Optional companions light up extra features when active:
+= Required plugins =
 
-* **Post Kinds for IndieWeb in Block Themes** — powers the "Look it up" media search and classifies every composer entry as its proper post kind (the composer names the kind explicitly when this companion is active, so ambiguous shapes like Issue and Jam land correctly). Without it, kind-shaped entries publish as generic notes.
-* **Post Formats for Block Themes** — post format selector and auto-detection.
-* **Link Extension for XFN** — XFN relationship picker on reply targets.
-* **Syndication Links** — destinations auto-populate the syndication chips.
-* **Yoast SEO** — focus keyphrase and meta description fields.
-* **ActivityPub** / **Bridgy** — surface as syndication chips automatically.
+Outpost publishes through the IndieWeb's own standards rather than a proprietary service, so it needs the two plugins that provide them. Both are free on WordPress.org, and Outpost tells you which one is missing:
+
+* [IndieAuth](https://wordpress.org/plugins/indieauth/) — signs you in to the composer with your own domain. Install this one first: Micropub requires it too.
+* [Micropub](https://wordpress.org/plugins/micropub/) — the endpoint that receives what the composer publishes.
+
+= Recommended =
+
+Not required, but Outpost is better with them, and it detects them the moment you activate one:
+
+* [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note.
+* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts.
+* [Syndication Links](https://wordpress.org/plugins/syndication-links/) — your configured destinations become the composer's syndication chips.
+
+= Works with =
+
+Active-only enhancements. Nothing here changes what Outpost can publish; each adds a field or a chip when present:
+
+* [Post Formats for Block Themes](https://wordpress.org/plugins/post-formats-for-block-themes/) — post format selector, plus automatic format inference from what you posted.
+* [Link Extension for XFN](https://wordpress.org/plugins/link-extension-for-xfn/) — XFN relationship picker on reply targets.
+* [ActivityPub](https://wordpress.org/plugins/activitypub/) — the Fediverse appears as a syndication chip.
+* [Bridgy](https://brid.gy/) — its publish endpoints appear as syndication chips.
+* [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
+* [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
 
 == Installation ==
 

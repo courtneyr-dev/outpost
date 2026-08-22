@@ -5,7 +5,7 @@
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
  * Version:           1.0.0
  * Requires at least: 6.5
- * Tested up to:      7.0
+ * Tested up to:      7.1
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
