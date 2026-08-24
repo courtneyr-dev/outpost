@@ -14,6 +14,7 @@
  *     "companions": {
  *       "post-kinds":            "active" | "inactive" | "absent",
  *       "post-formats":          "active" | "inactive" | "absent",
+ *       "rss-chat-routing":      "active" | "inactive" | "absent",
  *       "xfn":                   "active" | "inactive" | "absent",
  *       "syndication-links":     "active" | "inactive" | "absent",
  *       "yoast":                 "active" | "inactive" | "absent",
@@ -378,6 +379,7 @@ final class Outpost_Composer_Config_Endpoint {
 			'yoast'                 => Outpost_Companion_Detector::is_yoast_active(),
 			'activitypub'           => Outpost_Companion_Detector::is_activitypub_active(),
 			'accessibility-checker' => Outpost_Companion_Detector::is_accessibility_checker_active(),
+			'rss-chat-routing'      => Outpost_Companion_Detector::is_rss_chat_routing_active(),
 		);
 
 		$post_formats = self::resolve_post_formats( $companions['post-formats'] );

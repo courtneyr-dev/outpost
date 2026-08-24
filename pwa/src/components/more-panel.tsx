@@ -53,6 +53,12 @@ export interface MorePanelValues {
 	syndicateTo: string[];
 	/** Promote an otherwise stream-only kind onto the main archive (sends `pkiw-promote`). */
 	promoteToMain: boolean;
+	/**
+	 * Per-post rss.chat routing override (sends `mp-rss-chat-routing`).
+	 * Null follows the site default; the server-side decision stays
+	 * authoritative either way.
+	 */
+	rssChatRouting: 'include' | 'exclude' | null;
 }
 
 export const empty_more_values = (): MorePanelValues => ({
@@ -64,6 +70,7 @@ export const empty_more_values = (): MorePanelValues => ({
 	xfnRels: [],
 	syndicateTo: [],
 	promoteToMain: false,
+	rssChatRouting: null,
 });
 
 export interface MorePanelProps {
@@ -112,6 +119,7 @@ export function MorePanel(props: MorePanelProps) {
 	const yoast_active = composerConfig.companions['yoast'] === 'active';
 	const xfn_active = composerConfig.companions['xfn'] === 'active';
 	const post_kinds_active = composerConfig.companions['post-kinds'] === 'active';
+	const rss_chat_routing_active = composerConfig.companions['rss-chat-routing'] === 'active';
 
 	// Bridgy auto-suggest: when the Reply / Doing target URL host matches a
 	// known silo, the matching publish target gets surfaced as a separate
@@ -227,6 +235,13 @@ export function MorePanel(props: MorePanelProps) {
 		onChange({ ...values, postFormat: raw === '' ? null : raw });
 	};
 
+	const handle_rss_chat_routing = (raw: string): void => {
+		onChange({
+			...values,
+			rssChatRouting: raw === 'include' || raw === 'exclude' ? raw : null,
+		});
+	};
+
 	const handle_focuskw = (raw: string): void => {
 		const trimmed = raw.trim();
 		onChange({ ...values, yoastFocusKw: trimmed.length > 0 ? trimmed : null });
@@ -248,6 +263,7 @@ export function MorePanel(props: MorePanelProps) {
 
 	const slug_display = values.slug ?? '';
 	const post_format_display = values.postFormat ?? '';
+	const rss_chat_routing_display = values.rssChatRouting ?? '';
 	const focuskw_display = values.yoastFocusKw ?? '';
 
 	return (
@@ -313,6 +329,27 @@ export function MorePanel(props: MorePanelProps) {
 							))}
 						</select>
 					</>
+				)}
+
+				{rss_chat_routing_active && (
+					<div class="outpost-rss-chat-routing">
+						<label class="outpost-label" for={`${idPrefix}-rss-chat-routing`}>
+							Send to rss.chat
+						</label>
+						<select
+							id={`${idPrefix}-rss-chat-routing`}
+							class="outpost-input"
+							value={rss_chat_routing_display}
+							onChange={(e): void =>
+								handle_rss_chat_routing((e.target as HTMLSelectElement).value)
+							}
+							disabled={disabled}
+						>
+							<option value="">Site default</option>
+							<option value="include">Include in RSS Chat</option>
+							<option value="exclude">Exclude from RSS Chat</option>
+						</select>
+					</div>
 				)}
 
 				{yoast_active && (
@@ -583,6 +620,12 @@ export function merge_more_values<T>(
 	// archive. The plugin's Micropub bridge maps this to the pkiw_promote meta.
 	if (values.promoteToMain) {
 		merged['pkiw-promote'] = true;
+	}
+	// Per-post rss.chat routing override — the RSS Chat Routing companion's
+	// after_micropub bridge maps this to its _rss_chat_routing meta. Omitted
+	// means "follow the site default", so only explicit choices are sent.
+	if (values.rssChatRouting) {
+		merged['mp-rss-chat-routing'] = values.rssChatRouting;
 	}
 	return merged as T;
 }

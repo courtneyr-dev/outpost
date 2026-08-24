@@ -19,7 +19,8 @@ export type CompanionId =
 	| 'syndication-links'
 	| 'yoast'
 	| 'activitypub'
-	| 'accessibility-checker';
+	| 'accessibility-checker'
+	| 'rss-chat-routing';
 
 export interface TermSuggestion {
 	slug: string;

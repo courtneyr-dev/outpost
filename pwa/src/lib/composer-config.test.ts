@@ -28,6 +28,7 @@ const valid_config: ComposerConfig = {
 		yoast: 'absent',
 		activitypub: 'absent',
 		'accessibility-checker': 'absent',
+		'rss-chat-routing': 'absent',
 	},
 	postFormats: null,
 	xfnRels: ['friend', 'met'],
