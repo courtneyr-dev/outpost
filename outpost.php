@@ -52,6 +52,7 @@ define( 'OUTPOST_SYNDICATION_LINKS_PLUGIN_FILE', 'syndication-links/syndication-
 define( 'OUTPOST_YOAST_PLUGIN_FILE', 'wordpress-seo/wp-seo.php' );
 define( 'OUTPOST_ACTIVITYPUB_PLUGIN_FILE', 'activitypub/activitypub.php' );
 define( 'OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE', 'accessibility-checker/accessibility-checker.php' );
+define( 'OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE', 'rss-chat-routing/rss-chat-routing.php' );
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
