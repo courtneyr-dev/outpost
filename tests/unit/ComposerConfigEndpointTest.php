@@ -74,7 +74,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
-	public function test_permission_check_passes_for_logged_in_user(): void {
+	public function test_permission_check_passes_for_user_with_edit_posts(): void {
 		WP_Mock::userFunction( 'current_user_can' )
 			->with( 'edit_posts' )
 			->andReturn( true );
@@ -83,6 +83,24 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 			->with( true )
 			->reply( true );
 		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
+	}
+
+	public function test_permission_check_denies_logged_in_user_without_edit_posts(): void {
+		// wp.org plugin-review revision: a logged-in user without
+		// edit_posts (a Subscriber) must not read composer config +
+		// companion-plugin enumeration. The old check fell back to
+		// is_user_logged_in(), which let Subscribers through. The
+		// filter is a passthrough so the assertion reflects the raw
+		// permission decision, not a filtered override.
+		WP_Mock::userFunction( 'current_user_can' )
+			->with( 'edit_posts' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing(
+			static fn( $tag, $value ) => $value
+		);
+
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
 	}
 
 	public function test_permission_check_filter_can_open_anonymous(): void {

@@ -234,54 +234,33 @@ final class Outpost_Composer_Config_Endpoint {
 	}
 
 	/**
-	 * Permission check — composer config is per-user, so the caller must
-	 * be authenticated. The IndieAuth plugin's REST middleware translates
-	 * Authorization: Bearer ... headers into a current user, so the
-	 * standard `current_user_can( 'edit_posts' )` works for both cookie
-	 * and bearer auth.
-	 */
-	/**
 	 * Permission check for the composer-config endpoint.
 	 *
-	 * The payload is not per-user-sensitive: companion plugin
-	 * activation status, public taxonomy terms, the Bridgy host map,
-	 * the XFN spec list, and site-wide composer settings. Same
-	 * information any WordPress user with `read` cap can already see
-	 * via wp-admin. So we accept three auth paths:
+	 * Requires the `edit_posts` capability — the same gate every other
+	 * composer-serving Outpost route uses. The payload aggregates
+	 * companion-plugin enumeration + taxonomy terms + Bridgy host map
+	 * + composer settings; individually each maps to information a
+	 * logged-in user could dig up, but the aggregate makes
+	 * plugin-version reconnaissance trivial, so neither anonymous
+	 * visitors nor logged-in users below `edit_posts` (Subscribers)
+	 * may read it. An earlier build fell back to `is_user_logged_in()`
+	 * here; the wp.org plugin review (2026-08) flagged that fallback
+	 * and it is deliberately gone — do not reintroduce it.
 	 *
-	 *   1. `current_user_can('edit_posts')` — standard cap check.
-	 *      Succeeds for cookie auth (admin logged into wp-admin in
-	 *      the same browser) and for IndieAuth bearer when the
-	 *      plugin's `determine_current_user` filter covers our route.
-	 *   2. `is_user_logged_in()` — any logged-in user. Some IndieAuth
-	 *      plugin builds translate the bearer to user_id but don't
-	 *      pass through `edit_posts`; this fallback catches them.
-	 *   3. Otherwise reject with 401.
+	 * The IndieAuth plugin's REST middleware translates
+	 * `Authorization: Bearer` headers into a current user before this
+	 * runs, so the capability check covers cookie and bearer auth
+	 * alike; a bare unvalidated bearer header never resolves a user
+	 * and never passes.
 	 *
-	 * Filterable via `outpost_composer_config_permission` so site
-	 * admins can override (e.g. open to anonymous in development).
+	 * Sites that need anonymous access (rare but supported for
+	 * build-time pre-fetching) can opt back in via the
+	 * `outpost_composer_config_permission` filter.
 	 *
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
-		// Default to requiring authentication. The payload aggregates
-		// companion plugin enumeration + taxonomy terms + Bridgy host map
-		// + composer settings — individually each of these maps to a
-		// public WP endpoint, but the aggregate makes plugin-version
-		// reconnaissance trivial for an unauthenticated attacker (which
-		// `show_in_index => false` was already designed to prevent).
-		// Two auth paths accepted — both require a resolved WordPress user,
-		// so the mere presence of an unvalidated `Authorization: Bearer`
-		// header never authorizes the request:
-		//   1. `current_user_can('edit_posts')` — standard cap check
-		//      (cookie auth or IndieAuth-translated bearer).
-		//   2. `is_user_logged_in()` — any logged-in user; some IndieAuth
-		//      builds set the user without passing through edit_posts.
-		// Sites that need anonymous access (rare but supported for
-		// build-time pre-fetching) can opt back in via the
-		// `outpost_composer_config_permission` filter.
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in();
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the composer-config permission decision.
 		 *
