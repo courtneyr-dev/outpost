@@ -23,7 +23,6 @@ final class OAuthProviderWhoopTest extends TestCase {
 		Outpost_Encryption_Key_Resolver::reset_for_tests();
 		$ref  = new ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

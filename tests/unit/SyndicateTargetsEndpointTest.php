@@ -31,7 +31,6 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		// WP_Mock filtersWithAnyArgs leak workaround (CLAUDE.md A2 #8).
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

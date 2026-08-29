@@ -20,7 +20,6 @@ final class FetchRecentOuraTest extends TestCase {
 		WP_Mock::setUp();
 		$ref  = new ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		Outpost_Fetch_Recent_Oura::set_http_resolver_for_tests( null );
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
