@@ -26,7 +26,6 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		// home_url() is called by build_composer_url to make redirect_url
 		// absolute. Default tests assert against partial path/param strings

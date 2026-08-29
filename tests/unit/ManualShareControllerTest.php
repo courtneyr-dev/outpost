@@ -42,7 +42,6 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 
 		// F10: per-post edit-permission check. Default: allow. Tests

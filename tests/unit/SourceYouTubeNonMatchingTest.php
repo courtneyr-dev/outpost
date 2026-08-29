@@ -28,7 +28,6 @@ final class SourceYouTubeNonMatchingTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		// F14 #10 — registry reads settings via get_option.
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );

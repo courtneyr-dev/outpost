@@ -52,7 +52,6 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 	 */
 	private function invoke_private( string $method, array $args = array() ) {
 		$ref = new \ReflectionMethod( Outpost_Media_Lookup_Endpoint::class, $method );
-		$ref->setAccessible( true );
 		return $ref->invoke( null, ...$args );
 	}
 
