@@ -5,7 +5,11 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] - 2026-08-29
+
+### Security (Composer-config endpoint now requires edit_posts — Subscriber read access closed)
+
+The WordPress.org plugin review team flagged the composer-config REST endpoint (`GET /wp-json/outpost/v1/composer-config`): its permission callback fell back to `is_user_logged_in()`, so a logged-in user without `edit_posts` — a Subscriber — could read composer configuration and companion-plugin status. The 1.0.0 hardening pass consolidated every other REST route onto a capability-only gate and missed this one. The fallback is gone; the endpoint now gates solely on `current_user_can( 'edit_posts' )`, matching the other composer routes, and stays filterable through `outpost_composer_config_permission` for sites that deliberately open it. Unit tests pin the Subscriber denial, and a new integration test asserts the 403 plus the absence of handler side effects (no rate-limit transient, no `outpost_bridgy_host_map` run) for Subscriber and anonymous callers, with an editor positive control calibrating both probes.
 
 ### Fixed (Pending-syndication reminder was invisible to every block-editor user)
 

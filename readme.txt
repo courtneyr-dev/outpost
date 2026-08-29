@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.0
+Stable tag:        1.0.1
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -197,6 +197,10 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.1 =
+* Security: the composer-config REST endpoint now requires the `edit_posts` capability. Logged-in users without it (Subscribers) could previously read composer configuration and companion-plugin status. Flagged by the WordPress.org plugin review team.
+* Fix: the pending-syndication reminder now raises a block-editor notice; it previously rendered only inside the editor's hidden no-JS container, so block-editor users never saw it.
 
 = 1.0.0 =
 * First stable release, prepared for the WordPress.org plugin directory.
