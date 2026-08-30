@@ -44,7 +44,6 @@ final class PWAShellTest extends TestCase {
 		// a random integer, which then fails any downstream array lookup.
 		$ref = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

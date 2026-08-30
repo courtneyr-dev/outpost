@@ -30,7 +30,6 @@ final class G8bNotionPreviewProjectionTest extends TestCase {
 	private function project( array $result ): array {
 		$ref    = new ReflectionClass( Outpost_Preview_Endpoint::class );
 		$method = $ref->getMethod( 'project_notion_result_for_preview' );
-		$method->setAccessible( true );
 		$out = $method->invoke( null, $result );
 		return is_array( $out ) ? $out : array();
 	}

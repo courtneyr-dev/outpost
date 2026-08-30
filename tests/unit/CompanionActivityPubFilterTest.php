@@ -35,7 +35,6 @@ final class CompanionActivityPubFilterTest extends \WP_Mock\Tools\TestCase {
 		// bleed into the next case.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 
