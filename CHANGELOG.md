@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-08-30
+
+### Security (iOS Shortcut token scope enforcement hardened against a request-routing parser differential)
+
+The iOS Shortcut bridge issues an admin (`manage_options`) a long-lived bearer token whose threat model depends on one guarantee: it authenticates only `POST /wp-json/outpost/v1/shortcut` and returns 401 on every other REST route. `Outpost_IOS_Shortcut_Token_Authenticator::request_targets_shortcut_endpoint()` decided that scope by substring-matching the raw `REQUEST_URI`. WordPress does not route on the URI — it routes on the resolved `rest_route` query var, which `$_GET`/`$_POST` override ahead of the `/wp-json/` permalink rewrite. The two diverge, so a holder of a leaked token could smuggle `rest_route=/outpost/v1/shortcut` into a decoy position while WordPress dispatched, e.g., `/wp/v2/users` — authenticating an arbitrary REST route as the admin (a parser-differential scope bypass, the same class fixed in composer-config's `allow_anonymous_for_self`). The gate now keys on the route WordPress actually resolved (`$GLOBALS['wp']->query_vars['rest_route']`), compared exactly, and fails closed when no route is resolved. Reproduced end-to-end against WordPress 7.1 (a leaked token returned the full `wp/v2/users?context=edit` admin dump before the fix, 401 after) and pinned by three regression tests covering the decoy-key, route-override, and legitimate-override cases. Found in internal security review; no evidence of exploitation, and the plugin is not yet distributed on WordPress.org.
+
 ## [1.0.1] - 2026-08-29
 
 ### Security (Composer-config endpoint now requires edit_posts — Subscriber read access closed)

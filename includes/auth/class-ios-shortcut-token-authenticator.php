@@ -130,28 +130,52 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 
 	/**
 	 * Whether the current request targets the shortcut REST route.
-	 * Inspects REQUEST_URI because rest_authentication_errors runs
-	 * before WP_REST_Server populates the request route.
+	 *
+	 * Keys on the route WordPress actually resolved for this request, never on a
+	 * substring of REQUEST_URI. WordPress routes on the `rest_route` query var,
+	 * which `$_GET`/`$_POST` override ahead of the `/wp-json/` permalink rewrite,
+	 * so the raw URI and the dispatched route can diverge. An earlier substring
+	 * check let a leaked (admin-issued) token authenticate arbitrary REST routes
+	 * by smuggling `rest_route=/outpost/v1/shortcut` into a decoy query key while
+	 * WordPress dispatched, e.g., `/wp/v2/users` — a parser-differential scope
+	 * bypass, the same class fixed in composer-config's `allow_anonymous_for_self`.
+	 *
+	 * `rest_authentication_errors` fires during `rest_api_loaded()`, after
+	 * `WP::parse_request()` has populated `$GLOBALS['wp']->query_vars['rest_route']`
+	 * with the exact value WordPress will serve, so reading it here is
+	 * authoritative. Absent a resolved route, fail closed (deny scope).
+	 *
+	 * @return bool
 	 */
 	private static function request_targets_shortcut_endpoint(): bool {
-		if ( empty( $_SERVER['REQUEST_URI'] ) ) {
+		$resolved = self::resolved_rest_route();
+		if ( null === $resolved ) {
 			return false;
 		}
-		$uri = Outpost_Request_Headers::server_string( 'REQUEST_URI' );
-		// Strip query string before path comparison.
-		$path = strtok( $uri, '?' );
-		if ( false === $path ) {
-			return false;
+		// Normalize a leading slash and any trailing slash, then compare exactly
+		// — never a substring — against the one route this token may authenticate.
+		$normalized = '/' . ltrim( rtrim( $resolved, '/' ), '/' );
+		return self::REST_ROUTE_PATH === $normalized;
+	}
+
+	/**
+	 * The REST route WordPress resolved for this request, or null.
+	 *
+	 * Reads `$GLOBALS['wp']->query_vars['rest_route']` — the value WordPress
+	 * dispatches on. Deliberately does not parse REQUEST_URI: see
+	 * {@see self::request_targets_shortcut_endpoint()} for why the raw URI is not
+	 * authoritative.
+	 *
+	 * @return string|null
+	 */
+	private static function resolved_rest_route(): ?string {
+		if ( ! isset( $GLOBALS['wp'] ) || ! isset( $GLOBALS['wp']->query_vars ) || ! is_array( $GLOBALS['wp']->query_vars ) ) {
+			return null;
 		}
-		// Match either `/wp-json/outpost/v1/shortcut` or the rewritten
-		// permalink form `/?rest_route=/outpost/v1/shortcut` (some
-		// WP install layouts use the latter).
-		if ( false !== strpos( $path, '/wp-json' . self::REST_ROUTE_PATH ) ) {
-			return true;
+		$route = $GLOBALS['wp']->query_vars['rest_route'] ?? null;
+		if ( ! is_string( $route ) || '' === $route ) {
+			return null;
 		}
-		if ( false !== strpos( $uri, 'rest_route=' . self::REST_ROUTE_PATH ) ) {
-			return true;
-		}
-		return false;
+		return $route;
 	}
 }
