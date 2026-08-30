@@ -175,6 +175,12 @@ These destinations have no posting API Outpost can use, so sharing to them is a 
 
 * **IndieAuth sign-in** — authentication happens between your browser and your own site's IndieAuth endpoint (from the required IndieAuth plugin). Outpost sends nothing to third parties to sign you in.
 
+== Source Code ==
+
+The composer interface ships as compiled JavaScript in `build/pwa/`. Its human-readable source is the `pwa/src/` directory (TypeScript + Preact) in the public development repository: [github.com/courtneyr-dev/outpost](https://github.com/courtneyr-dev/outpost). The repository also carries the full PHP source, the test suites, and the build tooling.
+
+To rebuild the compiled assets from source: `npm install`, then `npm run build` (Node 20.10 or newer). Vite writes the production bundle to `build/pwa/`, and the shipped bundle is the unmodified output of that build for this version.
+
 == Screenshots ==
 
 1. The composer sign-in screen at /post on a phone — enter your site address to authorize the device via IndieAuth.
