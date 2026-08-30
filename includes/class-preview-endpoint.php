@@ -48,6 +48,11 @@ final class Outpost_Preview_Endpoint {
 	/** Allowed URL schemes — http(s) only. Defends against javascript:/data:/file:. */
 	private const ALLOWED_SCHEMES = array( 'http', 'https' );
 
+	/** Reject URLs longer than this before any parse or fetch. Matches the
+	 * bookmarklet/shortcut contract (CLAUDE.md Security Hot Spots) and the
+	 * manual-share writeback cap. */
+	private const URL_MAX_LENGTH = 2048;
+
 	/** Allowed Content-Type prefixes on the upstream response. */
 	private const ALLOWED_CONTENT_TYPE_PREFIXES = array( 'text/html', 'application/xhtml+xml' );
 
@@ -735,6 +740,14 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'invalid_url',
 				__( 'A url is required.', 'outpost-mobile-publishing' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( strlen( trim( $url ) ) > self::URL_MAX_LENGTH ) {
+			return new WP_Error(
+				'url_too_long',
+				__( 'The URL is too long.', 'outpost-mobile-publishing' ),
 				array( 'status' => 400 )
 			);
 		}

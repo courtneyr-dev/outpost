@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-08-30
+
+### Security (URL length cap enforced on the preview and share/shortcut validators)
+
+The plugin's input contract length-caps bookmarklet/share/shortcut URLs at 2048 characters. That cap was enforced only on the manual-share writeback path; the inbound preview validator (`Outpost_Preview_Endpoint::validate_url`) and the share/shortcut URL check (`Outpost_Source_Detector::is_http_url`) validated scheme and host but not length. Both now reject over-length URLs before any parse or fetch — `validate_url` returns a `url_too_long` 400, `is_http_url` returns false — closing the gap against the documented contract. The private-network half of that contract was already enforced downstream by `wp_safe_remote_get`. Regression-tested in `tests/unit/PreviewEndpointTest.php` and `tests/unit/SourceDetectorTest.php`.
+
 ## [1.0.2] - 2026-08-30
 
 ### Security (iOS Shortcut token scope enforcement hardened against a request-routing parser differential)
