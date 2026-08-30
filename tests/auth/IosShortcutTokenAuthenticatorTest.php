@@ -41,6 +41,7 @@ final class IosShortcutTokenAuthenticatorTest extends \WP_Mock\Tools\TestCase {
 		$this->token_index  = array();
 		$this->current_user = null;
 		$_SERVER            = array();
+		unset( $GLOBALS['wp'] );
 
 		WP_Mock::userFunction( 'wp_generate_password' )->andReturnUsing(
 			static fn ( int $length, bool $special, bool $extra ): string => substr(
@@ -89,13 +90,53 @@ final class IosShortcutTokenAuthenticatorTest extends \WP_Mock\Tools\TestCase {
 		Outpost_IOS_Shortcut_Token::set_resolver_for_tests( null );
 		WP_Mock::tearDown();
 		$_SERVER = array();
+		unset( $GLOBALS['wp'] );
 	}
 
+	/**
+	 * Model a request whose REQUEST_URI and WP-resolved route agree (no decoy).
+	 * Derives the resolved rest_route from the URI the way WordPress does:
+	 * an explicit ?rest_route= wins, otherwise the path after /wp-json.
+	 */
 	private function set_request( string $request_uri, ?string $auth_header ): void {
+		$resolved = $this->derive_resolved_route( $request_uri );
+		$this->set_resolved_request( $resolved, $request_uri, $auth_header );
+	}
+
+	/**
+	 * Model a request explicitly: the WP-resolved rest_route (what WordPress
+	 * dispatches — the authoritative scope signal) plus the raw REQUEST_URI
+	 * (which may carry a decoy that diverges from the resolved route).
+	 */
+	private function set_resolved_request( ?string $resolved_route, string $request_uri, ?string $auth_header ): void {
 		$_SERVER['REQUEST_URI'] = $request_uri;
 		if ( null !== $auth_header ) {
 			$_SERVER['HTTP_AUTHORIZATION'] = $auth_header;
 		}
+		$wp             = new \stdClass();
+		$wp->query_vars = array();
+		if ( null !== $resolved_route ) {
+			$wp->query_vars['rest_route'] = $resolved_route;
+		}
+		$GLOBALS['wp'] = $wp;
+	}
+
+	/** Derive the resolved rest_route from a decoy-free REQUEST_URI. */
+	private function derive_resolved_route( string $request_uri ): ?string {
+		$query = (string) parse_url( $request_uri, PHP_URL_QUERY );
+		if ( '' !== $query ) {
+			parse_str( $query, $args );
+			if ( isset( $args['rest_route'] ) && '' !== $args['rest_route'] ) {
+				return (string) $args['rest_route'];
+			}
+		}
+		$path   = (string) parse_url( $request_uri, PHP_URL_PATH );
+		$marker = '/wp-json';
+		$pos    = strpos( $path, $marker );
+		if ( false !== $pos ) {
+			return substr( $path, $pos + strlen( $marker ) );
+		}
+		return null;
 	}
 
 	// --- passthrough cases -----------------------------------------------
@@ -165,8 +206,10 @@ final class IosShortcutTokenAuthenticatorTest extends \WP_Mock\Tools\TestCase {
 		// Some Apache configurations forward the Authorization header
 		// as REDIRECT_HTTP_AUTHORIZATION when mod_rewrite is involved.
 		$token = Outpost_IOS_Shortcut_Token::regenerate( 42 );
-		$_SERVER['REQUEST_URI']                  = '/wp-json/outpost/v1/shortcut';
-		$_SERVER['REDIRECT_HTTP_AUTHORIZATION']  = "Bearer $token";
+		// Model the resolved route (scope signal) but deliver the token via the
+		// Apache REDIRECT_HTTP_AUTHORIZATION variant rather than HTTP_AUTHORIZATION.
+		$this->set_resolved_request( '/outpost/v1/shortcut', '/wp-json/outpost/v1/shortcut', null );
+		$_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = "Bearer $token";
 
 		$result = Outpost_IOS_Shortcut_Token_Authenticator::authenticate( null );
 
@@ -229,5 +272,67 @@ final class IosShortcutTokenAuthenticatorTest extends \WP_Mock\Tools\TestCase {
 			401,
 			(int) ( $result->get_error_data()['status'] ?? 0 )
 		);
+	}
+
+	// --- scope-bypass regressions (parser-differential) -----------------
+	//
+	// WordPress routes on the resolved `rest_route` query var, which
+	// $_GET/$_POST override ahead of the /wp-json/ permalink. The scope gate
+	// must key on that resolved route, never a substring of REQUEST_URI —
+	// otherwise a leaked (admin-issued) token authenticates arbitrary REST
+	// routes by smuggling the shortcut path into a decoy. Reproduced live on
+	// wp-env: both cases returned the full admin /wp/v2/users?context=edit dump
+	// before the fix. Resolved route below models what WP actually dispatches.
+
+	public function test_rejects_decoy_query_key_while_resolved_route_is_users(): void {
+		// REQUEST_URI: /?rest_route=/wp/v2/users&x=rest_route=/outpost/v1/shortcut
+		// WP resolves rest_route to /wp/v2/users (decoy sits under key `x`).
+		$token = Outpost_IOS_Shortcut_Token::regenerate( 42 );
+		$this->set_resolved_request(
+			'/wp/v2/users',
+			'/?rest_route=/wp/v2/users&x=rest_route=/outpost/v1/shortcut',
+			"Bearer $token"
+		);
+
+		$result = Outpost_IOS_Shortcut_Token_Authenticator::authenticate( null );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'outpost_ios_shortcut_token_out_of_scope', $result->get_error_code() );
+		$this->assertNull( $this->current_user, 'Must not set current user on a smuggled route.' );
+	}
+
+	public function test_rejects_rest_route_override_on_shortcut_path(): void {
+		// REQUEST_URI: /wp-json/outpost/v1/shortcut?rest_route=/wp/v2/users
+		// The /wp-json path says shortcut, but ?rest_route overrides — WP
+		// dispatches /wp/v2/users. Substring matching the path would authorize.
+		$token = Outpost_IOS_Shortcut_Token::regenerate( 42 );
+		$this->set_resolved_request(
+			'/wp/v2/users',
+			'/wp-json/outpost/v1/shortcut?rest_route=/wp/v2/users',
+			"Bearer $token"
+		);
+
+		$result = Outpost_IOS_Shortcut_Token_Authenticator::authenticate( null );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'outpost_ios_shortcut_token_out_of_scope', $result->get_error_code() );
+		$this->assertNull( $this->current_user );
+	}
+
+	public function test_authenticates_when_resolved_route_is_shortcut_despite_wp_json_prefix(): void {
+		// REQUEST_URI: /wp-json/wp/v2/users?rest_route=/outpost/v1/shortcut
+		// ?rest_route overrides the path, so WP dispatches the shortcut route —
+		// this IS a legitimate shortcut call and must authenticate.
+		$token = Outpost_IOS_Shortcut_Token::regenerate( 42 );
+		$this->set_resolved_request(
+			'/outpost/v1/shortcut',
+			'/wp-json/wp/v2/users?rest_route=/outpost/v1/shortcut',
+			"Bearer $token"
+		);
+
+		$result = Outpost_IOS_Shortcut_Token_Authenticator::authenticate( null );
+
+		$this->assertTrue( $result );
+		$this->assertSame( 42, $this->current_user );
 	}
 }

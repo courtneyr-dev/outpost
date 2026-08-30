@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.1
+Stable tag:        1.0.2
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -203,6 +203,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.2 =
+* Security: hardened iOS Shortcut token scope enforcement. The token, which is scoped to the share endpoint, could be accepted on other REST routes because scope was decided from the raw request URI rather than the route WordPress resolves. Now keyed on the resolved route. Found in internal security review.
 
 = 1.0.1 =
 * Security: the composer-config REST endpoint now requires the `edit_posts` capability. Logged-in users without it (Subscribers) could previously read composer configuration and companion-plugin status. Flagged by the WordPress.org plugin review team.
