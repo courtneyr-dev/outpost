@@ -6,9 +6,9 @@
 
 > *Post from your outpost. Reach your people everywhere.*
 
-Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Built for WordPress 6.5+ / 7.0 development branch.
+Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Requires WordPress 6.5+ and PHP 8.2+; tested up to WordPress 7.1.
 
-**Status:** version 1.0.0, prepared for release (2026-07-09 readiness audit: Plugin Check clean). Not yet listed on WordPress.org — install from GitHub.
+**Status:** version 1.0.3, prepared for release (Plugin Check 2.1.0 clean on WordPress 7.1). Not yet listed on WordPress.org — install from GitHub.
 
 ## User documentation
 
