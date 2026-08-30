@@ -11,6 +11,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The WordPress.org plugin review team flagged the composer-config REST endpoint (`GET /wp-json/outpost/v1/composer-config`): its permission callback fell back to `is_user_logged_in()`, so a logged-in user without `edit_posts` — a Subscriber — could read composer configuration and companion-plugin status. The 1.0.0 hardening pass consolidated every other REST route onto a capability-only gate and missed this one. The fallback is gone; the endpoint now gates solely on `current_user_can( 'edit_posts' )`, matching the other composer routes, and stays filterable through `outpost_composer_config_permission` for sites that deliberately open it. Unit tests pin the Subscriber denial, and a new integration test asserts the 403 plus the absence of handler side effects (no rate-limit transient, no `outpost_bridgy_host_map` run) for Subscriber and anonymous callers, with an editor positive control calibrating both probes.
 
+### Documentation (readme names the compiled-asset source and build steps)
+
+The distribution zip ships the composer as compiled JavaScript (`build/pwa/`) without its TypeScript source. Per the plugin directory's human-readable-code guideline, `readme.txt` now carries a Source Code section naming the public repository, the `pwa/src/` source directory, and the exact build commands (`npm install`, `npm run build`, Node 20.10+).
+
 ### Fixed (Pending-syndication reminder was invisible to every block-editor user)
 
 `Outpost_Pending_Syndication_Notice` hooked only `admin_notices`. WordPress prints that output inside `.wrap.hide-if-js.block-editor-no-js` — the no-JS fallback container — so on the post editor screen the reminder rendered with a computed height of 0 inside a `display: none` parent. It reached classic-editor users and nobody else.
