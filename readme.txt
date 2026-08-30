@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.2
+Stable tag:        1.0.3
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -203,6 +203,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.3 =
+* Security hardening: enforce the 2048-character URL length cap on the preview and share/shortcut URL validators, matching the manual-share path and the plugin's documented input contract.
 
 = 1.0.2 =
 * Security: hardened iOS Shortcut token scope enforcement. The token, which is scoped to the share endpoint, could be accepted on other REST routes because scope was decided from the raw request URI rather than the route WordPress resolves. Now keyed on the resolved route. Found in internal security review.

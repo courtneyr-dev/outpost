@@ -75,6 +75,16 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertEquals( 'invalid_scheme', $result->get_error_code() );
 	}
 
+	public function test_validate_url_rejects_url_over_2048_chars(): void {
+		// CLAUDE.md hot-spot contract: length-cap the bookmarklet/preview URL
+		// at 2048 chars. A syntactically valid but oversized http URL must be
+		// rejected before any fetch.
+		$long   = 'https://example.test/' . str_repeat( 'a', 2048 );
+		$result = $this->invoke_private( 'validate_url', array( $long ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'url_too_long', $result->get_error_code() );
+	}
+
 	public function test_validate_url_rejects_no_host(): void {
 		$result = $this->invoke_private( 'validate_url', array( 'http://' ) );
 		$this->assertInstanceOf( WP_Error::class, $result );

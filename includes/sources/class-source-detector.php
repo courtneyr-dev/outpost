@@ -39,6 +39,10 @@ final class Outpost_Source_Detector {
 	/** Composer base path — where redirects ultimately land. */
 	public const COMPOSER_PATH = '/post/';
 
+	/** Reject candidate URLs longer than this. Matches the bookmarklet/shortcut
+	 * contract (CLAUDE.md Security Hot Spots) and the manual-share writeback cap. */
+	private const URL_MAX_LENGTH = 2048;
+
 	/**
 	 * Per-request memoization of `find_for_url` results, keyed on
 	 * `lowercased-host + path`. Sources are filterable per-request
@@ -142,6 +146,11 @@ final class Outpost_Source_Detector {
 	 */
 	private static function is_http_url( string $candidate ): bool {
 		if ( '' === $candidate ) {
+			return false;
+		}
+		// Length-cap the bookmarklet/shortcut URL before parsing, per the
+		// Security Hot Spots contract (CLAUDE.md) and the manual-share cap.
+		if ( strlen( $candidate ) > self::URL_MAX_LENGTH ) {
 			return false;
 		}
 		$parts = wp_parse_url( $candidate );
