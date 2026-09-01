@@ -196,6 +196,7 @@ final class Outpost_Micropub_Bridges {
 		self::apply_categories( $post_id, $properties );
 		self::apply_place_name( $post_id, $properties );
 		self::apply_photo_alt_text( $post_id, $properties );
+		self::apply_featured_image( $post_id, $properties );
 	}
 
 	/**
@@ -320,6 +321,92 @@ final class Outpost_Micropub_Bridges {
 			);
 		}
 		return $pairs;
+	}
+
+
+	/**
+	 * Bridge: first photo → featured image.
+	 *
+	 * A Micropub photo post carries its picture in the body as a core/image
+	 * block and never sets a thumbnail. WordPress leans on the thumbnail
+	 * everywhere the post is shown as a card rather than read: archive grids,
+	 * query loops, related-post rails, and most theme card patterns all call
+	 * `has_post_thumbnail()` first and render nothing when it is empty. A photo
+	 * post then appears as a card with no photo in it, which is the one thing
+	 * it should never look like.
+	 *
+	 * So the first photo becomes the featured image. The picture is already an
+	 * attachment on this post, so nothing is uploaded twice and no file is
+	 * copied — this only writes `_thumbnail_id`.
+	 *
+	 * Deliberately conservative:
+	 *
+	 *   - An existing thumbnail is never replaced. A user who picked a
+	 *     different image in the editor keeps it.
+	 *   - Only attachments this post owns are used. `attachment_url_to_postid()`
+	 *     can resolve a URL to media parented elsewhere, and stealing another
+	 *     post's image would be worse than no thumbnail at all.
+	 *   - Only real images. A PDF or audio file in `photo` is skipped.
+	 *
+	 * Themes that render both a featured image and the post body will show the
+	 * same picture twice on the single view. That is a template decision, not a
+	 * data one, so it stays in the theme: suppress `core/post-featured-image`
+	 * for the photo kind, or filter this off entirely with
+	 * `outpost_set_featured_image`.
+	 *
+	 * @param int                  $post_id    Post ID.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_featured_image( int $post_id, array $properties ): void {
+		if ( has_post_thumbnail( $post_id ) ) {
+			return;
+		}
+
+		$pairs = self::collect_photo_alt_pairs( $properties );
+		if ( empty( $pairs ) ) {
+			return;
+		}
+
+		foreach ( $pairs as $pair ) {
+			$url = $pair['url'];
+			if ( '' === $url ) {
+				continue;
+			}
+
+			$attachment_id = (int) attachment_url_to_postid( $url );
+			if ( $attachment_id <= 0 ) {
+				continue;
+			}
+
+			$parent_id = (int) wp_get_post_parent_id( $attachment_id );
+			if ( 0 !== $parent_id && $parent_id !== $post_id ) {
+				continue;
+			}
+
+			if ( ! wp_attachment_is_image( $attachment_id ) ) {
+				continue;
+			}
+
+			/**
+			 * Filters whether Outpost sets a featured image from the first photo.
+			 *
+			 * Return false to leave the thumbnail unset, for sites whose theme
+			 * renders the featured image alongside the body and would show the
+			 * same picture twice.
+			 *
+			 * @since 1.0.4
+			 *
+			 * @param bool $enabled       Whether to set the thumbnail. Default true.
+			 * @param int  $post_id       Post being published.
+			 * @param int  $attachment_id Attachment that would become the thumbnail.
+			 */
+			if ( ! apply_filters( 'outpost_set_featured_image', true, $post_id, $attachment_id ) ) {
+				return;
+			}
+
+			set_post_thumbnail( $post_id, $attachment_id );
+			return;
+		}
 	}
 
 	/**
