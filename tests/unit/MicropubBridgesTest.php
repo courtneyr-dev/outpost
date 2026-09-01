@@ -35,6 +35,94 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		return $ref->invoke( null, ...$args );
 	}
 
+	// --- Featured image bridge --------------------------------------------
+
+	public function test_featured_image_set_from_first_photo(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
+		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
+		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( true );
+		WP_Mock::userFunction(
+			'set_post_thumbnail',
+			array(
+				'times' => 1,
+				'args'  => array( 7, 42 ),
+			)
+		);
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/a.jpg' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_never_replaces_an_existing_thumbnail(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => true ) );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/a.jpg' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_skips_attachment_owned_by_another_post(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
+		// Parented to a different post — never steal another entry's media.
+		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 99 ) );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/a.jpg' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_skips_non_image_attachment(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
+		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => false ) );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/doc.pdf' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_respects_the_disabling_filter(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
+		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
+		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( false );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/a.jpg' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_noop_without_a_photo_property(): void {
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'content' => 'no photo here' ) )
+		);
+		$this->assertTrue( true );
+	}
+
 	// --- Post format inference (POSSE integration) -------------------------
 
 	public function test_infer_post_format_like_of_maps_to_link(): void {
