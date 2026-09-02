@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.3
+Stable tag:        1.0.4
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -202,6 +202,12 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.4 =
+* New: attach a photo to any Doing kind except video and to Recipe posts; the first photo becomes the featured image.
+* Security: REST route scoping keys on the route WordPress resolves, closing a nonce-protection gap on the composer-config path; preview fetches refuse link-local, CGNAT, and IPv6-internal targets and re-check every redirect; fetched preview HTML is sanitized with a wp_kses allowlist; Outpost's own routes render only from a matched rewrite rule; the Notion page cache is scoped per user; Micropub bridges write only to attachments the author can edit.
+* Fixed: photo alt text is no longer lost on Micropub posts; the shipped app bundle matches the source; uninstall removes all Outpost data and nothing else.
+* Changed: the External services list matches the source; Requires Plugins header added.
 
 = 1.0.3 =
 * Security hardening: enforce the 2048-character URL length cap on the preview and share/shortcut URL validators, matching the manual-share path and the plugin's documented input contract.
