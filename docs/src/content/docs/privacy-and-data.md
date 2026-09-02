@@ -3,7 +3,7 @@ title: Privacy and data
 description: "What Outpost stores on your site and device, which external services it contacts, and what it adds to your public pages — verified against the source."
 ---
 
-What Outpost stores on your site and your device, which external services it talks to, and what it adds to your public pages. Everything here comes from reading the plugin source at version 1.0.3 (plugin header); items we couldn't verify are called out.
+What Outpost stores on your site and your device, which external services it talks to, and what it adds to your public pages. Everything here comes from reading the plugin source at version 1.0.6 (plugin header); items we couldn't verify are called out.
 
 ## Data stored in your WordPress database
 
@@ -34,7 +34,7 @@ Attached to individual posts as they're published or syndicated:
 
 ### On uninstall
 
-Deleting the plugin from the Plugins screen runs a cleanup that currently removes only `outpost_rewrite_version`. Other options, post meta, and user meta listed above are not removed by the current uninstall script — the script marks them as future cleanup. The [Uninstall](/outpost/uninstall/) page walks through removal and what remains.
+Since version 1.0.4, deleting the plugin from the Plugins screen removes every option, user-meta, and post-meta key listed above, Outpost's transients, and its scheduled syndication retries — on a single site and on every site of a multisite network. It leaves your posts, media, alt text, featured images, categories, and other plugins' data in place. The [Uninstall](/outpost/uninstall/) page walks through it.
 
 ## External services contacted
 
@@ -70,4 +70,4 @@ Verified in source: the options/meta inventories above, the external host list, 
 
 Attributed to the plugin's readme (not independently verified): offline drafts encrypted in IndexedDB; EXIF data stripped from photo uploads.
 
-Flagged for the maintainer (see [documentation plan](https://github.com/courtneyr-dev/outpost/blob/main/docs/documentation-plan.md)): the draft-encryption and EXIF claims, and the limited uninstall cleanup.
+Flagged for the maintainer (see [documentation plan](https://github.com/courtneyr-dev/outpost/blob/main/docs/documentation-plan.md)): the draft-encryption and EXIF claims. (The limited uninstall cleanup flagged in earlier versions was resolved in 1.0.4.)

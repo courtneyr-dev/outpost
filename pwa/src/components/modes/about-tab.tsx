@@ -1,4 +1,5 @@
 import { BookmarkletList } from '../bookmarklet-list';
+import { ShareSheetGuide } from '../share-sheet-guide';
 
 /**
  * About tab — informational content about Outpost.
@@ -350,10 +351,21 @@ export function AboutTab(): preact.JSX.Element {
 				</dd>
 			</dl>
 
+			<ShareSheetGuide />
+
 			<BookmarkletList />
 
 			<h3>Outpost itself</h3>
 			<dl class="outpost-spec-list">
+				<dt>
+					<ExternalLink href="https://courtneyr-dev.github.io/outpost/">
+						Documentation
+					</ExternalLink>
+				</dt>
+				<dd>
+					Installation, settings, everyday tasks, troubleshooting, and privacy
+					— the full guide to everything on this tab and more.
+				</dd>
 				<dt>
 					<ExternalLink href="https://github.com/courtneyr-dev/outpost">
 						Source on GitHub

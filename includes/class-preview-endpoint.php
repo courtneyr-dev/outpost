@@ -15,7 +15,9 @@
  *      just calls `current_user_can( 'edit_posts' )`).
  *   2. Validating the URL (http(s) scheme only).
  *   3. Rate-limiting per user (30 requests/minute via transient).
- *   4. Fetching with `wp_safe_remote_get` (auto-blocks loopback + private
+ *   4. Fetching with a per-hop SSRF guard on top of `wp_safe_remote_get`
+ *      (auto-blocks loopback + private ranges, and Outpost adds link-local,
+ *      CGNAT, and IPv6 internal ranges + validates every redirect) — private
  *      networks per the `http_request_host_is_external` filter chain).
  *   5. Capping response size at 5 MB.
  *   6. Validating Content-Type against an allowlist (text/html,
@@ -64,6 +66,9 @@ final class Outpost_Preview_Endpoint {
 
 	/** HTTP request timeout in seconds — short for snappier error fallback. */
 	private const HTTP_TIMEOUT = 3;
+
+	/** Max redirect hops followed, each re-validated against the SSRF guard. */
+	private const MAX_REDIRECTS = 3;
 
 	/**
 	 * Hook the route registration onto rest_api_init.
@@ -252,36 +257,14 @@ final class Outpost_Preview_Endpoint {
 		}
 
 		// Legacy path: fetch the source URL directly, return sanitized HTML.
-		$response = wp_safe_remote_get(
-			$url,
-			array(
-				'timeout'     => self::HTTP_TIMEOUT,
-				'redirection' => 3,
-				'headers'     => array(
-					'Accept' => implode( ', ', self::ALLOWED_CONTENT_TYPE_PREFIXES ),
-				),
-			)
-		);
-
+		$response = self::safe_fetch( $url, self::ALLOWED_CONTENT_TYPE_PREFIXES );
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
-				'fetch_failed',
-				__( 'Could not fetch the target URL.', 'outpost-mobile-publishing' ),
-				array(
-					'status' => 502,
-					'detail' => $response->get_error_message(),
-				)
-			);
+			return $response;
 		}
 
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		if ( $status < 200 || $status >= 300 ) {
-			return new WP_Error(
-				'fetch_failed',
-				/* translators: %d: HTTP status code */
-				sprintf( __( 'Target URL returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
-				array( 'status' => 502 )
-			);
+			return self::generic_fetch_error();
 		}
 
 		$content_type = (string) wp_remote_retrieve_header( $response, 'content-type' );
@@ -289,10 +272,7 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'unsupported_content_type',
 				__( 'Target URL did not return HTML.', 'outpost-mobile-publishing' ),
-				array(
-					'status'      => 415,
-					'contentType' => $content_type,
-				)
+				array( 'status' => 415 )
 			);
 		}
 
@@ -417,38 +397,17 @@ final class Outpost_Preview_Endpoint {
 			);
 		}
 
-		// SSRF defense rides on wp_safe_remote_get the same as the
-		// legacy path. The extractor-computed fetch URL goes through
-		// the host-is-external filter chain unchanged.
-		$response = wp_safe_remote_get(
-			$fetch_url,
-			array(
-				'timeout'     => self::HTTP_TIMEOUT,
-				'redirection' => 3,
-				'headers'     => array(
-					'Accept' => implode( ', ', $extractor->expected_content_types() ),
-				),
-			)
-		);
+		// SSRF defense: per-hop host validation + generic errors, the same as
+		// the legacy path. The extractor-computed fetch URL is user-influenced
+		// (it derives from the pasted URL), so it goes through the guard too.
+		$response = self::safe_fetch( $fetch_url, $extractor->expected_content_types() );
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
-				'fetch_failed',
-				__( 'Could not fetch the source URL through the extractor.', 'outpost-mobile-publishing' ),
-				array(
-					'status' => 502,
-					'detail' => $response->get_error_message(),
-				)
-			);
+			return $response;
 		}
 
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		if ( $status < 200 || $status >= 300 ) {
-			return new WP_Error(
-				'fetch_failed',
-				/* translators: %d: HTTP status code */
-				sprintf( __( 'Source URL returned HTTP %d.', 'outpost-mobile-publishing' ), $status ),
-				array( 'status' => 502 )
-			);
+			return self::generic_fetch_error();
 		}
 
 		$content_type = (string) wp_remote_retrieve_header( $response, 'content-type' );
@@ -457,11 +416,7 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'unsupported_content_type',
 				__( 'Source response content type is not one of the extractor accepted types.', 'outpost-mobile-publishing' ),
-				array(
-					'status'      => 415,
-					'contentType' => $content_type,
-					'expected'    => $expected,
-				)
+				array( 'status' => 415 )
 			);
 		}
 
@@ -779,7 +734,88 @@ final class Outpost_Preview_Endpoint {
 			);
 		}
 
+		// SSRF ceiling: reject link-local (169.254/16 cloud metadata), CGNAT
+		// (100.64/10), IPv6 loopback/link-local/ULA, and IPv4-mapped-IPv6 forms
+		// that `wp_safe_remote_get()` alone does not. A single generic error —
+		// never the resolved address or which rule matched.
+		if ( Outpost_Url_Guard::host_is_blocked( (string) $parts['host'] ) ) {
+			return new WP_Error(
+				'invalid_url',
+				__( 'The target URL could not be retrieved.', 'outpost-mobile-publishing' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		return true;
+	}
+
+	/**
+	 * Fetch a URL with SSRF-safe, per-hop redirect validation.
+	 *
+	 * `wp_safe_remote_get()` blocks loopback + RFC1918 but not the ranges
+	 * {@see Outpost_Url_Guard} adds, and it follows redirects internally — so a
+	 * public URL could 302 to `http://169.254.169.254/`. This follows redirects
+	 * manually (max 3), re-validating each destination host with the guard
+	 * before the request, and returns a generic error on any failure so no
+	 * transport message, resolved address, or response fragment leaks.
+	 *
+	 * @param string   $url             Initial URL (already scheme/host-validated).
+	 * @param string[] $accept_prefixes Accept header content-type prefixes.
+	 * @return array<string,mixed>|WP_Error Raw wp_remote response array, or WP_Error.
+	 */
+	private static function safe_fetch( string $url, array $accept_prefixes ) {
+		$current = $url;
+		for ( $hop = 0; $hop <= self::MAX_REDIRECTS; $hop++ ) {
+			$host = (string) wp_parse_url( $current, PHP_URL_HOST );
+			if ( '' === $host || Outpost_Url_Guard::host_is_blocked( $host ) ) {
+				return self::generic_fetch_error();
+			}
+
+			$response = wp_safe_remote_get(
+				$current,
+				array(
+					'timeout'     => self::HTTP_TIMEOUT,
+					'redirection' => 0,
+					'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+				)
+			);
+			if ( is_wp_error( $response ) ) {
+				return self::generic_fetch_error();
+			}
+
+			$status = (int) wp_remote_retrieve_response_code( $response );
+			if ( $status >= 300 && $status < 400 ) {
+				$location = (string) wp_remote_retrieve_header( $response, 'location' );
+				if ( '' === $location ) {
+					return self::generic_fetch_error();
+				}
+				$next   = \WP_Http::make_absolute_url( $location, $current );
+				$scheme = strtolower( (string) wp_parse_url( $next, PHP_URL_SCHEME ) );
+				if ( ! in_array( $scheme, self::ALLOWED_SCHEMES, true ) ) {
+					return self::generic_fetch_error();
+				}
+				$current = $next;
+				continue;
+			}
+
+			return $response;
+		}
+		return self::generic_fetch_error();
+	}
+
+	/**
+	 * The single generic upstream-fetch error. Deliberately says nothing about
+	 * the transport, the resolved address, the redirect chain, or the response —
+	 * an SSRF probe learns only that the fetch did not succeed.
+	 *
+	 * @return WP_Error
+	 */
+	private static function generic_fetch_error(): WP_Error {
+		return new WP_Error(
+			'fetch_failed',
+			__( 'Could not fetch the target URL.', 'outpost-mobile-publishing' ),
+			array( 'status' => 502 )
+		);
 	}
 
 	/**
@@ -827,22 +863,88 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
-	 * Strip `<script>`, `<iframe>`, `<object>`, `<embed>` blocks and
-	 * `on*=` event-handler attributes from the response HTML.
+	 * Reduce response HTML to a safe allowlist.
 	 *
-	 * Defense in depth: the client never executes returned HTML (it parses
-	 * for mf2 / extracts `<title>` via regex), but a future code path that
-	 * naively renders should not be a security regression.
+	 * The regex blacklist this replaces was bypassable (`<svg/onload=…>`,
+	 * `<body/onload=…>`, unquoted `href=javascript:…`, `formaction=…`,
+	 * mixed-case and encoded payloads all survived). This instead keeps ONLY
+	 * the semantic + microformats markup the Reply preview parser needs and
+	 * discards everything else: `wp_kses()` drops every tag not on the list,
+	 * strips all `on*` handlers and unknown attributes, rejects unsafe URL
+	 * protocols, and normalizes malformed and mixed-case tags. Script and style
+	 * blocks are removed with their contents first (their inner text is not
+	 * preview content and must not survive as text). The result is data for the
+	 * client's `<title>` / mf2 extraction, never inserted as executable DOM.
 	 */
 	private static function strip_dangerous_html( string $html ): string {
-		// Remove script/iframe/object/embed tag blocks (with content).
-		$html = preg_replace( '/<(script|iframe|object|embed)\b[^>]*>.*?<\/\1>/is', '', $html ) ?? $html;
-		// Remove self-closing or void variants.
-		$html = preg_replace( '/<(script|iframe|object|embed)\b[^>]*\/?>/is', '', $html ) ?? $html;
-		// Strip event handler attributes (onclick, onload, etc.).
-		$html = preg_replace( '/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^>\s]+)/i', '', $html ) ?? $html;
-		// Strip javascript: / data: hrefs and srcs.
-		$html = preg_replace( '/\s(href|src)\s*=\s*("javascript:[^"]*"|\'javascript:[^\']*\'|"data:[^"]*"|\'data:[^\']*\')/i', '', $html ) ?? $html;
-		return $html;
+		$html = preg_replace( '#<(script|style)\b[^>]*>.*?</\1>#is', '', $html ) ?? $html;
+		return wp_kses( $html, self::preview_allowed_html(), array( 'http', 'https', 'mailto' ) );
+	}
+
+	/**
+	 * Allowed tags/attributes for a sanitized preview body: enough to keep a
+	 * page title and h-entry / h-card microformats (class-annotated block and
+	 * inline elements, links, times, images), nothing that can script or embed.
+	 *
+	 * @return array<string, array<string, bool>>
+	 */
+	private static function preview_allowed_html(): array {
+		$common      = array(
+			'class' => true,
+			'id'    => true,
+			'lang'  => true,
+			'title' => true,
+		);
+		$with_common = static function ( array $extra = array() ) use ( $common ): array {
+			return array_merge( $common, $extra );
+		};
+		return array(
+			'title'      => array(),
+			'a'          => $with_common(
+				array(
+					'href' => true,
+					'rel'  => true,
+				)
+			),
+			'p'          => $with_common(),
+			'div'        => $with_common(),
+			'span'       => $with_common(),
+			'article'    => $with_common(),
+			'section'    => $with_common(),
+			'header'     => $with_common(),
+			'footer'     => $with_common(),
+			'main'       => $with_common(),
+			'aside'      => $with_common(),
+			'h1'         => $with_common(),
+			'h2'         => $with_common(),
+			'h3'         => $with_common(),
+			'h4'         => $with_common(),
+			'h5'         => $with_common(),
+			'h6'         => $with_common(),
+			'ul'         => $with_common(),
+			'ol'         => $with_common(),
+			'li'         => $with_common(),
+			'blockquote' => $with_common( array( 'cite' => true ) ),
+			'time'       => $with_common( array( 'datetime' => true ) ),
+			'img'        => $with_common(
+				array(
+					'src'    => true,
+					'alt'    => true,
+					'width'  => true,
+					'height' => true,
+				)
+			),
+			'figure'     => $with_common(),
+			'figcaption' => $with_common(),
+			'b'          => $with_common(),
+			'i'          => $with_common(),
+			'em'         => $with_common(),
+			'strong'     => $with_common(),
+			'small'      => $with_common(),
+			'code'       => $with_common(),
+			'pre'        => $with_common(),
+			'br'         => array(),
+			'hr'         => array(),
+		);
 	}
 }

@@ -17,11 +17,11 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 ## Sign-in or lookups fail on managed hosting (GoDaddy and similar)
 
-**Symptom:** you can sign in, but posting returns "forbidden"/"unauthorized"; or the media lookup says "The lookup was rejected. Sign out and back in to refresh your token" even after doing exactly that.
+**Symptom:** you can sign in, but posting returns "forbidden"/"unauthorized"; or the media lookup says "The lookup was rejected. Sign out and back in to refresh your token", or the More panel says "Couldn't load companion options — your sign-in may have expired", even after doing exactly that.
 
 **Cause:** some managed WordPress hosts (GoDaddy is the documented case) strip the `Authorization` HTTP header before it reaches PHP, so IndieAuth never sees your token. Hosts can also rewrite response status codes at their gateway, which used to make successful posts look like failures.
 
-**Fix:** update Outpost. The plugin has shipped a series of workarounds (versions 0.1.105, 0.1.112, and 0.1.113 in the changelog): tokens now also travel in the request body where hosts can't strip them, and any 2xx response counts as success.
+**Fix:** update Outpost. The plugin has shipped a series of workarounds (versions 0.1.105, 0.1.112, 0.1.113, and 1.0.5 in the changelog): tokens now also travel in the request body where hosts can't strip them — since 1.0.5 that includes the companion-options request behind the More panel (Yoast keyphrase, categories, tags, XFN) — and any 2xx response counts as success. If you still see the companion-options message on 1.0.5 or later, sign out and back in once so the app reloads.
 
 **Check next:** if you're on a managed host other than GoDaddy and still see auth failures on a current version, that host may need its own workaround — open an issue (below) with the host's name.
 

@@ -133,6 +133,9 @@ interface VariantConfig {
 	hasTitle?: boolean;
 	/** Show the OpenStreetMap geocode lookup (Checkin and Eat/Drink). */
 	hasGeocode?: boolean;
+	/** Offer an optional user-attached photo. Every Doing kind takes one
+	 *  except `video`, whose payload is the linked video itself. */
+	hasPhoto?: boolean;
 	/** Show the start / end datetime inputs (Event only). */
 	hasStart?: boolean;
 	hasEnd?: boolean;
@@ -166,6 +169,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'listen',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post listen',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 		personLabel: 'Artist',
@@ -180,6 +184,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Movie or show URL',
 		contentLabel: 'Body (optional)',
 		submitLabel: 'Post watch',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 		personLabel: 'Director (optional)',
@@ -194,6 +199,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Book URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post read',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 		personLabel: 'Author',
@@ -208,6 +214,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Game URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post play',
+		hasPhoto: true,
 		kind: 'play',
 		targetRequired: true,
 		hasTitle: true,
@@ -223,6 +230,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Game URL',
 		contentLabel: 'Optional comment',
 		submitLabel: 'Post game',
+		hasPhoto: true,
 		kind: 'play',
 		targetRequired: true,
 		hasTitle: true,
@@ -240,6 +248,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Track URL',
 		contentLabel: 'Why this track?',
 		submitLabel: 'Post jam',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 		personLabel: 'Artist',
@@ -254,6 +263,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Location URL or geo:lat,lon',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post checkin',
+		hasPhoto: true,
 		targetRequired: true,
 		personLabel: 'Place name (optional)',
 		personProperty: 'name',
@@ -271,6 +281,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post meal',
+		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you eat?',
 		personProperty: 'name', // posted as eat-of via property mapping below
@@ -283,6 +294,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'Optional note',
 		submitLabel: 'Post drink',
+		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you drink?',
 		personProperty: 'name',
@@ -299,6 +311,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'How did it feel? (optional)',
 		submitLabel: 'Post exercise',
+		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What activity?',
 		personProperty: 'name', // routed to `exercise` via the eat/drink-shaped branch below
@@ -315,6 +328,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Location URL or geo:lat,lon (optional)',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post craft',
+		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you make?',
 		personProperty: 'name', // routed to `craft-of` via the person-primary branch below
@@ -331,6 +345,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Venue URL or geo:lat,lon (optional)',
 		contentLabel: 'Event details (optional)',
 		submitLabel: 'Post event',
+		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'Event name',
 		personProperty: 'name',
@@ -347,6 +362,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Item URL',
 		contentLabel: 'Your review',
 		submitLabel: 'Post review',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 		hasRating: true,
@@ -373,6 +389,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		targetLabel: 'Audio URL',
 		contentLabel: 'Optional description',
 		submitLabel: 'Post audio',
+		hasPhoto: true,
 		targetRequired: true,
 		hasTitle: true,
 	},
@@ -756,10 +773,11 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			}
 		}
 
-		// Media + video inputs only render for hasGeocode (snapshot) variants;
-		// scope their state the same way so values left over from another
-		// variant never validate or submit here.
-		const active_media = config.hasGeocode ? media_entries : [];
+		// Scope each optional input to the variants that actually render it,
+		// so values left over from another variant never validate or submit
+		// here. Photos are offered on every Doing kind except `video`; the
+		// video-URL field stays with the hasGeocode (snapshot) variants.
+		const active_media = config.hasPhoto ? media_entries : [];
 		const trimmed_video_url = config.hasGeocode ? video_url.trim() : '';
 
 		// Alt-text discipline for user-attached photos. Mirrors PhotoMode's
@@ -1057,7 +1075,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		? !!target_url.trim()
 		: !!person_name.trim();
 	const media_complete =
-		!config.hasGeocode ||
+		config.hasPhoto !== true ||
 		media_entries.length === 0 ||
 		all_entries_have_alt(media_entries);
 	const can_submit = base_can_submit && media_complete;
@@ -1353,17 +1371,19 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					</>
 				)}
 
-				{config.hasGeocode && (
-					<>
-						<MediaPicker
-							entries={media_entries}
-							onChange={setMediaEntries}
-							disabled={submitting}
-							idPrefix={`outpost-listen-${variant}-media`}
-							emptyLabel="Attach a photo (optional)"
-							nonEmptyLabel="Add more photos"
-						/>
+				{config.hasPhoto === true && (
+					<MediaPicker
+						entries={media_entries}
+						onChange={setMediaEntries}
+						disabled={submitting}
+						idPrefix={`outpost-listen-${variant}-media`}
+						emptyLabel="Attach a photo (optional)"
+						nonEmptyLabel="Add more photos"
+					/>
+				)}
 
+				{config.hasGeocode === true && (
+					<>
 						<label class="outpost-label" for="outpost-listen-video-url">
 							Video URL (optional)
 						</label>
