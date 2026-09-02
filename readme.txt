@@ -22,10 +22,10 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 
 * **Post** — Note, Status, Aside, Quote, and Article (long-form with a title). Voice-input ready.
 * **Reply / Like / Favorite / Repost / Bookmark / RSVP / Follow / Wishlist / Tag / Acquisition / Issue** — paste a URL (or use a bookmarklet from any page), add your response, post.
-* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG.
+* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG. Any Doing entry except Video can carry a photo.
 * **Life: Mood / Weather / Sleep / Trip / Itinerary / Question** — quick personal-state entries with an optional note.
-* **Photo** — upload from your camera roll, with a required alt text field.
-* **Recipe** — title, ingredients, and steps, published as an h-recipe.
+* **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
+* **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
 The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet (Android's Web Share Target; on iOS via an Apple Shortcut).
 
@@ -83,7 +83,7 @@ Yes, two: IndieAuth (sign-in) and Micropub (publishing endpoint), both free on W
 
 = Is Outpost on WordPress.org yet? =
 
-Not yet — Outpost is pre-release and this readme is prepared for submission. Until it's listed, install from GitHub per the Installation section.
+Not yet — until it's listed, install from GitHub per the Installation section.
 
 = Where do the settings live? =
 
@@ -138,7 +138,6 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
     * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
     * **Spotify** — open.spotify.com/oembed. [Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/).
     * **SoundCloud** — soundcloud.com/oembed. [Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy).
-* **Apple iTunes Search API** — when the URL you paste is a music.apple.com link, the track or album metadata for the preview is fetched from itunes.apple.com with the item's ID. [Terms](https://www.apple.com/legal/internet-services/itunes/), [Privacy](https://www.apple.com/legal/privacy/).
 * **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
 
 = Geocoding =

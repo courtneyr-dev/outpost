@@ -8,7 +8,7 @@
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Requires WordPress 6.5+ and PHP 8.2+; tested up to WordPress 7.1.
 
-**Status:** version 1.0.3, prepared for release (Plugin Check 2.1.0 clean on WordPress 7.1). Not yet listed on WordPress.org — install from GitHub.
+**Status:** version 1.0.6 (Plugin Check clean on WordPress 7.1). Not yet listed on WordPress.org — install from GitHub.
 
 ## User documentation
 
@@ -38,6 +38,8 @@ Every kind that [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-
 | Doing | listen, watch, read, play, game, jam, checkin, eat, drink, exercise, craft, event, review, video, audio |
 | Life | mood, weather, sleep, trip, itinerary, question |
 | Recipe | recipe (h-recipe with ingredients and steps) |
+
+Any Doing kind except Video, and Recipe, accept an optional photo. The first photo on a post becomes its featured image unless one is already set (site owners can turn that off with the `outpost_set_featured_image` filter).
 
 When the Post Kinds companion is active, the composer also names the kind explicitly on each Micropub post (a `pkiw-kind` vendor property), so property-ambiguous kinds — an issue is wire-identical to a reply — classify correctly. Other Micropub servers never receive the property.
 
