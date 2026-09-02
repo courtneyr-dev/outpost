@@ -126,6 +126,7 @@ iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut. T
 3. Add the Open URLs action (not Share, which only reopens the share sheet). Set its URL to https://your-site.example/post/share-target?url= and insert Shortcut Input at the end.
 4. Rename it Post to Outpost.
 5. Share any page from Safari and pick Post to Outpost — the composer opens on Reply with that link.
+6. To keep it near the top of the share sheet, scroll to the bottom of the sheet, tap Edit Actions…, tap the green + next to Post to Outpost to add it to Favorites, drag it to the top, and tap Done.
 
 The composer's About tab has the same steps with your site's address filled in, and the full walkthrough is at https://courtneyr-dev.github.io/outpost/common-tasks/.
 

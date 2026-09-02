@@ -128,6 +128,13 @@ export function ShareSheetGuide(): preact.JSX.Element {
 					<strong>Post to Outpost</strong>. The composer opens on Reply with that
 					link as the target.
 				</li>
+				<li>
+					Move it up the list: scroll to the bottom of the share sheet, tap{' '}
+					<strong>Edit Actions…</strong>, tap the green <strong>+</strong> next to{' '}
+					<strong>Post to Outpost</strong> to add it to Favorites, then drag it to
+					the top with the <strong>≡</strong> handle and tap <strong>Done</strong>.
+					It now sits near the top every time you share.
+				</li>
 			</ol>
 			<p>
 				From then on, <strong>Post to Outpost</strong> is in your share sheet.
