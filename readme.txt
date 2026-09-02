@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.8
+Stable tag:        1.0.9
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -226,6 +226,10 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.9 =
+* Fixed: liking or replying to an X or Mastodon URL could fail with "Unknown mp-syndicate-to targets" because the suggested Bridgy chip sent a hard-coded brid.gy uid the site's Micropub endpoint never advertised. The chip now resolves to one of the endpoint's own syndication targets and stays hidden when there is none.
+* Changed: the share-sheet directions add a step for moving Post to Outpost near the top of the iOS share sheet through Edit Actions.
 
 = 1.0.8 =
 * Changed: the About tab's share-sheet directions name the two iOS Shortcut traps (tap Nowhere → Share Sheet; add Open URLs, not Share), add a test step, and link to the full walkthrough; the About tab now links to the documentation site.

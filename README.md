@@ -8,7 +8,7 @@
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Requires WordPress 6.5+ and PHP 8.2+; tested up to WordPress 7.1.
 
-**Status:** version 1.0.6 (Plugin Check clean on WordPress 7.1). Not yet listed on WordPress.org — install from GitHub.
+**Status:** version 1.0.9 (Plugin Check clean). Not yet listed on WordPress.org — install from GitHub.
 
 ## User documentation
 

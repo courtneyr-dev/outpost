@@ -5,6 +5,16 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-09-02
+
+### Fixed
+
+- The Bridgy suggestion chip sent a hard-coded `https://brid.gy/publish/<silo>` uid that most Micropub endpoints never advertise, so liking or replying to an X or Mastodon URL failed with `400 Unknown mp-syndicate-to targets`. The chip now resolves to one of the endpoint's own `?q=syndicate-to` targets (exact uid first, then the Bridgy-backed target for that silo, as Syndication Links names them) and stays hidden when there is none, so nothing the endpoint did not offer is ever sent. The suggested target no longer appears twice in the More panel.
+
+### Changed
+
+- The share-sheet directions (About tab, docs, both readmes) gain a sixth step: adding **Post to Outpost** to the share sheet's Favorites through **Edit Actions…** so it sits near the top.
+
 ## [1.0.8] - 2026-09-02
 
 ### Changed
