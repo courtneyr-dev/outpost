@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.6
+Stable tag:        1.0.7
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -89,7 +89,7 @@ Not yet — until it's listed, install from GitHub per the Installation section.
 
 = Where do the settings live? =
 
-In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost Settings** holds destination API keys; **Outpost → Appearance** controls day/night mode and color tokens; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
+In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost → Settings** holds destination API keys; **Outpost → Appearance** controls day/night mode and color tokens; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
 
 = Does it work on managed hosts? =
 
@@ -215,6 +215,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.7 =
+* Fixed: the wp-admin sidebar showed two identical "Outpost" menus; the settings screen now sits under the single Outpost menu as "Settings" (its URL is unchanged).
 
 = 1.0.6 =
 * New: the About tab now explains how to add Outpost to your device's share sheet — the automatic Web Share Target on Android (once installed as an app) and a Shortcut-based setup for iPhone/iPad, where iOS Safari doesn't support share targets.
