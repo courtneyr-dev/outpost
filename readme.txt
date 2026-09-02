@@ -22,10 +22,10 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 
 * **Post** — Note, Status, Aside, Quote, and Article (long-form with a title). Voice-input ready.
 * **Reply / Like / Favorite / Repost / Bookmark / RSVP / Follow / Wishlist / Tag / Acquisition / Issue** — paste a URL (or use a bookmarklet from any page), add your response, post.
-* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG.
+* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG. Any Doing entry except Video can carry a photo.
 * **Life: Mood / Weather / Sleep / Trip / Itinerary / Question** — quick personal-state entries with an optional note.
-* **Photo** — upload from your camera roll, with a required alt text field.
-* **Recipe** — title, ingredients, and steps, published as an h-recipe.
+* **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
+* **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
 The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet (Android's Web Share Target; on iOS via an Apple Shortcut).
 

@@ -25,7 +25,7 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 
 Faster paths so you don't paste URLs by hand:
 
-- **From your phone's share sheet:** installed as a PWA on Android, Outpost appears as a share target — share any page from any app straight into the composer. On iOS, use the Shortcut bridge (Settings → Outpost iOS Shortcut).
+- **From your phone's share sheet:** installed as a PWA on Android, Outpost appears as a share target — share any page from any app straight into the composer. On iOS, use the Shortcut bridge (Settings → Outpost iOS Shortcut). The composer's About tab walks through both setups, including a manual iOS Shortcut you can build yourself.
 - **From a desktop browser:** use bookmarklets (next task).
 
 ## Add the bookmarklets to your browser
@@ -42,6 +42,8 @@ Faster paths so you don't paste URLs by hand:
 3. Enter alt text — it's required; the post won't submit without a description of the image.
 4. Add any caption text and post.
 
+The first photo on a post also becomes its featured image, unless the post already has one. Site owners can turn that off with the `outpost_set_featured_image` filter.
+
 ![Photo mode with an uploaded image and the required alt text field](../../assets/screenshots/frontend-composer-photo-mode.png)
 
 ## Log something you're listening to, watching, or reading
@@ -50,9 +52,17 @@ Works best with the Post Kinds for IndieWeb in Block Themes companion plugin: th
 
 1. Switch to the Listen, Watch, Read, Checkin, or Play mode.
 2. Use the "Look it up" search to find the album, film, book, venue, or game — it fills the title, creator, and cover art from Post Kinds' lookup services (MusicBrainz, TMDB, Open Library, Foursquare/Nominatim, BoardGameGeek/RAWG). Watch mode has a Movie/TV toggle.
-3. Add your note or rating and post.
+3. Attach a photo if you like — every Doing kind except Video accepts one, and the first photo becomes the post's featured image.
+4. Add your note or rating and post.
 
 If lookup says a source is "not configured," add the relevant API key under Post Kinds → API Connections — music, book, game, and venue search only work once their keys are set there.
+
+## Post a recipe
+
+1. Switch to Recipe mode.
+2. Enter the title, the ingredients, and the steps.
+3. Attach a photo if you have one — it becomes the post's featured image.
+4. Post. The recipe publishes as an h-recipe, and with the Post Kinds companion active it's classified as the recipe kind.
 
 ## Write a long-form article
 
