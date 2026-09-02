@@ -111,6 +111,9 @@ final class MicropubPhotoWriteShapeTest extends TestCase {
 		$file_path  = $upload_dir['path'] . '/' . $filename;
 		$file_url   = $upload_dir['url'] . '/' . $filename;
 
+		// wp-env's uploads dir may not exist yet on a fresh test DB.
+		wp_mkdir_p( $upload_dir['path'] );
+
 		// Write a 1×1 JPEG so attachment_url_to_postid resolves the URL.
 		// Reusing F3's tests/fixtures/sample-photo-200x200.jpg would also
 		// work but a synthetic byte-stream avoids any fixture-coupling.

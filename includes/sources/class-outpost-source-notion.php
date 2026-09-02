@@ -139,12 +139,10 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 				__( 'No Notion page ID found in URL.', 'outpost-mobile-publishing' )
 			);
 		}
-		$cache_key = self::CACHE_PREFIX . $page_id;
-		$cached    = get_transient( $cache_key );
-		if ( is_array( $cached ) ) {
-			return $cached;
-		}
-
+		// Credentials FIRST, before any cache read. A Notion page is private to
+		// the connection that can see it, so the requesting user must have their
+		// own credential before they may be served even a cached copy — a
+		// disconnected user gets an error, never another user's cached page.
 		$creds = Outpost_Credentials_Store::get( 'notion', $user_id );
 		if ( null === $creds || empty( $creds['access_token'] ) ) {
 			return new \WP_Error(
@@ -153,6 +151,15 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 			);
 		}
 		$token = (string) $creds['access_token'];
+
+		// The cache is scoped to the page AND the requesting user's specific
+		// credential — one user's private page is never returned to another, and
+		// a reconnect or token rotation invalidates the entry. See cache_key().
+		$cache_key = self::cache_key( $page_id, $user_id, $token );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
 
 		$page = self::api_get( '/pages/' . $page_id, $token );
 		if ( is_wp_error( $page ) ) {
@@ -169,6 +176,26 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 		);
 		set_transient( $cache_key, $result, self::CACHE_TTL );
 		return $result;
+	}
+
+	/**
+	 * Cache key for a Notion page, scoped so one user's private page can never
+	 * be served to another.
+	 *
+	 * Keyed on the page id, the requesting user id, AND a non-secret fingerprint
+	 * of that user's current access token. The user id keeps two connected users
+	 * apart; the token fingerprint invalidates the entry on a reconnect or token
+	 * rotation. The raw token is never placed in the key — only a truncated
+	 * SHA-256 of it (a hash cannot be reversed to the credential, and appears in
+	 * the options table).
+	 *
+	 * @param string $page_id 32-hex Notion page id.
+	 * @param int    $user_id Requesting user.
+	 * @param string $token   That user's Notion access token.
+	 * @return string
+	 */
+	private static function cache_key( string $page_id, int $user_id, string $token ): string {
+		return self::CACHE_PREFIX . $page_id . '_' . $user_id . '_' . substr( hash( 'sha256', $token ), 0, 16 );
 	}
 
 	/**

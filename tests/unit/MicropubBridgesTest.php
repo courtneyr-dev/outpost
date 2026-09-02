@@ -41,6 +41,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
 		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
 		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 42 )->andReturn( true );
 		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
 		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( true );
 		WP_Mock::userFunction(
@@ -70,10 +71,39 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function test_featured_image_skips_attachment_owned_by_another_post(): void {
+		// Parented to a different post — never steal another entry's media.
+		// Every other guard is satisfied so the parentage check is the ONLY
+		// barrier: dropping it makes this test fail with a real write, not an
+		// unmocked-function error (audit item 11 — no accidental WP_Mock bailout).
 		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
 		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
-		// Parented to a different post — never steal another entry's media.
 		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 99 ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 42 )->andReturn( true );
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
+		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( true );
+		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
+
+		$this->invoke_private(
+			'apply_featured_image',
+			array( 7, array( 'photo' => 'https://example.test/a.jpg' ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_featured_image_skips_attachment_the_actor_cannot_edit(): void {
+		// The Micropub dependency re-parents a locally resolvable photo URL to
+		// the new post with NO capability check, so a lower-privilege actor can
+		// reference another user's attachment and have it transplanted here —
+		// parentage then reads as this post. The attachment's author does not
+		// change on re-parent, so edit_post is the ownership signal that
+		// survives. Every other guard passes; the capability check is the sole
+		// barrier, so removing it fails this test with a real write.
+		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
+		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
+		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 42 )->andReturn( false );
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
+		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( true );
 		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
 
 		$this->invoke_private(
@@ -87,6 +117,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
 		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
 		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 42 )->andReturn( true );
 		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => false ) );
 		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
 
@@ -101,6 +132,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'has_post_thumbnail', array( 'return' => false ) );
 		WP_Mock::userFunction( 'attachment_url_to_postid', array( 'return' => 42 ) );
 		WP_Mock::userFunction( 'wp_get_post_parent_id', array( 'return' => 7 ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 42 )->andReturn( true );
 		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
 		WP_Mock::onFilter( 'outpost_set_featured_image' )->with( true, 7, 42 )->reply( false );
 		WP_Mock::userFunction( 'set_post_thumbnail', array( 'times' => 0 ) );
@@ -654,6 +686,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_get_post_parent_id' )
 			->with( 101 )
 			->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
 		WP_Mock::userFunction( 'sanitize_text_field' )
 			->with( 'A red apple on a wooden table' )
 			->andReturn( 'A red apple on a wooden table' );
@@ -687,6 +720,8 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_get_post_parent_id' )
 			->with( 102 )
 			->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 102 )->andReturn( true );
 		WP_Mock::userFunction( 'sanitize_text_field' )
 			->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'update_post_meta' )
@@ -718,6 +753,7 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_get_post_parent_id' )
 			->with( 101 )
 			->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
 		WP_Mock::userFunction( 'sanitize_text_field' )
 			->with( '' )
 			->andReturn( '' );
@@ -785,24 +821,21 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( true );
 	}
 
-	public function test_apply_photo_alt_attachments_with_zero_parent_are_accepted(): void {
-		// Some attachments are created with post_parent=0 (orphan). The
-		// upstream Micropub plugin re-parents them, but during early
-		// processing the parent may still be 0. Treat 0 as "OK to write"
-		// — the bridge's job is to honor the alt-text intent, not enforce
-		// parent linkage.
+	public function test_apply_photo_alt_skips_unattached_attachment(): void {
+		// An attachment still parented to 0 at bridge time was never sideloaded
+		// into THIS post — Outpost's real path uploads via the media endpoint,
+		// and the Micropub plugin re-parents that upload to the new post before
+		// after_micropub fires (verified over the live endpoint: parent == post
+		// id by the time the bridge runs). So a parent of 0 here means the URL
+		// points at media this post does not own; fail closed rather than write
+		// alt text onto someone else's library item.
 		WP_Mock::userFunction( 'attachment_url_to_postid' )
 			->with( 'https://example.test/orphan.jpg' )
 			->andReturn( 101 );
 		WP_Mock::userFunction( 'wp_get_post_parent_id' )
 			->with( 101 )
 			->andReturn( 0 );
-		WP_Mock::userFunction( 'sanitize_text_field' )
-			->andReturnUsing( static fn( $v ) => $v );
-		WP_Mock::userFunction( 'update_post_meta' )
-			->once()
-			->with( 101, '_wp_attachment_image_alt', 'orphan alt' )
-			->andReturn( true );
+		// update_post_meta must NOT be called.
 
 		$properties = array(
 			'photo' => array(
@@ -814,6 +847,87 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		);
 		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
 		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_skips_attachment_the_actor_cannot_edit(): void {
+		// Parentage reads as this post (the dependency transplanted it), but the
+		// current actor cannot edit the attachment — its author is another user.
+		// The capability check is the sole barrier here.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/transplanted.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( false );
+		// update_post_meta must NOT be called.
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value' => 'https://example.test/transplanted.jpg',
+					'alt'   => 'hostile alt on another user\'s media',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_photo_alt_dedupes_doubled_url_keeping_the_real_alt(): void {
+		// Micropub's default_file_handler appends the canonical URL to the photo
+		// array, so the bridge sees the same URL twice: once with the client's
+		// alt, once bare. Pairing by index made the bare duplicate's empty alt
+		// overwrite the real one, wiping alt text on every real photo post.
+		// After dedup, the attachment is written exactly once, with the real alt.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/wp-content/uploads/a.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )
+			->with( 101 )
+			->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'update_post_meta' )
+			->once()
+			->with( 101, '_wp_attachment_image_alt', 'A cat asleep on a keyboard' )
+			->andReturn( true );
+
+		$properties = array(
+			'photo'        => array(
+				'https://example.test/wp-content/uploads/a.jpg',
+				'https://example.test/wp-content/uploads/a.jpg',
+			),
+			'mp-photo-alt' => array( 'A cat asleep on a keyboard' ),
+		);
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_collect_photo_alt_pairs_dedupes_by_url_first_non_empty_alt_wins(): void {
+		// Direct resolver test for the dedup contract: repeated URL collapses to
+		// one entry, first-seen order preserved, first NON-EMPTY alt retained
+		// even when it arrives on a later duplicate.
+		$result = $this->invoke_private(
+			'collect_photo_alt_pairs',
+			array(
+				array(
+					'photo'        => array(
+						'https://example.test/a.jpg',
+						'https://example.test/b.jpg',
+						'https://example.test/a.jpg',
+					),
+					'mp-photo-alt' => array( '', 'bee', 'the real a' ),
+				),
+			)
+		);
+		$this->assertSame(
+			array(
+				array( 'url' => 'https://example.test/a.jpg', 'alt' => 'the real a' ),
+				array( 'url' => 'https://example.test/b.jpg', 'alt' => 'bee' ),
+			),
+			$result
+		);
 	}
 
 	public function test_collect_photo_alt_pairs_normalizes_both_shapes(): void {

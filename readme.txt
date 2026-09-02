@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.3
+Stable tag:        1.0.4
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -123,7 +123,7 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
 
 = Syndication (per post, only for chips you leave enabled) =
 
-* **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the brid.gy or fed.brid.gy endpoint you configured. Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
+* **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the Bridgy endpoint you configured: **brid.gy** (Flickr, GitHub, Reddit), **bsky.brid.gy** (Bluesky), or **fed.brid.gy** (the fediverse). Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
 * **Telegraph (a Telegram service)** — when the Telegraph chip is enabled, the post's content is sent to api.telegra.ph to create the syndicated copy. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
 * **Beehiiv** — newsletter destination; when configured with an API key and enabled on a post, the post's content is sent to api.beehiiv.com. [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy).
 * **Buttondown** — newsletter destination; sends the post's content to api.buttondown.email when enabled. [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy).
@@ -147,14 +147,14 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
 
 = Connected life-tracking accounts (only after you connect them under Outpost → OAuth Connections) =
 
-Connecting an account stores an encrypted token on your site. Afterwards, Outpost contacts that service only to fetch your recent activity for prefilling posts and to maintain the connection (token refresh or revocation).
+Connecting an account sends you to that service's sign-in page to authorize Outpost, then stores an encrypted token on your site. Afterwards, Outpost contacts the service's API only when you connect or disconnect it, or when you fetch your recent activity to prefill a post — sending the stored token and, for a page citation, the item URL you are viewing. The hosts contacted for each service:
 
-* **Notion** — [Terms and privacy](https://www.notion.com/terms).
-* **Oura** — [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
-* **WHOOP** — [Terms](https://www.whoop.com/us/en/termsofuse/), [Privacy](https://www.whoop.com/us/en/privacy/).
-* **Polar (Flow / AccessLink)** — [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
-* **Ride With GPS** — [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
-* **Ravelry** — [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
+* **Notion** — api.notion.com (authorize, token exchange, and reading a page you cite). [Terms and privacy](https://www.notion.com/terms).
+* **Oura** — cloud.ouraring.com (authorize) and api.ouraring.com (token, verify, recent activity). [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
+* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [Terms](https://www.whoop.com/us/en/termsofuse/), [Privacy](https://www.whoop.com/us/en/privacy/).
+* **Polar (Flow / AccessLink)** — flow.polar.com (authorize), polarremote.com (token, revoke), and www.polaraccesslink.com (register, verify, recent activity). [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
+* **Ride With GPS** — ridewithgps.com (authorize, token, verify, and reading a trip or route you cite). [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
+* **Ravelry** — www.ravelry.com (authorize, token) and api.ravelry.com (verify, and reading a pattern or project you cite). [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
 
 = Manual share (opens the service in your browser, only when you tap its chip) =
 
@@ -169,7 +169,6 @@ These destinations have no posting API Outpost can use, so sharing to them is a 
 * **Instagram** and **Instagram Stories** — the Instagram app on your phone; your photo is handed to it through the share sheet. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
 * **TikTok** — the TikTok app on your phone. [Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en).
 * **Flickr** — the Flickr app, or flickr.com to finish by hand. [Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy).
-* **Tumblr** — www.tumblr.com, offered as a manual fallback. [Terms](https://www.tumblr.com/policy/terms-of-service), [Privacy](https://www.tumblr.com/privacy/en).
 
 = Inbound only (no data sent) =
 
@@ -203,6 +202,12 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.4 =
+* New: attach a photo to any Doing kind except video and to Recipe posts; the first photo becomes the featured image.
+* Security: REST route scoping keys on the route WordPress resolves, closing a nonce-protection gap on the composer-config path; preview fetches refuse link-local, CGNAT, and IPv6-internal targets and re-check every redirect; fetched preview HTML is sanitized with a wp_kses allowlist; Outpost's own routes render only from a matched rewrite rule; the Notion page cache is scoped per user; Micropub bridges write only to attachments the author can edit.
+* Fixed: photo alt text is no longer lost on Micropub posts; the shipped app bundle matches the source; uninstall removes all Outpost data and nothing else.
+* Changed: the External services list matches the source.
 
 = 1.0.3 =
 * Security hardening: enforce the 2048-character URL length cap on the preview and share/shortcut URL validators, matching the manual-share path and the plugin's documented input contract.
