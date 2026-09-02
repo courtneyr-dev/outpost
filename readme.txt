@@ -89,7 +89,7 @@ Not yet — until it's listed, install from GitHub per the Installation section.
 
 = Where do the settings live? =
 
-In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost Settings** holds destination API keys; **Outpost → Appearance** controls day/night mode and color tokens; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
+In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost → Settings** holds destination API keys; **Outpost → Appearance** controls day/night mode and color tokens; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
 
 = Does it work on managed hosts? =
 

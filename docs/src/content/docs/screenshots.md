@@ -15,7 +15,7 @@ The main **Outpost** admin page: per-variant bookmarklets and the phone install 
 
 ![Outpost Settings page showing the API Keys tab with credential fields](../../assets/screenshots/admin-settings-api-keys.png)
 
-**Outpost Settings → API Keys**: where syndication destination credentials go. Saved values are stored encrypted. See [Settings](/outpost/settings/).
+**Outpost → Settings → API Keys**: where syndication destination credentials go. Saved values are stored encrypted. See [Settings](/outpost/settings/).
 
 ![Outpost Appearance page with the day/night mode choice and token override fields](../../assets/screenshots/admin-appearance-settings.png)
 
