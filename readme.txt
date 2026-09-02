@@ -27,7 +27,7 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 * **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
 * **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
-The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet (Android's Web Share Target; on iOS via an Apple Shortcut).
+The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note.
 
 POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.
 
@@ -51,7 +51,7 @@ Outpost publishes through the IndieWeb's own standards rather than a proprietary
 Not required, but Outpost is better with them, and it detects them the moment you activate one:
 
 * [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note.
-* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts.
+* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts. It also carries the request that asks Bridgy to publish a post and brings back the replies Bridgy and rss.chat send home; Outpost itself sends and receives no webmentions.
 * [Syndication Links](https://wordpress.org/plugins/syndication-links/) — your configured destinations become the composer's syndication chips.
 
 = Works with =
@@ -64,6 +64,7 @@ Active-only enhancements. Nothing here changes what Outpost can publish; each ad
 * [Bridgy](https://brid.gy/) — its publish endpoints appear as syndication chips.
 * [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
 * [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
+* [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — rss.chat is a chat service built on RSS: your site pushes a post to it, people reply there, and the replies come back to your post as Webmentions. This companion chooses which posts go (by default post format, default Post Kind, or per post) and, when active, adds a per-post "Send to rss.chat" choice — site default, include, or exclude — to the composer's More panel, so you can opt a post in or out from the app.
 
 == Installation ==
 
@@ -113,9 +114,17 @@ Not currently. The composer is served at the fixed `/post` path.
 
 The Outpost admin page generates one bookmarklet per post kind, embedded with your site's URL. Drag one to your bookmark bar (or long-press on mobile); click it while viewing any page to open the composer with that page's URL pre-filled. Pattern adapted from IndieWeb Press This (Pfefferle, Shanske, Barrett).
 
+= How do I post from my phone's share sheet? =
+
+On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, and a title plus text an Article. iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut: the guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer, or build a manual one that opens your site's /post/share-target with the shared item and lets you review first. The composer's About tab walks through both.
+
 = Does Outpost replace the block editor for long-form? =
 
 No. The Article variant publishes a titled post through Micropub like every other mode, but Outpost is built for fast, phone-sized posts — the block editor remains the right tool for serious long-form work, and anything posted from Outpost can be reopened there.
+
+= Does Outpost create pages or custom post types? =
+
+No. Outpost writes standard posts only — not pages, custom post types, or comments (a Reply is a post on your own site that links to the page you're replying to). Routing Micropub posts to a custom post type is a filter on the Micropub plugin, not an Outpost setting.
 
 == External services ==
 

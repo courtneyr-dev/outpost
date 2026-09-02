@@ -43,6 +43,10 @@ Any Doing kind except Video, and Recipe, accept an optional photo. The first pho
 
 When the Post Kinds companion is active, the composer also names the kind explicitly on each Micropub post (a `pkiw-kind` vendor property), so property-ambiguous kinds — an issue is wire-identical to a reply — classify correctly. Other Micropub servers never receive the property.
 
+**What Outpost writes:** posts — the standard `post` type. Not pages, not custom post types (the Micropub plugin's filters decide any routing), not comments; a Reply is an h-entry on your own site that links to the page you're replying to. How each post gets its format, which IndieWeb specs it's built on, and what XFN adds are explained in [How Outpost shapes a post](https://courtneyr-dev.github.io/outpost/how-outpost-shapes-a-post/).
+
+**Share sheet:** installed as an app on Android (or desktop Chrome/Edge), Outpost registers as a Web Share Target — a shared link opens a Reply, shared text a Note, a title plus text an Article. iOS Safari has no share-target API, so iPhone and iPad use a Shortcut: the guided one from wp-admin **Settings → Outpost iOS Shortcut** (posts through a scoped token without opening the composer), or a manual one that opens `/post/share-target` with the shared item so you can review first. Steps for both are in the composer's About tab and in [Common tasks](https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone).
+
 It works standalone with the [Micropub plugin](https://wordpress.org/plugins/micropub/) (required) and lights up additional capabilities when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
 | ![Outpost composer on a phone showing Note mode with a text field and syndication chips](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode showing the pasted target URL context](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a queued draft badge](docs/src/assets/screenshots/frontend-offline-queue.png) |
@@ -67,7 +71,15 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |
-| Yoast SEO | Focus keyphrase + meta description. |
+| [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) | Focus keyphrase + meta description fields in the More panel. |
+| [ActivityPub](https://wordpress.org/plugins/activitypub/) | The Fediverse appears as a syndication chip; posts federate natively, no Bridgy needed. |
+| [Bridgy](https://brid.gy/) (a service, not a plugin) | Its publish endpoints — brid.gy, bsky.brid.gy for Bluesky, fed.brid.gy for the fediverse — appear as syndication chips; replying to a Mastodon or Bluesky URL pre-checks the matching one. |
+| [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) | A "View accessibility report" link after each post; the scan runs server-side on save. |
+| [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) | A per-post **Send to rss.chat** choice in the More panel (see below). |
+
+**Webmention.** Outpost sends and receives no webmentions itself. With the [Webmention plugin](https://wordpress.org/plugins/webmention/) active, your site sends the webmention that asks Bridgy to publish a post and receives the replies, likes, and reposts Bridgy backfeeds; Outpost marks each syndicated copy on the post as `u-syndication` so Bridgy can find it. rss.chat replies come home the same way.
+
+**rss.chat.** [rss.chat](https://rss.chat) is a chat service built on RSS: your site pushes a post to it as an item, people reply there, and the replies come back to your post. Matthias Pfefferle's [RSS Chat plugin](https://github.com/pfefferle/wordpress-rss-chat) does the sending; on its own it sends only posts carrying the core *chat* post format. [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) chooses which posts go instead — by default post format, default Post Kind, or per post — and brings replies home as verified Webmentions. With it active, the composer's More panel adds the same per-post choice, **Send to rss.chat** (Site default, Include in RSS Chat, or Exclude from RSS Chat), sent as `mp-rss-chat-routing`, so you can opt a post in or out from the app without opening the editor.
 | ActivityPub / Bridgy | Surface as syndication chips automatically. |
 
 ## The hard contract

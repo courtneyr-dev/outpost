@@ -25,15 +25,53 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 
 Faster paths so you don't paste URLs by hand:
 
-- **From your phone's share sheet:** installed as a PWA on Android, Outpost appears as a share target — share any page from any app straight into the composer. On iOS, use the Shortcut bridge (Settings → Outpost iOS Shortcut). The composer's About tab walks through both setups, including a manual iOS Shortcut you can build yourself.
+- **From your phone's share sheet:** see [Share to Outpost from your phone](#share-to-outpost-from-your-phone) below.
 - **From a desktop browser:** use bookmarklets (next task).
+
+## Share to Outpost from your phone
+
+Send a link, some text, or a photo into the composer from any app through your phone's share sheet. The setup differs by platform.
+
+### Android, and desktop Chrome or Edge
+
+1. Install Outpost as an app: open the browser menu and choose **Install app** (or **Add to Home Screen**).
+2. Outpost now appears in the share sheet — there's nothing else to set up.
+3. Share from any app and pick **Outpost**. The composer opens already filled in.
+
+What each kind of share becomes:
+
+- A link → a **Reply**, with the link as the target.
+- A link plus selected text → a **Reply**, with the text as your reply.
+- Plain text → a **Note**.
+- A title and text (some apps send both) → an **Article**.
+
+### iPhone and iPad
+
+iOS Safari doesn't support the Web Share Target API, so a web app can't join the share sheet by itself. Add a small Shortcut instead, one of two ways.
+
+- **Guided:** in wp-admin, open **Settings → Outpost iOS Shortcut**. It provides a ready-made Shortcut and the token it needs. That Shortcut posts straight to your site through the token without opening the composer — use it when you don't want to review first. If the one-tap Shortcut link isn't published in your version yet, use the manual steps.
+- **Manual** (no token; opens the composer so you can review before posting):
+  1. Open the **Shortcuts** app and tap **+** to make a new Shortcut.
+  2. In the Shortcut's settings, turn on **Show in Share Sheet** and let it accept **URLs and Text**.
+  3. Add the **Open URLs** action and set its URL to `https://your-site.example/post/share-target?url=` followed by the **Shortcut Input** magic variable. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
+  4. Name it **Post to Outpost** and save.
+
+  "Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
+
+The composer's About tab carries the same directions with your site's address already filled in.
 
 ## Add the bookmarklets to your browser
 
-1. In wp-admin, open Outpost (the first Outpost menu).
-2. Find the bookmarklet section — one bookmarklet per response type (Reply, Like, Repost, Bookmark), each pre-built with your site's URL.
-3. Drag each one to your browser's bookmarks bar.
-4. On any web page, click a bookmarklet to open the Outpost composer with that page's URL, title, and your selected text pre-filled.
+Outpost generates one bookmarklet per response type — Reply, Like, Repost, Bookmark — each pre-built with your site's URL. They're in two places: wp-admin → **Outpost** (the first Outpost menu), and the composer's **About** tab, which lists the same four with a copy button.
+
+Install them the way your device handles bookmarks:
+
+- **Desktop browsers:** drag the bookmarklet link to the bookmarks bar.
+- **iPhone Safari:** long-press the link and choose **Add Bookmark**.
+- **Android Chrome:** long-press the link, choose **Copy link**, then save it as a new bookmark.
+- **Anywhere else:** use the **Copy source** button in the About tab and paste the `javascript:` link wherever your device manages bookmarks.
+
+On any web page, open a bookmarklet to launch the composer with that page's URL, title, and your selected text pre-filled.
 
 ## Post a photo
 
