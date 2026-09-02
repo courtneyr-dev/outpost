@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.5
+Stable tag:        1.0.6
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -202,6 +202,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.6 =
+* New: the About tab now explains how to add Outpost to your device's share sheet — the automatic Web Share Target on Android (once installed as an app) and a Shortcut-based setup for iPhone/iPad, where iOS Safari doesn't support share targets.
 
 = 1.0.5 =
 * Fixed: on managed-WP hosts that strip the Authorization header, the composer's More-options surface (Yoast keyphrase, categories, tags, XFN) failed to load with a "sign-in may have expired" notice even after re-authenticating. The composer-config request now carries its token in the request body and is authenticated by that token, so it works on those hosts. The token no longer travels in the URL.
