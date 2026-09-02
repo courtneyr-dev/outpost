@@ -51,7 +51,7 @@ Outpost publishes through the IndieWeb's own standards rather than a proprietary
 Not required, but Outpost is better with them, and it detects them the moment you activate one:
 
 * [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note.
-* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts.
+* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts. It also carries the request that asks Bridgy to publish a post and brings back the replies Bridgy and rss.chat send home; Outpost itself sends and receives no webmentions.
 * [Syndication Links](https://wordpress.org/plugins/syndication-links/) — your configured destinations become the composer's syndication chips.
 
 = Works with =
@@ -64,7 +64,7 @@ Active-only enhancements. Nothing here changes what Outpost can publish; each ad
 * [Bridgy](https://brid.gy/) — its publish endpoints appear as syndication chips.
 * [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
 * [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
-* [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — a per-post "Send to rss.chat" choice (include or exclude) in the composer's More panel.
+* [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — rss.chat is a chat service built on RSS: your site pushes a post to it, people reply there, and the replies come back to your post as Webmentions. This companion chooses which posts go (by default post format, default Post Kind, or per post) and, when active, adds a per-post "Send to rss.chat" choice — site default, include, or exclude — to the composer's More panel, so you can opt a post in or out from the app.
 
 == Installation ==
 

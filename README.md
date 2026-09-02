@@ -71,8 +71,15 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |
-| Yoast SEO | Focus keyphrase + meta description. |
-| [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) | Per-post **Send to rss.chat** choice (include / exclude) in the More panel, sent as `mp-rss-chat-routing`; the companion routes posts to rss.chat and brings replies home as Webmentions. |
+| [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) | Focus keyphrase + meta description fields in the More panel. |
+| [ActivityPub](https://wordpress.org/plugins/activitypub/) | The Fediverse appears as a syndication chip; posts federate natively, no Bridgy needed. |
+| [Bridgy](https://brid.gy/) (a service, not a plugin) | Its publish endpoints — brid.gy, bsky.brid.gy for Bluesky, fed.brid.gy for the fediverse — appear as syndication chips; replying to a Mastodon or Bluesky URL pre-checks the matching one. |
+| [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) | A "View accessibility report" link after each post; the scan runs server-side on save. |
+| [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) | A per-post **Send to rss.chat** choice in the More panel (see below). |
+
+**Webmention.** Outpost sends and receives no webmentions itself. With the [Webmention plugin](https://wordpress.org/plugins/webmention/) active, your site sends the webmention that asks Bridgy to publish a post and receives the replies, likes, and reposts Bridgy backfeeds; Outpost marks each syndicated copy on the post as `u-syndication` so Bridgy can find it. rss.chat replies come home the same way.
+
+**rss.chat.** [rss.chat](https://rss.chat) is a chat service built on RSS: your site pushes a post to it as an item, people reply there, and the replies come back to your post. Matthias Pfefferle's [RSS Chat plugin](https://github.com/pfefferle/wordpress-rss-chat) does the sending; on its own it sends only posts carrying the core *chat* post format. [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) chooses which posts go instead — by default post format, default Post Kind, or per post — and brings replies home as verified Webmentions. With it active, the composer's More panel adds the same per-post choice, **Send to rss.chat** (Site default, Include in RSS Chat, or Exclude from RSS Chat), sent as `mp-rss-chat-routing`, so you can opt a post in or out from the app without opening the editor.
 | ActivityPub / Bridgy | Surface as syndication chips automatically. |
 
 ## The hard contract
