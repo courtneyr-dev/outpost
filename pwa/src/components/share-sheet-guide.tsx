@@ -40,6 +40,7 @@ export function ShareSheetGuide(): preact.JSX.Element {
 	const site        = origin();
 	const shareRoute  = site + '/post/share-target';
 	const shortcutAdmin = site + '/wp-admin/options-general.php?page=outpost-ios-shortcut';
+	const howto = 'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone';
 
 	return (
 		<section class="outpost-share-guide" aria-labelledby="outpost-share-guide-title">
@@ -122,12 +123,18 @@ export function ShareSheetGuide(): preact.JSX.Element {
 					Tap the shortcut&apos;s name at the top, choose <strong>Rename</strong>,
 					and call it <strong>Post to Outpost</strong>.
 				</li>
+				<li>
+					Test it: open any page in Safari, tap <strong>Share</strong>, and pick{' '}
+					<strong>Post to Outpost</strong>. The composer opens on Reply with that
+					link as the target.
+				</li>
 			</ol>
 			<p>
-				Now <strong>Post to Outpost</strong> shows up in your share sheet.
-				Choosing it opens the composer prefilled, where you review and post. It
-				uses the sign-in you already have in the app, so there&apos;s no token to
-				manage.
+				From then on, <strong>Post to Outpost</strong> is in your share sheet.
+				It opens the composer prefilled so you review before posting, using the
+				sign-in you already have in the app — no token to manage. The{' '}
+				<OutLink href={howto}>full walkthrough in the documentation</OutLink>{' '}
+				covers the same steps for both platforms.
 			</p>
 			<aside class="outpost-bookmarklet-tip" role="note">
 				<strong>Want a share-and-forget button?</strong> The guided setup&apos;s

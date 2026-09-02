@@ -41,5 +41,12 @@ describe('ShareSheetGuide', () => {
 		);
 		expect(adminLink?.getAttribute('target')).toBe('_blank');
 		expect(adminLink?.getAttribute('rel')).toBe('noopener noreferrer');
+
+		const docsLink = Array.from(container.querySelectorAll('a')).find((a) =>
+			a.getAttribute('href')?.includes('courtneyr-dev.github.io/outpost/common-tasks'),
+		);
+		expect(docsLink?.getAttribute('href')).toBe(
+			'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone',
+		);
 	});
 });
