@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-09-01
+
+### Fixed
+
+- Companion options (Yoast keyphrase, categories, tags, XFN) failed to load in the composer on managed-WP hosts that strip the `Authorization` header (GoDaddy), showing "Couldn't load companion options / your sign-in may have expired" even after signing out and back in. The `composer-config` endpoint read the bearer token only from the header, so on those hosts it received no token; at 1.0.3 the request had authenticated via the wp-admin cookie, which the 1.0.4 CSRF fix (correctly) removed. `composer-config` now authenticates through `Outpost_Bearer_Auth` — the same path the media-lookup endpoint uses — reading the token from the header or, when it is stripped, the Micropub-spec `access_token` request body. The client POSTs the token in the body with no cookie, so the token no longer appears in the query string (and thus not in access logs, referrers, or CDN cache keys), and the endpoint is authenticated purely by the token. The 1.0.4 composer-config CSRF fix is unchanged and re-verified.
+
 ## [1.0.4] - 2026-09-01
 
 ### Added
