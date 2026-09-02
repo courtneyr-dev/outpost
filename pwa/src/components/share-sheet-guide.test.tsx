@@ -20,6 +20,8 @@ describe('ShareSheetGuide', () => {
 		expect(html).toContain('Android');
 		expect(html).toContain('Safari');
 		expect(html).toContain('Show in Share Sheet');
+		expect(html).toContain('Open URLs');
+		expect(html).toContain('not');
 	});
 
 	it('builds the share-target URL and the wp-admin setup link against this origin', () => {
