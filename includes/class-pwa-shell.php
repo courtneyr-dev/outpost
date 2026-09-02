@@ -821,12 +821,19 @@ async function cache_first(request) {
 	private static function send_json_header(): void {
 		if ( ! headers_sent() ) {
 			header( 'Content-Type: application/manifest+json; charset=utf-8' );
+			header( 'Cache-Control: no-cache, must-revalidate' );
+			header( 'X-Content-Type-Options: nosniff' );
 		}
 	}
 
 	private static function send_js_header(): void {
 		if ( ! headers_sent() ) {
 			header( 'Content-Type: application/javascript; charset=utf-8' );
+			// A service worker must be revalidated so an update ships promptly;
+			// an explicit header also stops a managed-host page cache or CDN
+			// from pinning a stale worker.
+			header( 'Cache-Control: no-cache, must-revalidate' );
+			header( 'X-Content-Type-Options: nosniff' );
 		}
 	}
 
