@@ -7,6 +7,7 @@
  * Requires at least: 6.5
  * Tested up to:      7.1
  * Requires PHP:      8.2
+ * Requires Plugins:  indieauth, micropub
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
  * License:           GPLv2 or later
@@ -57,6 +58,7 @@ define( 'OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE', 'rss-chat-routing/rss-chat-routi
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-url-guard.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 // G99-mock-server — test-time HTTP rewriter. No-op in production
 // because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the

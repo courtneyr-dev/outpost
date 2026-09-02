@@ -43,6 +43,22 @@ describe('extract_title', () => {
 	it('matches case-insensitively', () => {
 		expect(extract_title('<TITLE>UPPER</TITLE>')).toBe('UPPER');
 	});
+
+	it('still extracts the title from a server-sanitized (wp_kses) body', () => {
+		// After the item-8 fix the server returns a wp_kses allowlist body: the
+		// <title> and microformats markup survive, scripts/handlers are gone.
+		// Reply preview extraction must keep working on exactly that shape.
+		const sanitized =
+			'<title>A Great Post</title>' +
+			'<div class="h-entry"><a class="u-url p-name" href="https://example.test/p">A Great Post</a>' +
+			'<div class="e-content"><p>Body <strong>text</strong>.</p></div></div>';
+		expect(extract_title(sanitized)).toBe('A Great Post');
+	});
+
+	it('returns null (no crash) when a sanitized body has no title', () => {
+		const sanitized = '<div class="h-entry"><p>content only</p></div>';
+		expect(extract_title(sanitized)).toBeNull();
+	});
 });
 
 describe('fetch_preview', () => {
