@@ -27,7 +27,7 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 * **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
 * **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
-The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet (Android's Web Share Target; on iOS via an Apple Shortcut).
+The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note.
 
 POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.
 
@@ -114,9 +114,17 @@ Not currently. The composer is served at the fixed `/post` path.
 
 The Outpost admin page generates one bookmarklet per post kind, embedded with your site's URL. Drag one to your bookmark bar (or long-press on mobile); click it while viewing any page to open the composer with that page's URL pre-filled. Pattern adapted from IndieWeb Press This (Pfefferle, Shanske, Barrett).
 
+= How do I post from my phone's share sheet? =
+
+On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, and a title plus text an Article. iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut: the guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer, or build a manual one that opens your site's /post/share-target with the shared item and lets you review first. The composer's About tab walks through both.
+
 = Does Outpost replace the block editor for long-form? =
 
 No. The Article variant publishes a titled post through Micropub like every other mode, but Outpost is built for fast, phone-sized posts — the block editor remains the right tool for serious long-form work, and anything posted from Outpost can be reopened there.
+
+= Does Outpost create pages or custom post types? =
+
+No. Outpost writes standard posts only — not pages, custom post types, or comments (a Reply is a post on your own site that links to the page you're replying to). Routing Micropub posts to a custom post type is a filter on the Micropub plugin, not an Outpost setting.
 
 == External services ==
 

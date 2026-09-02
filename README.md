@@ -43,6 +43,10 @@ Any Doing kind except Video, and Recipe, accept an optional photo. The first pho
 
 When the Post Kinds companion is active, the composer also names the kind explicitly on each Micropub post (a `pkiw-kind` vendor property), so property-ambiguous kinds — an issue is wire-identical to a reply — classify correctly. Other Micropub servers never receive the property.
 
+**What Outpost writes:** posts — the standard `post` type. Not pages, not custom post types (the Micropub plugin's filters decide any routing), not comments; a Reply is an h-entry on your own site that links to the page you're replying to. How each post gets its format, which IndieWeb specs it's built on, and what XFN adds are explained in [How Outpost shapes a post](https://courtneyr-dev.github.io/outpost/how-outpost-shapes-a-post/).
+
+**Share sheet:** installed as an app on Android (or desktop Chrome/Edge), Outpost registers as a Web Share Target — a shared link opens a Reply, shared text a Note, a title plus text an Article. iOS Safari has no share-target API, so iPhone and iPad use a Shortcut: the guided one from wp-admin **Settings → Outpost iOS Shortcut** (posts through a scoped token without opening the composer), or a manual one that opens `/post/share-target` with the shared item so you can review first. Steps for both are in the composer's About tab and in [Common tasks](https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone).
+
 It works standalone with the [Micropub plugin](https://wordpress.org/plugins/micropub/) (required) and lights up additional capabilities when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
 | ![Outpost composer on a phone showing Note mode with a text field and syndication chips](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode showing the pasted target URL context](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a queued draft badge](docs/src/assets/screenshots/frontend-offline-queue.png) |
@@ -68,6 +72,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
 | [Syndication Links](https://wordpress.org/plugins/syndication-links/) | Destinations populate syndication chips. |
 | Yoast SEO | Focus keyphrase + meta description. |
+| [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) | Per-post **Send to rss.chat** choice (include / exclude) in the More panel, sent as `mp-rss-chat-routing`; the companion routes posts to rss.chat and brings replies home as Webmentions. |
 | ActivityPub / Bridgy | Surface as syndication chips automatically. |
 
 ## The hard contract
