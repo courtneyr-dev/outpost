@@ -1,4 +1,5 @@
 import { BookmarkletList } from '../bookmarklet-list';
+import { ShareSheetGuide } from '../share-sheet-guide';
 
 /**
  * About tab — informational content about Outpost.
@@ -349,6 +350,8 @@ export function AboutTab(): preact.JSX.Element {
 					itself runs server-side automatically on save.
 				</dd>
 			</dl>
+
+			<ShareSheetGuide />
 
 			<BookmarkletList />
 

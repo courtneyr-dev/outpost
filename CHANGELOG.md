@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-09-01
+
+### Added
+
+- The About tab now documents how to add Outpost to your device's system share sheet. Android and desktop Chromium register Outpost as a Web Share Target automatically once it is installed as an app; iPhone/iPad (iOS Safari has no Web Share Target API) get a Shortcut-based setup, pointing at the wp-admin **Settings → Outpost iOS Shortcut** page and a works-today manual Shortcut that opens `/post/share-target` with the shared item.
+
 ## [1.0.5] - 2026-09-01
 
 ### Fixed
