@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.7
+Stable tag:        1.0.8
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -117,7 +117,17 @@ The Outpost admin page generates one bookmarklet per post kind, embedded with yo
 
 = How do I post from my phone's share sheet? =
 
-On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, and a title plus text an Article. iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut: the guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer, or build a manual one that opens your site's /post/share-target with the shared item and lets you review first. The composer's About tab walks through both.
+On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, and a title plus text an Article.
+
+iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut. The guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer. To build one that opens the composer so you can review first:
+
+1. Open the Shortcuts app and tap + for a new Shortcut.
+2. In the first action, tap Nowhere and choose Share Sheet; set the types to URLs and Text.
+3. Add the Open URLs action (not Share, which only reopens the share sheet). Set its URL to https://your-site.example/post/share-target?url= and insert Shortcut Input at the end.
+4. Rename it Post to Outpost.
+5. Share any page from Safari and pick Post to Outpost — the composer opens on Reply with that link.
+
+The composer's About tab has the same steps with your site's address filled in, and the full walkthrough is at https://courtneyr-dev.github.io/outpost/common-tasks/.
 
 = Does Outpost replace the block editor for long-form? =
 
@@ -215,6 +225,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.8 =
+* Changed: the About tab's share-sheet directions name the two iOS Shortcut traps (tap Nowhere → Share Sheet; add Open URLs, not Share), add a test step, and link to the full walkthrough; the About tab now links to the documentation site.
 
 = 1.0.7 =
 * Fixed: the wp-admin sidebar showed two identical "Outpost" menus; the settings screen now sits under the single Outpost menu as "Settings" (its URL is unchanged).

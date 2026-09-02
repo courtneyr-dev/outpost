@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-09-02
+
+### Changed
+
+- The About tab's share-sheet directions, rewritten after a real attempt exposed two traps: the first action's **Nowhere** must become **Share Sheet**, and the action to add is **Open URLs**, not *Share* (which only reopens the share sheet). The steps now include inserting **Shortcut Input** from the variable bar, renaming via the title, and a test step, and link to the full walkthrough in the documentation. The About tab's "Outpost itself" section now links to the documentation site.
+
 ## [1.0.7] - 2026-09-02
 
 ### Fixed
