@@ -97,23 +97,30 @@ export function ShareSheetGuide(): preact.JSX.Element {
 					a new one.
 				</li>
 				<li>
-					In the Shortcut&apos;s settings, turn on{' '}
-					<strong>Show in Share Sheet</strong> and let it accept{' '}
-					<strong>URLs and Text</strong>.
+					The first action reads <em>Receive … from Nowhere</em>. Tap{' '}
+					<strong>Nowhere</strong> and choose <strong>Share Sheet</strong> —
+					that&apos;s what makes the shortcut appear when you share. Then tap
+					the types (it starts as <em>Images and 18 more</em>), clear them, and
+					pick <strong>URLs</strong> and <strong>Text</strong>. On older iOS
+					this is the <strong>Show in Share Sheet</strong> toggle under the ⓘ
+					details instead.
 				</li>
 				<li>
-					Add the <strong>Open URLs</strong> action and set the URL to your share
-					route with the shared item as the input:
+					Search for the action named <strong>Open URLs</strong> — not{' '}
+					<em>Share</em>, which only reopens the share sheet — and add it. Set
+					its URL to your share route with the shared item as the input:
 					<br />
 					<code class="outpost-share-guide__url">{shareRoute}?url=</code>
 					<code>[Shortcut Input]</code>
 					<br />
-					Insert <em>Shortcut Input</em> as the magic variable after{' '}
+					With the cursor at the very end, tap <em>Shortcut Input</em> in the
+					variable bar above the keyboard to insert it after{' '}
 					<code>url=</code>. (Sharing plain text instead of a link? Use{' '}
 					<code>?text=</code> in place of <code>?url=</code>.)
 				</li>
 				<li>
-					Name it <strong>Post to Outpost</strong> and save.
+					Tap the shortcut&apos;s name at the top, choose <strong>Rename</strong>,
+					and call it <strong>Post to Outpost</strong>.
 				</li>
 			</ol>
 			<p>

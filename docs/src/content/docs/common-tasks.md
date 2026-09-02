@@ -52,9 +52,9 @@ iOS Safari doesn't support the Web Share Target API, so a web app can't join the
 - **Guided:** in wp-admin, open **Settings → Outpost iOS Shortcut**. It provides a ready-made Shortcut and the token it needs. That Shortcut posts straight to your site through the token without opening the composer — use it when you don't want to review first. If the one-tap Shortcut link isn't published in your version yet, use the manual steps.
 - **Manual** (no token; opens the composer so you can review before posting):
   1. Open the **Shortcuts** app and tap **+** to make a new Shortcut.
-  2. In the Shortcut's settings, turn on **Show in Share Sheet** and let it accept **URLs and Text**.
-  3. Add the **Open URLs** action and set its URL to `https://your-site.example/post/share-target?url=` followed by the **Shortcut Input** magic variable. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
-  4. Name it **Post to Outpost** and save.
+  2. The first action reads *Receive … from Nowhere*. Tap **Nowhere** and choose **Share Sheet** — that's what makes the shortcut appear when you share. Then tap the types (it starts as *Images and 18 more*), clear them, and pick **URLs** and **Text**. (On older iOS this is the **Show in Share Sheet** toggle under the ⓘ details instead.)
+  3. Search for the action named **Open URLs** — not *Share*, which only reopens the share sheet — and add it. In its URL field type `https://your-site.example/post/share-target?url=` and, with the cursor at the very end, tap **Shortcut Input** in the variable bar above the keyboard, so the field reads `…share-target?url=[Shortcut Input]`. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
+  4. Tap the shortcut's name at the top, choose **Rename**, and call it **Post to Outpost**.
 
   "Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
 
