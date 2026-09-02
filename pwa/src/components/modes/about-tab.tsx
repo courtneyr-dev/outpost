@@ -358,6 +358,15 @@ export function AboutTab(): preact.JSX.Element {
 			<h3>Outpost itself</h3>
 			<dl class="outpost-spec-list">
 				<dt>
+					<ExternalLink href="https://courtneyr-dev.github.io/outpost/">
+						Documentation
+					</ExternalLink>
+				</dt>
+				<dd>
+					Installation, settings, everyday tasks, troubleshooting, and privacy
+					— the full guide to everything on this tab and more.
+				</dd>
+				<dt>
 					<ExternalLink href="https://github.com/courtneyr-dev/outpost">
 						Source on GitHub
 					</ExternalLink>
