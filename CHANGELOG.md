@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-09-02
+
+### Fixed
+
+- The wp-admin sidebar showed two identical "Outpost" top-level menus on either side of core's Settings: the settings screen registered its own top-level menu. It now registers as the **Settings** submenu of the single Outpost menu, alongside Appearance and OAuth Connections. Its slug and `admin.php?page=outpost-settings` URL are unchanged.
+
 ## [1.0.6] - 2026-09-01
 
 ### Added
