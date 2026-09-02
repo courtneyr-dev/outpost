@@ -50,7 +50,7 @@ Outpost publishes through the IndieWeb's own standards rather than a proprietary
 
 Not required, but Outpost is better with them, and it detects them the moment you activate one:
 
-* [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note.
+* [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note. It also reads standard.site records behind the pages you cite in replies, likes, and bookmarks — no account needed — and, with ATmosphere, decides which kinds publish as standard.site documents on the AT Protocol.
 * [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts. It also carries the request that asks Bridgy to publish a post and brings back the replies Bridgy and rss.chat send home; Outpost itself sends and receives no webmentions.
 * [Syndication Links](https://wordpress.org/plugins/syndication-links/) — your configured destinations become the composer's syndication chips.
 
@@ -65,7 +65,7 @@ Active-only enhancements. Nothing here changes what Outpost can publish; each ad
 * [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
 * [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
 * [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — rss.chat is a chat network built on RSS: your site publishes a post to it, people reply there, and the replies come back to your post as comments. This companion chooses which posts go (by default post format, default Post Kind, or per post) and, when active, adds a per-post "Send to rss.chat" choice — site default, include, or exclude — to the composer's More panel, so you can opt a post in or out from the app.
-* [ATmosphere](https://wordpress.org/plugins/atmosphere/) — publishes each post to the AT Protocol: a Bluesky post or thread linking back to your site, plus the full article stored on your AT Protocol account as a standard.site document. Bluesky replies, likes, and reposts come back as comments. Outpost adds no chip for it — posts from the composer cross-post like any other published post; opt a post out from the block editor sidebar, and leave the "Bluesky via Bridgy" chip off when ATmosphere is connected so the same post doesn't reach Bluesky twice.
+* [ATmosphere](https://wordpress.org/plugins/atmosphere/) — publishes each post to the AT Protocol: a Bluesky post or thread linking back to your site, plus the full article stored on your AT Protocol account as a standard.site document. Bluesky replies, likes, and reposts come back as comments. Outpost adds no chip for it — posts from the composer cross-post like any other published post; opt a post out from the block editor sidebar, and leave the "Bluesky via Bridgy" chip off when ATmosphere is connected so the same post doesn't reach Bluesky twice. With Post Kinds active, Post Kinds decides which kinds publish by default and derives readable titles for untitled ones.
 
 == Installation ==
 
@@ -126,6 +126,10 @@ No. The Article variant publishes a titled post through Micropub like every othe
 = Does Outpost create pages or custom post types? =
 
 No. Outpost writes standard posts only — not pages, custom post types, or comments (a Reply is a post on your own site that links to the page you're replying to). Routing Micropub posts to a custom post type is a filter on the Micropub plugin, not an Outpost setting.
+
+= Does Outpost support standard.site and the AT Protocol? =
+
+Yes, through companions. With Post Kinds for IndieWeb in Block Themes, the pages you cite in replies, likes, and bookmarks are checked for a standard.site record and the author's own title, description, and tags are shown — no account needed. Add the ATmosphere plugin and, once it's connected and cross-posting is on, your posts publish as standard.site documents on the AT Protocol and appear on Bluesky, with Post Kinds deciding which kinds publish by default (public content and logs) and which stay opt-in (likes, check-ins, moods, and other private signals).
 
 == External services ==
 
