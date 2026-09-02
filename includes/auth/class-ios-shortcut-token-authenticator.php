@@ -35,11 +35,12 @@
  *
  * REQUEST IDENTIFICATION
  *
- * The shortcut REST route is `/wp-json/outpost/v1/shortcut`. The
- * authenticator inspects `$_SERVER['REQUEST_URI']` and / or the
- * resolved REST route. We use REQUEST_URI matching because the auth
- * filter runs BEFORE WP_REST_Server resolves the route, so the
- * request object's `route` property may not be populated yet.
+ * The shortcut REST route is `/outpost/v1/shortcut`. Scope is decided by
+ * the route WordPress resolved for the request
+ * ({@see Outpost_Request_Headers::is_rest_route()}), never by
+ * REQUEST_URI: `rest_authentication_errors` fires after
+ * `WP::parse_request()` has populated the `rest_route` query var, so
+ * that value is authoritative, and it fails closed when absent.
  *
  * @package Outpost
  */
@@ -138,44 +139,12 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 	 * check let a leaked (admin-issued) token authenticate arbitrary REST routes
 	 * by smuggling `rest_route=/outpost/v1/shortcut` into a decoy query key while
 	 * WordPress dispatched, e.g., `/wp/v2/users` — a parser-differential scope
-	 * bypass, the same class fixed in composer-config's `allow_anonymous_for_self`.
-	 *
-	 * `rest_authentication_errors` fires during `rest_api_loaded()`, after
-	 * `WP::parse_request()` has populated `$GLOBALS['wp']->query_vars['rest_route']`
-	 * with the exact value WordPress will serve, so reading it here is
-	 * authoritative. Absent a resolved route, fail closed (deny scope).
+	 * bypass. The comparison now lives in one place for every route-scoped
+	 * decision in the plugin; absent a resolved route it fails closed.
 	 *
 	 * @return bool
 	 */
 	private static function request_targets_shortcut_endpoint(): bool {
-		$resolved = self::resolved_rest_route();
-		if ( null === $resolved ) {
-			return false;
-		}
-		// Normalize a leading slash and any trailing slash, then compare exactly
-		// — never a substring — against the one route this token may authenticate.
-		$normalized = '/' . ltrim( rtrim( $resolved, '/' ), '/' );
-		return self::REST_ROUTE_PATH === $normalized;
-	}
-
-	/**
-	 * The REST route WordPress resolved for this request, or null.
-	 *
-	 * Reads `$GLOBALS['wp']->query_vars['rest_route']` — the value WordPress
-	 * dispatches on. Deliberately does not parse REQUEST_URI: see
-	 * {@see self::request_targets_shortcut_endpoint()} for why the raw URI is not
-	 * authoritative.
-	 *
-	 * @return string|null
-	 */
-	private static function resolved_rest_route(): ?string {
-		if ( ! isset( $GLOBALS['wp'] ) || ! isset( $GLOBALS['wp']->query_vars ) || ! is_array( $GLOBALS['wp']->query_vars ) ) {
-			return null;
-		}
-		$route = $GLOBALS['wp']->query_vars['rest_route'] ?? null;
-		if ( ! is_string( $route ) || '' === $route ) {
-			return null;
-		}
-		return $route;
+		return Outpost_Request_Headers::is_rest_route( self::REST_ROUTE_PATH );
 	}
 }

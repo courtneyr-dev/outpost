@@ -25,29 +25,38 @@ final class Outpost_Settings_Page {
 
 	public const PAGE_SLUG = 'outpost-settings';
 
+	/** Slug of the main Outpost menu (Outpost_Admin_Page::MENU_SLUG) this screen hangs under. */
+	private const PARENT_SLUG = 'outpost';
+
 	/**
 	 * Hook the admin menu registration. Called once on plugins_loaded.
 	 *
 	 * @since 0.1.79
 	 */
 	public static function register(): void {
-		add_action( 'admin_menu', array( __CLASS__, 'add_menu_page' ) );
+		// Priority 11: the parent Outpost menu registers at the default 10.
+		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 11 );
 	}
 
 	/**
-	 * Register the top-level admin menu. Called from the admin_menu action.
+	 * Register the settings screen as a submenu of the main Outpost menu.
+	 *
+	 * Until 1.0.7 this registered its own top-level "Outpost" menu at position
+	 * 80, which put two identical "Outpost" entries in the wp-admin sidebar on
+	 * either side of core's Settings. The page slug, and with it the
+	 * admin.php?page=outpost-settings URL, is unchanged.
 	 *
 	 * @since 0.1.79
+	 * @since 1.0.7 A submenu under the Outpost menu; was a top-level menu.
 	 */
-	public static function add_menu_page(): void {
-		add_menu_page(
-			__( 'Outpost', 'outpost-mobile-publishing' ),
-			__( 'Outpost', 'outpost-mobile-publishing' ),
+	public static function register_menu(): void {
+		add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Outpost Settings', 'outpost-mobile-publishing' ),
+			__( 'Settings', 'outpost-mobile-publishing' ),
 			'manage_options',
 			self::PAGE_SLUG,
-			array( __CLASS__, 'render' ),
-			outpost_menu_icon(),
-			80
+			array( __CLASS__, 'render' )
 		);
 	}
 

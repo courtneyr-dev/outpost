@@ -30,8 +30,18 @@ final class RouteHandlerTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		unset( $GLOBALS['wp'] );
 		WP_Mock::tearDown();
 		parent::tearDown();
+	}
+
+	/** Model WordPress having matched a rewrite rule for this request. */
+	private function set_matched_rule( ?string $rule ): void {
+		$wp = new \stdClass();
+		if ( null !== $rule ) {
+			$wp->matched_rule = $rule;
+		}
+		$GLOBALS['wp'] = $wp;
 	}
 
 	/** @test */
@@ -105,6 +115,7 @@ final class RouteHandlerTest extends TestCase {
 
 	/** @test */
 	public function dispatch_routes_composer_target_to_pwa_shell_render(): void {
+		$this->set_matched_rule( '^post/?$' );
 		WP_Mock::userFunction( 'get_query_var' )
 			->with( Outpost_Route_Handler::QUERY_VAR )
 			->andReturn( 'composer' );
@@ -131,6 +142,7 @@ final class RouteHandlerTest extends TestCase {
 
 	/** @test */
 	public function dispatch_routes_manifest_target_to_manifest_renderer(): void {
+		$this->set_matched_rule( '^post/manifest\\.json$' );
 		WP_Mock::userFunction( 'get_query_var' )
 			->with( Outpost_Route_Handler::QUERY_VAR )
 			->andReturn( 'manifest' );
@@ -150,6 +162,7 @@ final class RouteHandlerTest extends TestCase {
 
 	/** @test */
 	public function dispatch_routes_sw_target_to_service_worker_renderer(): void {
+		$this->set_matched_rule( '^post/sw/?$' );
 		WP_Mock::userFunction( 'get_query_var' )
 			->with( Outpost_Route_Handler::QUERY_VAR )
 			->andReturn( 'sw' );
@@ -159,5 +172,63 @@ final class RouteHandlerTest extends TestCase {
 		$out = ob_get_clean();
 
 		$this->assertStringContainsString( 'self.addEventListener', $out, 'Service worker stub must contain at least one event listener registration.' );
+	}
+
+	// --- Forged query var without a matched Outpost rewrite rule ----------
+	//
+	// `outpost_route` is a public query var, so `/?outpost_route=sw` (or any URL
+	// with it appended) sets it without WordPress having matched an Outpost
+	// rewrite rule. Rendering the shell/manifest/SW from that is the audited
+	// R1 finding. Dispatch must key on the matched rule, not the raw query var.
+
+	/** @test */
+	public function dispatch_ignores_forged_query_var_when_no_rule_matched(): void {
+		$this->set_matched_rule( null ); // WP matched nothing (e.g. front page with ?outpost_route=sw).
+		WP_Mock::userFunction( 'get_query_var' )
+			->with( Outpost_Route_Handler::QUERY_VAR )
+			->andReturn( 'sw' );
+
+		ob_start();
+		Outpost_Route_Handler::dispatch();
+		$out = ob_get_clean();
+
+		$this->assertSame( '', $out, 'A forged outpost_route with no matched rule must render nothing.' );
+	}
+
+	/** @test */
+	public function dispatch_ignores_query_var_when_a_foreign_rule_matched(): void {
+		// A real page matched some OTHER rewrite rule, with ?outpost_route=sw
+		// smuggled onto the query string.
+		$this->set_matched_rule( '(.?.+?)/?$' ); // WP's generic page rule, not ours.
+		WP_Mock::userFunction( 'get_query_var' )
+			->with( Outpost_Route_Handler::QUERY_VAR )
+			->andReturn( 'sw' );
+
+		ob_start();
+		Outpost_Route_Handler::dispatch();
+		$out = ob_get_clean();
+
+		$this->assertSame( '', $out, 'The matched rule is not ours; do not render.' );
+	}
+
+	/** @test */
+	public function matched_rule_wins_over_the_query_var(): void {
+		// The matched rewrite rule is authoritative: if WordPress matched the
+		// manifest rule, the manifest renders even when a smuggled
+		// ?outpost_route=sw says otherwise. The attacker-controlled query-var
+		// value never selects the renderer.
+		$this->set_matched_rule( '^post/manifest\\.json$' );
+		WP_Mock::userFunction( 'get_query_var' )
+			->with( Outpost_Route_Handler::QUERY_VAR )
+			->andReturn( 'sw' );
+		WP_Mock::userFunction( 'home_url' )
+			->andReturnUsing( static fn( $p = '' ) => 'https://example.test' . $p );
+
+		ob_start();
+		Outpost_Route_Handler::dispatch();
+		$out = ob_get_clean();
+
+		$this->assertStringNotContainsString( 'self.addEventListener', $out, 'The SW must NOT render from a manifest-rule match.' );
+		$this->assertStringContainsString( 'standalone', $out, 'The manifest (the matched rule) renders instead.' );
 	}
 }
