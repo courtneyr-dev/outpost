@@ -236,10 +236,11 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * For each photo URL with alt text, the bridge resolves the URL
 	 * back to its attachment ID via `attachment_url_to_postid()` and
-	 * writes the alt text to `_wp_attachment_image_alt`. URLs that
-	 * resolve to attachments not parented by `$post_id` are skipped
-	 * defensively — the bridge never updates someone else's
-	 * attachments.
+	 * writes the alt text to `_wp_attachment_image_alt`. The write is
+	 * gated by {@see self::actor_owns_post_attachment()} — the attachment
+	 * must be parented to `$post_id` AND editable by the current actor —
+	 * so the bridge never updates media the poster does not own, even
+	 * after the Micropub dependency re-parents a referenced URL.
 	 *
 	 * Empty alt strings are persisted (not skipped) because the AP
 	 * spec is fine with empty `attachment[].name` and an explicit
@@ -263,8 +264,7 @@ final class Outpost_Micropub_Bridges {
 			if ( $attachment_id <= 0 ) {
 				continue;
 			}
-			$parent_id = (int) wp_get_post_parent_id( $attachment_id );
-			if ( 0 !== $parent_id && $parent_id !== $post_id ) {
+			if ( ! self::actor_owns_post_attachment( $attachment_id, $post_id ) ) {
 				continue;
 			}
 			update_post_meta(
@@ -302,7 +302,8 @@ final class Outpost_Micropub_Bridges {
 			$alt_array = array( $mp_alt );
 		}
 
-		$pairs = array();
+		$pairs        = array();
+		$index_by_url = array();
 		foreach ( $entries as $index => $entry ) {
 			if ( is_array( $entry ) && isset( $entry['value'] ) ) {
 				$url = is_string( $entry['value'] ) ? $entry['value'] : '';
@@ -315,12 +316,66 @@ final class Outpost_Micropub_Bridges {
 			} else {
 				continue;
 			}
-			$pairs[] = array(
+
+			$url = trim( $url );
+			if ( '' === $url ) {
+				continue;
+			}
+
+			// Dedupe by URL. The Micropub plugin appends each photo's canonical
+			// URL back onto the `photo` property after sideloading, so the same
+			// URL arrives twice — once with the client's alt, once bare. Pairing
+			// by index let the bare duplicate's empty alt overwrite the real one,
+			// wiping alt text on every real photo post. Keep the first-seen
+			// entry and its position; upgrade its alt only if it was empty and a
+			// later duplicate carries a real one.
+			if ( isset( $index_by_url[ $url ] ) ) {
+				$existing = $index_by_url[ $url ];
+				if ( '' === $pairs[ $existing ]['alt'] && '' !== $alt ) {
+					$pairs[ $existing ]['alt'] = $alt;
+				}
+				continue;
+			}
+
+			$index_by_url[ $url ] = count( $pairs );
+			$pairs[]              = array(
 				'url' => $url,
 				'alt' => $alt,
 			);
 		}
 		return $pairs;
+	}
+
+	/**
+	 * Whether the current actor may have Outpost write to this attachment as a
+	 * property of `$post_id` — the one authorization invariant shared by the
+	 * alt-text and featured-image bridges.
+	 *
+	 * Parentage alone is insufficient. The Micropub media pipeline
+	 * (`Media_Controller::media_sideload_url`) re-parents any locally resolvable
+	 * photo URL to the new post with NO capability check, and does so before
+	 * `after_micropub` fires. So a lower-privilege actor can reference another
+	 * user's attachment by URL and have it transplanted onto their own post,
+	 * after which parentage reads as this post. Two checks close that:
+	 *
+	 *   1. The attachment must be parented to THIS post. Outpost's own photos
+	 *      are (the dependency re-parents the media-endpoint upload to the post
+	 *      before this runs — verified over the live endpoint); a foreign or
+	 *      still-unattached attachment referenced only by URL is not.
+	 *   2. The actor must be able to edit the attachment. Re-parenting does not
+	 *      change the attachment's author, so `edit_post` is the ownership
+	 *      signal that survives the transplant: an Author/Contributor cannot
+	 *      edit an Editor's or Administrator's media.
+	 *
+	 * @param int $attachment_id Attachment resolved from the photo URL.
+	 * @param int $post_id       Post being written.
+	 * @return bool
+	 */
+	private static function actor_owns_post_attachment( int $attachment_id, int $post_id ): bool {
+		if ( (int) wp_get_post_parent_id( $attachment_id ) !== $post_id ) {
+			return false;
+		}
+		return current_user_can( 'edit_post', $attachment_id );
 	}
 
 
@@ -343,9 +398,12 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 *   - An existing thumbnail is never replaced. A user who picked a
 	 *     different image in the editor keeps it.
-	 *   - Only attachments this post owns are used. `attachment_url_to_postid()`
-	 *     can resolve a URL to media parented elsewhere, and stealing another
-	 *     post's image would be worse than no thumbnail at all.
+	 *   - Only attachments this post owns are used, enforced by
+	 *     {@see self::actor_owns_post_attachment()} (parented to this post AND
+	 *     editable by the current actor). `attachment_url_to_postid()` resolves
+	 *     any local URL, and the Micropub dependency re-parents referenced media
+	 *     without a capability check, so stealing another user's image would be
+	 *     worse than no thumbnail at all.
 	 *   - Only real images. A PDF or audio file in `photo` is skipped.
 	 *
 	 * Themes that render both a featured image and the post body will show the
@@ -378,8 +436,7 @@ final class Outpost_Micropub_Bridges {
 				continue;
 			}
 
-			$parent_id = (int) wp_get_post_parent_id( $attachment_id );
-			if ( 0 !== $parent_id && $parent_id !== $post_id ) {
+			if ( ! self::actor_owns_post_attachment( $attachment_id, $post_id ) ) {
 				continue;
 			}
 
