@@ -83,7 +83,7 @@ Yes, two: IndieAuth (sign-in) and Micropub (publishing endpoint), both free on W
 
 = Is Outpost on WordPress.org yet? =
 
-Not yet — Outpost is pre-release and this readme is prepared for submission. Until it's listed, install from GitHub per the Installation section.
+Not yet — until it's listed, install from GitHub per the Installation section.
 
 = Where do the settings live? =
 
@@ -138,7 +138,6 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
     * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
     * **Spotify** — open.spotify.com/oembed. [Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/).
     * **SoundCloud** — soundcloud.com/oembed. [Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy).
-* **Apple iTunes Search API** — when the URL you paste is a music.apple.com link, the track or album metadata for the preview is fetched from itunes.apple.com with the item's ID. [Terms](https://www.apple.com/legal/internet-services/itunes/), [Privacy](https://www.apple.com/legal/privacy/).
 * **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
 
 = Geocoding =
