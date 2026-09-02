@@ -41,7 +41,7 @@ final class SettingsPageMenuTest extends \WP_Mock\Tools\TestCase {
 			->andReturn( 'outpost_page_outpost-settings' );
 		WP_Mock::userFunction( 'add_menu_page' )->never();
 
-		Outpost_Settings_Page::add_menu_page();
+		Outpost_Settings_Page::register_menu();
 
 		$this->assertConditionsMet();
 	}
