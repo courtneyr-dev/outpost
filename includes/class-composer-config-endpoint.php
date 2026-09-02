@@ -50,6 +50,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Composer_Config_Endpoint {
 
+	use Outpost_Bearer_Auth;
+
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PATH      = '/composer-config';
 
@@ -219,7 +221,7 @@ final class Outpost_Composer_Config_Endpoint {
 			self::ROUTE_NAMESPACE,
 			self::ROUTE_PATH,
 			array(
-				'methods'             => 'GET',
+				'methods'             => 'GET, POST',
 				'callback'            => array( self::class, 'handle' ),
 				'permission_callback' => array( self::class, 'permission_check' ),
 				'show_in_index'       => false,
@@ -254,6 +256,15 @@ final class Outpost_Composer_Config_Endpoint {
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
+		// Authenticate an Outpost/IndieAuth bearer token the same way the
+		// media-lookup route does: read it from the Authorization header or,
+		// on managed-WP hosts that strip that header (GoDaddy), the Micropub
+		// `access_token` request body, then let IndieAuth's
+		// determine_current_user callback validate it. This is what lets a
+		// token-authenticated request succeed WITHOUT the wp-admin cookie —
+		// the cookie path was the CSRF surface the 1.0.4 fix closed, and it
+		// never reached this endpoint on a header-stripping host anyway.
+		self::authenticate_bearer_token();
 		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the composer-config permission decision.
