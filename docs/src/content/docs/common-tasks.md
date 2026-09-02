@@ -32,7 +32,7 @@ Faster paths so you don't paste URLs by hand:
 
 Send a link, some text, or a photo into the composer from any app through your phone's share sheet. The setup differs by platform.
 
-**Android, and desktop Chrome or Edge**
+### Android, and desktop Chrome or Edge
 
 1. Install Outpost as an app: open the browser menu and choose **Install app** (or **Add to Home Screen**).
 2. Outpost now appears in the share sheet — there's nothing else to set up.
@@ -45,7 +45,7 @@ What each kind of share becomes:
 - Plain text → a **Note**.
 - A title and text (some apps send both) → an **Article**.
 
-**iPhone and iPad**
+### iPhone and iPad
 
 iOS Safari doesn't support the Web Share Target API, so a web app can't join the share sheet by itself. Add a small Shortcut instead, one of two ways.
 
