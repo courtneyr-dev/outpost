@@ -56,6 +56,7 @@ iOS Safari doesn't support the Web Share Target API, so a web app can't join the
   3. Search for the action named **Open URLs** — not *Share*, which only reopens the share sheet — and add it. In its URL field type `https://your-site.example/post/share-target?url=` and, with the cursor at the very end, tap **Shortcut Input** in the variable bar above the keyboard, so the field reads `…share-target?url=[Shortcut Input]`. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
   4. Tap the shortcut's name at the top, choose **Rename**, and call it **Post to Outpost**.
   5. Test it: open any page in Safari, tap **Share**, and pick **Post to Outpost**. The composer opens on Reply with that link as the target.
+  6. Move it up the list: scroll to the bottom of the share sheet, tap **Edit Actions…**, tap the green **+** next to **Post to Outpost** to add it to Favorites, then drag it to the top with the **≡** handle and tap **Done**. It now sits near the top every time you share.
 
   "Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
 

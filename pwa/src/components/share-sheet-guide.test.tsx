@@ -49,4 +49,9 @@ describe('ShareSheetGuide', () => {
 			'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone',
 		);
 	});
+	it('tells iOS users how to move the shortcut up the share sheet', () => {
+		const html = renderGuide().innerHTML;
+		expect(html).toContain('Edit Actions');
+		expect(html).toContain('Favorites');
+	});
 });

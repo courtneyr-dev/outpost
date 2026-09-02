@@ -8,6 +8,7 @@ import {
 } from './more-panel';
 import type { ComposerConfig } from '../lib/composer-config';
 import type { StoredToken } from '../lib/token-store';
+import type { MicropubEnvironment } from '../lib/micropub';
 
 describe('merge_more_values — pkiw-promote', () => {
 	it('adds pkiw-promote when promoteToMain is true', () => {
@@ -170,5 +171,104 @@ describe('MorePanel — promote toggle', () => {
 	it('hides the rss.chat select when the routing companion is absent', () => {
 		render(h(MorePanel, props('inactive', vi.fn())), root);
 		expect(root.querySelector('.outpost-rss-chat-routing')).toBeNull();
+	});
+
+	describe('Bridgy suggestion', () => {
+		const TWITTER = 'https://brid.gy/publish/twitter';
+		const MASTODON = 'https://brid.gy/publish/mastodon';
+
+		// The endpoint's ?q=syndicate-to answer, which is the only list the
+		// Micropub server will accept uids from.
+		function env_offering(targets: Array<{ uid: string; name: string }>): MicropubEnvironment {
+			return {
+				fetch: async () =>
+					new Response(JSON.stringify({ 'syndicate-to': targets }), {
+						status: 200,
+						headers: { 'content-type': 'application/json' },
+					}),
+			} as unknown as MicropubEnvironment;
+		}
+
+		function suggest_props(
+			onChange: (v: MorePanelValues) => void,
+			targetUrl: string,
+			offered: Array<{ uid: string; name: string }>,
+		) {
+			return {
+				...props('inactive', onChange),
+				composerConfig: {
+					...make_config('inactive'),
+					bridgyHostMap: {
+						'x.com': { name: 'Twitter (via Bridgy)', uid: TWITTER },
+						'mastodon.social': { name: 'Mastodon (via Bridgy)', uid: MASTODON },
+					},
+					siteSettings: { bridgyAutoSuggest: true, defaultPostVariant: 'note' as const },
+				},
+				micropubEndpoint: 'https://example.com/micropub',
+				micropubEnv: env_offering(offered),
+				xfnTargetUrl: targetUrl,
+			};
+		}
+
+		const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 20));
+		const sent_uids = (onChange: ReturnType<typeof vi.fn>): string[] =>
+			onChange.mock.calls.flatMap(([v]) => (v as MorePanelValues).syndicateTo);
+
+		it('never pre-selects a Bridgy target the endpoint does not offer', async () => {
+			const onChange = vi.fn();
+			render(
+				h(
+					MorePanel,
+					suggest_props(onChange, 'https://x.com/someone/status/1', [
+						{ uid: 'microdotblog', name: 'Micro.blog' },
+						{ uid: 'micropub-mastodon-bridgy', name: 'Mastodon via Bridgy' },
+					]),
+				),
+				root,
+			);
+			await settle();
+			expect(sent_uids(onChange)).not.toContain(TWITTER);
+			expect(root.querySelector('.outpost-bridgy-suggest')).toBeNull();
+		});
+
+		it("resolves the suggestion to the endpoint's own Bridgy target for that silo", async () => {
+			const onChange = vi.fn();
+			render(
+				h(
+					MorePanel,
+					suggest_props(onChange, 'https://mastodon.social/@someone/123', [
+						{ uid: 'microdotblog', name: 'Micro.blog' },
+						{ uid: 'micropub-mastodon-bridgy', name: 'Mastodon via Bridgy' },
+					]),
+				),
+				root,
+			);
+			await settle();
+			const uids = sent_uids(onChange);
+			expect(uids).toContain('micropub-mastodon-bridgy');
+			expect(uids).not.toContain(MASTODON);
+			expect(root.querySelector('.outpost-bridgy-suggest')?.textContent).toContain(
+				'Mastodon via Bridgy',
+			);
+			const shown = Array.from(root.querySelectorAll('.outpost-syndication-picker label')).filter(
+				(l) => (l.textContent ?? '').includes('Mastodon via Bridgy'),
+			);
+			expect(shown).toHaveLength(1);
+		});
+
+		it('keeps an exact-uid match when the endpoint offers the Bridgy URL itself', async () => {
+			const onChange = vi.fn();
+			render(
+				h(
+					MorePanel,
+					suggest_props(onChange, 'https://mastodon.social/@someone/123', [
+						{ uid: MASTODON, name: 'Mastodon via Bridgy' },
+					]),
+				),
+				root,
+			);
+			await settle();
+			expect(sent_uids(onChange)).toContain(MASTODON);
+		});
 	});
 });
