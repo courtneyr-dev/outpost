@@ -1,11 +1,19 @@
 import { useState } from 'preact/hooks';
 import {
 	discover_micropub_endpoint,
+	discover_media_endpoint,
+	upload_media,
 	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
+import { process_photo, PhotoError } from '../../lib/photo';
+import {
+	MediaPicker,
+	all_entries_have_alt,
+	type MediaEntry,
+} from '../media-picker';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
@@ -52,6 +60,8 @@ export interface RecipeModeProps {
 type Status =
 	| { kind: 'idle' }
 	| { kind: 'discovering-endpoint' }
+	| { kind: 'processing-photo' }
+	| { kind: 'uploading-photo'; current: number; total: number }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location?: string }
 	| { kind: 'queued' }
@@ -89,6 +99,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
+	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
+	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -120,6 +132,17 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			return;
 		}
 
+		// Alt-text discipline for the recipe photo. Mirrors PhotoMode and
+		// Doing: every entry needs alt text or an explicit decorative mark.
+		if (media_entries.length > 0 && !all_entries_have_alt(media_entries)) {
+			setStatus({
+				kind: 'error',
+				message:
+					'Every photo needs alt text, or mark it decorative. Decorative photos submit empty alt to indicate they\'re purely visual.',
+			});
+			return;
+		}
+
 		const minutes_num = duration_minutes.trim() === '' ? 0 : Number(duration_minutes);
 		if (duration_minutes.trim() !== '' && (!Number.isFinite(minutes_num) || minutes_num < 0)) {
 			setStatus({
@@ -138,6 +161,60 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setEndpoint(micropub_endpoint);
 			}
 
+			// Process + upload any attached photo. Same pipeline as PhotoMode
+			// and Doing: EXIF strip + downscale + JPEG re-encode, then a POST
+			// per photo to the media endpoint, collecting Location URLs.
+			const uploaded_photo_urls: string[] = [];
+			let alt_values: string[] = [];
+			if (media_entries.length > 0) {
+				setStatus({ kind: 'processing-photo' });
+				const processed_blobs: Blob[] = [];
+				for (const entry of media_entries) {
+					const processed = await process_photo(entry.file);
+					processed_blobs.push(processed.blob);
+				}
+
+				let resolved_media_endpoint = media_endpoint;
+				if (!resolved_media_endpoint) {
+					setStatus({ kind: 'discovering-endpoint' });
+					resolved_media_endpoint = await discover_media_endpoint(
+						micropub_endpoint,
+						token.accessToken,
+						micropubEnv,
+					);
+					setMediaEndpoint(resolved_media_endpoint);
+				}
+
+				for (let i = 0; i < processed_blobs.length; i++) {
+					setStatus({
+						kind: 'uploading-photo',
+						current: i + 1,
+						total: processed_blobs.length,
+					});
+					const upload = await upload_media(
+						{
+							blob: processed_blobs[i]!,
+							filename: `photo-${String(i + 1)}.jpg`,
+							accessToken: token.accessToken,
+							mediaEndpoint: resolved_media_endpoint,
+						},
+						micropubEnv,
+					);
+					uploaded_photo_urls.push(upload.location);
+				}
+				alt_values = media_entries.map((e) => (e.decorative ? '' : e.alt.trim()));
+			}
+
+			const photo_props: Partial<HEntryProperties> =
+				uploaded_photo_urls.length === 0
+					? {}
+					: uploaded_photo_urls.length === 1
+						? {
+								photo: uploaded_photo_urls[0]!,
+								'mp-photo-alt': alt_values[0] ?? '',
+							}
+						: { photo: uploaded_photo_urls, 'mp-photo-alt': alt_values };
+
 			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				name: trimmed_name,
@@ -151,6 +228,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					? { location: geo_uri(picked_location.lat, picked_location.lon) }
 					: {}),
 				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
+				...photo_props,
 			};
 			const properties = merge_more_values(base, more_values);
 
@@ -178,6 +256,10 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setMoreValues(empty_more_values());
 				setPickedLocation(null);
 				setVenueName('');
+				for (const entry of media_entries) {
+					URL.revokeObjectURL(entry.preview_url);
+				}
+				setMediaEntries([]);
 				return;
 			} catch (post_err) {
 				if (is_network_error(post_err)) {
@@ -198,24 +280,37 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			}
 		} catch (err) {
 			const message =
-				err instanceof MicropubError
-					? err.code + ': ' + err.message
-					: err instanceof Error
-						? err.message
-						: 'Unknown error';
+				err instanceof PhotoError
+					? err.message
+					: err instanceof MicropubError
+						? err.code + ': ' + err.message
+						: err instanceof Error
+							? err.message
+							: 'Unknown error';
 			setStatus({ kind: 'error', message });
 		}
 	};
 
-	const submitting = status.kind === 'discovering-endpoint' || status.kind === 'posting';
+	const submitting =
+		status.kind === 'discovering-endpoint' ||
+		status.kind === 'processing-photo' ||
+		status.kind === 'uploading-photo' ||
+		status.kind === 'posting';
 	const submit_label =
 		status.kind === 'discovering-endpoint'
 			? 'Finding endpoint…'
-			: status.kind === 'posting'
-				? 'Posting…'
-				: 'Post recipe';
+			: status.kind === 'processing-photo'
+				? 'Processing photo…'
+				: status.kind === 'uploading-photo'
+					? `Uploading ${String(status.current)}/${String(status.total)}…`
+					: status.kind === 'posting'
+						? 'Posting…'
+						: 'Post recipe';
 	const can_submit =
-		!!name.trim() && ingredients_text.trim().length > 0 && instructions_text.trim().length > 0;
+		!!name.trim() &&
+		ingredients_text.trim().length > 0 &&
+		instructions_text.trim().length > 0 &&
+		(media_entries.length === 0 || all_entries_have_alt(media_entries));
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-recipe-mode-title">
@@ -316,6 +411,15 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						setContent((event.target as HTMLTextAreaElement).value)
 					}
 					disabled={submitting}
+				/>
+
+				<MediaPicker
+					entries={media_entries}
+					onChange={setMediaEntries}
+					disabled={submitting}
+					idPrefix="outpost-recipe-media"
+					emptyLabel="Attach a photo (optional)"
+					nonEmptyLabel="Add more photos"
 				/>
 
 				<GeocodePicker

@@ -5,6 +5,81 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-09-02
+
+### Fixed
+
+- The Bridgy suggestion chip sent a hard-coded `https://brid.gy/publish/<silo>` uid that most Micropub endpoints never advertise, so liking or replying to an X or Mastodon URL failed with `400 Unknown mp-syndicate-to targets`. The chip now resolves to one of the endpoint's own `?q=syndicate-to` targets (exact uid first, then the Bridgy-backed target for that silo, as Syndication Links names them) and stays hidden when there is none, so nothing the endpoint did not offer is ever sent. The suggested target no longer appears twice in the More panel.
+
+### Changed
+
+- The share-sheet directions (About tab, docs, both readmes) gain a sixth step: adding **Post to Outpost** to the share sheet's Favorites through **Edit Actions…** so it sits near the top.
+
+## [1.0.8] - 2026-09-02
+
+### Changed
+
+- The About tab's share-sheet directions, rewritten after a real attempt exposed two traps: the first action's **Nowhere** must become **Share Sheet**, and the action to add is **Open URLs**, not *Share* (which only reopens the share sheet). The steps now include inserting **Shortcut Input** from the variable bar, renaming via the title, and a test step, and link to the full walkthrough in the documentation. The About tab's "Outpost itself" section now links to the documentation site.
+
+## [1.0.7] - 2026-09-02
+
+### Fixed
+
+- The wp-admin sidebar showed two identical "Outpost" top-level menus on either side of core's Settings: the settings screen registered its own top-level menu. It now registers as the **Settings** submenu of the single Outpost menu, alongside Appearance and OAuth Connections. Its slug and `admin.php?page=outpost-settings` URL are unchanged.
+
+## [1.0.6] - 2026-09-01
+
+### Added
+
+- The About tab now documents how to add Outpost to your device's system share sheet. Android and desktop Chromium register Outpost as a Web Share Target automatically once it is installed as an app; iPhone/iPad (iOS Safari has no Web Share Target API) get a Shortcut-based setup, pointing at the wp-admin **Settings → Outpost iOS Shortcut** page and a works-today manual Shortcut that opens `/post/share-target` with the shared item.
+
+## [1.0.5] - 2026-09-01
+
+### Fixed
+
+- Companion options (Yoast keyphrase, categories, tags, XFN) failed to load in the composer on managed-WP hosts that strip the `Authorization` header (GoDaddy), showing "Couldn't load companion options / your sign-in may have expired" even after signing out and back in. The `composer-config` endpoint read the bearer token only from the header, so on those hosts it received no token; at 1.0.3 the request had authenticated via the wp-admin cookie, which the 1.0.4 CSRF fix (correctly) removed. `composer-config` now authenticates through `Outpost_Bearer_Auth` — the same path the media-lookup endpoint uses — reading the token from the header or, when it is stripped, the Micropub-spec `access_token` request body. The client POSTs the token in the body with no cookie, so the token no longer appears in the query string (and thus not in access logs, referrers, or CDN cache keys), and the endpoint is authenticated purely by the token. The 1.0.4 composer-config CSRF fix is unchanged and re-verified.
+
+## [1.0.4] - 2026-09-01
+
+### Added
+
+- Photo attachment on every Doing kind except video and on Recipe posts, with the first photo set as the post's featured image (`outpost_set_featured_image` filter to opt out).
+
+### Security (REST route resolution — composer-config nonce CSRF closed)
+
+`Outpost_Composer_Config_Endpoint::allow_anonymous_for_self()` decided which request it was scoping by matching `REQUEST_URI`, while WordPress dispatches on the resolved `rest_route` query var. A cookie-authenticated request carrying a bogus nonce and `?rest_route=` pointing at another endpoint therefore lost REST nonce protection (reproduced: a `_method=DELETE` sent through the composer-config path deleted a post; the same request through the plain path returned 403). Route scoping now goes through one helper, `Outpost_Request_Headers::is_rest_route()`, which reads the route WordPress actually resolved, compares it exactly, and fails closed; the composer-config opt-out never clears core's `rest_cookie_invalid_nonce` error. The same helper now backs the media-lookup bearer path (its global `determine_current_user` shim is gone; authentication runs inside the route's own permission callback) and the iOS Shortcut authenticator. Regression-tested in unit and real-dispatch integration tests.
+
+### Security (preview fetch: internal-address ceiling and generic errors)
+
+`wp_safe_remote_get()` blocks loopback and RFC 1918 but not link-local `169.254.0.0/16` (cloud metadata), CGNAT `100.64.0.0/10`, or any IPv6 form. The new `Outpost_Url_Guard` rejects those, including IPv4-mapped IPv6, for a literal host and for every resolved A/AAAA answer, and the preview fetch follows redirects itself, re-validating each hop. Failures return one generic error with no transport detail or resolved address.
+
+### Security (preview HTML: allowlist sanitizer)
+
+The regex blacklist that scrubbed fetched HTML was bypassable (`<svg/onload>`, unquoted `href=javascript:`, `formaction=`, mixed-case and entity-encoded handlers). It is replaced by a `wp_kses` allowlist keeping only the title and microformats markup the Reply preview reads; script and style blocks are removed with their contents.
+
+### Security (Outpost routes render only from a matched rewrite rule)
+
+`outpost_route` is a public query var, so `/?outpost_route=sw` returned the service worker on any URL. `Outpost_Route_Handler::dispatch()` now requires WordPress to have matched one of Outpost's own rewrite rules and derives the renderer from that rule, never from the raw query var. The manifest and service worker send `Cache-Control: no-cache, must-revalidate` and `X-Content-Type-Options: nosniff`.
+
+### Security (Notion page cache scoped per user)
+
+`Outpost_Source_Notion::fetch_page()` read a transient keyed on the page id before checking credentials, so one user's private page could be returned to another. Credentials are now checked first, and the cache key carries the page id, the user id, and a truncated SHA-256 of that user's token, so a reconnect invalidates it and no raw token is stored in a key.
+
+### Security (Micropub bridges write only to the actor's own attachments)
+
+The Micropub dependency re-parents any locally resolvable media URL to the new post without a capability check. Outpost's alt-text and featured-image bridges now require the attachment to be parented to this post and `current_user_can( 'edit_post', $attachment )` before writing. An upstream report is prepared for the dependency.
+
+### Fixed
+
+- Photo alt text survives the Micropub pipeline. Micropub appends each photo's canonical URL to `photo`, and index-pairing overwrote every real alt with the empty duplicate; pairs now dedupe by URL, first non-empty alt wins.
+- The tracked `build/pwa/` bundle is rebuilt from source. The committed bundle was still the 1.0.3 build, so the Recipe and Doing photo pickers were absent from the shipped shell.
+- `uninstall.php` now removes everything Outpost writes — options, the encryption key, encrypted credentials, iOS Shortcut tokens, owned post meta, transients, and the POSSE cron — on single-site and every multisite site, through a testable `Outpost_Uninstaller`. Posts, attachments, alt text, featured images, Yoast keys, and category terms are never touched.
+- `.prettierrc.js` is now `.prettierrc.cjs` so it loads under `"type": "module"` and `format:check` runs.
+
+### Changed
+
+- readme External services: Tumblr removed (no reachable share path); the Bridgy entry names `brid.gy`, `bsky.brid.gy`, and `fed.brid.gy`; each OAuth service lists the hosts contacted and when data is sent.
+
 ## [1.0.3] - 2026-08-30
 
 ### Security (URL length cap enforced on the preview and share/shortcut validators)

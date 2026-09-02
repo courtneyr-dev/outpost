@@ -175,4 +175,52 @@ final class ComposerConfigPermissionTest extends TestCase {
 			'Success path must run outpost_bridgy_host_map (calibrates the denial probes).'
 		);
 	}
+
+	/**
+	 * A bearer token in the request body authenticates the endpoint even when
+	 * the Authorization header never reaches PHP (managed-WP hosts like GoDaddy
+	 * strip it). This is the path that broke composer-config on live after the
+	 * 1.0.4 CSRF fix removed the cookie fallback: the token now authenticates
+	 * through Outpost_Bearer_Auth, with no wp-admin cookie involved.
+	 *
+	 * @test
+	 */
+	public function body_token_authenticates_when_the_header_is_stripped(): void {
+		$editor = $this->editor_id;
+		// Stand in for IndieAuth's determine_current_user validator: it reads
+		// the Authorization header the trait restores from the body token.
+		$validator = static function ( $user ) use ( $editor ) {
+			if ( $user ) {
+				return $user;
+			}
+			$auth = isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? (string) $_SERVER['HTTP_AUTHORIZATION'] : '';
+			return ( false !== stripos( $auth, 'Bearer valid-editor-token' ) ) ? $editor : $user;
+		};
+		add_filter( 'determine_current_user', $validator, 15 );
+		wp_set_current_user( 0 );
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+
+		try {
+			// The trait reads $_POST['access_token'] first; php://input has no
+			// test seam under dispatch, so this exercises the same body path.
+			$_POST['access_token'] = 'valid-editor-token';
+			$request               = new WP_REST_Request( 'POST', '/outpost/v1/composer-config' );
+			$ok                    = rest_get_server()->dispatch( $request );
+
+			// Each real HTTP request is a fresh process; reset the user AND the
+			// header the trait restored so the bogus token is judged alone.
+			wp_set_current_user( 0 );
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$_POST['access_token'] = 'not-a-real-token';
+			$bad                   = rest_get_server()->dispatch( new WP_REST_Request( 'POST', '/outpost/v1/composer-config' ) );
+		} finally {
+			unset( $_POST['access_token'], $_SERVER['HTTP_AUTHORIZATION'] );
+			remove_filter( 'determine_current_user', $validator, 15 );
+			wp_set_current_user( 0 );
+		}
+
+		$this->assertSame( 200, $ok->get_status(), 'A valid body token must authenticate with no header and no cookie.' );
+		$this->assertArrayHasKey( 'companions', (array) $ok->get_data() );
+		$this->assertSame( 401, $bad->get_status(), 'A bogus body token must be rejected.' );
+	}
 }

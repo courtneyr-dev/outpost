@@ -1,6 +1,6 @@
 ---
 title: Uninstall
-description: "How to deactivate and delete Outpost, exactly what its uninstaller removes today, and which settings and posts stay on your site."
+description: "How to deactivate and delete Outpost, what its uninstaller removes, and what stays on your site."
 ---
 
 How to remove Outpost from your site, what the uninstaller cleans up, and what it leaves behind. Your posts are never touched — anything Outpost published is a standard WordPress post and stays on your site.
@@ -21,16 +21,14 @@ WordPress removes the plugin files and runs Outpost's uninstall script.
 
 ## What the uninstaller removes — and what it doesn't
 
-The current uninstall script removes one database row: the `outpost_rewrite_version` option (internal bookkeeping for the `/post` URL).
+Since version 1.0.4, deleting the plugin removes everything Outpost created on your site — on a single site and on every site of a multisite network:
 
-Everything else Outpost stored **remains in your database** after deletion:
+- **All Outpost options** — settings, destination API keys, the generated encryption key, Bridgy silo choices, Telegraph author settings, and the `/post` rewrite bookkeeping.
+- **Per-user data** — encrypted service credentials, iOS Shortcut tokens, appearance preferences, and dismissed-notice markers.
+- **Outpost's own post meta** — syndication targets and recorded syndication links, POSSE retry state, manual-share and Bridgy logs, Telegraph page links, XFN relationship choices, and check-in place names.
+- **Cached data** (transients) and any scheduled syndication retries.
 
-- Settings options (`outpost_settings*`) and the generated encryption key option, if one was created.
-- Encrypted service credentials (`outpost_creds_*` options and user meta).
-- Per-post syndication records and activity snapshots (post meta).
-- The iOS Shortcut token and appearance preference (user meta).
-
-The uninstall script itself marks these as future cleanup. If you want a full purge, remove those rows manually — [Privacy and data](/outpost/privacy-and-data/) lists every option and meta key with its purpose. The limited cleanup is flagged for the maintainer in the repository's documentation plan.
+It never removes your posts or media, image alt text, featured images, categories, or another plugin's data — for example a Yoast focus keyphrase Outpost saved on your behalf stays with the post. [Privacy and data](/outpost/privacy-and-data/) lists every option and meta key with its purpose.
 
 ## Remove the app from your phone
 
