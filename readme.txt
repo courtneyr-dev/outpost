@@ -64,6 +64,7 @@ Active-only enhancements. Nothing here changes what Outpost can publish; each ad
 * [Bridgy](https://brid.gy/) — its publish endpoints appear as syndication chips.
 * [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
 * [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
+* [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — a per-post "Send to rss.chat" choice (include or exclude) in the composer's More panel.
 
 == Installation ==
 

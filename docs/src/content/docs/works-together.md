@@ -37,3 +37,4 @@ Editing on the desktop side, Post Formats' selection modal shows the kind mappin
 - **Post Kinds for IndieWeb** — card blocks and microformats for the kind-shaped posts the composer creates.
 - **Post Formats for Block Themes** — format patterns, badges, and templates; formats map onto kinds automatically.
 - **Link Extension for XFN** — relationship attributes on links in any post, including reply targets.
+- **RSS Chat Routing** — chooses which posts go to [rss.chat](https://rss.chat/) by default post format, default Post Kind, or per post, and brings rss.chat replies home as verified Webmentions. With it active, the composer's More panel adds a **Send to rss.chat** choice on every post: Site default, Include in RSS Chat, or Exclude from RSS Chat. Source: [github.com/courtneyr-dev/rss-chat-routing](https://github.com/courtneyr-dev/rss-chat-routing).
