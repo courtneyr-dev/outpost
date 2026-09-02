@@ -74,6 +74,9 @@ if ( ! class_exists( 'Outpost_Test_Dependencies' ) ) {
 		/** @var array<string, string> handle => inline payload */
 		public array $inline = array();
 
+		/** @var array<string, string> handle => 'before'|'after' */
+		public array $inline_positions = array();
+
 		public string $tag_format = '<link rel="stylesheet" id="%1$s-css" href="%2$s">';
 
 		public string $inline_format = '<style id="%1$s-inline-css">%2$s</style>';
@@ -83,8 +86,15 @@ if ( ! class_exists( 'Outpost_Test_Dependencies' ) ) {
 			$this->registered[ $handle ] = $src;
 		}
 
-		public function add_inline( string $handle, string $data ): void {
-			$this->inline[ $handle ] = ( $this->inline[ $handle ] ?? '' ) . $data;
+		public function add_inline( string $handle, string $data, string $position = 'after' ): void {
+			$this->inline[ $handle ]           = ( $this->inline[ $handle ] ?? '' ) . $data;
+			$this->inline_positions[ $handle ] = $position;
+		}
+
+		public function reset(): void {
+			$this->registered       = array();
+			$this->inline           = array();
+			$this->inline_positions = array();
 		}
 
 		/** @param string[]|false $handles */
@@ -145,7 +155,7 @@ if ( ! function_exists( 'wp_add_inline_style' ) ) {
 }
 if ( ! function_exists( 'wp_add_inline_script' ) ) {
 	function wp_add_inline_script( string $handle, string $data, string $position = 'after' ): bool {
-		wp_scripts()->add_inline( $handle, $data );
+		wp_scripts()->add_inline( $handle, $data, $position );
 		return true;
 	}
 }
@@ -209,8 +219,41 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 		);
 	}
 }
+/** @var array<int, array{hook:string, callback:mixed, priority:int}> */
+$GLOBALS['outpost_test_actions'] = array();
+
+/**
+ * Reset the recorded add_action() calls. Call from a test's setUp().
+ */
+function outpost_test_reset_hooks(): void {
+	$GLOBALS['outpost_test_actions'] = array();
+}
+
+/**
+ * Recorded add_action() calls for one hook name.
+ *
+ * @return array<int, array{hook:string, callback:mixed, priority:int}>
+ */
+function outpost_test_actions_for( string $hook ): array {
+	return array_values(
+		array_filter(
+			(array) ( $GLOBALS['outpost_test_actions'] ?? array() ),
+			static fn ( array $entry ): bool => $entry['hook'] === $hook
+		)
+	);
+}
+
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( ...$args ): bool {
+		// Record rather than discard: WP_Mock's expectActionAdded() can't
+		// intercept a function this bootstrap has already defined, so hook
+		// wiring is only assertable through this registry. Reset it with
+		// outpost_test_reset_hooks() in setUp().
+		$GLOBALS['outpost_test_actions'][] = array(
+			'hook'     => (string) ( $args[0] ?? '' ),
+			'callback' => $args[1] ?? null,
+			'priority' => isset( $args[2] ) ? (int) $args[2] : 10,
+		);
 		return true;
 	}
 }
@@ -416,6 +459,7 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 if ( ! class_exists( 'WP_Post' ) ) {
 	class WP_Post {
 		public int $ID                = 0;
+		public int $post_author       = 0;
 		public string $post_title     = '';
 		public string $post_content   = '';
 		public string $post_status    = '';

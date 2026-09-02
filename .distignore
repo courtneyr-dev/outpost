@@ -18,7 +18,7 @@
 .gitkeep
 .distignore
 .session-progress.md
-.prettierrc.js
+.prettierrc.cjs
 .eslintrc.json
 eslint.config.js
 .wp-env.json

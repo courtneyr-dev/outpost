@@ -26,7 +26,6 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		// home_url() is called by build_composer_url to make redirect_url
 		// absolute. Default tests assert against partial path/param strings
@@ -65,6 +64,17 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 			)
 		);
 		$this->assertSame( 'https://example.com/from-text', $out );
+	}
+
+	public function test_extract_url_rejects_url_field_over_2048_chars(): void {
+		// CLAUDE.md hot-spot contract: length-cap the bookmarklet/shortcut URL
+		// at 2048 chars. An oversized but otherwise-valid http URL in the url
+		// field is not accepted (and there's no shorter fallback here).
+		$long = 'https://example.com/' . str_repeat( 'a', 2048 );
+		$out  = Outpost_Source_Detector::extract_url_from_payload(
+			array( 'url' => $long )
+		);
+		$this->assertNull( $out );
 	}
 
 	public function test_extract_url_finds_url_inside_free_text(): void {

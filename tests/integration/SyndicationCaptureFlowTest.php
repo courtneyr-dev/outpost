@@ -289,32 +289,42 @@ final class SyndicationCaptureFlowTest extends TestCase {
 	}
 
 	/**
-	 * Test 5: pending notice renders on admin post-edit screen.
+	 * Put the request into the post-edit screen context the notice
+	 * guards on, and choose which editor is active.
+	 *
+	 * With 'post.php', WP_Screen::get computes base = 'post'. Whether
+	 * that screen reports as the block editor is what decides which of
+	 * the notice's two surfaces fires, so the tests set it explicitly
+	 * rather than inheriting core's default for the post type.
+	 */
+	private function enter_post_edit_screen( bool $block_editor ): void {
+		$GLOBALS['post']    = get_post( $this->test_post_id );
+		$_GET['post']       = $this->test_post_id;
+		$_GET['action']     = 'edit';
+		$GLOBALS['pagenow'] = 'post.php';
+		$GLOBALS['typenow'] = 'post';
+		set_current_screen( 'post.php' );
+		get_current_screen()->is_block_editor( $block_editor );
+	}
+
+	private function leave_post_edit_screen(): void {
+		unset( $_GET['post'], $_GET['action'], $GLOBALS['pagenow'], $GLOBALS['typenow'], $GLOBALS['post'] );
+	}
+
+	/**
+	 * Test 5: the classic editor still gets the admin_notices markup.
 	 *
 	 * @test
 	 */
-	public function admin_post_edit_screen_shows_pending_notice(): void {
+	public function classic_post_edit_screen_shows_pending_notice(): void {
 		$this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
-
-		// Capture admin_notices output. The notice class hooks into
-		// admin_notices and renders only when on the post-edit screen
-		// for a post with pending entries.
-		$GLOBALS['post']             = get_post( $this->test_post_id );
-		$_GET['post']                = $this->test_post_id;
-		$_GET['action']              = 'edit';
-		$GLOBALS['pagenow']          = 'post.php';
-		$GLOBALS['typenow']          = 'post';
-		// Initialize WP_Screen so get_current_screen() returns non-null and
-		// the notice's first guard passes. With 'post.php', WP_Screen::get
-		// computes base = 'post'. Confirmed empirically + matches WP core
-		// behavior for the post-edit context.
-		set_current_screen( 'post.php' );
+		$this->enter_post_edit_screen( false );
 
 		ob_start();
 		do_action( 'admin_notices' );
 		$notices_html = (string) ob_get_clean();
 
-		unset( $_GET['post'], $_GET['action'], $GLOBALS['pagenow'], $GLOBALS['typenow'], $GLOBALS['post'] );
+		$this->leave_post_edit_screen();
 
 		$this->assertNotEmpty( $notices_html );
 		$this->assertMatchesRegularExpression(
@@ -322,6 +332,53 @@ final class SyndicationCaptureFlowTest extends TestCase {
 			$notices_html,
 			'Admin notice must mention pending syndication.'
 		);
+	}
+
+	/**
+	 * Test 5b: on a block-editor screen the notice does NOT go through
+	 * admin_notices, because core prints that output inside
+	 * `.wrap.hide-if-js.block-editor-no-js` — the no-JS fallback
+	 * container, hidden whenever the editor loads. Emitting there is
+	 * indistinguishable from emitting nothing, so the class skips it
+	 * and hands the data to the editor bundle instead.
+	 *
+	 * @test
+	 */
+	public function block_editor_screen_skips_the_hidden_admin_notice(): void {
+		$this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+		$this->enter_post_edit_screen( true );
+
+		ob_start();
+		do_action( 'admin_notices' );
+		$notices_html = (string) ob_get_clean();
+
+		$this->leave_post_edit_screen();
+
+		$this->assertSame(
+			'',
+			$notices_html,
+			'admin_notices output would land in the hidden no-JS container.'
+		);
+	}
+
+	/**
+	 * Test 5c: the block editor gets the same data as an inline payload
+	 * on the sidebar bundle, which turns it into a core/notices notice.
+	 *
+	 * @test
+	 */
+	public function block_editor_screen_attaches_the_notice_payload(): void {
+		$this->seed_pending_entry( $this->test_post_id, 'instagram-feed' );
+		$this->enter_post_edit_screen( true );
+
+		do_action( 'enqueue_block_editor_assets' );
+		$inline = wp_scripts()->get_data( \Outpost_Sidebar_Assets::HANDLE, 'before' );
+
+		$this->leave_post_edit_screen();
+
+		$payload = is_array( $inline ) ? implode( '', $inline ) : (string) $inline;
+		$this->assertStringContainsString( 'window.outpostPendingSyndication', $payload );
+		$this->assertStringContainsString( 'Instagram', $payload );
 	}
 
 	/**

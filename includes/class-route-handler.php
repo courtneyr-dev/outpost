@@ -105,17 +105,36 @@ final class Outpost_Route_Handler {
 	}
 
 	/**
-	 * Read the query var and hand off to the right renderer.
+	 * Hand off to the right renderer for a matched Outpost rewrite rule.
 	 *
-	 * Hooked on template_redirect so WP's main query has already resolved.
-	 * For unknown route values the dispatcher returns silently — WP's own
-	 * 404 handling will catch URLs that didn't match a rule.
+	 * Hooked on template_redirect so WP's main query has already resolved,
+	 * which means `$GLOBALS['wp']->matched_rule` holds the rewrite rule
+	 * WordPress matched. The renderer target comes from that matched rule, not
+	 * from the raw `outpost_route` query var — a public query var an arbitrary
+	 * URL can set. Requests that matched no Outpost rule return silently; WP's
+	 * own 404 handling catches URLs that matched nothing.
 	 */
 	public static function dispatch(): void {
 		$route = (string) get_query_var( self::QUERY_VAR );
 		if ( '' === $route ) {
 			return;
 		}
+
+		// `outpost_route` is a public query var, so any URL can carry
+		// `?outpost_route=sw` without WordPress having matched one of our
+		// rewrite rules. Rendering the shell / manifest / service worker from
+		// that raw value lets an arbitrary URL emit Outpost responses. Dispatch
+		// only when WordPress actually matched one of OUR rewrite rules, and
+		// only to the target that rule maps to — never to the attacker-supplied
+		// query-var value.
+		$rules        = self::rules();
+		$matched_rule = isset( $GLOBALS['wp'], $GLOBALS['wp']->matched_rule )
+			? (string) $GLOBALS['wp']->matched_rule
+			: '';
+		if ( '' === $matched_rule || ! isset( $rules[ $matched_rule ] ) ) {
+			return;
+		}
+		$route = $rules[ $matched_rule ];
 
 		switch ( $route ) {
 			case 'manifest':

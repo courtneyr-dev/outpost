@@ -5,7 +5,7 @@ description: "Reference for every user-visible Outpost setting — where it live
 
 Every user-visible Outpost setting, where to find it in wp-admin, and when to change it.
 
-Heads up on navigation: Outpost currently registers **two top-level "Outpost" menus** in the wp-admin sidebar. The first (with the share icon) holds the composer link, bookmarklets, phone-install steps, and the Composer defaults form, plus the Appearance and OAuth Connections submenus. The second opens the multi-tab "Outpost Settings" page (API Keys). There's also an entry under Settings for the iOS Shortcut. The sections below name each screen by its page title so you can match what you see.
+Navigation: everything lives under one **Outpost** menu in the wp-admin sidebar — the main page (the composer link, bookmarklets, phone-install steps, and the Composer defaults form), then the **Settings**, **Appearance**, and **OAuth Connections** submenus. The one exception is the iOS Shortcut bridge, which sits under WordPress's own **Settings → Outpost iOS Shortcut**.
 
 ## Composer defaults
 
@@ -23,7 +23,7 @@ These are site-wide defaults; each user can override them at post time from the 
 
 ## Outpost Settings (multi-tab page)
 
-**Location:** wp-admin → Outpost (the second Outpost menu) → "Outpost Settings" page. Requires `manage_options`.
+**Location:** wp-admin → Outpost → Settings. Requires `manage_options`.
 
 ### API Keys tab
 

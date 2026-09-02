@@ -28,6 +28,7 @@ const valid_config: ComposerConfig = {
 		yoast: 'absent',
 		activitypub: 'absent',
 		'accessibility-checker': 'absent',
+		'rss-chat-routing': 'absent',
 	},
 	postFormats: null,
 	xfnRels: ['friend', 'met'],
@@ -49,6 +50,29 @@ describe('fetch_composer_config', () => {
 		expect(result.companions['post-kinds']).toBe('active');
 		expect(result.postFormats).toBeNull();
 		expect(result.xfnRels).toContain('friend');
+	});
+
+	it('POSTs the token in the body, not the query string, with no cookie', async () => {
+		// The token must ride in the JSON body (leak-safe) and the request
+		// must send no wp-admin cookie, so a header-stripping host still
+		// authenticates by the token and the cookie/nonce CSRF check is never
+		// tripped. See the endpoint's Outpost_Bearer_Auth path.
+		let seen: { url: string; init: RequestInit } | undefined;
+		const env: ComposerConfigEnvironment = {
+			fetch: (async (url: string, init: RequestInit): Promise<Response> => {
+				seen = { url, init };
+				return { ok: true, status: 200, json: async () => valid_config } as Response;
+			}) as unknown as typeof fetch,
+		};
+		await fetch_composer_config('secret-token-abc', env);
+
+		expect(seen?.init.method).toBe('POST');
+		expect(seen?.init.credentials).toBe('omit');
+		expect(seen?.url).not.toContain('secret-token-abc');
+		expect(seen?.url).not.toContain('_o_token');
+		expect(String(seen?.init.body)).toContain('secret-token-abc');
+		const parsed = JSON.parse(String(seen?.init.body)) as { access_token?: string };
+		expect(parsed.access_token).toBe('secret-token-abc');
 	});
 
 	it('throws unauthorized on 401', async () => {

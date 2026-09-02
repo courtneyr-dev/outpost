@@ -7,7 +7,7 @@ Quick answers to the questions Outpost users ask most.
 
 ## Is Outpost on WordPress.org?
 
-Not that we can confirm — Outpost (version 1.0.0) is not yet confirmed to be listed there. Install it from GitHub per the [installation guide](/outpost/installation/). Its two required dependencies (IndieAuth and Micropub) are on WordPress.org.
+Not that we can confirm — Outpost (version 1.0.6) is not yet confirmed to be listed there. Install it from GitHub per the [installation guide](/outpost/installation/). Its two required dependencies (IndieAuth and Micropub) are on WordPress.org.
 
 ## Does Outpost require Jetpack?
 

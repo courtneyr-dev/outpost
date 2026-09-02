@@ -41,7 +41,6 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		// to subsequent tests' apply_filters calls.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		// F14: chips_for_mode now iterates Bridgy_Publish_Adapter which
 		// reads Bridgy settings via get_option. Default to "no Bridgy

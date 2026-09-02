@@ -61,7 +61,6 @@ final class G4PrimitivesTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Composite_Inbound::reset_strategies_for_tests();
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

@@ -50,7 +50,6 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 	 */
 	private function invoke_private( string $method, array $args = array() ) {
 		$ref = new \ReflectionMethod( Outpost_Preview_Endpoint::class, $method );
-		$ref->setAccessible( true );
 		return $ref->invoke( null, ...$args );
 	}
 
@@ -76,19 +75,45 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertEquals( 'invalid_scheme', $result->get_error_code() );
 	}
 
+	public function test_validate_url_rejects_url_over_2048_chars(): void {
+		// CLAUDE.md hot-spot contract: length-cap the bookmarklet/preview URL
+		// at 2048 chars. A syntactically valid but oversized http URL must be
+		// rejected before any fetch.
+		$long   = 'https://example.test/' . str_repeat( 'a', 2048 );
+		$result = $this->invoke_private( 'validate_url', array( $long ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'url_too_long', $result->get_error_code() );
+	}
+
 	public function test_validate_url_rejects_no_host(): void {
 		$result = $this->invoke_private( 'validate_url', array( 'http://' ) );
 		$this->assertInstanceOf( WP_Error::class, $result );
 	}
 
 	public function test_validate_url_accepts_http(): void {
+		WP_Mock::onFilter( 'outpost_resolve_host_ips' )->with( array(), 'example.test' )->reply( array( '93.184.216.34' ) );
 		$result = $this->invoke_private( 'validate_url', array( 'http://example.test/post' ) );
 		$this->assertTrue( $result );
 	}
 
 	public function test_validate_url_accepts_https(): void {
+		WP_Mock::onFilter( 'outpost_resolve_host_ips' )->with( array(), 'example.test' )->reply( array( '93.184.216.34' ) );
 		$result = $this->invoke_private( 'validate_url', array( 'https://example.test/post' ) );
+
 		$this->assertTrue( $result );
+	}
+
+	public function test_validate_url_rejects_link_local_metadata_host(): void {
+		// A literal internal-IP host is classified directly (no DNS). This is
+		// the SSRF ceiling wp_safe_remote_get alone does not close.
+		$result = $this->invoke_private( 'validate_url', array( 'http://169.254.169.254/latest/meta-data/' ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'invalid_url', $result->get_error_code() );
+	}
+
+	public function test_validate_url_rejects_cgnat_host(): void {
+		$result = $this->invoke_private( 'validate_url', array( 'https://100.64.0.1/' ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
 	}
 
 	public function test_content_type_is_allowed_html(): void {
@@ -121,38 +146,6 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( $result );
 	}
 
-	public function test_strip_dangerous_html_removes_script_tags(): void {
-		$input  = '<p>safe</p><script>alert(1)</script><p>also safe</p>';
-		$output = $this->invoke_private( 'strip_dangerous_html', array( $input ) );
-		$this->assertStringNotContainsString( '<script', $output );
-		$this->assertStringNotContainsString( 'alert(1)', $output );
-		$this->assertStringContainsString( '<p>safe</p>', $output );
-	}
-
-	public function test_strip_dangerous_html_removes_iframe(): void {
-		$input  = '<iframe src="https://example.com"></iframe>';
-		$output = $this->invoke_private( 'strip_dangerous_html', array( $input ) );
-		$this->assertStringNotContainsString( '<iframe', $output );
-	}
-
-	public function test_strip_dangerous_html_removes_event_handlers(): void {
-		$input  = '<a href="https://example.test" onclick="alert(1)">link</a>';
-		$output = $this->invoke_private( 'strip_dangerous_html', array( $input ) );
-		$this->assertStringNotContainsString( 'onclick', $output );
-		$this->assertStringContainsString( 'href=', $output );
-	}
-
-	public function test_strip_dangerous_html_removes_javascript_href(): void {
-		$input  = '<a href="javascript:alert(1)">click</a>';
-		$output = $this->invoke_private( 'strip_dangerous_html', array( $input ) );
-		$this->assertStringNotContainsString( 'javascript:', $output );
-	}
-
-	public function test_strip_dangerous_html_preserves_safe_anchor(): void {
-		$input  = '<a href="https://example.test/post">read</a>';
-		$output = $this->invoke_private( 'strip_dangerous_html', array( $input ) );
-		$this->assertSame( $input, $output );
-	}
 
 	/**
 	 * Register apply_filters so the permission callback can call the

@@ -33,7 +33,6 @@ final class ManualShareAdapterTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		// F14: Bridgy_Publish_Settings reads get_option to decide
 		// per-silo deferral. F9 tests don't care about Bridgy state;

@@ -19,7 +19,8 @@ export type CompanionId =
 	| 'syndication-links'
 	| 'yoast'
 	| 'activitypub'
-	| 'accessibility-checker';
+	| 'accessibility-checker'
+	| 'rss-chat-routing';
 
 export interface TermSuggestion {
 	slug: string;
@@ -77,29 +78,31 @@ export async function fetch_composer_config(
 	access_token: string,
 	env: ComposerConfigEnvironment = default_env,
 ): Promise<ComposerConfig> {
-	// Belt-and-suspenders bearer + cache-bust:
-	//   - `_o_token` carries the bearer when managed-WP hosts (GoDaddy,
-	//     certain WP Engine configs) strip the Authorization header.
-	//   - `_t=<timestamp>` makes every request URL unique so Cloudflare
-	//     edge caches can't serve a previously cached response (e.g. a
-	//     stale 429 from a prior rate-limit window). Critical for
-	//     environments where edge cache can't be flushed independently
-	//     of production (GoDaddy's staging mirror is one such case).
-	const url =
-		ENDPOINT_PATH +
-		'?_o_token=' +
-		encodeURIComponent(access_token) +
-		'&_t=' +
-		String(Date.now());
+	// The bearer travels in the Authorization header AND the request body:
+	//   - The header works on hosts that pass it through to PHP.
+	//   - Managed-WP hosts (GoDaddy) strip the Authorization header, so the
+	//     token also rides in the JSON body's `access_token` field
+	//     (Micropub-spec), which the endpoint reads when the header is gone.
+	//     This is a POST for that reason — a GET can't carry a body reliably —
+	//     and the token stays out of the query string, so it never lands in
+	//     access logs, referrers, or CDN cache keys.
+	//   - `credentials: 'omit'` sends no wp-admin cookie: this request is
+	//     authenticated purely by the token, so it never trips WordPress's
+	//     cookie/nonce CSRF check.
+	//   - `_t=<timestamp>` keeps every request URL unique so an edge cache
+	//     can't serve a stale response (e.g. a 429 from a prior window).
+	const url = ENDPOINT_PATH + '?_t=' + String(Date.now());
 	let response: Response;
 	try {
 		response = await env.fetch(url, {
-			method: 'GET',
-			credentials: 'include',
+			method: 'POST',
+			credentials: 'omit',
 			headers: {
 				Authorization: 'Bearer ' + access_token,
+				'Content-Type': 'application/json',
 				Accept: 'application/json',
 			},
+			body: JSON.stringify({ access_token }),
 		});
 	} catch (err) {
 		throw new ComposerConfigError(
