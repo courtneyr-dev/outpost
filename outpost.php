@@ -7,7 +7,6 @@
  * Requires at least: 6.5
  * Tested up to:      7.1
  * Requires PHP:      8.2
- * Requires Plugins:  indieauth, micropub
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
  * License:           GPLv2 or later

@@ -45,7 +45,6 @@ The Micropub dependency re-parents any locally resolvable media URL to the new p
 ### Changed
 
 - readme External services: Tumblr removed (no reachable share path); the Bridgy entry names `brid.gy`, `bsky.brid.gy`, and `fed.brid.gy`; each OAuth service lists the hosts contacted and when data is sent.
-- `Requires Plugins: indieauth, micropub` added to the plugin header (the readme already declared it).
 
 ## [1.0.3] - 2026-08-30
 
