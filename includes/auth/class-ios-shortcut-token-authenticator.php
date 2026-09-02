@@ -35,11 +35,12 @@
  *
  * REQUEST IDENTIFICATION
  *
- * The shortcut REST route is `/wp-json/outpost/v1/shortcut`. The
- * authenticator inspects `$_SERVER['REQUEST_URI']` and / or the
- * resolved REST route. We use REQUEST_URI matching because the auth
- * filter runs BEFORE WP_REST_Server resolves the route, so the
- * request object's `route` property may not be populated yet.
+ * The shortcut REST route is `/outpost/v1/shortcut`. Scope is decided by
+ * the route WordPress resolved for the request
+ * ({@see Outpost_Request_Headers::is_rest_route()}), never by
+ * REQUEST_URI: `rest_authentication_errors` fires after
+ * `WP::parse_request()` has populated the `rest_route` query var, so
+ * that value is authoritative, and it fails closed when absent.
  *
  * @package Outpost
  */
@@ -130,28 +131,20 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 
 	/**
 	 * Whether the current request targets the shortcut REST route.
-	 * Inspects REQUEST_URI because rest_authentication_errors runs
-	 * before WP_REST_Server populates the request route.
+	 *
+	 * Keys on the route WordPress actually resolved for this request, never on a
+	 * substring of REQUEST_URI. WordPress routes on the `rest_route` query var,
+	 * which `$_GET`/`$_POST` override ahead of the `/wp-json/` permalink rewrite,
+	 * so the raw URI and the dispatched route can diverge. An earlier substring
+	 * check let a leaked (admin-issued) token authenticate arbitrary REST routes
+	 * by smuggling `rest_route=/outpost/v1/shortcut` into a decoy query key while
+	 * WordPress dispatched, e.g., `/wp/v2/users` — a parser-differential scope
+	 * bypass. The comparison now lives in one place for every route-scoped
+	 * decision in the plugin; absent a resolved route it fails closed.
+	 *
+	 * @return bool
 	 */
 	private static function request_targets_shortcut_endpoint(): bool {
-		if ( empty( $_SERVER['REQUEST_URI'] ) ) {
-			return false;
-		}
-		$uri = Outpost_Request_Headers::server_string( 'REQUEST_URI' );
-		// Strip query string before path comparison.
-		$path = strtok( $uri, '?' );
-		if ( false === $path ) {
-			return false;
-		}
-		// Match either `/wp-json/outpost/v1/shortcut` or the rewritten
-		// permalink form `/?rest_route=/outpost/v1/shortcut` (some
-		// WP install layouts use the latter).
-		if ( false !== strpos( $path, '/wp-json' . self::REST_ROUTE_PATH ) ) {
-			return true;
-		}
-		if ( false !== strpos( $uri, 'rest_route=' . self::REST_ROUTE_PATH ) ) {
-			return true;
-		}
-		return false;
+		return Outpost_Request_Headers::is_rest_route( self::REST_ROUTE_PATH );
 	}
 }

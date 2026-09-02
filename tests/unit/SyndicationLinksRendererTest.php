@@ -27,7 +27,6 @@ final class SyndicationLinksRendererTest extends \WP_Mock\Tools\TestCase {
 		// F2 #10 / A2 #8 static-state reset for filter mocks.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 
 		WP_Mock::userFunction( 'esc_url' )->andReturnUsing( static fn ( string $u ): string => $u );

@@ -29,7 +29,6 @@ final class OAuthProviderOuraTest extends TestCase {
 		// Reset WP_Mock filter registry per CLAUDE.md A2 #8.
 		$ref  = new ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

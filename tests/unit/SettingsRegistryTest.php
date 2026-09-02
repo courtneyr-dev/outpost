@@ -20,7 +20,6 @@ final class SettingsRegistryTest extends TestCase {
 		WP_Mock::setUp();
 		$ref  = new ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
 	}

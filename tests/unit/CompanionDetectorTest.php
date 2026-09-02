@@ -74,6 +74,7 @@ final class CompanionDetectorTest extends TestCase {
 			'yoast'                 => OUTPOST_YOAST_PLUGIN_FILE,
 			'activitypub'           => OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
 			'accessibility_checker' => OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE,
+			'rss_chat_routing'      => OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE,
 		);
 	}
 
@@ -157,6 +158,7 @@ final class CompanionDetectorTest extends TestCase {
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_yoast_active() );
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_activitypub_active() );
 		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_accessibility_checker_active() );
+		$this->assertSame( 'inactive', Outpost_Companion_Detector::is_rss_chat_routing_active() );
 	}
 
 	/** @test */
@@ -171,7 +173,7 @@ final class CompanionDetectorTest extends TestCase {
 	}
 
 	/** @test */
-	public function optional_companions_returns_the_seven_optional_file_paths(): void {
+	public function optional_companions_returns_the_eight_optional_file_paths(): void {
 		$this->assertEqualsCanonicalizing(
 			array(
 				OUTPOST_POST_KINDS_PLUGIN_FILE,
@@ -181,6 +183,7 @@ final class CompanionDetectorTest extends TestCase {
 				OUTPOST_YOAST_PLUGIN_FILE,
 				OUTPOST_ACTIVITYPUB_PLUGIN_FILE,
 				OUTPOST_ACCESSIBILITY_CHECKER_PLUGIN_FILE,
+				OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE,
 			),
 			Outpost_Companion_Detector::optional_companions()
 		);

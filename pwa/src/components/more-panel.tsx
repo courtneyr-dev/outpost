@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { ComposerConfig, TermSuggestion } from '../lib/composer-config';
+import type { BridgyTarget, ComposerConfig, TermSuggestion } from '../lib/composer-config';
 import { discover_syndication_targets, type SyndicationTarget } from '../lib/micropub';
 import type { MicropubEnvironment } from '../lib/micropub';
 import type { StoredToken } from '../lib/token-store';
@@ -53,6 +53,12 @@ export interface MorePanelValues {
 	syndicateTo: string[];
 	/** Promote an otherwise stream-only kind onto the main archive (sends `pkiw-promote`). */
 	promoteToMain: boolean;
+	/**
+	 * Per-post rss.chat routing override (sends `mp-rss-chat-routing`).
+	 * Null follows the site default; the server-side decision stays
+	 * authoritative either way.
+	 */
+	rssChatRouting: 'include' | 'exclude' | null;
 }
 
 export const empty_more_values = (): MorePanelValues => ({
@@ -64,6 +70,7 @@ export const empty_more_values = (): MorePanelValues => ({
 	xfnRels: [],
 	syndicateTo: [],
 	promoteToMain: false,
+	rssChatRouting: null,
 });
 
 export interface MorePanelProps {
@@ -89,6 +96,32 @@ export interface MorePanelProps {
 	idPrefix: string;
 }
 
+/**
+ * Pick the endpoint-advertised target that a Bridgy host-map entry refers to.
+ *
+ * The Micropub server rejects any `mp-syndicate-to` uid it did not advertise
+ * through `?q=syndicate-to` (400 "Unknown mp-syndicate-to targets"), so the
+ * host map can only name the silo — the chip must be one of `offered`. Exact
+ * uid first (sites whose list carries brid.gy URLs), then the Bridgy-backed
+ * target for the same silo (Syndication Links exposes Bridgy as slugs such as
+ * `micropub-mastodon-bridgy`), else nothing.
+ */
+export function resolve_bridgy_suggestion(
+	mapped: BridgyTarget,
+	offered: SyndicationTarget[],
+): SyndicationTarget | null {
+	const exact = offered.find((t) => t.uid === mapped.uid);
+	if (exact) return exact;
+	const silo = mapped.uid.replace(/\/+$/, '').split('/').pop()?.toLowerCase() ?? '';
+	if (!silo) return null;
+	return (
+		offered.find((t) => {
+			const hay = (t.uid + ' ' + t.name).toLowerCase();
+			return hay.includes('bridgy') && hay.includes(silo);
+		}) ?? null
+	);
+}
+
 export function MorePanel(props: MorePanelProps) {
 	const {
 		token,
@@ -112,26 +145,35 @@ export function MorePanel(props: MorePanelProps) {
 	const yoast_active = composerConfig.companions['yoast'] === 'active';
 	const xfn_active = composerConfig.companions['xfn'] === 'active';
 	const post_kinds_active = composerConfig.companions['post-kinds'] === 'active';
+	const rss_chat_routing_active = composerConfig.companions['rss-chat-routing'] === 'active';
 
 	// Bridgy auto-suggest: when the Reply / Doing target URL host matches a
 	// known silo, the matching publish target gets surfaced as a separate
-	// pre-checked syndication chip. Distinct from the user's Micropub-
-	// configured syndicate-to list (which loads async above) so the user
-	// can see WHY the chip appeared (it's contextual to the target URL).
+	// pre-checked syndication chip so the user can see WHY it appeared (it's
+	// contextual to the target URL). The host map only names the silo; the
+	// chip itself is always one of the endpoint's own ?q=syndicate-to targets
+	// (see resolve_bridgy_suggestion), so it stays hidden until discovery has
+	// loaded and never sends a uid the endpoint did not offer.
 	// Site admins can disable this entirely via Settings → Bridgy auto-suggest.
 	const bridgy_target = ((): SyndicationTarget | null => {
 		if (!xfnTargetUrl) return null;
 		if (composerConfig.siteSettings && !composerConfig.siteSettings.bridgyAutoSuggest) {
 			return null;
 		}
+		let mapped: BridgyTarget | undefined;
 		try {
-			const u = new URL(xfnTargetUrl);
-			const match = composerConfig.bridgyHostMap[u.host.toLowerCase()];
-			return match ? { uid: match.uid, name: match.name } : null;
+			mapped = composerConfig.bridgyHostMap[new URL(xfnTargetUrl).host.toLowerCase()];
 		} catch (_err) {
 			return null;
 		}
+		return mapped ? resolve_bridgy_suggestion(mapped, syndication_targets) : null;
 	})();
+
+	// The suggested chip renders in its own fieldset; keep it out of the
+	// general list so a target never shows twice.
+	const other_targets = bridgy_target
+		? syndication_targets.filter((t) => t.uid !== bridgy_target.uid)
+		: syndication_targets;
 
 	// When a Bridgy target appears for a fresh URL, default to checked.
 	useEffect(() => {
@@ -227,6 +269,13 @@ export function MorePanel(props: MorePanelProps) {
 		onChange({ ...values, postFormat: raw === '' ? null : raw });
 	};
 
+	const handle_rss_chat_routing = (raw: string): void => {
+		onChange({
+			...values,
+			rssChatRouting: raw === 'include' || raw === 'exclude' ? raw : null,
+		});
+	};
+
 	const handle_focuskw = (raw: string): void => {
 		const trimmed = raw.trim();
 		onChange({ ...values, yoastFocusKw: trimmed.length > 0 ? trimmed : null });
@@ -248,6 +297,7 @@ export function MorePanel(props: MorePanelProps) {
 
 	const slug_display = values.slug ?? '';
 	const post_format_display = values.postFormat ?? '';
+	const rss_chat_routing_display = values.rssChatRouting ?? '';
 	const focuskw_display = values.yoastFocusKw ?? '';
 
 	return (
@@ -315,6 +365,27 @@ export function MorePanel(props: MorePanelProps) {
 					</>
 				)}
 
+				{rss_chat_routing_active && (
+					<div class="outpost-rss-chat-routing">
+						<label class="outpost-label" for={`${idPrefix}-rss-chat-routing`}>
+							Send to rss.chat
+						</label>
+						<select
+							id={`${idPrefix}-rss-chat-routing`}
+							class="outpost-input"
+							value={rss_chat_routing_display}
+							onChange={(e): void =>
+								handle_rss_chat_routing((e.target as HTMLSelectElement).value)
+							}
+							disabled={disabled}
+						>
+							<option value="">Site default</option>
+							<option value="include">Include in RSS Chat</option>
+							<option value="exclude">Exclude from RSS Chat</option>
+						</select>
+					</div>
+				)}
+
 				{yoast_active && (
 					<fieldset class="outpost-field-group">
 						<legend class="outpost-label">Focus keyphrase (Yoast SEO)</legend>
@@ -367,10 +438,10 @@ export function MorePanel(props: MorePanelProps) {
 					</fieldset>
 				)}
 
-				{syndication_status === 'loaded' && syndication_targets.length > 0 && (
+				{syndication_status === 'loaded' && other_targets.length > 0 && (
 					<fieldset class="outpost-syndication-picker">
 						<legend class="outpost-label">Send to</legend>
-						{syndication_targets.map((target) => (
+						{other_targets.map((target) => (
 							<label key={target.uid} class="outpost-checkbox">
 								<input
 									type="checkbox"
@@ -583,6 +654,12 @@ export function merge_more_values<T>(
 	// archive. The plugin's Micropub bridge maps this to the pkiw_promote meta.
 	if (values.promoteToMain) {
 		merged['pkiw-promote'] = true;
+	}
+	// Per-post rss.chat routing override — the RSS Chat Routing companion's
+	// after_micropub bridge maps this to its _rss_chat_routing meta. Omitted
+	// means "follow the site default", so only explicit choices are sent.
+	if (values.rssChatRouting) {
+		merged['mp-rss-chat-routing'] = values.rssChatRouting;
 	}
 	return merged as T;
 }

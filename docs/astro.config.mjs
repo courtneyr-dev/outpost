@@ -49,7 +49,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Reference',
-					items: ['supported-services', 'screenshots', 'playground'],
+					items: ['how-outpost-shapes-a-post', 'supported-services', 'screenshots', 'playground'],
 				},
 				{
 					label: 'Help',

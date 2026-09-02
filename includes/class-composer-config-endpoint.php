@@ -14,6 +14,7 @@
  *     "companions": {
  *       "post-kinds":            "active" | "inactive" | "absent",
  *       "post-formats":          "active" | "inactive" | "absent",
+ *       "rss-chat-routing":      "active" | "inactive" | "absent",
  *       "xfn":                   "active" | "inactive" | "absent",
  *       "syndication-links":     "active" | "inactive" | "absent",
  *       "yoast":                 "active" | "inactive" | "absent",
@@ -48,6 +49,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Composer_Config_Endpoint {
+
+	use Outpost_Bearer_Auth;
 
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PATH      = '/composer-config';
@@ -159,56 +162,50 @@ final class Outpost_Composer_Config_Endpoint {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
 		// Opt this route out of any global rest_authentication_errors
 		// gating that other plugins (Wordfence, "Disable REST API", any
-		// "API hardening" snippet) impose. Runs late (999) so it
-		// overrides whatever upstream callback added the error. Scoped
-		// strictly to the composer-config path — never broadens auth on
-		// other routes.
+		// "API hardening" snippet) impose, so the request reaches this
+		// route's own edit_posts permission callback. Runs late (999) so
+		// it overrides whatever upstream callback added the error. Scoped
+		// to the route WordPress actually resolved — see
+		// allow_anonymous_for_self() for why the request path is not that.
 		add_filter( 'rest_authentication_errors', array( self::class, 'allow_anonymous_for_self' ), 999 );
 	}
 
 	/**
-	 * Clears any rest_authentication_errors result for the composer-config
-	 * route. Other plugins commonly add a global "must be logged in"
-	 * error via this filter; without an opt-out the request never
-	 * reaches our permission_callback.
+	 * Clears a third-party rest_authentication_errors result for the
+	 * composer-config route — and only that route.
+	 *
+	 * Other plugins commonly add a blanket "must be logged in" error via this
+	 * filter; without an opt-out the request never reaches our own
+	 * permission_callback (edit_posts). Two things this deliberately does
+	 * NOT do:
+	 *
+	 *   - It never keys on REQUEST_URI, a path substring, or a hand-parsed
+	 *     query string. WordPress dispatches on the `rest_route` query var,
+	 *     which `$_GET`/`$_POST` override ahead of the `/wp-json/` rewrite,
+	 *     so the raw URI and the dispatched route can disagree. The pre-1.0.4
+	 *     audit fired that differential: a cookie-authenticated victim sent to
+	 *     `/wp-json/outpost/v1/composer-config?rest_route=/wp/v2/posts/N
+	 *     &_method=DELETE&_wpnonce=x` had core's invalid-nonce error cleared
+	 *     and the DELETE executed as them. Route identity now comes from
+	 *     {@see Outpost_Request_Headers::is_rest_route()}, which reads the
+	 *     value WordPress will serve and fails closed when none resolved.
+	 *   - It never clears core's `rest_cookie_invalid_nonce` error, even for
+	 *     this route. That error is WordPress's CSRF defense for cookie
+	 *     sessions; the opt-out exists for third-party blanket gates, not to
+	 *     disable core's own check.
 	 *
 	 * @param mixed $result Existing filter result (null, true, WP_Error).
-	 * @return mixed Cleared (null) when the request is for our route;
-	 *               unchanged otherwise.
+	 * @return mixed Cleared (null) when a third-party error stands on our
+	 *               own resolved route; unchanged otherwise.
 	 */
 	public static function allow_anonymous_for_self( $result ) {
-		if ( ! isset( $_SERVER['REQUEST_URI'] ) ) {
+		if ( is_wp_error( $result ) && 'rest_cookie_invalid_nonce' === $result->get_error_code() ) {
 			return $result;
 		}
-		$uri = Outpost_Request_Headers::server_string( 'REQUEST_URI' );
-		// Path-anchored match. The previous strpos-based check accepted any
-		// URI containing the substring `/wp-json/outpost/v1/composer-config`,
-		// which an attacker could smuggle into another endpoint's URI
-		// (e.g., `/wp-json/wp/v2/users?bypass=/wp-json/outpost/v1/composer-config`)
-		// to disable rest_authentication_errors for sensitive routes. Now we
-		// parse out the path and compare exactly, plus support the
-		// `?rest_route=...` permalink-disabled fallback as its own check.
-		$expected_path  = '/wp-json/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH;
-		$path_component = wp_parse_url( $uri, PHP_URL_PATH );
-		if ( is_string( $path_component ) ) {
-			$path_component = rtrim( $path_component, '/' );
-			if ( rtrim( $expected_path, '/' ) === $path_component ) {
-				return null;
-			}
+		if ( ! Outpost_Request_Headers::is_rest_route( '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
+			return $result;
 		}
-		// Permalinks-disabled fallback: WordPress serves REST at
-		// `/?rest_route=/outpost/v1/composer-config`. Match the rest_route
-		// query var exactly, not by substring.
-		$query_component = wp_parse_url( $uri, PHP_URL_QUERY );
-		if ( is_string( $query_component ) ) {
-			parse_str( $query_component, $query_args );
-			if ( isset( $query_args['rest_route'] )
-				&& '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH === $query_args['rest_route']
-			) {
-				return null;
-			}
-		}
-		return $result;
+		return null;
 	}
 
 	/**
@@ -224,7 +221,7 @@ final class Outpost_Composer_Config_Endpoint {
 			self::ROUTE_NAMESPACE,
 			self::ROUTE_PATH,
 			array(
-				'methods'             => 'GET',
+				'methods'             => 'GET, POST',
 				'callback'            => array( self::class, 'handle' ),
 				'permission_callback' => array( self::class, 'permission_check' ),
 				'show_in_index'       => false,
@@ -233,54 +230,42 @@ final class Outpost_Composer_Config_Endpoint {
 	}
 
 	/**
-	 * Permission check — composer config is per-user, so the caller must
-	 * be authenticated. The IndieAuth plugin's REST middleware translates
-	 * Authorization: Bearer ... headers into a current user, so the
-	 * standard `current_user_can( 'edit_posts' )` works for both cookie
-	 * and bearer auth.
-	 */
-	/**
 	 * Permission check for the composer-config endpoint.
 	 *
-	 * The payload is not per-user-sensitive: companion plugin
-	 * activation status, public taxonomy terms, the Bridgy host map,
-	 * the XFN spec list, and site-wide composer settings. Same
-	 * information any WordPress user with `read` cap can already see
-	 * via wp-admin. So we accept three auth paths:
+	 * Requires the `edit_posts` capability — the same gate every other
+	 * composer-serving Outpost route uses. The payload aggregates
+	 * companion-plugin enumeration + taxonomy terms + Bridgy host map
+	 * + composer settings; individually each maps to information a
+	 * logged-in user could dig up, but the aggregate makes
+	 * plugin-version reconnaissance trivial, so neither anonymous
+	 * visitors nor logged-in users below `edit_posts` (Subscribers)
+	 * may read it. An earlier build fell back to `is_user_logged_in()`
+	 * here; the wp.org plugin review (2026-08) flagged that fallback
+	 * and it is deliberately gone — do not reintroduce it.
 	 *
-	 *   1. `current_user_can('edit_posts')` — standard cap check.
-	 *      Succeeds for cookie auth (admin logged into wp-admin in
-	 *      the same browser) and for IndieAuth bearer when the
-	 *      plugin's `determine_current_user` filter covers our route.
-	 *   2. `is_user_logged_in()` — any logged-in user. Some IndieAuth
-	 *      plugin builds translate the bearer to user_id but don't
-	 *      pass through `edit_posts`; this fallback catches them.
-	 *   3. Otherwise reject with 401.
+	 * The IndieAuth plugin's REST middleware translates
+	 * `Authorization: Bearer` headers into a current user before this
+	 * runs, so the capability check covers cookie and bearer auth
+	 * alike; a bare unvalidated bearer header never resolves a user
+	 * and never passes.
 	 *
-	 * Filterable via `outpost_composer_config_permission` so site
-	 * admins can override (e.g. open to anonymous in development).
+	 * Sites that need anonymous access (rare but supported for
+	 * build-time pre-fetching) can opt back in via the
+	 * `outpost_composer_config_permission` filter.
 	 *
 	 * @return bool
 	 */
 	public static function permission_check(): bool {
-		// Default to requiring authentication. The payload aggregates
-		// companion plugin enumeration + taxonomy terms + Bridgy host map
-		// + composer settings — individually each of these maps to a
-		// public WP endpoint, but the aggregate makes plugin-version
-		// reconnaissance trivial for an unauthenticated attacker (which
-		// `show_in_index => false` was already designed to prevent).
-		// Two auth paths accepted — both require a resolved WordPress user,
-		// so the mere presence of an unvalidated `Authorization: Bearer`
-		// header never authorizes the request:
-		//   1. `current_user_can('edit_posts')` — standard cap check
-		//      (cookie auth or IndieAuth-translated bearer).
-		//   2. `is_user_logged_in()` — any logged-in user; some IndieAuth
-		//      builds set the user without passing through edit_posts.
-		// Sites that need anonymous access (rare but supported for
-		// build-time pre-fetching) can opt back in via the
-		// `outpost_composer_config_permission` filter.
-		$allow = current_user_can( 'edit_posts' )
-			|| is_user_logged_in();
+		// Authenticate an Outpost/IndieAuth bearer token the same way the
+		// media-lookup route does: read it from the Authorization header or,
+		// on managed-WP hosts that strip that header (GoDaddy), the Micropub
+		// `access_token` request body, then let IndieAuth's
+		// determine_current_user callback validate it. This is what lets a
+		// token-authenticated request succeed WITHOUT the wp-admin cookie —
+		// the cookie path was the CSRF surface the 1.0.4 fix closed, and it
+		// never reached this endpoint on a header-stripping host anyway.
+		self::authenticate_bearer_token();
+		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the composer-config permission decision.
 		 *
@@ -378,6 +363,7 @@ final class Outpost_Composer_Config_Endpoint {
 			'yoast'                 => Outpost_Companion_Detector::is_yoast_active(),
 			'activitypub'           => Outpost_Companion_Detector::is_activitypub_active(),
 			'accessibility-checker' => Outpost_Companion_Detector::is_accessibility_checker_active(),
+			'rss-chat-routing'      => Outpost_Companion_Detector::is_rss_chat_routing_active(),
 		);
 
 		$post_formats = self::resolve_post_formats( $companions['post-formats'] );

@@ -30,7 +30,6 @@ final class DependencyPresentationTest extends TestCase {
 		// leaks across tests — see the same comment in PWAShellTest::setUp.
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 

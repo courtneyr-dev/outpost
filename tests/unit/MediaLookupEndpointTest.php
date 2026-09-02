@@ -52,7 +52,6 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 	 */
 	private function invoke_private( string $method, array $args = array() ) {
 		$ref = new \ReflectionMethod( Outpost_Media_Lookup_Endpoint::class, $method );
-		$ref->setAccessible( true );
 		return $ref->invoke( null, ...$args );
 	}
 
@@ -472,6 +471,8 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer x'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
@@ -482,6 +483,7 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function test_permission_allows_validated_editor(): void {
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
@@ -491,6 +493,11 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		// An unvalidated body token resolves no user: determine_current_user is the
+		// only authority, and it is left at its default (false) here.
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
@@ -500,56 +507,67 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
 
-	// --- GoDaddy header reinjection (determine_current_user shim) -----------
+	// --- Route scoping of the body-token fallback ----------------------------
+	//
+	// Audit finding (route-resolution class, third instance): the bearer
+	// reinjection used to hook determine_current_user GLOBALLY and scope itself
+	// by an unanchored strpos() on REQUEST_URI, so a body token on
+	// /wp/v2/posts?probe=outpost/v1/lookup was reinjected onto the wrong route.
+	// The fix moves authentication into this route's own permission callback
+	// (the pattern preview / geocode / syndicate-targets already use): the REST
+	// dispatcher has identified the route by the time it runs, so no URI or
+	// query-string parsing is involved at all.
 
-	private function mock_body_token_helpers(): void {
-		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing(
-			static fn( $v ) => is_string( $v ) ? trim( $v ) : $v
+	public function test_global_request_uri_scoped_shim_is_gone(): void {
+		// The vulnerable determine_current_user shim scoped by strpos() on
+		// REQUEST_URI is removed; authentication moved into the route's own
+		// permission callback (scoped by construction — the REST dispatcher
+		// has already identified the route). Runtime scoping is proven by the
+		// integration test RestRouteResolutionTest. This is the unit-level
+		// regression guard: re-adding the global shim brings the method back.
+		$this->assertFalse(
+			method_exists( Outpost_Media_Lookup_Endpoint::class, 'reinject_bearer_from_body' ),
+			'The REQUEST_URI-scoped global determine_current_user shim must not return.'
+		);
+		$this->assertContains(
+			'Outpost_Bearer_Auth',
+			class_uses( Outpost_Media_Lookup_Endpoint::class ),
+			'Authentication must go through the shared, callback-scoped bearer trait.'
 		);
 	}
 
-	public function test_reinject_restores_header_from_body_token(): void {
-		// Mobile on GoDaddy: header stripped, token in the body, no WP user yet.
-		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/lookup?_t=1';
-		$_POST['access_token']  = 'live-token'; // outpost-lint:fixture-credential
-		$this->mock_body_token_helpers();
+	public function test_permission_authenticates_a_body_token_via_determine_current_user(): void {
+		// Managed host stripped the header; the token rides in the form body.
+		$_POST['access_token'] = 'body-token'; // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		// IndieAuth (or any determine_current_user authority) validates the
+		// restored header and returns the user id.
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 7 );
+		WP_Mock::userFunction( 'wp_set_current_user' )->once()->with( 7 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 
-		$result = Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
-
-		$this->assertNull( $result, 'must pass through — it restores the header, it does not resolve the user' );
-		$this->assertSame( 'Bearer live-token', $_SERVER['HTTP_AUTHORIZATION'] ?? '' );
+		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
+		$this->assertSame( 'Bearer body-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'Header restored for the validating filter.' );
 	}
 
-	public function test_reinject_skips_when_header_already_present(): void {
-		$_SERVER['REQUEST_URI']       = '/wp-json/outpost/v1/lookup';
+	public function test_permission_does_not_restore_header_when_one_is_present(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer already-here'; // outpost-lint:fixture-credential
-		$_POST['access_token']         = 'other-token'; // outpost-lint:fixture-credential
+		$_POST['access_token']         = 'body-token'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 0 );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 
-		Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
+		$result = Outpost_Media_Lookup_Endpoint::check_permission();
 
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'Bearer already-here', $_SERVER['HTTP_AUTHORIZATION'] );
-	}
-
-	public function test_reinject_skips_when_not_the_lookup_route(): void {
-		$_SERVER['REQUEST_URI'] = '/wp-json/wp/v2/posts';
-		$_POST['access_token']  = 'tok'; // outpost-lint:fixture-credential
-		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-
-		Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( null );
-
-		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'must not touch auth for unrelated routes' );
-	}
-
-	public function test_reinject_passes_through_already_resolved_user(): void {
-		// A cookie/header already authenticated the request — do nothing.
-		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/lookup';
-		$_POST['access_token']  = 'tok'; // outpost-lint:fixture-credential
-
-		$result = Outpost_Media_Lookup_Endpoint::reinject_bearer_from_body( 7 );
-
-		$this->assertSame( 7, $result );
-		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER );
 	}
 }

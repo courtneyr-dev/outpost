@@ -36,7 +36,6 @@ final class SourceF17BatchTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Source_Registry::reset_for_tests();
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, array() );
 	}
 
