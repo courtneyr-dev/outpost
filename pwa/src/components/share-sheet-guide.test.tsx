@@ -28,27 +28,42 @@ describe('ShareSheetGuide', () => {
 		const container = renderGuide();
 		const origin = window.location.origin;
 
-		const shareCode = Array.from(container.querySelectorAll('code')).find((c) =>
-			(c.textContent ?? '').includes('/post/share-target'),
+		const shareCode = Array.from(container.querySelectorAll('code')).find(
+			(c) => (c.textContent ?? '').includes('/post/share-target')
 		);
 		expect(shareCode?.textContent).toBe(origin + '/post/share-target?url=');
 
-		const adminLink = Array.from(container.querySelectorAll('a')).find((a) =>
-			a.getAttribute('href')?.includes('outpost-ios-shortcut'),
+		const adminLink = Array.from(container.querySelectorAll('a')).find(
+			(a) => a.getAttribute('href')?.includes('outpost-ios-shortcut')
 		);
 		expect(adminLink?.getAttribute('href')).toBe(
-			origin + '/wp-admin/options-general.php?page=outpost-ios-shortcut',
+			origin + '/wp-admin/options-general.php?page=outpost-ios-shortcut'
 		);
 		expect(adminLink?.getAttribute('target')).toBe('_blank');
 		expect(adminLink?.getAttribute('rel')).toBe('noopener noreferrer');
 
 		const docsLink = Array.from(container.querySelectorAll('a')).find((a) =>
-			a.getAttribute('href')?.includes('courtneyr-dev.github.io/outpost/common-tasks'),
+			a
+				.getAttribute('href')
+				?.includes('courtneyr-dev.github.io/outpost/common-tasks')
 		);
 		expect(docsLink?.getAttribute('href')).toBe(
-			'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone',
+			'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone'
 		);
 	});
+	it('tells both platforms what a shared photo becomes and gives iOS a photo Shortcut', () => {
+		const container = renderGuide();
+		const html = container.innerHTML;
+		expect(html).toContain('Photo to Outpost');
+		expect(html).toContain('Images');
+		const photoCode = container.querySelector(
+			'code.outpost-share-guide__url--photo'
+		);
+		expect(photoCode?.textContent?.trim()).toBe(
+			window.location.origin + '/post/?mode=photo'
+		);
+	});
+
 	it('tells iOS users how to move the shortcut up the share sheet', () => {
 		const html = renderGuide().innerHTML;
 		expect(html).toContain('Edit Actions');

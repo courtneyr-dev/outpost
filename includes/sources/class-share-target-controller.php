@@ -54,9 +54,16 @@ final class Outpost_Share_Target_Controller {
 		$payload = self::read_payload();
 		$url     = Outpost_Source_Detector::extract_url_from_payload( $payload );
 
-		// No URL detected anywhere AND no share text — direct navigation
-		// to /post/share-target. Let the caller render the PWA shell.
+		// No URL detected anywhere AND no share text — either direct
+		// navigation to /post/share-target (let the caller render the PWA
+		// shell) or a photo share that reached PHP because no service
+		// worker intercepted it. The file can't be kept here without a
+		// session and is never read; land the composer on the Photo tab
+		// so the user picks the picture again from the library.
 		if ( null === $url && empty( $payload['title'] ) && empty( $payload['text'] ) ) {
+			if ( self::has_shared_files() ) {
+				self::redirect( Outpost_Source_Detector::COMPOSER_PATH . '?mode=photo' );
+			}
 			return;
 		}
 
@@ -111,6 +118,18 @@ final class Outpost_Share_Target_Controller {
 			'text'  => $text,
 			'url'   => $url,
 		);
+	}
+
+	/**
+	 * Whether the request carried at least one uploaded file — the Web
+	 * Share Target Level 2 `files` param. The upload itself is never
+	 * touched here; this only decides which composer tab opens.
+	 *
+	 * @return bool
+	 */
+	private static function has_shared_files(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Web Share Target spec; nonces don't apply to OS-initiated share intents.
+		return ! empty( $_FILES );
 	}
 
 	/**

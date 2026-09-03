@@ -204,9 +204,36 @@ final class PWAShellTest extends TestCase {
 		$this->assertArrayHasKey( '512x512|any|image/png', $by_size_purpose, 'Manifest must ship a 512px raster icon.' );
 		$this->assertArrayHasKey( '512x512|maskable|image/png', $by_size_purpose, 'Manifest must ship a 512px maskable raster icon.' );
 
-		// The share_target contract the Android share sheet registers.
+		// The share_target contract the Android share sheet registers. Level 2
+		// (POST + multipart) is what lets the sheet offer Outpost for a photo;
+		// the `photos` files param is the field the service worker reads.
 		$this->assertSame( '/post/share-target', $decoded['share_target']['action'] );
-		$this->assertSame( 'GET', $decoded['share_target']['method'] );
+		$this->assertSame( 'POST', $decoded['share_target']['method'] );
+		$this->assertSame( 'multipart/form-data', $decoded['share_target']['enctype'] );
+		$this->assertSame( 'title', $decoded['share_target']['params']['title'] );
+		$this->assertSame( 'text', $decoded['share_target']['params']['text'] );
+		$this->assertSame( 'url', $decoded['share_target']['params']['url'] );
+		$this->assertSame( 'photos', $decoded['share_target']['params']['files'][0]['name'] );
+		$this->assertSame( array( 'image/*' ), $decoded['share_target']['params']['files'][0]['accept'] );
+	}
+
+	/** @test */
+	public function render_service_worker_parks_shared_photos_and_opens_the_photo_tab(): void {
+		ob_start();
+		Outpost_PWA_Shell::render_service_worker();
+		$out = ob_get_clean();
+
+		// The share-sheet POST is the one non-GET the worker owns: it must be
+		// matched before the generic non-GET passthrough, park the files in
+		// the inbox the composer reads, and redirect to the Photo tab.
+		$post_branch = strpos( $out, "request.method === 'POST' && is_share_target_request" );
+		$get_gate    = strpos( $out, "request.method !== 'GET'" );
+		$this->assertNotFalse( $post_branch, 'Service worker must handle the share-target POST.' );
+		$this->assertNotFalse( $get_gate );
+		$this->assertLessThan( $get_gate, $post_branch, 'The share POST branch must run before the non-GET passthrough.' );
+		$this->assertStringContainsString( "'outpost-share-inbox'", $out );
+		$this->assertStringContainsString( "form.getAll('photos')", $out );
+		$this->assertStringContainsString( "?mode=photo&shared=photos', 303", $out );
 	}
 
 	/** @test */

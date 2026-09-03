@@ -442,19 +442,28 @@ final class Outpost_PWA_Shell {
 					'purpose' => 'maskable',
 				),
 			),
-			// Web Share Target API (Phase E0). When the user shares text + URL
-			// from another app, the browser navigates to action with params
-			// merged into the query string. Our /post/share-target route
-			// stashes the data and forwards to the composer with the right
-			// mode pre-filled.
+			// Web Share Target API (Phase E0; Level 2 since 1.0.10). When the
+			// user shares from another app, the browser POSTs the fields —
+			// and, for a photo, the image file — to /post/share-target. The
+			// service worker keeps shared photos on the device and lands the
+			// composer on the Photo tab; text-only shares reach the PHP
+			// dispatcher, which routes them by content. A GET-only target
+			// can't accept files, so the share sheet never offered Outpost
+			// for a picture.
 			'share_target'     => array(
 				'action'  => '/post/share-target',
-				'method'  => 'GET',
-				'enctype' => 'application/x-www-form-urlencoded',
+				'method'  => 'POST',
+				'enctype' => 'multipart/form-data',
 				'params'  => array(
 					'title' => 'title',
 					'text'  => 'text',
 					'url'   => 'url',
+					'files' => array(
+						array(
+							'name'   => 'photos',
+							'accept' => array( 'image/*' ),
+						),
+					),
 				),
 			),
 		);
@@ -575,10 +584,103 @@ function is_outpost_rest(url) {
 		url.pathname.startsWith('/wp-json/outpost/v1/');
 }
 
+function is_share_target_request(url) {
+	if (url.origin !== self.location.origin) return false;
+	return url.pathname === '/post/share-target' || url.pathname === '/post/share-target/';
+}
+
+// Shared photos (Web Share Target Level 2). The share sheet POSTs the
+// image files to /post/share-target; they stay on the device, parked in
+// IndexedDB, and the composer opens on the Photo tab to collect them.
+// Nothing is uploaded until the user posts. Text-only shares pass through
+// to the PHP dispatcher, which routes them by content. The database and
+// store names must match pwa/src/lib/share-inbox.ts.
+const SHARE_INBOX_DB = 'outpost-share-inbox';
+const SHARE_INBOX_STORE = 'inbox';
+const SHARE_INBOX_KEY = 'pending';
+
+function open_share_inbox() {
+	return new Promise((resolve, reject) => {
+		const req = indexedDB.open(SHARE_INBOX_DB, 1);
+		req.onupgradeneeded = () => {
+			const db = req.result;
+			if (!db.objectStoreNames.contains(SHARE_INBOX_STORE)) {
+				db.createObjectStore(SHARE_INBOX_STORE);
+			}
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+async function park_shared_photos(payload) {
+	const db = await open_share_inbox();
+	try {
+		await new Promise((resolve, reject) => {
+			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
+			tx.objectStore(SHARE_INBOX_STORE).put(payload, SHARE_INBOX_KEY);
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+			tx.onabort = () => reject(tx.error);
+		});
+	} finally {
+		db.close();
+	}
+}
+
+async function handle_share_post(event) {
+	// Clone before reading: formData() consumes the body, and a share with
+	// no photo still has to reach the server as the original POST.
+	const passthrough = event.request.clone();
+	let form;
+	try {
+		form = await event.request.formData();
+	} catch (_err) {
+		return fetch(passthrough);
+	}
+	const photos = form.getAll('photos').filter((entry) =>
+		entry && typeof entry === 'object' &&
+		typeof entry.size === 'number' && entry.size > 0 &&
+		/^image\//.test(entry.type || '')
+	);
+	if (photos.length === 0) {
+		return fetch(passthrough);
+	}
+	try {
+		// Plain records (name, type, bytes) rather than File objects: a File
+		// survives a structured clone in theory, but Blob storage in
+		// IndexedDB has a patchy history across engines, and bytes are cheap
+		// to rebuild into a File on the composer side.
+		const records = await Promise.all(photos.map(async (photo) => ({
+			name: photo.name || 'shared-photo',
+			type: photo.type,
+			lastModified: typeof photo.lastModified === 'number' ? photo.lastModified : Date.now(),
+			buffer: await photo.arrayBuffer(),
+		})));
+		await park_shared_photos({
+			files: records,
+			title: String(form.get('title') || ''),
+			text: String(form.get('text') || ''),
+			received: Date.now(),
+		});
+	} catch (_err) {
+		// IndexedDB unavailable (storage pressure, private mode). The
+		// composer still opens on the Photo tab; the user picks the photo
+		// again from the library.
+	}
+	return Response.redirect(SHELL_URL + '?mode=photo&shared=photos', 303);
+}
+
 self.addEventListener('fetch', (event) => {
 	const request = event.request;
 
-	// Non-GET (POSTs to Micropub, our preview endpoint) is always passthrough.
+	// A share-sheet POST carrying photos is the one non-GET we own.
+	if (request.method === 'POST' && is_share_target_request(new URL(request.url))) {
+		event.respondWith(handle_share_post(event));
+		return;
+	}
+
+	// Every other non-GET (POSTs to Micropub, our preview endpoint) is passthrough.
 	if (request.method !== 'GET') {
 		return;
 	}
