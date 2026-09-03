@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-09-02
+
+### Fixed
+
+- Sharing a photo from the phone's share sheet lands on the Photo tab. The manifest's Web Share Target was GET-only, which cannot carry files, so Android never offered Outpost for a picture, and a photo sent through the iOS Shortcut opened the default tab. The target is now a Level 2 POST that accepts image files: the service worker keeps the picture on the device in an IndexedDB inbox and opens the composer on the Photo tab with it attached, and a photo POST that reaches PHP without a worker still opens the Photo tab. The About tab, the docs, and both readmes add a second iOS Shortcut, **Photo to Outpost**, that keeps Images as its type and opens `/post/?mode=photo`.
+
 ## [1.0.9] - 2026-09-02
 
 ### Fixed

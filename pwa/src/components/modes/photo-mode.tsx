@@ -13,6 +13,14 @@ import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
 import { enqueue, is_network_error } from '../../lib/offline-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
+import {
+	peek_share_target,
+	consume_share_target,
+} from '../../lib/share-target';
+import {
+	consume_shared_photos,
+	type ShareInboxEnvironment,
+} from '../../lib/share-inbox';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
@@ -58,6 +66,8 @@ export interface PhotoModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Injectable IndexedDB for the share inbox (tests pass fake-indexeddb). */
+	shareInboxEnv?: ShareInboxEnvironment;
 }
 
 interface PhotoEntry {
@@ -81,19 +91,30 @@ type Status =
 let next_id = 1;
 const make_id = (): string => `photo-${String(next_id++)}`;
 
-export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps) {
+export function PhotoMode({
+	token,
+	micropubEnv,
+	composerConfig,
+	shareInboxEnv,
+}: PhotoModeProps) {
 	const [entries, setEntries] = useState<PhotoEntry[]>([]);
 	const [name, setName] = useState('');
 	const [content, setContent] = useState('');
-	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
+	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(
+		null
+	);
 	const [venue_name, setVenueName] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
-	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(null);
+	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(
+		null
+	);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues] =
+		useState<MorePanelValues>(empty_more_values());
 	const [more_open, setMoreOpen] = useMoreOpen();
 
-	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
+	const a11y_active =
+		composerConfig?.companions['accessibility-checker'] === 'active';
 
 	// Revoke blob URLs on unmount. The previous cleanup captured `entries`
 	// at mount (empty array) due to the empty deps array, so unmount
@@ -111,29 +132,65 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 		};
 	}, []);
 
+	const add_files = (files: File[]): void => {
+		if (files.length === 0) return;
+		const new_entries: PhotoEntry[] = files.map((file) => ({
+			id: make_id(),
+			file,
+			preview_url: URL.createObjectURL(file),
+			alt: '',
+			decorative: false,
+		}));
+		setEntries((prev) => [...prev, ...new_entries]);
+	};
+
 	const handle_file_change = (event: Event): void => {
 		const input = event.target as HTMLInputElement;
 		const picked = input.files;
 		if (!picked || picked.length === 0) return;
-		const new_entries: PhotoEntry[] = [];
-		for (const file of Array.from(picked)) {
-			new_entries.push({
-				id: make_id(),
-				file,
-				preview_url: URL.createObjectURL(file),
-				alt: '',
-				decorative: false,
-			});
-		}
-		setEntries((prev) => [...prev, ...new_entries]);
+		add_files(Array.from(picked));
 		// Clear the file input so the user can pick the same file again
 		// after removing it (browsers cache the previous selection
 		// otherwise — picking the same filename does nothing).
 		input.value = '';
-		if (status.kind === 'posted' || status.kind === 'error' || status.kind === 'queued') {
+		if (
+			status.kind === 'posted' ||
+			status.kind === 'error' ||
+			status.kind === 'queued'
+		) {
 			setStatus({ kind: 'idle' });
 		}
 	};
+
+	// Share-sheet intake: when this tab is the share destination, claim the
+	// stash (caption text) and drain the photos the service worker parked in
+	// the share inbox. One-shot — the stash clears on read and the inbox
+	// record is deleted once consumed. Runs once on mount, like the other
+	// modes' intake; the inbox is only read when the dispatch says it's full.
+	useEffect(() => {
+		const share = peek_share_target();
+		if (!share || share.tab !== 'photo') return;
+		consume_share_target();
+		if (share.content) setContent(share.content);
+		if (share.title) setName(share.title);
+		if (!share.sharedPhotos) return;
+		let cancelled = false;
+		consume_shared_photos(shareInboxEnv)
+			.then((inbox) => {
+				if (cancelled || !inbox) return;
+				add_files(inbox.files);
+				if (!share.content && inbox.text) setContent(inbox.text);
+				if (!share.title && inbox.title) setName(inbox.title);
+			})
+			.catch(() => {
+				// Inbox unreadable — the Photo tab is open; the user picks the
+				// picture again from the library.
+			});
+		return (): void => {
+			cancelled = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only intake, same as NoteMode's consume_share_target_for_note()
+	}, []);
 
 	const remove_entry = (id: string): void => {
 		setEntries((prev) => {
@@ -145,7 +202,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 
 	const update_entry = (id: string, patch: Partial<PhotoEntry>): void => {
 		setEntries((prev) =>
-			prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
+			prev.map((entry) =>
+				entry.id === id ? { ...entry, ...patch } : entry
+			)
 		);
 	};
 
@@ -153,7 +212,8 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 		setEntries((prev) => {
 			const idx = prev.findIndex((e) => e.id === id);
 			const target_idx = idx + direction;
-			if (idx === -1 || target_idx < 0 || target_idx >= prev.length) return prev;
+			if (idx === -1 || target_idx < 0 || target_idx >= prev.length)
+				return prev;
 			const next = [...prev];
 			[next[idx], next[target_idx]] = [next[target_idx]!, next[idx]!];
 			return next;
@@ -165,13 +225,13 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 		if (entries.length === 0) return;
 		// Each entry must have alt text OR be marked decorative.
 		const incomplete = entries.find(
-			(entry) => !entry.decorative && entry.alt.trim().length === 0,
+			(entry) => !entry.decorative && entry.alt.trim().length === 0
 		);
 		if (incomplete) {
 			setStatus({
 				kind: 'error',
 				message:
-					'Every photo needs alt text, or mark it decorative. Decorative photos submit empty alt to indicate they\'re purely visual.',
+					"Every photo needs alt text, or mark it decorative. Decorative photos submit empty alt to indicate they're purely visual.",
 			});
 			return;
 		}
@@ -191,11 +251,18 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			if (!mp || !media) {
 				setStatus({ kind: 'discovering-endpoints' });
 				if (!mp) {
-					mp = await discover_micropub_endpoint(token.me, micropubEnv);
+					mp = await discover_micropub_endpoint(
+						token.me,
+						micropubEnv
+					);
 					setMicropubEndpoint(mp);
 				}
 				if (!media) {
-					media = await discover_media_endpoint(mp, token.accessToken, micropubEnv);
+					media = await discover_media_endpoint(
+						mp,
+						token.accessToken,
+						micropubEnv
+					);
 					setMediaEndpoint(media);
 				}
 			}
@@ -216,7 +283,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 						accessToken: token.accessToken,
 						mediaEndpoint: media,
 					},
-					micropubEnv,
+					micropubEnv
 				);
 				uploaded_urls.push(upload.location);
 			}
@@ -224,9 +291,13 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 			setStatus({ kind: 'posting' });
 			// Single-photo posts retain the string-shape for back-compat.
 			// Multi-photo posts use the array shape per Micropub spec.
-			const photo_value = uploaded_urls.length === 1 ? uploaded_urls[0]! : uploaded_urls;
-			const alt_array = entries.map((e) => (e.decorative ? '' : e.alt.trim()));
-			const alt_value = alt_array.length === 1 ? alt_array[0]! : alt_array;
+			const photo_value =
+				uploaded_urls.length === 1 ? uploaded_urls[0]! : uploaded_urls;
+			const alt_array = entries.map((e) =>
+				e.decorative ? '' : e.alt.trim()
+			);
+			const alt_value =
+				alt_array.length === 1 ? alt_array[0]! : alt_array;
 			const trimmed_content = content.trim();
 			const trimmed_name = name.trim();
 			const trimmed_venue = venue_name.trim();
@@ -237,7 +308,12 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
 				...(picked_location
-					? { location: geo_uri(picked_location.lat, picked_location.lon) }
+					? {
+							location: geo_uri(
+								picked_location.lat,
+								picked_location.lon
+							),
+						}
 					: {}),
 				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
@@ -249,7 +325,7 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 						accessToken: token.accessToken,
 						micropubEndpoint: mp,
 					},
-					micropubEnv,
+					micropubEnv
 				);
 				setStatus({
 					kind: 'posted',
@@ -313,12 +389,15 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 							: 'Post photo';
 
 	const all_have_alt = entries.every(
-		(entry) => entry.decorative || entry.alt.trim().length > 0,
+		(entry) => entry.decorative || entry.alt.trim().length > 0
 	);
 	const can_submit = entries.length > 0 && all_have_alt && !submitting;
 
 	return (
-		<section class="outpost-card" aria-labelledby="outpost-photo-mode-title">
+		<section
+			class="outpost-card"
+			aria-labelledby="outpost-photo-mode-title"
+		>
 			<h2 id="outpost-photo-mode-title" class="outpost-card__title">
 				{entries.length > 1 ? 'Gallery' : 'Photo'}
 			</h2>
@@ -359,7 +438,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 									>
 										Alt text{' '}
 										{!entry.decorative && (
-											<span class="outpost-required">(required)</span>
+											<span class="outpost-required">
+												(required)
+											</span>
 										)}
 									</label>
 									<textarea
@@ -369,11 +450,15 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 										value={entry.alt}
 										onInput={(event): void =>
 											update_entry(entry.id, {
-												alt: (event.target as HTMLTextAreaElement).value,
+												alt: (
+													event.target as HTMLTextAreaElement
+												).value,
 											})
 										}
 										placeholder="Describe what's in the photo for screen readers"
-										disabled={submitting || entry.decorative}
+										disabled={
+											submitting || entry.decorative
+										}
 									/>
 									<label class="outpost-checkbox">
 										<input
@@ -381,20 +466,25 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 											checked={entry.decorative}
 											onChange={(event): void =>
 												update_entry(entry.id, {
-													decorative: (event.target as HTMLInputElement)
-														.checked,
+													decorative: (
+														event.target as HTMLInputElement
+													).checked,
 												})
 											}
 											disabled={submitting}
 										/>
-										<span>Decorative (no alt text needed)</span>
+										<span>
+											Decorative (no alt text needed)
+										</span>
 									</label>
 								</div>
 								<div class="outpost-photo-list__actions">
 									<button
 										type="button"
 										class="outpost-button outpost-button--secondary"
-										onClick={(): void => move_entry(entry.id, -1)}
+										onClick={(): void =>
+											move_entry(entry.id, -1)
+										}
 										disabled={submitting || index === 0}
 										aria-label={`Move photo ${String(index + 1)} earlier`}
 									>
@@ -403,8 +493,13 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 									<button
 										type="button"
 										class="outpost-button outpost-button--secondary"
-										onClick={(): void => move_entry(entry.id, 1)}
-										disabled={submitting || index === entries.length - 1}
+										onClick={(): void =>
+											move_entry(entry.id, 1)
+										}
+										disabled={
+											submitting ||
+											index === entries.length - 1
+										}
 										aria-label={`Move photo ${String(index + 1)} later`}
 									>
 										<span aria-hidden="true">↓</span>
@@ -412,7 +507,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 									<button
 										type="button"
 										class="outpost-button outpost-button--secondary"
-										onClick={(): void => remove_entry(entry.id)}
+										onClick={(): void =>
+											remove_entry(entry.id)
+										}
 										disabled={submitting}
 										aria-label={`Remove photo ${String(index + 1)}`}
 									>
@@ -432,7 +529,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					class="outpost-input"
 					type="text"
 					value={name}
-					onInput={(event): void => setName((event.target as HTMLInputElement).value)}
+					onInput={(event): void =>
+						setName((event.target as HTMLInputElement).value)
+					}
 					disabled={submitting}
 				/>
 
@@ -443,7 +542,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					<VoiceButton
 						onTranscript={(text): void =>
 							setContent((c) =>
-								c.length > 0 && !/\s$/.test(c) ? c + ' ' + text : c + text,
+								c.length > 0 && !/\s$/.test(c)
+									? c + ' ' + text
+									: c + text
 							)
 						}
 						disabled={submitting}
@@ -454,7 +555,9 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 					class="outpost-textarea"
 					rows={3}
 					value={content}
-					onInput={(event): void => setContent((event.target as HTMLTextAreaElement).value)}
+					onInput={(event): void =>
+						setContent((event.target as HTMLTextAreaElement).value)
+					}
 					disabled={submitting}
 				/>
 
@@ -482,13 +585,19 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				<p
 					class="outpost-status"
 					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
+					hidden={
+						status.kind !== 'posted' && status.kind !== 'queued'
+					}
 				>
 					{status.kind === 'posted' ? (
 						status.location ? (
 							<>
 								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
+								<a
+									href={status.location}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
 									{status.location}
 								</a>
 								{a11y_active && (
@@ -534,7 +643,11 @@ export function PhotoMode({ token, micropubEnv, composerConfig }: PhotoModeProps
 				)}
 
 				<div class="outpost-form-actions">
-					<button class="outpost-button" type="submit" disabled={!can_submit}>
+					<button
+						class="outpost-button"
+						type="submit"
+						disabled={!can_submit}
+					>
 						{submit_label}
 					</button>
 					{composerConfig && (

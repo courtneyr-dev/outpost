@@ -55,7 +55,8 @@ export type DoingVariant =
 	| 'audio';
 
 /** Life-tab variants (content-only kinds rendered by LifeMode). */
-export type LifeVariant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
+export type LifeVariant =
+	'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
 export interface ShareTargetData {
 	tab: 'note' | 'reply' | 'photo' | 'listen' | 'life' | 'recipe';
@@ -74,6 +75,8 @@ export interface ShareTargetData {
 	sourceId?: string;
 	/** Cached preview transient token from F6 dispatcher; lets the mode component fetch parsed metadata via /preview. */
 	cachedFor?: string;
+	/** Photo tab only — the service worker parked shared image files in the share inbox for PhotoMode to drain. */
+	sharedPhotos?: boolean;
 }
 
 const REPLY_VARIANT_VALUES: ReplyVariant[] = [
@@ -155,6 +158,8 @@ function safe_session_remove(key: string): void {
  *   - `mode=note` (auto)            → tab: note (variant 'note')
  *   - `mode=reply` (auto)           → tab: reply
  *   - `picker=reply` + `default=X`  → tab: reply with X as initial variant
+ *   - `mode=photo&shared=photos`    → tab: photo, with the shared pictures
+ *                                     waiting in the share inbox (share-inbox.ts)
  *
  * The `cached_for` token is preserved in sessionStorage alongside
  * the dispatch data so the composer can read the pre-fill transient
@@ -170,6 +175,7 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const title = (params.get('title') ?? '').trim();
 	const source_id = (params.get('source') ?? '').trim();
 	const cached_for = (params.get('cached_for') ?? '').trim();
+	const shared = (params.get('shared') ?? '').trim();
 
 	if (!mode && !picker) {
 		return null;
@@ -211,9 +217,12 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	}
 
 	// Photo tab: photo + gallery (gallery routes through the same component).
+	// `shared=photos` is the service worker saying it parked the shared
+	// files in the inbox; PhotoMode drains them on mount.
 	if (mode === 'photo' || mode === 'gallery') {
 		return {
 			tab: 'photo',
+			...(shared === 'photos' ? { sharedPhotos: true } : {}),
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),

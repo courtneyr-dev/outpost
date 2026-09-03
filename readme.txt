@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.9
+Stable tag:        1.0.10
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -27,7 +27,7 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 * **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
 * **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
-The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note.
+The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note, a shared photo the Photo tab.
 
 POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.
 
@@ -117,7 +117,7 @@ The Outpost admin page generates one bookmarklet per post kind, embedded with yo
 
 = How do I post from my phone's share sheet? =
 
-On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, and a title plus text an Article.
+On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, a title plus text an Article, and a shared photo opens the Photo tab with the picture attached.
 
 iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut. The guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer. To build one that opens the composer so you can review first:
 
@@ -127,6 +127,8 @@ iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut. T
 4. Rename it Post to Outpost.
 5. Share any page from Safari and pick Post to Outpost — the composer opens on Reply with that link.
 6. To keep it near the top of the share sheet, scroll to the bottom of the sheet, tap Edit Actions…, tap the green + next to Post to Outpost to add it to Favorites, drag it to the top, and tap Done.
+
+Photos get a second Shortcut, because the share sheet only offers a Shortcut that accepts what you're sharing: the same steps, but keep Images as the type and set Open URLs to https://your-site.example/post/?mode=photo with nothing after it. Name it Photo to Outpost. Sharing a photo then opens the composer on the Photo tab; pick the picture there and add alt text.
 
 The composer's About tab has the same steps with your site's address filled in, and the full walkthrough is at https://courtneyr-dev.github.io/outpost/common-tasks/.
 
@@ -226,6 +228,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.10 =
+* Fixed: sharing a photo from the phone's share sheet lands on the Photo tab. The Web Share Target now accepts image files (Android and desktop Chrome/Edge): the picture stays on the device and the composer opens with it attached. The iOS directions add a second Shortcut, Photo to Outpost, that opens the Photo tab.
 
 = 1.0.9 =
 * Fixed: liking or replying to an X or Mastodon URL could fail with "Unknown mp-syndicate-to targets" because the suggested Bridgy chip sent a hard-coded brid.gy uid the site's Micropub endpoint never advertised. The chip now resolves to one of the endpoint's own syndication targets and stays hidden when there is none.

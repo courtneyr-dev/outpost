@@ -20,7 +20,9 @@
  */
 
 function origin(): string {
-	return typeof window !== 'undefined' && window.location ? window.location.origin : '';
+	return typeof window !== 'undefined' && window.location
+		? window.location.origin
+		: '';
 }
 
 interface OutLinkProps {
@@ -37,118 +39,174 @@ function OutLink({ href, children }: OutLinkProps): preact.JSX.Element {
 }
 
 export function ShareSheetGuide(): preact.JSX.Element {
-	const site        = origin();
-	const shareRoute  = site + '/post/share-target';
-	const shortcutAdmin = site + '/wp-admin/options-general.php?page=outpost-ios-shortcut';
-	const howto = 'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone';
+	const site = origin();
+	const shareRoute = site + '/post/share-target';
+	const shortcutAdmin =
+		site + '/wp-admin/options-general.php?page=outpost-ios-shortcut';
+	const howto =
+		'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone';
 
 	return (
-		<section class="outpost-share-guide" aria-labelledby="outpost-share-guide-title">
-			<h3 id="outpost-share-guide-title">Add Outpost to your share sheet</h3>
+		<section
+			class="outpost-share-guide"
+			aria-labelledby="outpost-share-guide-title"
+		>
+			<h3 id="outpost-share-guide-title">
+				Add Outpost to your share sheet
+			</h3>
 			<p>
-				Send a link, a quote, or a photo straight into Outpost from any app using
-				your device&apos;s share sheet. The setup is different on Android and iOS
-				because the two platforms handle share targets differently.
+				Send a link, a quote, or a photo straight into Outpost from any
+				app using your device&apos;s share sheet. The setup is different
+				on Android and iOS because the two platforms handle share
+				targets differently.
 			</p>
 
 			<h4>Android &amp; desktop Chrome / Edge</h4>
 			<ol>
 				<li>
 					Install Outpost as an app: open the browser menu and choose{' '}
-					<strong>Install app</strong> (or <strong>Add to Home Screen</strong>).
+					<strong>Install app</strong> (or{' '}
+					<strong>Add to Home Screen</strong>).
 				</li>
 				<li>
-					Once it&apos;s installed, Outpost appears in your device&apos;s{' '}
-					<strong>share sheet</strong> automatically — there&apos;s nothing else to
-					set up.
+					Once it&apos;s installed, Outpost appears in your
+					device&apos;s <strong>share sheet</strong> automatically —
+					there&apos;s nothing else to set up.
 				</li>
 				<li>
-					Share a page or some text from any app, pick <strong>Outpost</strong>,
-					and the composer opens already filled in.
+					Share a page or some text from any app, pick{' '}
+					<strong>Outpost</strong>, and the composer opens already
+					filled in.
 				</li>
 			</ol>
 			<p>What each kind of share turns into:</p>
 			<ul>
-				<li>A link → a <strong>Reply</strong>, with the link as the target.</li>
-				<li>A link plus selected text → a <strong>Reply</strong>, with the text as your reply.</li>
-				<li>Plain text → a <strong>Note</strong>.</li>
-				<li>A title and text (some apps send both) → an <strong>Article</strong>.</li>
+				<li>
+					A link → a <strong>Reply</strong>, with the link as the
+					target.
+				</li>
+				<li>
+					A link plus selected text → a <strong>Reply</strong>, with
+					the text as your reply.
+				</li>
+				<li>
+					Plain text → a <strong>Note</strong>.
+				</li>
+				<li>
+					A title and text (some apps send both) → an{' '}
+					<strong>Article</strong>.
+				</li>
+				<li>
+					A photo → the <strong>Photo</strong> tab, with the picture
+					already attached. Add alt text and post.
+				</li>
 			</ul>
 
 			<h4>iPhone &amp; iPad (Safari)</h4>
 			<p>
-				iOS Safari doesn&apos;t support the Web Share Target API, so a web app
-				can&apos;t join the share sheet by itself. You add a small Shortcut
-				instead. Two ways:
+				iOS Safari doesn&apos;t support the Web Share Target API, so a
+				web app can&apos;t join the share sheet by itself. You add a
+				small Shortcut instead. Two ways:
 			</p>
 			<p>
-				<strong>Guided setup.</strong> Your site has a setup page in wp-admin —{' '}
-				<OutLink href={shortcutAdmin}>Settings → Outpost iOS Shortcut</OutLink> —
-				that hands you a ready-made Shortcut and the token it needs. If the
-				one-tap Shortcut link there isn&apos;t published in your version yet, use
-				the manual steps below; they work today.
+				<strong>Guided setup.</strong> Your site has a setup page in
+				wp-admin —{' '}
+				<OutLink href={shortcutAdmin}>
+					Settings → Outpost iOS Shortcut
+				</OutLink>{' '}
+				— that hands you a ready-made Shortcut and the token it needs.
+				If the one-tap Shortcut link there isn&apos;t published in your
+				version yet, use the manual steps below; they work today.
 			</p>
 			<p>
-				<strong>Manual (works today, no token).</strong> Build a Shortcut that
-				opens Outpost&apos;s share route:
+				<strong>Manual (works today, no token).</strong> Build a
+				Shortcut that opens Outpost&apos;s share route:
 			</p>
 			<ol>
 				<li>
-					Open the <strong>Shortcuts</strong> app, tap <strong>+</strong> to make
-					a new one.
+					Open the <strong>Shortcuts</strong> app, tap{' '}
+					<strong>+</strong> to make a new one.
 				</li>
 				<li>
 					The first action reads <em>Receive … from Nowhere</em>. Tap{' '}
-					<strong>Nowhere</strong> and choose <strong>Share Sheet</strong> —
-					that&apos;s what makes the shortcut appear when you share. Then tap
-					the types (it starts as <em>Images and 18 more</em>), clear them, and
-					pick <strong>URLs</strong> and <strong>Text</strong>. On older iOS
-					this is the <strong>Show in Share Sheet</strong> toggle under the ⓘ
-					details instead.
+					<strong>Nowhere</strong> and choose{' '}
+					<strong>Share Sheet</strong> — that&apos;s what makes the
+					shortcut appear when you share. Then tap the types (it
+					starts as <em>Images and 18 more</em>), clear them, and pick{' '}
+					<strong>URLs</strong> and <strong>Text</strong>. On older
+					iOS this is the <strong>Show in Share Sheet</strong> toggle
+					under the ⓘ details instead.
 				</li>
 				<li>
 					Search for the action named <strong>Open URLs</strong> — not{' '}
-					<em>Share</em>, which only reopens the share sheet — and add it. Set
-					its URL to your share route with the shared item as the input:
+					<em>Share</em>, which only reopens the share sheet — and add
+					it. Set its URL to your share route with the shared item as
+					the input:
 					<br />
-					<code class="outpost-share-guide__url">{shareRoute}?url=</code>
+					<code class="outpost-share-guide__url">
+						{shareRoute}?url=
+					</code>
 					<code>[Shortcut Input]</code>
 					<br />
-					With the cursor at the very end, tap <em>Shortcut Input</em> in the
-					variable bar above the keyboard to insert it after{' '}
-					<code>url=</code>. (Sharing plain text instead of a link? Use{' '}
-					<code>?text=</code> in place of <code>?url=</code>.)
+					With the cursor at the very end, tap <em>
+						Shortcut Input
+					</em>{' '}
+					in the variable bar above the keyboard to insert it after{' '}
+					<code>url=</code>. (Sharing plain text instead of a link?
+					Use <code>?text=</code> in place of <code>?url=</code>.)
 				</li>
 				<li>
-					Tap the shortcut&apos;s name at the top, choose <strong>Rename</strong>,
-					and call it <strong>Post to Outpost</strong>.
+					Tap the shortcut&apos;s name at the top, choose{' '}
+					<strong>Rename</strong>, and call it{' '}
+					<strong>Post to Outpost</strong>.
 				</li>
 				<li>
-					Test it: open any page in Safari, tap <strong>Share</strong>, and pick{' '}
-					<strong>Post to Outpost</strong>. The composer opens on Reply with that
-					link as the target.
+					Test it: open any page in Safari, tap <strong>Share</strong>
+					, and pick <strong>Post to Outpost</strong>. The composer
+					opens on Reply with that link as the target.
 				</li>
 				<li>
-					Move it up the list: scroll to the bottom of the share sheet, tap{' '}
-					<strong>Edit Actions…</strong>, tap the green <strong>+</strong> next to{' '}
-					<strong>Post to Outpost</strong> to add it to Favorites, then drag it to
-					the top with the <strong>≡</strong> handle and tap <strong>Done</strong>.
-					It now sits near the top every time you share.
+					Move it up the list: scroll to the bottom of the share
+					sheet, tap <strong>Edit Actions…</strong>, tap the green{' '}
+					<strong>+</strong> next to <strong>Post to Outpost</strong>{' '}
+					to add it to Favorites, then drag it to the top with the{' '}
+					<strong>≡</strong> handle and tap <strong>Done</strong>. It
+					now sits near the top every time you share.
 				</li>
 			</ol>
 			<p>
-				From then on, <strong>Post to Outpost</strong> is in your share sheet.
-				It opens the composer prefilled so you review before posting, using the
-				sign-in you already have in the app — no token to manage. The{' '}
-				<OutLink href={howto}>full walkthrough in the documentation</OutLink>{' '}
+				From then on, <strong>Post to Outpost</strong> is in your share
+				sheet. It opens the composer prefilled so you review before
+				posting, using the sign-in you already have in the app — no
+				token to manage. The{' '}
+				<OutLink href={howto}>
+					full walkthrough in the documentation
+				</OutLink>{' '}
 				covers the same steps for both platforms.
 			</p>
+			<p>
+				<strong>Photos, too.</strong> The share sheet only offers a
+				Shortcut that accepts the kind of thing you&apos;re sharing, so
+				pictures get a second one. Make it exactly like the first, but
+				keep <strong>Images</strong> as the accepted type and set its{' '}
+				<strong>Open URLs</strong> action to
+				<br />
+				<code class="outpost-share-guide__url outpost-share-guide__url--photo">
+					{site + '/post/?mode=photo'}
+				</code>
+				<br />
+				with nothing after it (no Shortcut Input). Name it{' '}
+				<strong>Photo to Outpost</strong>. Sharing a photo from your
+				library then opens the composer on the Photo tab; pick the
+				picture there and add alt text.
+			</p>
 			<aside class="outpost-bookmarklet-tip" role="note">
-				<strong>Want a share-and-forget button?</strong> The guided setup&apos;s
-				Shortcut posts straight to your site through a scoped token, publishing
-				without opening the composer. Use that if you don&apos;t want to review
-				first; use the manual URL Shortcut above if you&apos;d rather see the post
-				before it goes out.
+				<strong>Want a share-and-forget button?</strong> The guided
+				setup&apos;s Shortcut posts straight to your site through a
+				scoped token, publishing without opening the composer. Use that
+				if you don&apos;t want to review first; use the manual URL
+				Shortcut above if you&apos;d rather see the post before it goes
+				out.
 			</aside>
 		</section>
 	);

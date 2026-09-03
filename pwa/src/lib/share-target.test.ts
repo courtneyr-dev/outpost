@@ -10,8 +10,14 @@ import { parse_dispatch_params, parse_share_target } from './share-target';
  */
 describe('parse_dispatch_params', () => {
 	it('routes reply modes with a default variant', () => {
-		const data = parse_dispatch_params('?picker=reply&default=favorite&url=https%3A%2F%2Fexample.test%2Fp');
-		expect(data).toMatchObject({ tab: 'reply', replyVariant: 'favorite', url: 'https://example.test/p' });
+		const data = parse_dispatch_params(
+			'?picker=reply&default=favorite&url=https%3A%2F%2Fexample.test%2Fp'
+		);
+		expect(data).toMatchObject({
+			tab: 'reply',
+			replyVariant: 'favorite',
+			url: 'https://example.test/p',
+		});
 	});
 
 	it('routes every Doing variant to the listen tab', () => {
@@ -33,22 +39,44 @@ describe('parse_dispatch_params', () => {
 			'audio',
 		];
 		for (const mode of doing) {
-			const data = parse_dispatch_params(`?mode=${mode}&url=https%3A%2F%2Fexample.test%2Fx`);
-			expect(data, mode).toMatchObject({ tab: 'listen', doingVariant: mode });
+			const data = parse_dispatch_params(
+				`?mode=${mode}&url=https%3A%2F%2Fexample.test%2Fx`
+			);
+			expect(data, mode).toMatchObject({
+				tab: 'listen',
+				doingVariant: mode,
+			});
 		}
 	});
 
 	it('routes every Life variant to the life tab', () => {
-		const life = ['mood', 'weather', 'sleep', 'trip', 'itinerary', 'question'];
+		const life = [
+			'mood',
+			'weather',
+			'sleep',
+			'trip',
+			'itinerary',
+			'question',
+		];
 		for (const mode of life) {
 			const data = parse_dispatch_params(`?mode=${mode}&text=hello`);
-			expect(data, mode).toMatchObject({ tab: 'life', lifeVariant: mode, content: 'hello' });
+			expect(data, mode).toMatchObject({
+				tab: 'life',
+				lifeVariant: mode,
+				content: 'hello',
+			});
 		}
 	});
 
 	it('routes mode=recipe to the recipe tab', () => {
-		const data = parse_dispatch_params('?mode=recipe&title=Bread&text=knead');
-		expect(data).toMatchObject({ tab: 'recipe', title: 'Bread', content: 'knead' });
+		const data = parse_dispatch_params(
+			'?mode=recipe&title=Bread&text=knead'
+		);
+		expect(data).toMatchObject({
+			tab: 'recipe',
+			title: 'Bread',
+			content: 'knead',
+		});
 	});
 
 	it('still routes note and article to the note tab', () => {
@@ -57,7 +85,9 @@ describe('parse_dispatch_params', () => {
 			variant: 'note',
 			content: 'hi',
 		});
-		expect(parse_dispatch_params('?mode=article&title=T&text=B')).toMatchObject({
+		expect(
+			parse_dispatch_params('?mode=article&title=T&text=B')
+		).toMatchObject({
 			tab: 'note',
 			variant: 'article',
 			title: 'T',
@@ -71,14 +101,20 @@ describe('parse_dispatch_params', () => {
 
 describe('parse_share_target (Web Share Target Level 1 fallback)', () => {
 	it('routes a bare URL to the reply tab', () => {
-		expect(parse_share_target('?url=https%3A%2F%2Fexample.test%2Fp')).toMatchObject({
+		expect(
+			parse_share_target('?url=https%3A%2F%2Fexample.test%2Fp')
+		).toMatchObject({
 			tab: 'reply',
 			url: 'https://example.test/p',
 		});
 	});
 
 	it('accepts the extended reply variants via ?variant=', () => {
-		expect(parse_share_target('?url=https%3A%2F%2Fexample.test%2Fp&variant=acquisition')).toMatchObject({
+		expect(
+			parse_share_target(
+				'?url=https%3A%2F%2Fexample.test%2Fp&variant=acquisition'
+			)
+		).toMatchObject({
 			tab: 'reply',
 			replyVariant: 'acquisition',
 		});
@@ -93,5 +129,25 @@ describe('parse_share_target (Web Share Target Level 1 fallback)', () => {
 
 	it('returns null when nothing shareable is present', () => {
 		expect(parse_share_target('')).toBeNull();
+	});
+});
+
+describe('parse_dispatch_params — shared photos', () => {
+	it('flags the photo tab when the service worker parked shared pictures', () => {
+		expect(parse_dispatch_params('?mode=photo&shared=photos')).toEqual({
+			tab: 'photo',
+			sharedPhotos: true,
+		});
+	});
+
+	it('leaves the flag off for a plain photo dispatch', () => {
+		expect(parse_dispatch_params('?mode=photo')).toEqual({ tab: 'photo' });
+	});
+
+	it('ignores the flag outside the photo tab', () => {
+		expect(parse_dispatch_params('?mode=note&shared=photos')).toEqual({
+			tab: 'note',
+			variant: 'note',
+		});
 	});
 });

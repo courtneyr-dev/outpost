@@ -44,6 +44,7 @@ What each kind of share becomes:
 - A link plus selected text → a **Reply**, with the text as your reply.
 - Plain text → a **Note**.
 - A title and text (some apps send both) → an **Article**.
+- A photo → the **Photo** tab, with the picture already attached. Add alt text and post.
 
 ### iPhone and iPad
 
@@ -59,6 +60,8 @@ iOS Safari doesn't support the Web Share Target API, so a web app can't join the
   6. Move it up the list: scroll to the bottom of the share sheet, tap **Edit Actions…**, tap the green **+** next to **Post to Outpost** to add it to Favorites, then drag it to the top with the **≡** handle and tap **Done**. It now sits near the top every time you share.
 
   "Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
+
+  **Photos, too.** The share sheet only offers a Shortcut that accepts the kind of thing you're sharing, so pictures get a second one. Make it exactly like the first, but keep **Images** as the accepted type and set its **Open URLs** action to `https://your-site.example/post/?mode=photo` with nothing after it (no Shortcut Input). Name it **Photo to Outpost**. Sharing a photo from your library then opens the composer on the Photo tab; pick the picture there and add alt text.
 
 The composer's About tab carries the same directions with your site's address already filled in.
 
