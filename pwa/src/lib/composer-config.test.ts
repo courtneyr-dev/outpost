@@ -152,3 +152,29 @@ describe('pkiw_kind_hint', () => {
 		expect(pkiw_kind_hint(undefined, 'event')).toEqual({});
 	});
 });
+
+describe('fetch_composer_config — site default terms', () => {
+	it('carries defaultCategories and defaultTags through', async () => {
+		const env = mock_env(
+			{ ok: true, status: 200 },
+			{
+				...valid_config,
+				siteSettings: {
+					...valid_config.siteSettings,
+					defaultCategories: ['Activity'],
+					defaultTags: ['indieweb'],
+				},
+			},
+		);
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.siteSettings.defaultCategories).toEqual(['Activity']);
+		expect(result.siteSettings.defaultTags).toEqual(['indieweb']);
+	});
+
+	it('still accepts a server that predates the fields', async () => {
+		const env = mock_env({ ok: true, status: 200 }, valid_config);
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.siteSettings.defaultCategories).toBeUndefined();
+		expect(result.siteSettings.defaultTags).toBeUndefined();
+	});
+});
