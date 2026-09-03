@@ -5,6 +5,12 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-09-02
+
+### Added
+
+- Default categories and default tags in Composer defaults (wp-admin → Outpost). The composer's More options open with them pre-selected on every post, so the site's choice, not WordPress's Settings → Writing default category, is what an untagged post gets; the user can still change them per post. The Micropub bridge applies the defaults to a post that named none (the composer with the pickers cleared, the iOS Shortcut, another client), replacing only WordPress's fallback category and never a category the request chose. Empty settings behave exactly as before.
+
 ## [1.0.10] - 2026-09-02
 
 ### Fixed
