@@ -10,7 +10,7 @@ export default {
 	github: 'https://github.com/courtneyr-dev/outpost',
 	// Not published in the WordPress.org plugin directory. Set to the listing URL after publication.
 	wporg: null,
-	version: '1.0.10',
+	version: '1.0.11',
 	requiresWP: '6.5',
 	requiresPHP: '8.2',
 	author: 'Courtney Robertson',

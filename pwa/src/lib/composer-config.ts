@@ -35,6 +35,10 @@ export interface BridgyTarget {
 export interface SiteSettings {
 	bridgyAutoSuggest: boolean;
 	defaultPostVariant: 'note' | 'status' | 'aside' | 'article' | 'quote';
+	/** Category names pre-selected in More options (Outpost > Settings > Composer defaults). Absent on older servers. */
+	defaultCategories?: string[];
+	/** Tag names pre-selected in More options. Absent on older servers. */
+	defaultTags?: string[];
 }
 
 export interface ComposerConfig {

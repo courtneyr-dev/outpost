@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, h } from 'preact';
+import { act } from 'preact/test-utils';
 import {
 	MorePanel,
 	merge_more_values,
 	empty_more_values,
+	default_more_values,
+	useMorePanelValues,
 	type MorePanelValues,
 } from './more-panel';
 import type { ComposerConfig } from '../lib/composer-config';
@@ -270,5 +273,108 @@ describe('MorePanel — promote toggle', () => {
 			await settle();
 			expect(sent_uids(onChange)).toContain(MASTODON);
 		});
+	});
+});
+
+describe('site default terms — default_more_values / useMorePanelValues', () => {
+	function config_with(siteSettings: Partial<ComposerConfig['siteSettings']>): ComposerConfig {
+		return {
+			companions: {
+				'post-kinds': 'absent',
+				'post-formats': 'absent',
+				xfn: 'absent',
+				'syndication-links': 'absent',
+				yoast: 'absent',
+				activitypub: 'absent',
+				'accessibility-checker': 'absent',
+				'rss-chat-routing': 'absent',
+			},
+			postFormats: null,
+			xfnRels: [],
+			existingCategories: [{ slug: 'activity', name: 'Activity' }],
+			existingTags: [],
+			bridgyHostMap: {},
+			siteSettings: { bridgyAutoSuggest: false, defaultPostVariant: 'note', ...siteSettings },
+		};
+	}
+
+	const seeded_config = config_with({ defaultCategories: ['Activity'], defaultTags: ['indieweb'] });
+
+	it('seeds categories and tags from siteSettings and nothing else', () => {
+		const values = default_more_values(seeded_config);
+		expect(values.categories).toEqual(['Activity']);
+		expect(values.tags).toEqual(['indieweb']);
+		expect({ ...values, categories: [], tags: [] }).toEqual(empty_more_values());
+	});
+
+	it('is empty without a config, and on a server without the fields', () => {
+		expect(default_more_values(undefined)).toEqual(empty_more_values());
+		expect(default_more_values(config_with({}))).toEqual(empty_more_values());
+	});
+
+	it('hands out a fresh copy each time', () => {
+		default_more_values(seeded_config).categories.push('Speaking');
+		expect(default_more_values(seeded_config).categories).toEqual(['Activity']);
+	});
+
+	it('seeds once the config lands, keeps user picks, and resets to the defaults', () => {
+		let latest: MorePanelValues | null = null;
+		let api: { set: (v: MorePanelValues) => void; reset: () => void } | null = null;
+		function Probe({ config }: { config: ComposerConfig | null }) {
+			const [values, set, reset] = useMorePanelValues(config);
+			latest = values;
+			api = { set, reset };
+			return null;
+		}
+		const root = document.createElement('div');
+		document.body.appendChild(root);
+
+		// Mounted before composer-config resolves: nothing to seed from yet.
+		act(() => {
+			render(h(Probe, { config: null }), root);
+		});
+		expect(latest!.categories).toEqual([]);
+
+		// Config arrives: the defaults land exactly once.
+		act(() => {
+			render(h(Probe, { config: seeded_config }), root);
+		});
+		expect(latest!.categories).toEqual(['Activity']);
+		expect(latest!.tags).toEqual(['indieweb']);
+
+		// The user overrides for this post; a re-render with the same config leaves it alone.
+		act(() => {
+			api!.set({ ...latest!, categories: ['Speaking'], tags: [] });
+		});
+		act(() => {
+			render(h(Probe, { config: seeded_config }), root);
+		});
+		expect(latest!.categories).toEqual(['Speaking']);
+		expect(latest!.tags).toEqual([]);
+
+		// After a post: back to the site defaults, not to empty.
+		act(() => {
+			api!.reset();
+		});
+		expect(latest!.categories).toEqual(['Activity']);
+		expect(latest!.tags).toEqual(['indieweb']);
+
+		render(null, root);
+		root.remove();
+	});
+
+	it('starts seeded when the config is already there on first render', () => {
+		let latest: MorePanelValues | null = null;
+		function Probe() {
+			const [values] = useMorePanelValues(seeded_config);
+			latest = values;
+			return null;
+		}
+		const root = document.createElement('div');
+		act(() => {
+			render(h(Probe, {}), root);
+		});
+		expect(latest!.categories).toEqual(['Activity']);
+		render(null, root);
 	});
 });

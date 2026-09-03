@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.10
+Stable tag:        1.0.11
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -228,6 +228,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.11 =
+* Added: Default categories and Default tags in Composer defaults. The composer's More options open with them pre-selected, and a post that names no category gets them instead of WordPress's own default category. Leave them empty to keep the old behavior.
 
 = 1.0.10 =
 * Fixed: sharing a photo from the phone's share sheet lands on the Photo tab. The Web Share Target now accepts image files (Android and desktop Chrome/Edge): the picture stays on the device and the composer opens with it attached. The iOS directions add a second Shortcut, Photo to Outpost, that opens the Photo tab.
