@@ -27,9 +27,8 @@ import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
-	empty_more_values,
+	useMorePanelValues,
 	merge_more_values,
-	type MorePanelValues,
 } from '../more-panel';
 
 /**
@@ -109,8 +108,7 @@ export function PhotoMode({
 		null
 	);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] =
-		useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 
 	const a11y_active =
@@ -351,7 +349,7 @@ export function PhotoMode({
 			setEntries([]);
 			setName('');
 			setContent('');
-			setMoreValues(empty_more_values());
+			resetMoreValues();
 			setPickedLocation(null);
 			setVenueName('');
 		} catch (err) {

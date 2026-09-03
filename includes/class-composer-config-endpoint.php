@@ -24,8 +24,17 @@
  *     "postFormats": ["aside", "gallery", "image", ...] | null,
  *     "xfnRels": ["friend", "met", "colleague", ...],
  *     "existingCategories": [{"slug": "tech", "name": "Tech"}, ...],
- *     "existingTags": [{"slug": "indieweb", "name": "IndieWeb"}, ...]
+ *     "existingTags": [{"slug": "indieweb", "name": "IndieWeb"}, ...],
+ *     "siteSettings": {
+ *       "bridgyAutoSuggest": true,
+ *       "defaultPostVariant": "article",
+ *       "defaultCategories": ["Activity"],
+ *       "defaultTags": ["indieweb"]
+ *     }
  *   }
+ *
+ * `defaultCategories` / `defaultTags` are the names the composer
+ * pre-selects in More options (Outpost > Settings > Composer defaults).
  *
  * `postFormats` is null when Post Formats for Block Themes is absent —
  * the client uses null to hide the format selector entirely. When the
@@ -395,6 +404,8 @@ final class Outpost_Composer_Config_Endpoint {
 					'defaultPostVariant' => isset( $settings_payload['default_post_variant'] )
 						? (string) $settings_payload['default_post_variant']
 						: 'article',
+					'defaultCategories'  => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_category_names() : array(),
+					'defaultTags'        => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_tag_names() : array(),
 				),
 			),
 			200

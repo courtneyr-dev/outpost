@@ -36,9 +36,8 @@ import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
-	empty_more_values,
+	useMorePanelValues,
 	merge_more_values,
-	type MorePanelValues,
 } from '../more-panel';
 
 /**
@@ -545,7 +544,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	const [content, setContent] = useState(initial_share.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 
 	// Geocode-search state, used by checkin / eat / drink (any variant whose
@@ -996,7 +995,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				setReadStatus('');
 				setRating('');
 				setContent('');
-				setMoreValues(empty_more_values());
+				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
 				for (const entry of media_entries) {
@@ -1021,7 +1020,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						setReadStatus('');
 						setRating('');
 						setContent('');
-						setMoreValues(empty_more_values());
+						resetMoreValues();
 						for (const entry of media_entries) {
 							URL.revokeObjectURL(entry.preview_url);
 						}

@@ -19,9 +19,8 @@ import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
-	empty_more_values,
+	useMorePanelValues,
 	merge_more_values,
-	type MorePanelValues,
 } from '../more-panel';
 
 /**
@@ -185,7 +184,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [content, setContent] = useState(initial_share?.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	// Optional location attached to the h-entry — populated by the
 	// GeocodePicker. Two parts:
 	//   - venue_name: free-text venue label, sent as `mp-place-name`.
@@ -255,7 +254,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				mark_posted_once();
 				setContent('');
 				setTitle('');
-				setMoreValues(empty_more_values());
+				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
 				return;
@@ -271,7 +270,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 						setStatus({ kind: 'queued' });
 						setContent('');
 						setTitle('');
-						setMoreValues(empty_more_values());
+						resetMoreValues();
 						return;
 					} catch (_q_err) {
 						// Queue write failed; fall through to error display.

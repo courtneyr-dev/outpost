@@ -515,6 +515,95 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 
 	// --- Place name bridge (mp-place-name → _outpost_place_name post meta) ---
 
+	// --- Default terms bridge ----------------------------------------------
+
+	/**
+	 * @param int[]    $categories Stored default category IDs.
+	 * @param string[] $tags       Stored default tag names.
+	 * @param int      $core       WordPress's own default_category option.
+	 */
+	private function mock_default_terms( array $categories, array $tags, int $core ): void {
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
+			static function ( string $name, $fallback = false ) use ( $categories, $tags, $core ) {
+				if ( 'outpost_settings' === $name ) {
+					return array(
+						'default_categories' => $categories,
+						'default_tags'       => $tags,
+					);
+				}
+				if ( 'default_category' === $name ) {
+					return $core;
+				}
+				return $fallback;
+			}
+		);
+		WP_Mock::userFunction( 'term_exists' )->andReturn( 1 );
+	}
+
+	public function test_default_categories_replace_the_core_fallback_when_none_were_sent(): void {
+		$this->mock_default_terms( array( 1105 ), array(), 7 );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 7 ) );
+		WP_Mock::userFunction( 'wp_set_post_categories' )->once()->with( 42, array( 1105 ), false );
+		WP_Mock::userFunction( 'wp_set_post_terms' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array( 'content' => 'hi' ) ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_categories_apply_to_a_post_with_no_category_at_all(): void {
+		$this->mock_default_terms( array( 1105, 760 ), array(), 7 );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->andReturn( array() );
+		WP_Mock::userFunction( 'wp_set_post_categories' )->once()->with( 42, array( 1105, 760 ), false );
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array() ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_categories_leave_a_real_category_alone(): void {
+		$this->mock_default_terms( array( 1105 ), array(), 7 );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->andReturn( array( 7, 3 ) );
+		WP_Mock::userFunction( 'wp_set_post_categories' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array() ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_categories_skip_a_request_that_named_its_own(): void {
+		$this->mock_default_terms( array( 1105 ), array(), 7 );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->never();
+		WP_Mock::userFunction( 'wp_set_post_categories' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array( 'mp-categories' => array( 'Speaking' ) ) ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_tags_append_when_the_request_carried_no_category_property(): void {
+		$this->mock_default_terms( array(), array( 'indieweb', 'photos' ), 7 );
+		WP_Mock::userFunction( 'wp_set_post_terms' )->once()->with( 42, array( 'indieweb', 'photos' ), 'post_tag', true );
+		WP_Mock::userFunction( 'wp_set_post_categories' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array() ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_tags_skip_a_request_with_its_own_tags(): void {
+		$this->mock_default_terms( array(), array( 'indieweb' ), 7 );
+		WP_Mock::userFunction( 'wp_set_post_terms' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array( 'category' => array( 'wordpress' ) ) ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_default_terms_noop_when_nothing_is_configured(): void {
+		$this->mock_default_terms( array(), array(), 7 );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->never();
+		WP_Mock::userFunction( 'wp_set_post_categories' )->never();
+		WP_Mock::userFunction( 'wp_set_post_terms' )->never();
+
+		$this->invoke_private( 'apply_default_terms', array( 42, array() ) );
+		$this->assertTrue( true );
+	}
+
 	public function test_apply_place_name_writes_post_meta(): void {
 		WP_Mock::userFunction( 'sanitize_text_field' )
 			->with( 'Big Bend National Park' )

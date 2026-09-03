@@ -24,9 +24,8 @@ import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
-	empty_more_values,
+	useMorePanelValues,
 	merge_more_values,
-	type MorePanelValues,
 } from '../more-panel';
 
 /**
@@ -95,7 +94,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 	const [content, setContent] = useState('');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
@@ -253,7 +252,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				setRecipeYield('');
 				setDurationMinutes('');
 				setContent('');
-				setMoreValues(empty_more_values());
+				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
 				for (const entry of media_entries) {
