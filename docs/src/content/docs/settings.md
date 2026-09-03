@@ -16,10 +16,14 @@ These are site-wide defaults; each user can override them at post time from the 
 | Setting | What it does | Default |
 | --- | --- | --- |
 | Default Post variant | Which variant the Post tab opens to on every fresh composer load. Choices: Article (title + body), Note (auto-format from content length), Status, Aside, Quote. | Article |
+| Default categories | Checkboxes, one per category. The ticked ones come pre-selected in the composer's More options on every post, and a post from Outpost that names no category gets them instead of WordPress's own default (Settings → Writing → Default Post Category). Untick everything to keep WordPress's default. | None |
+| Default tags | Comma-separated tag names, pre-selected in the composer's More options. A name that doesn't exist yet is created the first time a post uses it. | None |
 | Bridgy auto-suggest | When a Reply or Doing target URL's host matches a known silo, pre-check the matching Bridgy publish target. Bridgy is a bridge service that syndicates posts to networks like Mastodon and Bluesky. Turn off if you prefer explicit syndication only. | On |
 | Auto Post-Format inference | Sets the WordPress post format automatically from the post's content signals (likes become link format, photos become image or gallery, and so on). Turn off if you prefer manual format selection. | On |
 
 ![Composer defaults form with Default Post variant, Bridgy auto-suggest, and Auto Post-Format inference fields](../../assets/screenshots/admin-settings-composer-defaults.png)
+
+The screenshot predates the Default categories and Default tags fields, which sit between Default Post variant and Bridgy auto-suggest.
 
 ## Outpost Settings (multi-tab page)
 

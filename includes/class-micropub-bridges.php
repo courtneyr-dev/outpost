@@ -194,6 +194,7 @@ final class Outpost_Micropub_Bridges {
 		self::apply_yoast_focuskw( $post_id, $properties );
 		self::apply_xfn( $post_id, $properties );
 		self::apply_categories( $post_id, $properties );
+		self::apply_default_terms( $post_id, $properties );
 		self::apply_place_name( $post_id, $properties );
 		self::apply_photo_alt_text( $post_id, $properties );
 		self::apply_featured_image( $post_id, $properties );
@@ -547,6 +548,52 @@ final class Outpost_Micropub_Bridges {
 			return;
 		}
 		wp_set_post_categories( $post_id, $ids, true );
+	}
+
+	/**
+	 * Bridge: the site's default categories and tags, for a request that
+	 * named none (Outpost > Settings > Composer defaults).
+	 *
+	 * The composer pre-selects the defaults, so a post from it normally
+	 * carries them explicitly and this does nothing. It covers the rest:
+	 * the composer with the pickers cleared, the iOS Shortcut, any other
+	 * Micropub client. Without it an untagged post gets WordPress's own
+	 * Settings > Writing default category, which is not what a site that
+	 * configured Outpost defaults asked for.
+	 *
+	 * Categories apply only when the request carried no `mp-categories`
+	 * AND the post holds nothing but core's fallback category (or none),
+	 * so a category the Micropub plugin resolved from `category[]` is
+	 * left alone. They replace rather than append, so core's fallback
+	 * doesn't ride along. Tags append only when the request carried no
+	 * `category[]` at all.
+	 *
+	 * @param int                  $post_id    Post ID.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_default_terms( int $post_id, array $properties ): void {
+		if ( ! class_exists( 'Outpost_Settings' ) ) {
+			return;
+		}
+
+		if ( ! self::has_property( $properties, 'mp-categories' ) ) {
+			$ids = Outpost_Settings::default_category_ids();
+			if ( ! empty( $ids ) ) {
+				$current = wp_get_post_categories( $post_id );
+				$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
+				$core    = (int) get_option( 'default_category' );
+				if ( empty( $current ) || array( $core ) === $current ) {
+					wp_set_post_categories( $post_id, $ids, false );
+				}
+			}
+		}
+
+		if ( ! self::has_property( $properties, 'category' ) ) {
+			$tags = Outpost_Settings::default_tag_names();
+			if ( ! empty( $tags ) ) {
+				wp_set_post_terms( $post_id, $tags, 'post_tag', true );
+			}
+		}
 	}
 
 	/**

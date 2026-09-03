@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { BridgyTarget, ComposerConfig, TermSuggestion } from '../lib/composer-config';
 import { discover_syndication_targets, type SyndicationTarget } from '../lib/micropub';
 import type { MicropubEnvironment } from '../lib/micropub';
@@ -72,6 +72,47 @@ export const empty_more_values = (): MorePanelValues => ({
 	promoteToMain: false,
 	rssChatRouting: null,
 });
+
+/**
+ * Fresh panel values seeded from the site defaults (Outpost > Settings >
+ * Composer defaults): categories and tags start pre-selected, everything
+ * else starts empty as before. No config (still loading, or an older
+ * server without the fields) seeds nothing.
+ */
+export const default_more_values = (config?: ComposerConfig | null): MorePanelValues => ({
+	...empty_more_values(),
+	categories: [...(config?.siteSettings?.defaultCategories ?? [])],
+	tags: [...(config?.siteSettings?.defaultTags ?? [])],
+});
+
+/**
+ * Panel state that starts from the site defaults.
+ *
+ * The composer mounts every mode before composer-config resolves, so the
+ * first render has no config; the effect seeds categories and tags once
+ * when it lands. The panel itself only renders once config exists, so
+ * nothing the user picked can be overwritten by the seed. `reset` returns
+ * to the seeded defaults, which is what a mode wants after a post goes
+ * out (it used to reset to empty).
+ */
+export function useMorePanelValues(
+	config?: ComposerConfig | null,
+): [MorePanelValues, (values: MorePanelValues) => void, () => void] {
+	const [values, setValues] = useState<MorePanelValues>(() => default_more_values(config));
+	const seeded = useRef<boolean>(Boolean(config));
+	useEffect(() => {
+		if (seeded.current || !config) return;
+		seeded.current = true;
+		const defaults = default_more_values(config);
+		setValues((prev) => ({
+			...prev,
+			categories: prev.categories.length > 0 ? prev.categories : defaults.categories,
+			tags: prev.tags.length > 0 ? prev.tags : defaults.tags,
+		}));
+	}, [config]);
+	const reset = (): void => setValues(default_more_values(config));
+	return [values, setValues, reset];
+}
 
 export interface MorePanelProps {
 	token: StoredToken;

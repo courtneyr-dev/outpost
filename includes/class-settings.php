@@ -15,6 +15,13 @@
  *   - default_post_format_inference (bool, default true) — controls
  *     the Post-Format auto-inference bridge in C5. Sites that prefer
  *     manual format selection can disable it.
+ *   - default_categories (int[], default []) — category term IDs the
+ *     composer pre-selects in More options, and the Micropub bridge
+ *     applies to a post that named no category. Empty means WordPress's
+ *     own Settings > Writing default category applies, as before.
+ *   - default_tags (string[], default []) — tag names the composer
+ *     pre-selects in More options, and the bridge appends to a post
+ *     whose request carried no `category[]`.
  *
  * The options are exposed to the composer via the composer-config
  * REST endpoint (`siteSettings` field) so the client can react.
@@ -37,6 +44,9 @@ final class Outpost_Settings {
 	private const OPTION_NAME    = 'outpost_settings';
 	private const SETTINGS_GROUP = 'outpost_settings_group';
 
+	/** Upper bound on default tags — a default list, not a taxonomy. */
+	private const MAX_DEFAULT_TAGS = 25;
+
 	/**
 	 * Defaults applied when a setting is missing from the stored array.
 	 *
@@ -44,6 +54,8 @@ final class Outpost_Settings {
 	 *     bridgy_auto_suggest: bool,
 	 *     default_post_variant: string,
 	 *     default_post_format_inference: bool,
+	 *     default_categories: int[],
+	 *     default_tags: string[],
 	 * }
 	 */
 	public static function defaults(): array {
@@ -51,6 +63,8 @@ final class Outpost_Settings {
 			'bridgy_auto_suggest'           => true,
 			'default_post_variant'          => 'article',
 			'default_post_format_inference' => true,
+			'default_categories'            => array(),
+			'default_tags'                  => array(),
 		);
 	}
 
@@ -100,6 +114,22 @@ final class Outpost_Settings {
 		);
 
 		add_settings_field(
+			'default_categories',
+			__( 'Default categories', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_default_categories_field' ),
+			'outpost-settings',
+			'outpost_settings_main'
+		);
+
+		add_settings_field(
+			'default_tags',
+			__( 'Default tags', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_default_tags_field' ),
+			'outpost-settings',
+			'outpost_settings_main'
+		);
+
+		add_settings_field(
 			'bridgy_auto_suggest',
 			__( 'Bridgy auto-suggest', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_bridgy_field' ),
@@ -135,7 +165,122 @@ final class Outpost_Settings {
 			'bridgy_auto_suggest'           => ! empty( $input['bridgy_auto_suggest'] ),
 			'default_post_variant'          => $variant,
 			'default_post_format_inference' => ! empty( $input['default_post_format_inference'] ),
+			'default_categories'            => self::sanitize_category_ids( $input['default_categories'] ?? array() ),
+			'default_tags'                  => self::sanitize_tag_names( $input['default_tags'] ?? '' ),
 		);
+	}
+
+	/**
+	 * Checkbox values from the settings form → positive, unique term IDs.
+	 * Existence is checked at read time (default_category_ids()), not
+	 * here, so a category deleted later just drops out.
+	 *
+	 * @param mixed $raw Submitted values.
+	 * @return int[]
+	 */
+	private static function sanitize_category_ids( $raw ): array {
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+		$ids = array();
+		foreach ( $raw as $value ) {
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+			$id = (int) $value;
+			if ( $id > 0 && ! in_array( $id, $ids, true ) ) {
+				$ids[] = $id;
+			}
+		}
+		return $ids;
+	}
+
+	/**
+	 * The comma-separated text field (or an array) → trimmed names,
+	 * de-duplicated case-insensitively, capped at MAX_DEFAULT_TAGS.
+	 *
+	 * @param mixed $raw Submitted value.
+	 * @return string[]
+	 */
+	private static function sanitize_tag_names( $raw ): array {
+		if ( is_string( $raw ) ) {
+			$raw = explode( ',', $raw );
+		}
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+		$names = array();
+		$seen  = array();
+		foreach ( $raw as $value ) {
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+			$clean = trim( sanitize_text_field( (string) $value ) );
+			if ( '' === $clean ) {
+				continue;
+			}
+			$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $clean ) : strtolower( $clean );
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+			$seen[ $key ] = true;
+			$names[]      = $clean;
+			if ( count( $names ) >= self::MAX_DEFAULT_TAGS ) {
+				break;
+			}
+		}
+		return $names;
+	}
+
+	/**
+	 * Stored default category IDs that still exist, in stored order.
+	 *
+	 * @return int[]
+	 */
+	public static function default_category_ids(): array {
+		$settings = self::get();
+		$stored   = is_array( $settings['default_categories'] ) ? $settings['default_categories'] : array();
+		$ids      = array();
+		foreach ( $stored as $raw ) {
+			$id = (int) $raw;
+			if ( $id > 0 && term_exists( $id, 'category' ) ) {
+				$ids[] = $id;
+			}
+		}
+		return $ids;
+	}
+
+	/**
+	 * Default category names for the composer (it picks terms by name).
+	 *
+	 * @return string[]
+	 */
+	public static function default_category_names(): array {
+		$names = array();
+		foreach ( self::default_category_ids() as $id ) {
+			$term = get_term( $id, 'category' );
+			if ( $term instanceof \WP_Term && '' !== (string) $term->name ) {
+				$names[] = (string) $term->name;
+			}
+		}
+		return $names;
+	}
+
+	/**
+	 * Default tag names, as stored.
+	 *
+	 * @return string[]
+	 */
+	public static function default_tag_names(): array {
+		$settings = self::get();
+		$tags     = is_array( $settings['default_tags'] ) ? $settings['default_tags'] : array();
+		$out      = array();
+		foreach ( $tags as $tag ) {
+			if ( is_scalar( $tag ) && '' !== (string) $tag ) {
+				$out[] = (string) $tag;
+			}
+		}
+		return $out;
 	}
 
 	public static function render_section_intro(): void {
@@ -167,6 +312,60 @@ final class Outpost_Settings {
 		echo '</select>';
 		echo '<p class="description">' . esc_html__(
 			'The variant the Post tab opens to on every fresh composer load.',
+			'outpost-mobile-publishing'
+		) . '</p>';
+	}
+
+	public static function render_default_categories_field(): void {
+		$settings = self::get();
+		$selected = array_map( 'intval', is_array( $settings['default_categories'] ) ? $settings['default_categories'] : array() );
+		$terms    = get_terms(
+			array(
+				'taxonomy'   => 'category',
+				'hide_empty' => false,
+				'number'     => 200,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+			)
+		);
+		if ( ! is_array( $terms ) || empty( $terms ) ) {
+			echo '<p class="description">' . esc_html__(
+				'No categories exist yet. Create one under Posts > Categories first.',
+				'outpost-mobile-publishing'
+			) . '</p>';
+			return;
+		}
+		echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Default categories', 'outpost-mobile-publishing' ) . '</legend>';
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
+			}
+			printf(
+				'<label style="display:block;margin-bottom:4px"><input type="checkbox" name="%1$s[default_categories][]" value="%2$d"%3$s /> %4$s</label>',
+				esc_attr( self::OPTION_NAME ),
+				(int) $term->term_id,
+				checked( in_array( (int) $term->term_id, $selected, true ), true, false ),
+				esc_html( $term->name )
+			);
+		}
+		echo '</fieldset>';
+		echo '<p class="description">' . esc_html__(
+			'Pre-selected in the composer\'s More options on every post, and applied to a post from Outpost that names no category. Leave every box unticked to keep WordPress\'s own default category (Settings > Writing).',
+			'outpost-mobile-publishing'
+		) . '</p>';
+	}
+
+	public static function render_default_tags_field(): void {
+		$settings = self::get();
+		$tags     = is_array( $settings['default_tags'] ) ? $settings['default_tags'] : array();
+		printf(
+			'<input type="text" class="regular-text" id="default_tags" name="%1$s[default_tags]" value="%2$s" placeholder="%3$s" />',
+			esc_attr( self::OPTION_NAME ),
+			esc_attr( implode( ', ', $tags ) ),
+			esc_attr__( 'indieweb, photos', 'outpost-mobile-publishing' )
+		);
+		echo '<p class="description">' . esc_html__(
+			'Comma-separated tag names, pre-selected in the composer\'s More options. A name that doesn\'t exist yet is created the first time a post uses it. Leave empty for no default tags.',
 			'outpost-mobile-publishing'
 		) . '</p>';
 	}

@@ -18,9 +18,8 @@ import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
-	empty_more_values,
+	useMorePanelValues,
 	merge_more_values,
-	type MorePanelValues,
 } from '../more-panel';
 
 /**
@@ -156,7 +155,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [content, setContent] = useState(initial_share.content ?? '');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
-	const [more_values, setMoreValues] = useState<MorePanelValues>(empty_more_values());
+	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
 	const [venue_name, setVenueName] = useState('');
@@ -212,7 +211,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				setTitle('');
 				setPrimaryValue('');
 				setContent('');
-				setMoreValues(empty_more_values());
+				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
 				return;
@@ -228,7 +227,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						setStatus({ kind: 'queued' });
 						setPrimaryValue('');
 						setContent('');
-						setMoreValues(empty_more_values());
+						resetMoreValues();
 						return;
 					} catch (_q_err) {
 						// Queue write failed; surface the original post error below.
