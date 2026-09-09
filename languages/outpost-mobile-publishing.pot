@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.10\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.12\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-09T13:12:30+00:00\n"
+"POT-Creation-Date: 2026-09-09T13:36:33+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -1002,55 +1002,80 @@ msgstr ""
 msgid "Server requirements"
 msgstr ""
 
-#: includes/class-settings.php:89
+#: includes/class-settings.php:103
 msgid "Composer defaults"
 msgstr ""
 
-#: includes/class-settings.php:96
+#: includes/class-settings.php:110
 msgid "Default Post variant"
 msgstr ""
 
-#: includes/class-settings.php:104
+#: includes/class-settings.php:118
+#: includes/class-settings.php:338
+msgid "Default categories"
+msgstr ""
+
+#: includes/class-settings.php:126
+msgid "Default tags"
+msgstr ""
+
+#: includes/class-settings.php:134
 msgid "Bridgy auto-suggest"
 msgstr ""
 
-#: includes/class-settings.php:112
+#: includes/class-settings.php:142
 msgid "Auto Post-Format inference"
 msgstr ""
 
-#: includes/class-settings.php:142
+#: includes/class-settings.php:287
 msgid "Site-wide defaults the Outpost composer respects. Each user can override at post time from the More options panel."
 msgstr ""
 
-#: includes/class-settings.php:152
+#: includes/class-settings.php:297
 msgid "Article (title + body)"
 msgstr ""
 
-#: includes/class-settings.php:153
+#: includes/class-settings.php:298
 msgid "Note (auto-format from content length)"
 msgstr ""
 
-#: includes/class-settings.php:154
+#: includes/class-settings.php:299
 msgid "Status (forces the Status post format)"
 msgstr ""
 
-#: includes/class-settings.php:155
+#: includes/class-settings.php:300
 msgid "Aside (forces the Aside post format)"
 msgstr ""
 
-#: includes/class-settings.php:156
+#: includes/class-settings.php:301
 msgid "Quote (forces the Quote post format)"
 msgstr ""
 
-#: includes/class-settings.php:168
+#: includes/class-settings.php:313
 msgid "The variant the Post tab opens to on every fresh composer load."
 msgstr ""
 
-#: includes/class-settings.php:181
+#: includes/class-settings.php:332
+msgid "No categories exist yet. Create one under Posts > Categories first."
+msgstr ""
+
+#: includes/class-settings.php:352
+msgid "Pre-selected in the composer's More options on every post, and applied to a post from Outpost that names no category. Leave every box unticked to keep WordPress's own default category (Settings > Writing)."
+msgstr ""
+
+#: includes/class-settings.php:365
+msgid "indieweb, photos"
+msgstr ""
+
+#: includes/class-settings.php:367
+msgid "Comma-separated tag names, pre-selected in the composer's More options. A name that doesn't exist yet is created the first time a post uses it. Leave empty for no default tags."
+msgstr ""
+
+#: includes/class-settings.php:380
 msgid "When the Reply / Doing target URL host matches a known silo, pre-check the matching Bridgy publish target."
 msgstr ""
 
-#: includes/class-settings.php:195
+#: includes/class-settings.php:394
 msgid "Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only."
 msgstr ""
 
