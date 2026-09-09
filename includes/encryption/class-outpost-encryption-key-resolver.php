@@ -106,6 +106,24 @@ final class Outpost_Encryption_Key_Resolver {
 	}
 
 	/**
+	 * Whether OUTPOST_ENCRYPTION_KEY is defined AND the right length, i.e.
+	 * whether resolve() will actually use it.
+	 *
+	 * `constant_is_defined()` answers a narrower question and must not be
+	 * used to decide whether the key is out of the database: a constant of
+	 * the wrong length is defined but unused, and resolve() falls back to
+	 * the stored key. Callers that care where the key lives want this.
+	 *
+	 * @return bool
+	 */
+	public static function constant_is_usable(): bool {
+		if ( ! defined( 'OUTPOST_ENCRYPTION_KEY' ) ) {
+			return false;
+		}
+		return self::KEY_BYTES === strlen( (string) constant( 'OUTPOST_ENCRYPTION_KEY' ) );
+	}
+
+	/**
 	 * Whether a key value exists in wp_options. Doesn't decode or
 	 * validate; just presence-check. Used by the admin notice.
 	 *

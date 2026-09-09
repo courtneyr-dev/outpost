@@ -52,9 +52,10 @@ final class Outpost_Encryption_Key_Notice {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		if ( Outpost_Encryption_Key_Resolver::constant_is_defined() ) {
+		if ( Outpost_Encryption_Key_Resolver::constant_is_usable() ) {
 			return;
 		}
+		$constant_is_wrong_length = Outpost_Encryption_Key_Resolver::constant_is_defined();
 		if ( ! Outpost_Encryption_Key_Resolver::option_value_exists() ) {
 			return;
 		}
@@ -75,10 +76,17 @@ final class Outpost_Encryption_Key_Notice {
 
 		echo '<div class="notice notice-warning is-dismissible outpost-encryption-key-notice">';
 		echo '<p>';
-		echo esc_html__(
-			'Outpost: Your encryption key is stored in the database. For best security, move it to wp-config.php.',
-			'outpost-mobile-publishing'
-		);
+		if ( $constant_is_wrong_length ) {
+			echo esc_html__(
+				'Outpost: OUTPOST_ENCRYPTION_KEY is defined in wp-config.php but is not 32 raw bytes, so Outpost is ignoring it and using the key stored in the database. Wrap the value in base64_decode().',
+				'outpost-mobile-publishing'
+			);
+		} else {
+			echo esc_html__(
+				'Outpost: Your encryption key is stored in the database. For best security, move it to wp-config.php.',
+				'outpost-mobile-publishing'
+			);
+		}
 		echo ' <a href="' . esc_url( $docs_url ) . '" target="_blank" rel="noopener">';
 		echo esc_html__( 'Show instructions →', 'outpost-mobile-publishing' );
 		echo '</a>';
