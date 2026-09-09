@@ -206,4 +206,114 @@ final class MicropubPhotoWriteShapeTest extends TestCase {
 			'Parallel-array shape: alt[1] must persist on attachment[1].'
 		);
 	}
+
+	/**
+	 * Test 3: photo caption → attachment `post_excerpt`.
+	 *
+	 * A caption is prose shown under the photo, distinct from alt text.
+	 * WordPress keeps it as the attachment post's excerpt, which is the
+	 * field the media library shows and core's Image block renders. This
+	 * fires the real `after_micropub` action, so it also proves the bridge
+	 * is wired — a writer nothing calls is a feature that does not exist.
+	 *
+	 * @test
+	 */
+	public function photo_caption_is_written_to_the_attachment_excerpt(): void {
+		$att = $this->make_attachment( 'Photo with a caption' );
+
+		$input = array(
+			'properties' => array(
+				'photo' => array(
+					array(
+						'value'   => $att['url'],
+						'alt'     => 'Three wild turkeys on a suburban lawn',
+						'caption' => 'They own this street now',
+					),
+				),
+			),
+		);
+
+		do_action( 'after_micropub', $input, array( 'ID' => $this->test_post_id ) );
+
+		$this->assertSame(
+			'They own this street now',
+			get_post_field( 'post_excerpt', $att['id'] ),
+			'Caption must land on the attachment excerpt.'
+		);
+		$this->assertSame(
+			'Three wild turkeys on a suburban lawn',
+			get_post_meta( $att['id'], '_wp_attachment_image_alt', true ),
+			'Alt text must be unaffected by the caption write.'
+		);
+	}
+
+	/**
+	 * A photo with no caption leaves the attachment excerpt alone. Every
+	 * post published before this feature took that path, so it must stay
+	 * a no-op rather than blanking an excerpt set elsewhere.
+	 *
+	 * @test
+	 */
+	public function absent_caption_leaves_the_existing_excerpt_untouched(): void {
+		$att = $this->make_attachment( 'Photo without a caption' );
+		wp_update_post(
+			array(
+				'ID'           => $att['id'],
+				'post_excerpt' => 'Set by hand in the media library',
+			)
+		);
+
+		$input = array(
+			'properties' => array(
+				'photo' => array(
+					array(
+						'value' => $att['url'],
+						'alt'   => 'Alt text but no caption',
+					),
+				),
+			),
+		);
+
+		do_action( 'after_micropub', $input, array( 'ID' => $this->test_post_id ) );
+
+		$this->assertSame(
+			'Set by hand in the media library',
+			get_post_field( 'post_excerpt', $att['id'] ),
+			'A post with no caption must not touch the attachment excerpt.'
+		);
+	}
+
+	/**
+	 * Outpost's own composer sends the parallel-array shape — `photo[]` of
+	 * URLs alongside `mp-photo-alt[]` — not the structured `{value, alt}`
+	 * object. Captions must travel the same way or the bridge never fires
+	 * for a post made in Outpost.
+	 *
+	 * @test
+	 */
+	public function caption_is_written_from_the_parallel_array_shape(): void {
+		$one = $this->make_attachment( 'Parallel shape photo one' );
+		$two = $this->make_attachment( 'Parallel shape photo two' );
+
+		$input = array(
+			'properties' => array(
+				'photo'             => array( $one['url'], $two['url'] ),
+				'mp-photo-alt'      => array( 'Alt for one', 'Alt for two' ),
+				'mp-photo-caption'  => array( 'Caption for one', 'Caption for two' ),
+			),
+		);
+
+		do_action( 'after_micropub', $input, array( 'ID' => $this->test_post_id ) );
+
+		$this->assertSame(
+			'Caption for one',
+			get_post_field( 'post_excerpt', $one['id'] ),
+			'Parallel-shape caption must pair to the first photo by index.'
+		);
+		$this->assertSame(
+			'Caption for two',
+			get_post_field( 'post_excerpt', $two['id'] ),
+			'Parallel-shape caption must pair to the second photo by index.'
+		);
+	}
 }

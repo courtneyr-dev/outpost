@@ -1120,4 +1120,40 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		);
 		$this->assertTrue( true );
 	}
+
+	/**
+	 * A caption is prose shown under the photo, distinct from alt text, and
+	 * WordPress keeps it as the attachment's post_excerpt.
+	 */
+	public function test_apply_photo_captions_writes_attachment_excerpt(): void {
+		WP_Mock::userFunction( 'attachment_url_to_postid' )
+			->with( 'https://example.test/wp-content/uploads/2026/09/turkey.jpg' )
+			->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )->with( 101 )->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->with( 'They own this street now' )
+			->andReturn( 'They own this street now' );
+		WP_Mock::userFunction( 'wp_update_post' )
+			->once()
+			->with(
+				array(
+					'ID'           => 101,
+					'post_excerpt' => 'They own this street now',
+				)
+			)
+			->andReturn( 101 );
+
+		$properties = array(
+			'photo' => array(
+				array(
+					'value'   => 'https://example.test/wp-content/uploads/2026/09/turkey.jpg',
+					'alt'     => 'Three wild turkeys on a suburban lawn',
+					'caption' => 'They own this street now',
+				),
+			),
+		);
+		$this->invoke_private( 'apply_photo_captions', array( 42, $properties ) );
+		$this->assertTrue( true );
+	}
 }
