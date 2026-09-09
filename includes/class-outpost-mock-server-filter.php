@@ -49,10 +49,6 @@ final class Outpost_Mock_Server_Filter {
 		'api.prod.whoop.com',
 		'polarremote.com',
 		'www.polaraccesslink.com',
-		// G4 inbound (Apple Music + iTunes).
-		'itunes.apple.com',
-		// G10 scripture (placeholders for upcoming providers).
-		'api.scripture.bible',
 		// F-phase inbound — sources that hit upstreams directly.
 		'open.spotify.com',
 		'www.youtube.com',
