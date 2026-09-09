@@ -107,6 +107,15 @@ final class Outpost_POSSE_Dispatcher {
 		}
 		$post_id = (int) $post->ID;
 
+		// When a real user drove this transition, they must be able to edit
+		// the post. Without this the check below authorizes the post's
+		// author, not the actor, so a user who can flip another author's
+		// post into `publish` syndicates content they cannot edit.
+		// Cron and WP-CLI have no current user; those keep the author check.
+		if ( get_current_user_id() > 0 && ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
 		$publishing_user_id = (int) ( $post->post_author ?? get_current_user_id() );
 		if ( ! user_can( $publishing_user_id, 'publish_posts' ) ) {
 			return;

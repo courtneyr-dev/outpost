@@ -400,6 +400,62 @@ async function safe_read_text(response: Response): Promise<string> {
 }
 
 /**
+ * Run a Micropub `?q=` query, keeping the token out of the URL unless the
+ * host makes that impossible.
+ *
+ * The bearer goes in the Authorization header. Some managed hosts strip that
+ * header, and the Micropub spec allows a GET query to carry the bearer as an
+ * `access_token` parameter instead — but a query string is logged by the
+ * origin, by any reverse proxy or CDN in front of it, and is part of the cache
+ * key, so sending it unconditionally leaked a live credential into logs on
+ * every host including the ones where the header arrives intact.
+ *
+ * So: header first, and fall back to the parameter only after a 401, which is
+ * what a stripped header looks like from here. A 403 is a permissions answer,
+ * not a missing credential, so it is not retried.
+ */
+async function micropub_query(
+	micropub_endpoint: string,
+	query: string,
+	access_token: string,
+	env: MicropubEnvironment,
+	context: string,
+): Promise<Response> {
+	const separator = micropub_endpoint.includes('?') ? '&' : '?';
+	const base = micropub_endpoint + separator + 'q=' + encodeURIComponent(query);
+	const headers = {
+		Authorization: 'Bearer ' + access_token,
+		Accept: 'application/json',
+	};
+
+	let response: Response;
+	try {
+		response = await env.fetch(base, { method: 'GET', headers, credentials: 'omit' });
+	} catch (err) {
+		throw new MicropubError(
+			context + ': fetch threw — ' + (err instanceof Error ? err.message : String(err)),
+			'discovery_failed',
+		);
+	}
+
+	if (response.status !== 401) {
+		return response;
+	}
+
+	// Header path rejected. Retry once with the token in the query string, the
+	// only option left on a host that strips Authorization.
+	const fallback_url = base + '&access_token=' + encodeURIComponent(access_token);
+	try {
+		return await env.fetch(fallback_url, { method: 'GET', headers, credentials: 'omit' });
+	} catch (err) {
+		throw new MicropubError(
+			context + ': fetch threw — ' + (err instanceof Error ? err.message : String(err)),
+			'discovery_failed',
+		);
+	}
+}
+
+/**
  * Discover the Micropub media endpoint via `?q=config`.
  *
  * Per the Micropub spec, querying the micropub endpoint with `?q=config`
@@ -411,32 +467,13 @@ export async function discover_media_endpoint(
 	access_token: string,
 	env: MicropubEnvironment = default_env,
 ): Promise<string> {
-	const separator = micropub_endpoint.includes('?') ? '&' : '?';
-	// Per the Micropub spec, GET queries can carry the bearer in `access_token`.
-	// Header is still preferred (and sent below) but the query param is a
-	// fallback for hosts that strip Authorization.
-	const url =
-		micropub_endpoint +
-		separator +
-		'q=config&access_token=' +
-		encodeURIComponent(access_token);
-	let response: Response;
-	try {
-		response = await env.fetch(url, {
-			method: 'GET',
-			headers: {
-				Authorization: 'Bearer ' + access_token,
-				Accept: 'application/json',
-			},
-			credentials: 'omit',
-		});
-	} catch (err) {
-		throw new MicropubError(
-			'discover_media_endpoint: fetch threw — ' +
-				(err instanceof Error ? err.message : String(err)),
-			'discovery_failed',
-		);
-	}
+	const response = await micropub_query(
+		micropub_endpoint,
+		'config',
+		access_token,
+		env,
+		'discover_media_endpoint',
+	);
 
 	if (!response.ok) {
 		throw new MicropubError(
@@ -472,29 +509,13 @@ export async function discover_syndication_targets(
 	access_token: string,
 	env: MicropubEnvironment = default_env,
 ): Promise<SyndicationTarget[]> {
-	const separator = micropub_endpoint.includes('?') ? '&' : '?';
-	const url =
-		micropub_endpoint +
-		separator +
-		'q=syndicate-to&access_token=' +
-		encodeURIComponent(access_token);
-	let response: Response;
-	try {
-		response = await env.fetch(url, {
-			method: 'GET',
-			headers: {
-				Authorization: 'Bearer ' + access_token,
-				Accept: 'application/json',
-			},
-			credentials: 'omit',
-		});
-	} catch (err) {
-		throw new MicropubError(
-			'discover_syndication_targets: fetch threw — ' +
-				(err instanceof Error ? err.message : String(err)),
-			'discovery_failed',
-		);
-	}
+	const response = await micropub_query(
+		micropub_endpoint,
+		'syndicate-to',
+		access_token,
+		env,
+		'discover_syndication_targets',
+	);
 
 	if (!response.ok) {
 		throw new MicropubError(

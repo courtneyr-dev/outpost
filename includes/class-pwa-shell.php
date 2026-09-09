@@ -412,31 +412,31 @@ final class Outpost_PWA_Shell {
 			// plain homescreen shortcut, which never gets share_target.
 			'icons'            => array(
 				array(
-					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-192.png',
+					'src'     => OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon-192.png',
 					'sizes'   => '192x192',
 					'type'    => 'image/png',
 					'purpose' => 'any',
 				),
 				array(
-					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-512.png',
+					'src'     => OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon-512.png',
 					'sizes'   => '512x512',
 					'type'    => 'image/png',
 					'purpose' => 'any',
 				),
 				array(
-					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-maskable-512.png',
+					'src'     => OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon-maskable-512.png',
 					'sizes'   => '512x512',
 					'type'    => 'image/png',
 					'purpose' => 'maskable',
 				),
 				array(
-					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon.svg',
+					'src'     => OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon.svg',
 					'sizes'   => 'any',
 					'type'    => 'image/svg+xml',
 					'purpose' => 'any',
 				),
 				array(
-					'src'     => '/wp-content/plugins/outpost/assets/icons/outpost-icon-maskable.svg',
+					'src'     => OUTPOST_PLUGIN_URL . 'assets/icons/outpost-icon-maskable.svg',
 					'sizes'   => 'any',
 					'type'    => 'image/svg+xml',
 					'purpose' => 'maskable',

@@ -262,6 +262,20 @@ if ( ! function_exists( 'add_filter' ) ) {
 		return true;
 	}
 }
+if ( ! function_exists( 'has_filter' ) ) {
+	// Unit tests register no core cookie validators, so nothing is
+	// hooked and Outpost_Request_Headers::resolve_token_user() has
+	// nothing to unhook — it falls through to the mocked
+	// determine_current_user filter the tests already expect.
+	function has_filter( ...$args ) {
+		return false;
+	}
+}
+if ( ! function_exists( 'remove_filter' ) ) {
+	function remove_filter( ...$args ): bool {
+		return true;
+	}
+}
 if ( ! function_exists( 'register_activation_hook' ) ) {
 	function register_activation_hook( ...$args ): void {
 		// no-op for unit tests.

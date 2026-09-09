@@ -16,12 +16,8 @@ Paste a link from one of these services into the composer and Outpost recognizes
 | [Bear Blog](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/bear-blog.md) | Suggests a Read post for the pasted article |
 | [Mataroa](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/mataroa.md) | Suggests a Read post for the pasted article |
 | [iFixit](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/ifixit.md) | Suggests a Bookmark for the repair guide |
-| [Sefaria](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/sefaria.md) | Suggests a Quote post with the referenced Jewish text |
-| [SuttaCentral](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/suttacentral.md) | Suggests a Quote post with the referenced Buddhist text |
 | [Snipd](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/snipd.md) | Captures podcast snips from Snipd share links |
 | [Pretalx](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/pretalx.md) | Captures conference talk details from Pretalx pages |
-| [Ravelry](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/ravelry-source.md) | Captures knit/crochet pattern and project metadata (requires a connected Ravelry account) |
-| [Ride With GPS](https://github.com/courtneyr-dev/outpost/blob/main/docs/adapters/ridewithgps-source.md) | Captures trip and route details (requires a connected Ride With GPS account) |
 
 Many other hosts (Spotify, YouTube, Goodreads, Mastodon, Bluesky, and about 30 more) get generic metadata capture without a dedicated adapter — [Privacy and data](/outpost/privacy-and-data/) lists them.
 

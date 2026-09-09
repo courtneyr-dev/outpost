@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
 	discover_micropub_endpoint,
+	discover_media_endpoint,
+	discover_syndication_targets,
 	post_note,
 	MicropubError,
 	type MicropubEnvironment,
@@ -293,5 +295,73 @@ describe('post_note', () => {
 			env,
 		);
 		expect(result.location).toBe('https://example.test/lc');
+	});
+});
+
+describe('?q= discovery keeps the token out of the URL', () => {
+	const TOKEN = 'SECRET_TOKEN_VALUE';
+
+	function recording_env(responses: Response[]): {
+		env: MicropubEnvironment;
+		urls: string[];
+	} {
+		const urls: string[] = [];
+		let i = 0;
+		const env: MicropubEnvironment = {
+			fetch: async (input: URL | RequestInfo) => {
+				urls.push(String(input));
+				return responses[Math.min(i++, responses.length - 1)] as Response;
+			},
+		};
+		return { env, urls };
+	}
+
+	it('sends the bearer in the header and never in the URL on the happy path', async () => {
+		const { env, urls } = recording_env([
+			make_response({ body: JSON.stringify({ 'media-endpoint': 'https://example.test/media' }) }),
+		]);
+
+		const endpoint = await discover_media_endpoint('https://example.test/mp', TOKEN, env);
+
+		expect(endpoint).toBe('https://example.test/media');
+		expect(urls).toHaveLength(1);
+		expect(urls[0]).not.toContain(TOKEN);
+		expect(urls[0]).not.toContain('access_token');
+	});
+
+	it('falls back to the query parameter only after a 401', async () => {
+		const { env, urls } = recording_env([
+			make_response({ status: 401 }),
+			make_response({ body: JSON.stringify({ 'media-endpoint': 'https://example.test/media' }) }),
+		]);
+
+		const endpoint = await discover_media_endpoint('https://example.test/mp', TOKEN, env);
+
+		expect(endpoint).toBe('https://example.test/media');
+		expect(urls).toHaveLength(2);
+		expect(urls[0]).not.toContain('access_token');
+		expect(urls[1]).toContain('access_token=' + TOKEN);
+	});
+
+	it('does not retry a 403, which is a permissions answer not a stripped header', async () => {
+		const { env, urls } = recording_env([ make_response({ status: 403 }) ]);
+
+		await expect(
+			discover_media_endpoint('https://example.test/mp', TOKEN, env),
+		).rejects.toBeInstanceOf(MicropubError);
+
+		expect(urls).toHaveLength(1);
+		expect(urls[0]).not.toContain('access_token');
+	});
+
+	it('applies the same rule to the syndicate-to query', async () => {
+		const { env, urls } = recording_env([
+			make_response({ body: JSON.stringify({ 'syndicate-to': [] }) }),
+		]);
+
+		await discover_syndication_targets('https://example.test/mp', TOKEN, env);
+
+		expect(urls).toHaveLength(1);
+		expect(urls[0]).not.toContain(TOKEN);
 	});
 });

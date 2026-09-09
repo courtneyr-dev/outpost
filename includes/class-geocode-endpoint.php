@@ -143,8 +143,7 @@ final class Outpost_Geocode_Endpoint {
 		if ( '' === Outpost_Request_Headers::authorization() ) {
 			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
 		}
-		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
-		$user_id = (int) apply_filters( 'determine_current_user', false );
+		$user_id = Outpost_Request_Headers::resolve_token_user();
 		if ( $user_id > 0 ) {
 			wp_set_current_user( $user_id );
 		}

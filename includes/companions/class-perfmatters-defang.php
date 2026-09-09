@@ -114,15 +114,22 @@ final class Outpost_Perfmatters_Defang {
 	}
 
 	/**
-	 * True when the current request is an Outpost PWA route. Read via
-	 * Outpost_Route_Handler::QUERY_VAR which dispatch() consults; non-
-	 * empty values indicate one of `composer`, `auth-callback`,
-	 * `share-target`, `manifest`, `sw`, `shortcut`.
+	 * True when the current request is an Outpost PWA route.
+	 *
+	 * Identity comes from the matched rewrite rule, the same source
+	 * Outpost_Route_Handler::dispatch() trusts. The `outpost_route` query
+	 * var is public, so any URL can set it; reading it here would let
+	 * `/?outpost_route=x` on an unrelated page turn these filters on.
 	 *
 	 * @since 0.1.70
 	 */
 	private static function is_outpost_route(): bool {
-		$route = (string) get_query_var( Outpost_Route_Handler::QUERY_VAR );
-		return '' !== $route;
+		$matched = isset( $GLOBALS['wp'], $GLOBALS['wp']->matched_rule )
+			? (string) $GLOBALS['wp']->matched_rule
+			: '';
+		if ( '' === $matched ) {
+			return false;
+		}
+		return isset( Outpost_Route_Handler::rules()[ $matched ] );
 	}
 }

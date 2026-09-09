@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.11
+Stable tag:        1.0.12
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -151,15 +151,16 @@ Outpost publishes to your own WordPress site through the Micropub plugin. It con
 = Syndication (per post, only for chips you leave enabled) =
 
 * **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the Bridgy endpoint you configured: **brid.gy** (Flickr, GitHub, Reddit), **bsky.brid.gy** (Bluesky), or **fed.brid.gy** (the fediverse). Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
-* **Telegraph (a Telegram service)** — when the Telegraph chip is enabled, the post's content is sent to api.telegra.ph to create the syndicated copy. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
+* **Telegraph (a Telegram service)** — off, and there is no settings screen for it yet; it stays off unless a site owner deliberately sets the `outpost_telegraph_enabled` option. While it is on, each post you publish is sent to api.telegra.ph, which creates a public copy of it at a telegra.ph address. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
 * **Beehiiv** — newsletter destination; when configured with an API key and enabled on a post, the post's content is sent to api.beehiiv.com. [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy).
 * **Buttondown** — newsletter destination; sends the post's content to api.buttondown.email when enabled. [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy).
-* **Kit (formerly ConvertKit)** — newsletter destination; sends the post's content to api.convertkit.com when enabled. [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy).
+* **Kit (formerly ConvertKit)** — newsletter destination; sends the post's content to api.convertkit.com when enabled, and records the resulting broadcast’s app.kit.com URL on the post (that URL is stored and displayed, never requested). [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy).
 * **write.as** — blog destination; sends the post's content to the write.as API when enabled. [Platform guidelines](https://write.as/guidelines), [Privacy](https://write.as/privacy).
 
 = Reply context and link previews =
 
 * **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page (and, where available, its feed or oEmbed endpoint) once to build the preview (title, image, summary). Only the URL you pasted and endpoints it advertises are requested, from whatever site it points to.
+* **Recognized link hosts** — to pick the right post kind and read the right fields, Outpost matches a pasted link against a built-in list of host patterns (Bandcamp, Bluesky, Goodreads, iFixit, Last.fm, Mastodon, Mataroa, Medium, Pinterest, Pretalx, Readwise, Reddit, Snipd, Substack, TikTok, Twitch, Apple Music, Apple Podcasts, Amazon, Bear Blog, and others). Matching happens entirely on your own server and sends nothing anywhere: the only request is the one to the page you pasted, described above. Hosts named in the plugin for this purpose are not services Outpost contacts.
 * **Named oEmbed providers** — for four hosts, Outpost skips discovery and requests a known oEmbed endpoint directly, sending only the URL you pasted. This happens once per pasted link, and only for that host:
     * **Vimeo** — vimeo.com/api/oembed.json. [Terms](https://vimeo.com/terms), [Privacy](https://vimeo.com/privacy).
     * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
@@ -177,10 +178,10 @@ Connecting an account sends you to that service's sign-in page to authorize Outp
 
 * **Notion** — api.notion.com (authorize, token exchange, and reading a page you cite). [Terms and privacy](https://www.notion.com/terms).
 * **Oura** — cloud.ouraring.com (authorize) and api.ouraring.com (token, verify, recent activity). [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
-* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [Terms](https://www.whoop.com/us/en/termsofuse/), [Privacy](https://www.whoop.com/us/en/privacy/).
+* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [API terms of use](https://developer.whoop.com/api-terms-of-use/), [API privacy and security terms](https://developer.whoop.com/api-terms-of-use/#6-whoop-privacy-and-security), [Privacy policy](https://www.whoop.com/privacy/).
 * **Polar (Flow / AccessLink)** — flow.polar.com (authorize), polarremote.com (token, revoke), and www.polaraccesslink.com (register, verify, recent activity). [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
-* **Ride With GPS** — ridewithgps.com (authorize, token, verify, and reading a trip or route you cite). [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
-* **Ravelry** — www.ravelry.com (authorize, token) and api.ravelry.com (verify, and reading a pattern or project you cite). [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
+* **Ride With GPS** — ridewithgps.com (authorize, token, and one call to confirm the connection is live). [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
+* **Ravelry** — www.ravelry.com (authorize, token) and api.ravelry.com (one call to confirm the connection is live). [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
 
 = Manual share (opens the service in your browser, only when you tap its chip) =
 
@@ -195,6 +196,10 @@ These destinations have no posting API Outpost can use, so sharing to them is a 
 * **Instagram** and **Instagram Stories** — the Instagram app on your phone; your photo is handed to it through the share sheet. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
 * **TikTok** — the TikTok app on your phone. [Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en).
 * **Flickr** — the Flickr app, or flickr.com to finish by hand. [Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy).
+
+= Links Outpost hands you (no request from your server) =
+
+* **iCloud Shortcuts** — the iOS Shortcut installer link on the Outpost settings screen points at www.icloud.com/shortcuts/. Your site never contacts iCloud; the link opens in your browser only when you tap it. [Terms](https://www.apple.com/legal/internet-services/icloud/), [Privacy](https://www.apple.com/legal/privacy/).
 
 = Inbound only (no data sent) =
 
@@ -228,6 +233,24 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.12 =
+* Security: the composer sent your Micropub access token in the query string when it looked up the media endpoint and your syndication targets, on every host and every time. Query strings are written to server access logs, to any proxy or CDN in front of the site, and into cache keys, so a live token with permission to post was being recorded in places it should never appear. The token now travels in the Authorization header, and only falls back to the query string after a 401, which is what a host that strips that header looks like. Found in internal review.
+* Security: the Micropub bridges wrote a post's featured image, place name, categories, post format, focus keyphrase, and XFN values without checking that the acting user could edit that post. The bridges run on update as well as create, and the Micropub plugin resolves the target post from a URL in the request while checking only a site-wide capability, so an Author could set those values on posts and pages belonging to Editors and Administrators. The bridges now check edit_post on the target before writing anything. Found in internal review.
+* Security: creating a new category through Micropub now requires manage_categories. Any user who could post was able to create terms in the site's primary taxonomy, which WordPress otherwise reserves. Assigning existing categories is unchanged.
+* Security: POSSE syndication now checks that the user who triggered a post's transition to published can edit it. The check authorized the post's author rather than the acting user, so someone who could flip another author's post into published could syndicate content they could not edit. Scheduled posts and WP-CLI, which have no acting user, are unaffected.
+* Security: Telegraph syndication is now off unless the `outpost_telegraph_enabled` option is set. Its publish hook was registered unconditionally, so with the plugin merely active, publishing any post sent that post to api.telegra.ph — which creates a public copy of it — and the first publish also registered a Telegraph account carrying the site's name and address. There was no setting to turn it off and no chip to enable, contrary to what this readme described. Consent is now checked both where the hook is registered and inside the handler. Found in internal review.
+* Fixed: if OUTPOST_ENCRYPTION_KEY was defined in wp-config.php but was not exactly 32 raw bytes — what happens when the base64 string is pasted without base64_decode() — Outpost ignored it and used the key stored in the database, while the notice warning that the key is in the database was suppressed because the constant was defined. The site owner who took the trouble to move the key got no signal that it had not moved. The notice now reports the wrong-length constant and says how to fix it.
+* Security: seven REST endpoints accepted a request that carried a logged-in cookie and any non-empty access_token in the body, without the REST nonce WordPress requires for cookie authentication. Token validation was delegated to the determine_current_user filter, which is core's whole user-resolution chain, so the cookie validators on it re-authenticated the session core had deliberately dropped. Token resolution now runs with the cookie and application-password validators unhooked, so only a real token can authenticate. Found in internal review.
+* Security: the preview fetcher's address guard classified IPv6 addresses from their text form, so an internal address written in its expanded form (0:0:0:0:0:ffff:127.0.0.1) was not recognized as the internal address its compressed form (::ffff:127.0.0.1) already blocked. Any user who can write a post could make the site fetch a loopback, private, or cloud-metadata address and read the response. Addresses are now classified from their packed bytes, so every spelling of an address gets one verdict. Found in internal review.
+* Changed: "Tested up to" is declared only in readme.txt. It was also present in the plugin header, where it is not a supported field and can override the readme value.
+* Removed: the unused Apple Music enrichment path. It shipped an iTunes Lookup API call that no code reached, so the plugin no longer contacts Apple at all.
+* Removed: the Sefaria and SuttaCentral link sources. Outpost no longer recognizes those hosts or suggests a Quote post for them; pasted links from either site are handled by the generic page reader like any other URL.
+* Removed: three classes that shipped without a runtime path — the Ravelry and Ride With GPS URL-paste sources, whose authenticated preview branch was never built, and a duplicate RSS inbound extractor superseded by the one the source registry dispatches. Pasted Ravelry and Ride With GPS links keep the generic page preview they already had.
+* Changed: External services documents the Kit broadcast URL recorded on a post and the iCloud Shortcuts installer link, and explains that the built-in list of recognized link hosts is matched locally and contacts nothing.
+* Changed: the WHOOP entry links the API terms of use and their privacy and security section, both on developer.whoop.com, alongside the privacy policy itself. whoop.com refuses automated clients, so the policy link cannot be machine-checked; the developer-site links can be.
+* Fixed: the PWA web app manifest pointed its five icons at /wp-content/plugins/outpost/, the folder name used before the plugin was renamed. On any install the icons 404'd, so the install prompt and home-screen icon fell back to a generic placeholder. The manifest now builds those URLs from the plugin's own location.
+* Fixed: the Playground blueprint activated outpost/outpost.php, a path that no longer exists after the rename.
 
 = 1.0.11 =
 * Added: Default categories and Default tags in Composer defaults. The composer's More options open with them pre-selected, and a post that names no category gets them instead of WordPress's own default category. Leave them empty to keep the old behavior.

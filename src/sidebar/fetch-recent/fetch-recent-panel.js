@@ -52,7 +52,7 @@ export function FetchRecentPanel() {
 
 	if ( null === providers ) {
 		return (
-			<PanelBody title={ __( 'Add from connected platforms', 'outpost' ) } initialOpen>
+			<PanelBody title={ __( 'Add from connected platforms', 'outpost-mobile-publishing' ) } initialOpen>
 				<Spinner />
 			</PanelBody>
 		);
@@ -60,11 +60,11 @@ export function FetchRecentPanel() {
 
 	if ( providers.length === 0 ) {
 		return (
-			<PanelBody title={ __( 'Add from connected platforms', 'outpost' ) }>
+			<PanelBody title={ __( 'Add from connected platforms', 'outpost-mobile-publishing' ) }>
 				<p>
 					{ __(
 						'No fetch-recent providers registered. Connect a provider (Oura, WHOOP, Polar) to see "Add from …" buttons here.',
-						'outpost'
+						'outpost-mobile-publishing'
 					) }
 				</p>
 			</PanelBody>
@@ -72,7 +72,7 @@ export function FetchRecentPanel() {
 	}
 
 	return (
-		<PanelBody title={ __( 'Add from connected platforms', 'outpost' ) } initialOpen>
+		<PanelBody title={ __( 'Add from connected platforms', 'outpost-mobile-publishing' ) } initialOpen>
 			{ providers.map( ( provider ) => (
 				<Button
 					key={ provider.id }
@@ -82,7 +82,7 @@ export function FetchRecentPanel() {
 				>
 					{ sprintf(
 						/* translators: %s: provider label */
-						__( 'Add from %s', 'outpost' ),
+						__( 'Add from %s', 'outpost-mobile-publishing' ),
 						provider.label
 					) }
 				</Button>

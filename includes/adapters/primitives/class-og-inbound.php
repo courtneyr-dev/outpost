@@ -5,7 +5,7 @@
  * Generic Open Graph + JSON-LD inbound extractor primitive. A higher-
  * level wrapper around Outpost_Source_Extractor_Og_Tags + a JSON-LD
  * schema.org parser, plus category-specific extractors registered via
- * filter. Phase G adapters (G10 scripture cluster, G11 wellness, G12
+ * filter. Phase G adapters (G11 wellness, G12
  * cycling/climbing, G13 conference, G14 maker) consume this primitive
  * for any URL that emits OG tags + optionally JSON-LD.
  *

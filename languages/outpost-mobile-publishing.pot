@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.0\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.12\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-22T01:25:16+00:00\n"
+"POT-Creation-Date: 2026-09-09T13:36:33+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -39,57 +39,43 @@ msgstr ""
 msgid "https://courtneyr.dev"
 msgstr ""
 
-#: includes/adapters/class-apple-music-adapter.php:58
-msgid "URL is not an Apple Music album, song, or playlist URL."
-msgstr ""
-
-#. translators: %d: HTTP status
-#: includes/adapters/class-apple-music-adapter.php:159
-#, php-format
-msgid "iTunes Lookup HTTP %d."
-msgstr ""
-
-#: includes/adapters/class-apple-music-adapter.php:168
-msgid "iTunes Lookup returned no results."
-msgstr ""
-
-#: includes/adapters/outbound/class-telegraph-adapter.php:135
+#: includes/adapters/outbound/class-telegraph-adapter.php:156
 msgid "Post has no author."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:149
+#: includes/adapters/outbound/class-telegraph-adapter.php:170
 msgid "(empty)"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:187
+#: includes/adapters/outbound/class-telegraph-adapter.php:208
 msgid "Telegraph response missing URL."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:246
+#: includes/adapters/outbound/class-telegraph-adapter.php:267
 msgid "Telegraph account creation returned no token."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:250
+#: includes/adapters/outbound/class-telegraph-adapter.php:271
 msgid "Telegraph token could not be stored securely."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/adapters/outbound/class-telegraph-adapter.php:453
+#: includes/adapters/outbound/class-telegraph-adapter.php:474
 #, php-format
 msgid "Telegraph transport error: %s"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/adapters/outbound/class-telegraph-adapter.php:461
+#: includes/adapters/outbound/class-telegraph-adapter.php:482
 #, php-format
 msgid "Telegraph HTTP %d"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:468
+#: includes/adapters/outbound/class-telegraph-adapter.php:489
 msgid "Telegraph returned non-JSON."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:473
+#: includes/adapters/outbound/class-telegraph-adapter.php:494
 msgid "Telegraph API error."
 msgstr ""
 
@@ -435,15 +421,19 @@ msgstr ""
 msgid "You do not have permission to manage Outpost iOS Shortcut tokens."
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:78
+#: includes/admin/class-outpost-encryption-key-notice.php:80
+msgid "Outpost: OUTPOST_ENCRYPTION_KEY is defined in wp-config.php but is not 32 raw bytes, so Outpost is ignoring it and using the key stored in the database. Wrap the value in base64_decode()."
+msgstr ""
+
+#: includes/admin/class-outpost-encryption-key-notice.php:85
 msgid "Outpost: Your encryption key is stored in the database. For best security, move it to wp-config.php."
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:83
+#: includes/admin/class-outpost-encryption-key-notice.php:91
 msgid "Show instructions →"
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:86
+#: includes/admin/class-outpost-encryption-key-notice.php:94
 msgid "Dismiss"
 msgstr ""
 
@@ -465,7 +455,6 @@ msgid "Provider"
 msgstr ""
 
 #: includes/admin/class-outpost-oauth-settings-page.php:71
-#: includes/sources/class-outpost-source-ravelry.php:317
 msgid "Status"
 msgstr ""
 
@@ -533,15 +522,13 @@ msgstr ""
 msgid "You do not have permission to disconnect OAuth providers."
 msgstr ""
 
-#: includes/auth/class-ios-shortcut-token-authenticator.php:102
+#: includes/auth/class-ios-shortcut-token-authenticator.php:103
 msgid "This token is scoped to the iOS Shortcut endpoint and cannot authenticate other requests."
 msgstr ""
 
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
 #: includes/class-admin-page.php:208
-#: includes/settings/class-outpost-settings-page.php:44
-#: includes/settings/class-outpost-settings-page.php:45
 msgid "Outpost"
 msgstr ""
 
@@ -650,6 +637,7 @@ msgid "Either way, the page URL, title, and any text you had selected get sent t
 msgstr ""
 
 #: includes/class-admin-page.php:352
+#: includes/settings/class-outpost-settings-page.php:56
 msgid "Settings"
 msgstr ""
 
@@ -701,31 +689,31 @@ msgid "Outpost geocode requires an authenticated user."
 msgstr ""
 
 #. translators: 1: minimum length, 2: maximum length
-#: includes/class-geocode-endpoint.php:198
-#: includes/class-media-lookup-endpoint.php:223
+#: includes/class-geocode-endpoint.php:197
+#: includes/class-media-lookup-endpoint.php:170
 #, php-format
 msgid "Search query must be between %1$d and %2$d characters."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:262
+#: includes/class-geocode-endpoint.php:261
 msgid "Too many geocode requests. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:287
+#: includes/class-geocode-endpoint.php:286
 msgid "Too many geocode requests from this network. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:404
+#: includes/class-geocode-endpoint.php:403
 msgid "Could not reach the geocoding service."
 msgstr ""
 
 #. translators: %d: HTTP status code
-#: includes/class-geocode-endpoint.php:417
+#: includes/class-geocode-endpoint.php:416
 #, php-format
 msgid "Geocoding service returned HTTP %d."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:427
+#: includes/class-geocode-endpoint.php:426
 msgid "Geocoding service returned invalid JSON."
 msgstr ""
 
@@ -824,139 +812,136 @@ msgstr ""
 msgid "Invalid snooze duration."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:198
+#: includes/class-media-lookup-endpoint.php:145
 msgid "Outpost media lookup requires an authenticated user."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:235
+#: includes/class-media-lookup-endpoint.php:182
 msgid "Unknown lookup kind."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:245
+#: includes/class-media-lookup-endpoint.php:192
 msgid "Post Kinds for IndieWeb must be active to look up media."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:266
+#: includes/class-media-lookup-endpoint.php:213
 msgid "The metadata lookup service could not be reached."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:281
+#: includes/class-media-lookup-endpoint.php:228
 msgid "The lookup was not authorized. Sign out and back in to refresh your token."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:298
+#: includes/class-media-lookup-endpoint.php:245
 msgid "The metadata lookup service returned an error."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:393
+#: includes/class-media-lookup-endpoint.php:340
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
 #. translators: %d: number of pending platforms.
-#: includes/class-pending-syndication-notice.php:102
+#: includes/class-pending-syndication-notice.php:159
+#: includes/class-pending-syndication-notice.php:247
 #, php-format
 msgid "This post has %d pending syndication."
 msgid_plural "This post has %d pending syndications."
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/class-pending-syndication-notice.php:134
+#: includes/class-pending-syndication-notice.php:172
+msgid "Open the Outpost composer"
+msgstr ""
+
+#: includes/class-pending-syndication-notice.php:279
 msgid "Open the Outpost composer to paste the silo URLs and complete syndication."
 msgstr ""
 
-#: includes/class-pending-syndication-notice.php:136
+#: includes/class-pending-syndication-notice.php:281
 msgid "View detail"
 msgstr ""
 
 #. translators: %s: human time diff (e.g. "2 hours").
-#: includes/class-pending-syndication-notice.php:178
+#: includes/class-pending-syndication-notice.php:323
 #, php-format
 msgid "fired %s ago"
 msgstr ""
 
-#: includes/class-preview-endpoint.php:129
+#: includes/class-preview-endpoint.php:139
 msgid "Outpost preview requires an authenticated user."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:264
-msgid "Could not fetch the target URL."
-msgstr ""
-
-#. translators: %d: HTTP status code
-#: includes/class-preview-endpoint.php:277
-#, php-format
-msgid "Target URL returned HTTP %d."
-msgstr ""
-
-#: includes/class-preview-endpoint.php:286
+#: includes/class-preview-endpoint.php:273
 msgid "Target URL did not return HTML."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:298
+#: includes/class-preview-endpoint.php:282
 msgid "Target URL response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:395
+#: includes/class-preview-endpoint.php:379
 #, php-format
 msgid "Source declares an unrecognized extractor type: %s"
 msgstr ""
 
-#: includes/class-preview-endpoint.php:407
+#: includes/class-preview-endpoint.php:391
 msgid "Source recipe is invalid for the requested URL."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:431
-msgid "Could not fetch the source URL through the extractor."
-msgstr ""
-
-#. translators: %d: HTTP status code
-#: includes/class-preview-endpoint.php:444
-#, php-format
-msgid "Source URL returned HTTP %d."
-msgstr ""
-
-#: includes/class-preview-endpoint.php:454
+#: includes/class-preview-endpoint.php:417
 msgid "Source response content type is not one of the extractor accepted types."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:467
+#: includes/class-preview-endpoint.php:426
 msgid "Source response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:478
+#: includes/class-preview-endpoint.php:437
 #, php-format
 msgid "Extractor \"%s\" is not yet implemented in this build."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:484
+#: includes/class-preview-endpoint.php:443
 msgid "Extractor failed to parse the source response."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:737
+#: includes/class-preview-endpoint.php:696
 msgid "A url is required."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:746
+#: includes/class-preview-endpoint.php:704
+msgid "The URL is too long."
+msgstr ""
+
+#: includes/class-preview-endpoint.php:713
 msgid "The url could not be parsed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:756
+#: includes/class-preview-endpoint.php:723
 msgid "Only http and https URLs are allowed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:764
+#: includes/class-preview-endpoint.php:731
 msgid "The URL must include a host."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:790
+#: includes/class-preview-endpoint.php:743
+msgid "The target URL could not be retrieved."
+msgstr ""
+
+#: includes/class-preview-endpoint.php:815
+msgid "Could not fetch the target URL."
+msgstr ""
+
+#: includes/class-preview-endpoint.php:838
 msgid "Too many preview requests. Try again in a minute."
 msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:282
-#: outpost.php:651
+#: outpost.php:639
 #, php-format
 msgid "Install %s"
 msgstr ""
@@ -969,14 +954,14 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:297
-#: outpost.php:636
+#: outpost.php:624
 #, php-format
 msgid "Activate %s"
 msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:302
-#: outpost.php:641
+#: outpost.php:629
 #, php-format
 msgid "Outpost needs the %s plugin to be activated before the composer can run."
 msgstr ""
@@ -1008,7 +993,7 @@ msgstr ""
 
 #. translators: 1: minimum WP version, 2: minimum PHP version.
 #: includes/class-pwa-shell.php:359
-#: outpost.php:699
+#: outpost.php:687
 #, php-format
 msgid "Outpost requires WordPress %1$s or newer and PHP %2$s or newer."
 msgstr ""
@@ -1017,55 +1002,80 @@ msgstr ""
 msgid "Server requirements"
 msgstr ""
 
-#: includes/class-settings.php:89
+#: includes/class-settings.php:103
 msgid "Composer defaults"
 msgstr ""
 
-#: includes/class-settings.php:96
+#: includes/class-settings.php:110
 msgid "Default Post variant"
 msgstr ""
 
-#: includes/class-settings.php:104
+#: includes/class-settings.php:118
+#: includes/class-settings.php:338
+msgid "Default categories"
+msgstr ""
+
+#: includes/class-settings.php:126
+msgid "Default tags"
+msgstr ""
+
+#: includes/class-settings.php:134
 msgid "Bridgy auto-suggest"
 msgstr ""
 
-#: includes/class-settings.php:112
+#: includes/class-settings.php:142
 msgid "Auto Post-Format inference"
 msgstr ""
 
-#: includes/class-settings.php:142
+#: includes/class-settings.php:287
 msgid "Site-wide defaults the Outpost composer respects. Each user can override at post time from the More options panel."
 msgstr ""
 
-#: includes/class-settings.php:152
+#: includes/class-settings.php:297
 msgid "Article (title + body)"
 msgstr ""
 
-#: includes/class-settings.php:153
+#: includes/class-settings.php:298
 msgid "Note (auto-format from content length)"
 msgstr ""
 
-#: includes/class-settings.php:154
+#: includes/class-settings.php:299
 msgid "Status (forces the Status post format)"
 msgstr ""
 
-#: includes/class-settings.php:155
+#: includes/class-settings.php:300
 msgid "Aside (forces the Aside post format)"
 msgstr ""
 
-#: includes/class-settings.php:156
+#: includes/class-settings.php:301
 msgid "Quote (forces the Quote post format)"
 msgstr ""
 
-#: includes/class-settings.php:168
+#: includes/class-settings.php:313
 msgid "The variant the Post tab opens to on every fresh composer load."
 msgstr ""
 
-#: includes/class-settings.php:181
+#: includes/class-settings.php:332
+msgid "No categories exist yet. Create one under Posts > Categories first."
+msgstr ""
+
+#: includes/class-settings.php:352
+msgid "Pre-selected in the composer's More options on every post, and applied to a post from Outpost that names no category. Leave every box unticked to keep WordPress's own default category (Settings > Writing)."
+msgstr ""
+
+#: includes/class-settings.php:365
+msgid "indieweb, photos"
+msgstr ""
+
+#: includes/class-settings.php:367
+msgid "Comma-separated tag names, pre-selected in the composer's More options. A name that doesn't exist yet is created the first time a post uses it. Leave empty for no default tags."
+msgstr ""
+
+#: includes/class-settings.php:380
 msgid "When the Reply / Doing target URL host matches a known silo, pre-check the matching Bridgy publish target."
 msgstr ""
 
-#: includes/class-settings.php:195
+#: includes/class-settings.php:394
 msgid "Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only."
 msgstr ""
 
@@ -1325,12 +1335,10 @@ msgid "Polar AccessLink user registration failed (HTTP %d)."
 msgstr ""
 
 #: includes/oauth/providers/class-outpost-oauth-provider-ravelry.php:58
-#: includes/sources/class-outpost-source-ravelry.php:64
 msgid "Ravelry"
 msgstr ""
 
 #: includes/oauth/providers/class-outpost-oauth-provider-ridewithgps.php:53
-#: includes/sources/class-outpost-source-rwg.php:69
 msgid "Ride With GPS"
 msgstr ""
 
@@ -1589,44 +1597,45 @@ msgstr ""
 msgid "Security check failed. Please reload and try again."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:79
-msgid "You do not have permission to view these settings."
-msgstr ""
-
-#: includes/settings/class-outpost-settings-page.php:87
-#: includes/settings/class-outpost-settings-page.php:99
+#: includes/settings/class-outpost-settings-page.php:55
+#: includes/settings/class-outpost-settings-page.php:96
+#: includes/settings/class-outpost-settings-page.php:108
 msgid "Outpost Settings"
 msgstr ""
 
 #: includes/settings/class-outpost-settings-page.php:88
+msgid "You do not have permission to view these settings."
+msgstr ""
+
+#: includes/settings/class-outpost-settings-page.php:97
 msgid "No settings tabs are registered."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:95
+#: includes/settings/class-outpost-settings-page.php:104
 msgid "You do not have permission to view this settings tab."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:103
+#: includes/settings/class-outpost-settings-page.php:112
 msgid "Settings saved."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:112
+#: includes/settings/class-outpost-settings-page.php:121
 msgid "Tab callback is not callable."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:127
+#: includes/settings/class-outpost-settings-page.php:136
 msgid "Outpost settings tabs"
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:168
+#: includes/settings/class-outpost-settings-page.php:177
 msgid "No settings registered for this tab yet. Concrete platforms add fields in follow-up updates."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:186
+#: includes/settings/class-outpost-settings-page.php:195
 msgid "Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-page.php:203
+#: includes/settings/class-outpost-settings-page.php:212
 msgid "Save settings"
 msgstr ""
 
@@ -1635,7 +1644,7 @@ msgid "API Keys"
 msgstr ""
 
 #: includes/settings/tabs/class-outpost-settings-tab-api-keys.php:31
-msgid "Some platforms (such as scripture sources or scholarly databases) use API keys instead of OAuth. Add keys here for the platforms you use."
+msgid "Some platforms (such as scholarly databases) use API keys instead of OAuth. Add keys here for the platforms you use."
 msgstr ""
 
 #: includes/sources/class-outpost-fetch-recent-oura.php:168
@@ -1796,124 +1805,26 @@ msgstr ""
 msgid "No Notion page ID found in URL."
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:152
+#: includes/sources/class-outpost-source-notion.php:150
 msgid "Notion is not connected. Connect via Settings → OAuth."
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:203
+#: includes/sources/class-outpost-source-notion.php:230
 msgid "This Notion page has not been shared with Outpost. In Notion, click the ••• menu on the page → Add connections → Outpost."
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:209
+#: includes/sources/class-outpost-source-notion.php:236
 msgid "Notion rejected the access token. Reconnect Notion in Settings → OAuth."
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/sources/class-outpost-source-notion.php:216
+#: includes/sources/class-outpost-source-notion.php:243
 #, php-format
 msgid "Notion API HTTP %d"
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:225
+#: includes/sources/class-outpost-source-notion.php:252
 msgid "Notion API returned non-JSON."
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:81
-msgid "Private projects are not surfaced even when the connected user has access."
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:82
-msgid "The connected Ravelry account must have read access to the pattern or project."
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:241
-msgid "Pattern"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:251
-msgid "Gauge"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:254
-msgid "Yardage"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:257
-msgid "Needles / hooks"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:260
-msgid "Fiber"
-msgstr ""
-
-#. translators: %s: pattern name.
-#: includes/sources/class-outpost-source-ravelry.php:264
-#, php-format
-msgid "Pattern: %s"
-msgstr ""
-
-#. translators: 1: pattern name, 2: designer name.
-#: includes/sources/class-outpost-source-ravelry.php:267
-#, php-format
-msgid "Pattern: %1$s by %2$s"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:309
-msgid "Project"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:320
-msgid "Started"
-msgstr ""
-
-#: includes/sources/class-outpost-source-ravelry.php:323
-msgid "Completed"
-msgstr ""
-
-#. translators: %s: project name.
-#: includes/sources/class-outpost-source-ravelry.php:328
-#, php-format
-msgid "Project: %s"
-msgstr ""
-
-#: includes/sources/class-outpost-source-rwg.php:86
-msgid "Private trips and routes (\"friends\" or \"private\" visibility) are not surfaced even when the connected user has access."
-msgstr ""
-
-#: includes/sources/class-outpost-source-rwg.php:87
-msgid "The connected Ride With GPS account must be the owner or have read access to the trip or route."
-msgstr ""
-
-#: includes/sources/class-outpost-source-rwg.php:199
-msgid "Ride"
-msgstr ""
-
-#: includes/sources/class-outpost-source-rwg.php:247
-msgid "Route"
-msgstr ""
-
-#. translators: 1: distance summary, 2: elevation summary.
-#: includes/sources/class-outpost-source-rwg.php:254
-#, php-format
-msgid "Planned route: %1$s, %2$s"
-msgstr ""
-
-#. translators: 1: distance summary (metric + imperial), 2: elevation summary.
-#: includes/sources/class-outpost-source-rwg.php:346
-#, php-format
-msgid "Ride With GPS — %1$s, %2$s elevation gain"
-msgstr ""
-
-#. translators: 1: distance in km, 2: distance in miles.
-#: includes/sources/class-outpost-source-rwg.php:357
-#, php-format
-msgid "%1$s km / %2$s mi"
-msgstr ""
-
-#. translators: 1: elevation in m, 2: elevation in ft.
-#: includes/sources/class-outpost-source-rwg.php:367
-#, php-format
-msgid "%1$d m / %2$d ft"
 msgstr ""
 
 #: includes/sources/class-source-amazon.php:89
@@ -2010,14 +1921,6 @@ msgstr ""
 msgid "Reddit"
 msgstr ""
 
-#: includes/sources/class-source-sefaria.php:35
-msgid "Sefaria"
-msgstr ""
-
-#: includes/sources/class-source-sefaria.php:55
-msgid "Sefaria texts are CC0 / CC-BY / CC-BY-SA depending on the work. The og_tags adapter cannot detect which license applies; the docs page recommends a generic \"Source: Sefaria.org\" attribution. License-aware attribution arrives with G10b."
-msgstr ""
-
 #: includes/sources/class-source-snipd.php:61
 msgid "Snipd"
 msgstr ""
@@ -2032,14 +1935,6 @@ msgstr ""
 
 #: includes/sources/class-source-substack.php:36
 msgid "Substack"
-msgstr ""
-
-#: includes/sources/class-source-suttacentral.php:35
-msgid "SuttaCentral"
-msgstr ""
-
-#: includes/sources/class-source-suttacentral.php:55
-msgid "SuttaCentral texts are mostly CC0 (Bhikkhu Sujato translations). The og_tags adapter cannot detect translator metadata; the docs page recommends a generic \"Source: SuttaCentral.net\" attribution. Translator-aware attribution arrives with G10b."
 msgstr ""
 
 #: includes/sources/class-source-twitch.php:42
@@ -2067,13 +1962,13 @@ msgid "YouTube"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: outpost.php:656
+#: outpost.php:644
 #, php-format
 msgid "Outpost requires the %s plugin. Install it from WordPress.org to continue."
 msgstr ""
 
 #. translators: %s: installed Micropub plugin version.
-#: outpost.php:807
+#: outpost.php:795
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
 msgstr ""

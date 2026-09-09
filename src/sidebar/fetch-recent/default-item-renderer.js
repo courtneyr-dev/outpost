@@ -28,18 +28,18 @@ export function formatRelativeTime( isoTimestamp ) {
 	}
 	const seconds = Math.max( 0, ( Date.now() - then ) / 1000 );
 	if ( seconds < 60 ) {
-		return __( 'Just now', 'outpost' );
+		return __( 'Just now', 'outpost-mobile-publishing' );
 	}
 	if ( seconds < 3600 ) {
 		const minutes = Math.round( seconds / 60 );
-		return `${ minutes } ${ minutes === 1 ? __( 'minute ago', 'outpost' ) : __( 'minutes ago', 'outpost' ) }`;
+		return `${ minutes } ${ minutes === 1 ? __( 'minute ago', 'outpost-mobile-publishing' ) : __( 'minutes ago', 'outpost-mobile-publishing' ) }`;
 	}
 	if ( seconds < 86400 ) {
 		const hours = Math.round( seconds / 3600 );
-		return `${ hours } ${ hours === 1 ? __( 'hour ago', 'outpost' ) : __( 'hours ago', 'outpost' ) }`;
+		return `${ hours } ${ hours === 1 ? __( 'hour ago', 'outpost-mobile-publishing' ) : __( 'hours ago', 'outpost-mobile-publishing' ) }`;
 	}
 	const days = Math.round( seconds / 86400 );
-	return `${ days } ${ days === 1 ? __( 'day ago', 'outpost' ) : __( 'days ago', 'outpost' ) }`;
+	return `${ days } ${ days === 1 ? __( 'day ago', 'outpost-mobile-publishing' ) : __( 'days ago', 'outpost-mobile-publishing' ) }`;
 }
 
 /**

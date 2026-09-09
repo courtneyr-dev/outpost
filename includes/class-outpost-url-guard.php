@@ -158,18 +158,39 @@ final class Outpost_Url_Guard {
 	 * address, or null when `$ip` is not such an address.
 	 */
 	private static function mapped_ipv4( string $ip ): ?string {
-		$lower = strtolower( $ip );
-		// Dotted-quad form: ::ffff:169.254.169.254 or ::169.254.169.254.
-		if ( preg_match( '/^::(ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/', $lower, $m ) ) {
-			return $m[2];
+		// Classify from the packed bytes, not from notation. `inet_pton`
+		// accepts every spelling of an address (compressed `::ffff:127.0.0.1`,
+		// expanded `0:0:0:0:0:ffff:127.0.0.1`, zero-padded, hex tail), and a
+		// regex over the text form only ever matches some of them — so the
+		// same address could be read two ways and get opposite verdicts.
+		// Validate before converting rather than silencing inet_pton's warning
+		// on malformed input. Anything that is not an IP is not our business
+		// here; is_blocked_ip() fails those closed on its own.
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
+			return null;
 		}
-		// Hex form: ::ffff:a9fe:a9fe.
-		if ( preg_match( '/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/', $lower, $m ) ) {
-			$hi = hexdec( $m[1] );
-			$lo = hexdec( $m[2] );
-			return sprintf( '%d.%d.%d.%d', ( $hi >> 8 ) & 0xFF, $hi & 0xFF, ( $lo >> 8 ) & 0xFF, $lo & 0xFF );
+		$packed = inet_pton( $ip );
+		if ( false === $packed || 16 !== strlen( $packed ) ) {
+			return null;
 		}
-		return null;
+
+		$prefix       = substr( $packed, 0, 12 );
+		$carries_ipv4 = (
+			// ::ffff:0:0/96 IPv4-mapped.
+			"\0\0\0\0\0\0\0\0\0\0\xff\xff" === $prefix
+			// ::/96 IPv4-compatible (deprecated, still routed by some stacks).
+			// `::1` and `::` land here too and normalize to 0.0.0.1 / 0.0.0.0,
+			// which is_blocked_ipv4() rejects via its 0.0.0.0/8 rule.
+			|| "\0\0\0\0\0\0\0\0\0\0\0\0" === $prefix
+			// 64:ff9b::/96 NAT64 well-known prefix.
+			|| "\x00\x64\xff\x9b\0\0\0\0\0\0\0\0" === $prefix
+		);
+		if ( ! $carries_ipv4 ) {
+			return null;
+		}
+
+		$octets = array_map( 'ord', str_split( substr( $packed, 12, 4 ) ) );
+		return implode( '.', $octets );
 	}
 
 	private static function is_blocked_ipv4( string $ip ): bool {

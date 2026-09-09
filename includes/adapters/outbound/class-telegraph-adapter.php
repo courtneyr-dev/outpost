@@ -67,11 +67,26 @@ final class Outpost_Telegraph_Adapter {
 	private const SKIP_POST_META = '_outpost_skip_telegraph';
 
 	/**
+	 * Opt-in switch. Telegraph publishes a public copy of the post to a
+	 * third party, so it stays off until the site owner turns it on.
+	 */
+	public const ENABLED_OPTION = 'outpost_telegraph_enabled';
+
+	/**
 	 * Hook registration. Hooks transition_post_status at priority 20
 	 * (after WP's own publish-state machinery).
 	 *
 	 * @since 0.1.69
 	 */
+	/**
+	 * Whether the site owner has switched Telegraph syndication on.
+	 *
+	 * @return bool
+	 */
+	public static function is_enabled(): bool {
+		return (bool) get_option( self::ENABLED_OPTION, false );
+	}
+
 	public static function register(): void {
 		add_action(
 			'transition_post_status',
@@ -92,6 +107,12 @@ final class Outpost_Telegraph_Adapter {
 	 * @param WP_Post $post       Post object.
 	 */
 	public static function maybe_syndicate_on_publish( string $new_status, string $old_status, $post ): void {
+		// Fail closed. Registration is gated too, but syndicate() is also
+		// reachable directly (WP-CLI, a site's own code), so consent is
+		// checked here rather than only at hook-registration time.
+		if ( ! self::is_enabled() ) {
+			return;
+		}
 		if ( 'publish' !== $new_status || 'publish' === $old_status ) {
 			return;
 		}

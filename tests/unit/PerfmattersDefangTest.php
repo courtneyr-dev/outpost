@@ -32,13 +32,13 @@ final class PerfmattersDefangTest extends TestCase {
 	}
 
 	public function test_returns_empty_list_off_outpost_routes(): void {
-		WP_Mock::userFunction( 'get_query_var' )->andReturn( '' );
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '' );
 		$this->assertSame( array(), Outpost_Perfmatters_Defang::disable_filters_for_request() );
 	}
 
 	public function test_returns_default_disable_filter_set_on_composer_route(): void {
 		$this->passthrough_apply_filters();
-		WP_Mock::userFunction( 'get_query_var' )->andReturn( 'composer' );
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '^post/?$' );
 		$filters = Outpost_Perfmatters_Defang::disable_filters_for_request();
 
 		$this->assertContains( 'perfmatters_delay_js_disable', $filters );
@@ -53,19 +53,19 @@ final class PerfmattersDefangTest extends TestCase {
 
 	public function test_returns_filters_for_share_target_route(): void {
 		$this->passthrough_apply_filters();
-		WP_Mock::userFunction( 'get_query_var' )->andReturn( 'share-target' );
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '^post/share-target/?$' );
 		$this->assertNotEmpty( Outpost_Perfmatters_Defang::disable_filters_for_request() );
 	}
 
 	public function test_returns_filters_for_auth_callback_route(): void {
 		$this->passthrough_apply_filters();
-		WP_Mock::userFunction( 'get_query_var' )->andReturn( 'auth-callback' );
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '^post/auth/callback/?$' );
 		$this->assertNotEmpty( Outpost_Perfmatters_Defang::disable_filters_for_request() );
 	}
 
 	public function test_returns_filters_for_manifest_route(): void {
 		$this->passthrough_apply_filters();
-		WP_Mock::userFunction( 'get_query_var' )->andReturn( 'manifest' );
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '^post/manifest\\.json$' );
 		$this->assertNotEmpty( Outpost_Perfmatters_Defang::disable_filters_for_request() );
 	}
 
@@ -79,4 +79,16 @@ final class PerfmattersDefangTest extends TestCase {
 	 * list). Override behavior is identical mechanism, so flaky-test
 	 * suppression beats false-positive failures.
 	 */
+
+	/**
+	 * `outpost_route` is a public query var, so any URL can set it. Route
+	 * identity must come from the matched rewrite rule instead, the same
+	 * source Outpost_Route_Handler::dispatch() trusts.
+	 */
+	public function test_public_query_var_alone_does_not_enable_filters(): void {
+		$GLOBALS['wp'] = (object) array( 'matched_rule' => '' );
+		WP_Mock::userFunction( 'get_query_var' )->andReturn( 'sw' );
+
+		$this->assertSame( array(), Outpost_Perfmatters_Defang::disable_filters_for_request() );
+	}
 }

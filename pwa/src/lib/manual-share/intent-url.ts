@@ -16,7 +16,7 @@
  * filled — the PWA passes its blob: object URL — but Android target
  * apps generally won't accept blob: URIs in EXTRA_STREAM. The intent://
  * URL path is therefore most useful for caption-only platforms (X,
- * Threads, Pinterest, Reddit, Tumblr, where `web_intent_url` is set
+ * Threads, Pinterest, Reddit, where `web_intent_url` is set
  * to a public https://...intent endpoint). The image-bearing path
  * relies on `navigator.share()` instead.
  *

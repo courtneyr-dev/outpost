@@ -137,6 +137,51 @@ final class Outpost_Request_Headers {
 		if ( '' === $expected ) {
 			return false;
 		}
-		return '/' . $expected === $resolved;
+		// Core matches routes with a case-insensitive regex
+		// (WP_REST_Server::dispatch uses '@^' . $route . '$@i'), so an
+		// exact comparison here would disagree with the route that
+		// actually ran. Route paths are ASCII.
+		return 0 === strcasecmp( '/' . $expected, $resolved );
+	}
+
+	/**
+	 * Resolve a bearer token to a user id, using only token-based
+	 * authentication.
+	 *
+	 * `determine_current_user` is core's whole user-resolution chain, and
+	 * cookie validators sit on it. Calling it to validate a token therefore
+	 * also re-validates whatever session cookie the request happens to
+	 * carry — which resurrects a cookie session that core deliberately
+	 * dropped for a REST request with no nonce, so any non-empty token
+	 * string would authorize a cookie-bearing request. The cookie and
+	 * application-password validators are unhooked for the duration of the
+	 * call so only token validators (IndieAuth's) can answer, then restored.
+	 *
+	 * @return int Resolved user id, or 0 when the token authenticates nobody.
+	 */
+	public static function resolve_token_user(): int {
+		$cookie_validators = array(
+			'wp_validate_auth_cookie',
+			'wp_validate_logged_in_cookie',
+			'wp_validate_application_password',
+		);
+
+		$removed = array();
+		foreach ( $cookie_validators as $callback ) {
+			$priority = has_filter( 'determine_current_user', $callback );
+			if ( false !== $priority ) {
+				remove_filter( 'determine_current_user', $callback, $priority );
+				$removed[ $callback ] = $priority;
+			}
+		}
+
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
+		$user_id = (int) apply_filters( 'determine_current_user', false );
+
+		foreach ( $removed as $callback => $priority ) {
+			add_filter( 'determine_current_user', $callback, $priority );
+		}
+
+		return $user_id > 0 ? $user_id : 0;
 	}
 }

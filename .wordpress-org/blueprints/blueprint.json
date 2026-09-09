@@ -19,7 +19,7 @@
 		},
 		{
 			"step": "activatePlugin",
-			"pluginPath": "outpost/outpost.php"
+			"pluginPath": "outpost-mobile-publishing/outpost.php"
 		}
 	]
 }
