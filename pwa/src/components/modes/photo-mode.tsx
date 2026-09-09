@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { build_photo_properties } from '../../lib/photo-properties';
 import {
 	discover_micropub_endpoint,
 	discover_media_endpoint,
@@ -75,6 +76,7 @@ interface PhotoEntry {
 	preview_url: string;
 	alt: string;
 	decorative: boolean;
+	caption: string;
 }
 
 type Status =
@@ -137,6 +139,7 @@ export function PhotoMode({
 			file,
 			preview_url: URL.createObjectURL(file),
 			alt: '',
+			caption: '',
 			decorative: false,
 		}));
 		setEntries((prev) => [...prev, ...new_entries]);
@@ -289,19 +292,15 @@ export function PhotoMode({
 			setStatus({ kind: 'posting' });
 			// Single-photo posts retain the string-shape for back-compat.
 			// Multi-photo posts use the array shape per Micropub spec.
-			const photo_value =
-				uploaded_urls.length === 1 ? uploaded_urls[0]! : uploaded_urls;
-			const alt_array = entries.map((e) =>
-				e.decorative ? '' : e.alt.trim()
+			const photo_properties = build_photo_properties(
+				uploaded_urls,
+				entries
 			);
-			const alt_value =
-				alt_array.length === 1 ? alt_array[0]! : alt_array;
 			const trimmed_content = content.trim();
 			const trimmed_name = name.trim();
 			const trimmed_venue = venue_name.trim();
 			const base = {
-				photo: photo_value,
-				'mp-photo-alt': alt_value,
+				...photo_properties,
 				...pkiw_kind_hint(composerConfig, 'photo'),
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
@@ -475,6 +474,27 @@ export function PhotoMode({
 											Decorative (no alt text needed)
 										</span>
 									</label>
+									<label
+										class="outpost-label"
+										for={`outpost-photo-caption-${entry.id}`}
+									>
+										Caption
+									</label>
+									<textarea
+										id={`outpost-photo-caption-${entry.id}`}
+										class="outpost-textarea"
+										rows={2}
+										value={entry.caption}
+										onInput={(event): void =>
+											update_entry(entry.id, {
+												caption: (
+													event.target as HTMLTextAreaElement
+												).value,
+											})
+										}
+										placeholder="Shown under the photo. Leave empty for none."
+										disabled={submitting}
+									/>
 								</div>
 								<div class="outpost-photo-list__actions">
 									<button

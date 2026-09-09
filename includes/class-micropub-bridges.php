@@ -208,6 +208,7 @@ final class Outpost_Micropub_Bridges {
 		self::apply_default_terms( $post_id, $properties );
 		self::apply_place_name( $post_id, $properties );
 		self::apply_photo_alt_text( $post_id, $properties );
+		self::apply_photo_captions( $post_id, $properties );
 		self::apply_featured_image( $post_id, $properties );
 	}
 
@@ -260,6 +261,92 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map from `extract_properties()`.
+	 */
+	/**
+	 * Bridge: photo caption → the attachment's `post_excerpt`.
+	 *
+	 * WordPress stores an image caption as the attachment post's excerpt, which
+	 * is what the media library shows and what core's Image block renders. Alt
+	 * text answers "what is this image" for someone who cannot see it; a caption
+	 * is prose everyone reads. They are separate fields and neither is derived
+	 * from the other.
+	 *
+	 * @param int                  $post_id    Post the photos belong to.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_photo_captions( int $post_id, array $properties ): void {
+		$photo = $properties['photo'] ?? null;
+		if ( null === $photo ) {
+			return;
+		}
+		$entries = is_array( $photo ) ? array_values( $photo ) : array( $photo );
+
+		// Two shapes reach here. Other clients send a structured object per
+		// photo, `{value, alt, caption}`. Outpost's own composer sends a flat
+		// `photo[]` of URLs alongside parallel `mp-photo-alt[]` and
+		// `mp-photo-caption[]` arrays, paired by index — so a bridge that read
+		// only the structured shape would never fire for a post made in Outpost.
+		$parallel = $properties['mp-photo-caption'] ?? null;
+		if ( is_array( $parallel ) ) {
+			$parallel = array_values( $parallel );
+		} elseif ( is_string( $parallel ) ) {
+			$parallel = array( $parallel );
+		} else {
+			$parallel = array();
+		}
+
+		$seen = array();
+		foreach ( $entries as $index => $entry ) {
+			if ( is_array( $entry ) && isset( $entry['value'] ) ) {
+				$url     = is_string( $entry['value'] ) ? $entry['value'] : '';
+				$caption = isset( $entry['caption'] ) && is_string( $entry['caption'] )
+					? $entry['caption']
+					: '';
+			} elseif ( is_string( $entry ) ) {
+				$url     = $entry;
+				$caption = isset( $parallel[ $index ] ) && is_string( $parallel[ $index ] )
+					? $parallel[ $index ]
+					: '';
+			} else {
+				continue;
+			}
+
+			$url     = trim( $url );
+			$caption = trim( $caption );
+			// An absent or empty caption writes nothing, so a photo without one
+			// keeps whatever excerpt the attachment already has.
+			if ( '' === $url || '' === $caption ) {
+				continue;
+			}
+			// The Micropub plugin appends each photo's canonical URL back onto
+			// the property after sideloading, so the same URL arrives twice. Keep
+			// the first caption seen for a URL, the way the alt bridge does.
+			if ( isset( $seen[ $url ] ) ) {
+				continue;
+			}
+			$seen[ $url ] = true;
+
+			$attachment_id = (int) attachment_url_to_postid( $url );
+			if ( $attachment_id <= 0 ) {
+				continue;
+			}
+			if ( ! self::actor_owns_post_attachment( $attachment_id, $post_id ) ) {
+				continue;
+			}
+			wp_update_post(
+				array(
+					'ID'           => $attachment_id,
+					'post_excerpt' => sanitize_text_field( $caption ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Bridge: photo alt text → `_wp_attachment_image_alt` on each attachment.
+	 *
+	 * @param int                  $post_id    Post the photos belong to.
+	 * @param array<string, mixed> $properties Flat properties map.
 	 */
 	private static function apply_photo_alt_text( int $post_id, array $properties ): void {
 		$pairs = self::collect_photo_alt_pairs( $properties );
