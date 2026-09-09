@@ -63,6 +63,17 @@ final class UrlGuardTest extends \WP_Mock\Tools\TestCase {
 			'ipv4-mapped loopback'    => array( '::ffff:127.0.0.1' ),
 			'ipv4-mapped private'     => array( '::ffff:10.0.0.1' ),
 			'ipv4-mapped hex'         => array( '::ffff:a9fe:a9fe' ),
+			// Expanded spellings. inet_pton accepts these as the same
+			// addresses as the compressed forms above; a text-pattern
+			// classifier matched only the compressed ones and let these
+			// through to the fetcher.
+			'expanded mapped loopback' => array( '0:0:0:0:0:ffff:127.0.0.1' ),
+			'expanded mapped metadata' => array( '0:0:0:0:0:ffff:169.254.169.254' ),
+			'expanded mapped private'  => array( '0:0:0:0:0:ffff:10.0.0.5' ),
+			'zero-padded mapped'       => array( '0000:0000:0000:0000:0000:ffff:192.168.1.1' ),
+			'expanded mapped cgnat'    => array( '0:0:0:0:0:ffff:100.64.0.1' ),
+			'ipv4-compatible loopback' => array( '::127.0.0.1' ),
+			'nat64 loopback'           => array( '64:ff9b::127.0.0.1' ),
 		);
 	}
 
@@ -129,5 +140,30 @@ final class UrlGuardTest extends \WP_Mock\Tools\TestCase {
 			->reply( array() );
 
 		$this->assertTrue( Outpost_Url_Guard::host_is_blocked( 'nxdomain.example' ) );
+	}
+
+	/**
+	 * Every spelling `inet_pton` accepts for one address must get the same
+	 * verdict. The guard previously classified from the text form, so
+	 * `::ffff:127.0.0.1` was blocked while `0:0:0:0:0:ffff:127.0.0.1` — the
+	 * identical address — was fetched.
+	 */
+	public function test_notation_does_not_change_the_verdict(): void {
+		$spellings = array(
+			'::ffff:127.0.0.1',
+			'0:0:0:0:0:ffff:127.0.0.1',
+			'0000:0000:0000:0000:0000:ffff:127.0.0.1',
+			'::ffff:7f00:1',
+			'0:0:0:0:0:ffff:7f00:1',
+		);
+		$packed = array_map( 'inet_pton', $spellings );
+		$this->assertCount( 1, array_unique( $packed ), 'Fixture error: these must be one address.' );
+
+		foreach ( $spellings as $ip ) {
+			$this->assertTrue(
+				Outpost_Url_Guard::is_blocked_ip( $ip ),
+				sprintf( 'Spelling %s of 127.0.0.1 must be blocked.', $ip )
+			);
+		}
 	}
 }
