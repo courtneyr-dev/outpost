@@ -53,7 +53,7 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 				if ( cancelled ) {
 					return;
 				}
-				setError( err && err.message ? err.message : __( 'Request failed.', 'outpost' ) );
+				setError( err && err.message ? err.message : __( 'Request failed.', 'outpost-mobile-publishing' ) );
 				setLoading( false );
 			} );
 
@@ -93,7 +93,7 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 
 	const title = sprintf(
 		/* translators: %s: provider label */
-		__( 'Pick a recent item from %s', 'outpost' ),
+		__( 'Pick a recent item from %s', 'outpost-mobile-publishing' ),
 		providerLabel
 	);
 
@@ -107,7 +107,7 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 			{ loading && (
 				<div className="outpost-fetch-recent-loading">
 					<Spinner />
-					<p>{ __( 'Fetching recent items…', 'outpost' ) }</p>
+					<p>{ __( 'Fetching recent items…', 'outpost-mobile-publishing' ) }</p>
 				</div>
 			) }
 
@@ -120,7 +120,7 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 						variant="secondary"
 						onClick={ () => setRetryToken( ( token ) => token + 1 ) }
 					>
-						{ __( 'Retry', 'outpost' ) }
+						{ __( 'Retry', 'outpost-mobile-publishing' ) }
 					</Button>
 				</>
 			) }
@@ -128,14 +128,14 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 			{ ! loading && ! error && response && response.reason === 'not_connected' && (
 				<Notice status="info" isDismissible={ false }>
 					{ response.message ||
-						__( 'Connect this provider in OAuth settings before using this picker.', 'outpost' ) }
+						__( 'Connect this provider in OAuth settings before using this picker.', 'outpost-mobile-publishing' ) }
 				</Notice>
 			) }
 
 			{ ! loading && ! error && response && response.reason === 'auth_failed' && (
 				<Notice status="warning" isDismissible={ false }>
 					{ response.message ||
-						__( 'Connection expired. Reconnect in OAuth settings.', 'outpost' ) }
+						__( 'Connection expired. Reconnect in OAuth settings.', 'outpost-mobile-publishing' ) }
 				</Notice>
 			) }
 
@@ -146,7 +146,7 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 				Array.isArray( response.items ) && (
 					<div className="outpost-fetch-recent-items">
 						{ response.items.length === 0 ? (
-							<p>{ __( 'No recent items available.', 'outpost' ) }</p>
+							<p>{ __( 'No recent items available.', 'outpost-mobile-publishing' ) }</p>
 						) : (
 							response.items.map( renderItem )
 						) }

@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-08T22:54:29+00:00\n"
+"POT-Creation-Date: 2026-09-09T00:08:42+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -39,43 +39,43 @@ msgstr ""
 msgid "https://courtneyr.dev"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:135
+#: includes/adapters/outbound/class-telegraph-adapter.php:156
 msgid "Post has no author."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:149
+#: includes/adapters/outbound/class-telegraph-adapter.php:170
 msgid "(empty)"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:187
+#: includes/adapters/outbound/class-telegraph-adapter.php:208
 msgid "Telegraph response missing URL."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:246
+#: includes/adapters/outbound/class-telegraph-adapter.php:267
 msgid "Telegraph account creation returned no token."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:250
+#: includes/adapters/outbound/class-telegraph-adapter.php:271
 msgid "Telegraph token could not be stored securely."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/adapters/outbound/class-telegraph-adapter.php:453
+#: includes/adapters/outbound/class-telegraph-adapter.php:474
 #, php-format
 msgid "Telegraph transport error: %s"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/adapters/outbound/class-telegraph-adapter.php:461
+#: includes/adapters/outbound/class-telegraph-adapter.php:482
 #, php-format
 msgid "Telegraph HTTP %d"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:468
+#: includes/adapters/outbound/class-telegraph-adapter.php:489
 msgid "Telegraph returned non-JSON."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:473
+#: includes/adapters/outbound/class-telegraph-adapter.php:494
 msgid "Telegraph API error."
 msgstr ""
 
@@ -421,15 +421,19 @@ msgstr ""
 msgid "You do not have permission to manage Outpost iOS Shortcut tokens."
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:78
+#: includes/admin/class-outpost-encryption-key-notice.php:80
+msgid "Outpost: OUTPOST_ENCRYPTION_KEY is defined in wp-config.php but is not 32 raw bytes, so Outpost is ignoring it and using the key stored in the database. Wrap the value in base64_decode()."
+msgstr ""
+
+#: includes/admin/class-outpost-encryption-key-notice.php:85
 msgid "Outpost: Your encryption key is stored in the database. For best security, move it to wp-config.php."
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:83
+#: includes/admin/class-outpost-encryption-key-notice.php:91
 msgid "Show instructions →"
 msgstr ""
 
-#: includes/admin/class-outpost-encryption-key-notice.php:86
+#: includes/admin/class-outpost-encryption-key-notice.php:94
 msgid "Dismiss"
 msgstr ""
 
@@ -685,31 +689,31 @@ msgid "Outpost geocode requires an authenticated user."
 msgstr ""
 
 #. translators: 1: minimum length, 2: maximum length
-#: includes/class-geocode-endpoint.php:198
+#: includes/class-geocode-endpoint.php:197
 #: includes/class-media-lookup-endpoint.php:170
 #, php-format
 msgid "Search query must be between %1$d and %2$d characters."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:262
+#: includes/class-geocode-endpoint.php:261
 msgid "Too many geocode requests. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:287
+#: includes/class-geocode-endpoint.php:286
 msgid "Too many geocode requests from this network. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:404
+#: includes/class-geocode-endpoint.php:403
 msgid "Could not reach the geocoding service."
 msgstr ""
 
 #. translators: %d: HTTP status code
-#: includes/class-geocode-endpoint.php:417
+#: includes/class-geocode-endpoint.php:416
 #, php-format
 msgid "Geocoding service returned HTTP %d."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:427
+#: includes/class-geocode-endpoint.php:426
 msgid "Geocoding service returned invalid JSON."
 msgstr ""
 
@@ -867,71 +871,71 @@ msgstr ""
 msgid "Outpost preview requires an authenticated user."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:274
+#: includes/class-preview-endpoint.php:273
 msgid "Target URL did not return HTML."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:283
+#: includes/class-preview-endpoint.php:282
 msgid "Target URL response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:380
+#: includes/class-preview-endpoint.php:379
 #, php-format
 msgid "Source declares an unrecognized extractor type: %s"
 msgstr ""
 
-#: includes/class-preview-endpoint.php:392
+#: includes/class-preview-endpoint.php:391
 msgid "Source recipe is invalid for the requested URL."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:418
+#: includes/class-preview-endpoint.php:417
 msgid "Source response content type is not one of the extractor accepted types."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:427
+#: includes/class-preview-endpoint.php:426
 msgid "Source response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:438
+#: includes/class-preview-endpoint.php:437
 #, php-format
 msgid "Extractor \"%s\" is not yet implemented in this build."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:444
+#: includes/class-preview-endpoint.php:443
 msgid "Extractor failed to parse the source response."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:697
+#: includes/class-preview-endpoint.php:696
 msgid "A url is required."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:705
+#: includes/class-preview-endpoint.php:704
 msgid "The URL is too long."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:714
+#: includes/class-preview-endpoint.php:713
 msgid "The url could not be parsed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:724
+#: includes/class-preview-endpoint.php:723
 msgid "Only http and https URLs are allowed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:732
+#: includes/class-preview-endpoint.php:731
 msgid "The URL must include a host."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:744
+#: includes/class-preview-endpoint.php:743
 msgid "The target URL could not be retrieved."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:816
+#: includes/class-preview-endpoint.php:815
 msgid "Could not fetch the target URL."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:839
+#: includes/class-preview-endpoint.php:838
 msgid "Too many preview requests. Try again in a minute."
 msgstr ""
 

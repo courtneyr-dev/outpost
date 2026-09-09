@@ -27,11 +27,11 @@ export function OutpostSidebar() {
 	return (
 		<>
 			<PluginSidebarMoreMenuItem target="outpost-sidebar" icon={ fingerpost }>
-				{ __( 'Outpost', 'outpost' ) }
+				{ __( 'Outpost', 'outpost-mobile-publishing' ) }
 			</PluginSidebarMoreMenuItem>
 			<PluginSidebar
 				name="outpost-sidebar"
-				title={ __( 'Outpost', 'outpost' ) }
+				title={ __( 'Outpost', 'outpost-mobile-publishing' ) }
 				icon={ fingerpost }
 			>
 				<PanelBody initialOpen>
@@ -39,7 +39,7 @@ export function OutpostSidebar() {
 						<CardBody>
 							{ __(
 								'Outpost sidebar is loaded. Components will appear here as features ship.',
-								'outpost'
+								'outpost-mobile-publishing'
 							) }
 						</CardBody>
 					</Card>
