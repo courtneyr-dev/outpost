@@ -163,12 +163,18 @@ final class Outpost_Url_Guard {
 		// expanded `0:0:0:0:0:ffff:127.0.0.1`, zero-padded, hex tail), and a
 		// regex over the text form only ever matches some of them — so the
 		// same address could be read two ways and get opposite verdicts.
-		$packed = @inet_pton( $ip );
+		// Validate before converting rather than silencing inet_pton's warning
+		// on malformed input. Anything that is not an IP is not our business
+		// here; is_blocked_ip() fails those closed on its own.
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
+			return null;
+		}
+		$packed = inet_pton( $ip );
 		if ( false === $packed || 16 !== strlen( $packed ) ) {
 			return null;
 		}
 
-		$prefix = substr( $packed, 0, 12 );
+		$prefix       = substr( $packed, 0, 12 );
 		$carries_ipv4 = (
 			// ::ffff:0:0/96 IPv4-mapped.
 			"\0\0\0\0\0\0\0\0\0\0\xff\xff" === $prefix
