@@ -178,7 +178,7 @@ Connecting an account sends you to that service's sign-in page to authorize Outp
 
 * **Notion** — api.notion.com (authorize, token exchange, and reading a page you cite). [Terms and privacy](https://www.notion.com/terms).
 * **Oura** — cloud.ouraring.com (authorize) and api.ouraring.com (token, verify, recent activity). [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
-* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [API terms of use](https://developer.whoop.com/api-terms-of-use/), [Privacy](https://www.whoop.com/us/en/privacy/).
+* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [API terms of use](https://developer.whoop.com/api-terms-of-use/), [API privacy and security terms](https://developer.whoop.com/api-terms-of-use/#6-whoop-privacy-and-security), [Privacy policy](https://www.whoop.com/privacy/).
 * **Polar (Flow / AccessLink)** — flow.polar.com (authorize), polarremote.com (token, revoke), and www.polaraccesslink.com (register, verify, recent activity). [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
 * **Ride With GPS** — ridewithgps.com (authorize, token, and one call to confirm the connection is live). [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
 * **Ravelry** — www.ravelry.com (authorize, token) and api.ravelry.com (one call to confirm the connection is live). [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
@@ -247,7 +247,7 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Removed: the Sefaria and SuttaCentral link sources. Outpost no longer recognizes those hosts or suggests a Quote post for them; pasted links from either site are handled by the generic page reader like any other URL.
 * Removed: three classes that shipped without a runtime path — the Ravelry and Ride With GPS URL-paste sources, whose authenticated preview branch was never built, and a duplicate RSS inbound extractor superseded by the one the source registry dispatches. Pasted Ravelry and Ride With GPS links keep the generic page preview they already had.
 * Changed: External services documents the Kit broadcast URL recorded on a post and the iCloud Shortcuts installer link, and explains that the built-in list of recognized link hosts is matched locally and contacts nothing.
-* Changed: the WHOOP terms link points at the API terms of use, which is the document that governs Outpost's use of that API.
+* Changed: the WHOOP entry links the API terms of use and their privacy and security section, both on developer.whoop.com, alongside the privacy policy itself. whoop.com refuses automated clients, so the policy link cannot be machine-checked; the developer-site links can be.
 * Fixed: the PWA web app manifest pointed its five icons at /wp-content/plugins/outpost/, the folder name used before the plugin was renamed. On any install the icons 404'd, so the install prompt and home-screen icon fell back to a generic placeholder. The manifest now builds those URLs from the plugin's own location.
 * Fixed: the Playground blueprint activated outpost/outpost.php, a path that no longer exists after the rename.
 
