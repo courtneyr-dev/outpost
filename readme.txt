@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.13
+Stable tag:        1.0.14
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -233,6 +233,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.14 =
+* Fixed: photo captions now appear under the photo. 1.0.13 saved them to the image in your media library, but WordPress only shows a caption that was typed into the block itself, so nothing appeared on the post. Captions written in Outpost, or edited later in the media library, now show wherever the image does. A caption you typed directly into a block still wins.
 
 = 1.0.13 =
 * Added: a caption for each photo, separate from its alt text and from the post title. Alt text says what an image is for someone who cannot see it; a caption is the line everyone reads under the photo. Captions are optional, start empty, and are saved as the image's caption in your media library, so the block editor and your theme both read the same value.
