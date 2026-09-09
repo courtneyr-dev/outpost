@@ -39,6 +39,7 @@ final class Outpost_Uninstaller {
 		'outpost_settings',
 		'outpost_settings_api_keys',
 		'outpost_bridgy_silos_enabled',
+		'outpost_telegraph_enabled',
 		'outpost_telegraph_short_name',
 		'outpost_telegraph_author_name',
 		'outpost_telegraph_author_url',

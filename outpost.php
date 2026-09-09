@@ -5,7 +5,6 @@
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
  * Version:           1.0.11
  * Requires at least: 6.5
- * Tested up to:      7.1
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
@@ -114,8 +113,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/extractors/class-extractor-c
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/interface-schema-extractor.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-og-inbound.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/class-composite-inbound.php';
-// F5 #6 — generic RSS / Atom inbound primitive (SimplePie-backed).
-require_once OUTPOST_PLUGIN_DIR . 'includes/inbound/extractors/class-outpost-rss-inbound.php';
 // G4b concrete schema extractors. Auto-register on plugins_loaded below.
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/trait-schema-helpers.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-article-extractor.php';
@@ -124,7 +121,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-book-extractor.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/primitives/extractors/class-restaurant-extractor.php';
 // G4b composite-primitive demo: Apple Music + iTunes Lookup enrichment.
-require_once OUTPOST_PLUGIN_DIR . 'includes/adapters/class-apple-music-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-unknown.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
@@ -176,10 +172,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/providers/class-outpost-oauth-
 require_once OUTPOST_PLUGIN_DIR . 'includes/oauth/class-outpost-oauth-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/notion/class-outpost-notion-blocks-converter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-notion.php';
-// G14b-source — Ravelry URL-paste consumer.
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-ravelry.php';
-// G12a-source — Ride With GPS URL-paste consumer.
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-source-rwg.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-encryption-key-notice.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-outpost-oauth-settings-page.php';
 // G3.5d — Multi-tab settings UI foundation.
@@ -215,9 +207,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-o
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-whoop.php';
 // G11c-consumer — Polar Flow fetch-recent provider (transaction model).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-polar.php';
-// G10a — scripture inbound (og_tags-only; api/license/translator-aware paths in G10b).
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-sefaria.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-suttacentral.php';
 // G14a — iFixit repair-guide inbound (og_tags-only; full api_json integration in G14b).
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-ifixit.php';
 // G13a — Pretalx hosted SaaS conference inbound (og_tags-only;
@@ -396,9 +385,6 @@ add_action(
 		Outpost_Source_Registry::register( new Outpost_Source_Bluesky() );
 		// G3.5a Notion source (auth-required; uses OAuth credentials store).
 		Outpost_Source_Registry::register( new Outpost_Source_Notion() );
-		// G10a scripture inbound (og_tags-only batch).
-		Outpost_Source_Registry::register( new Outpost_Source_Sefaria() );
-		Outpost_Source_Registry::register( new Outpost_Source_SuttaCentral() );
 		// G14a iFixit repair-guide inbound (og_tags-only).
 		Outpost_Source_Registry::register( new Outpost_Source_Ifixit() );
 		// G13a Pretalx hosted SaaS conference inbound.
@@ -880,8 +866,18 @@ function outpost_activate(): void {
 }
 register_activation_hook( __FILE__, 'outpost_activate' );
 
-// G9 — Register Telegraph outbound adapter's transition_post_status hook.
-Outpost_Telegraph_Adapter::register();
+// G9 — Telegraph outbound adapter. Off unless the site owner has opted in:
+// it publishes a public copy of each post to a third-party service.
+// Registered on plugins_loaded, like the POSSE destinations, so the
+// option read happens once WordPress is available.
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		if ( Outpost_Telegraph_Adapter::is_enabled() ) {
+			Outpost_Telegraph_Adapter::register();
+		}
+	}
+);
 
 /**
  * Deactivation hook. Flushes rewrite rules so /post/* rules are dropped from
