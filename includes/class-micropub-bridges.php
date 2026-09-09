@@ -187,7 +187,18 @@ final class Outpost_Micropub_Bridges {
 			return;
 		}
 
-		$post_id    = (int) $args['ID'];
+		$post_id = (int) $args['ID'];
+
+		// Authorize the actor against this post. `after_micropub` fires on
+		// update as well as create, and the dependency resolves the target
+		// post from a URL in the request while gating only on the global
+		// `edit_published_posts`, so $post_id can be a post this user
+		// cannot edit. The attachment guard below answers a different
+		// question and does not cover the post.
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
 		$properties = self::extract_properties( $input );
 
 		self::apply_post_format( $post_id, $properties );
@@ -537,6 +548,11 @@ final class Outpost_Micropub_Bridges {
 			}
 			if ( $term instanceof \WP_Term ) {
 				$ids[] = (int) $term->term_id;
+				continue;
+			}
+			// Assigning an existing term rides on the post's own capability,
+			// but creating one is a taxonomy mutation core gates separately.
+			if ( ! current_user_can( 'manage_categories' ) ) {
 				continue;
 			}
 			$created = wp_insert_term( $clean, 'category' );

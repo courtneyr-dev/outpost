@@ -465,6 +465,8 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	public function test_apply_categories_creates_new_term_when_missing(): void {
+		WP_Mock::userFunction( 'current_user_can' )
+			->andReturn( true );
 		WP_Mock::userFunction( 'sanitize_text_field' )
 			->andReturn( 'Brand New' );
 		WP_Mock::userFunction( 'get_term_by' )
@@ -1090,5 +1092,32 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			\PFBT_Format_Detector::$mark_as_manual_calls,
 			'mark_format_manual passes each call through; PFBT side handles idempotence'
 		);
+	}
+
+	/**
+	 * Creating a category is a taxonomy mutation core gates on
+	 * `manage_categories`; assigning an existing one rides on the post's own
+	 * capability. A poster without `manage_categories` must not be able to
+	 * mint terms in the site's primary taxonomy.
+	 */
+	public function test_apply_categories_does_not_create_term_without_manage_categories(): void {
+		WP_Mock::userFunction( 'current_user_can' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'sanitize_text_field' )
+			->andReturn( 'Brand New' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->andReturn( false );
+		WP_Mock::userFunction( 'sanitize_title' )
+			->andReturn( 'brand-new' );
+		WP_Mock::userFunction( 'wp_insert_term' )
+			->never();
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->never();
+
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Brand New' ) ) )
+		);
+		$this->assertTrue( true );
 	}
 }
