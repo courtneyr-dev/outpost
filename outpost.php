@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.13
+ * Version:           1.0.14
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.13' );
+define( 'OUTPOST_VERSION', '1.0.14' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -235,6 +235,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-pending-syndication-notice.php
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-admin-column.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
 // FX iOS Shortcut bridge.
@@ -870,6 +871,11 @@ register_activation_hook( __FILE__, 'outpost_activate' );
 // it publishes a public copy of each post to a third-party service.
 // Registered on plugins_loaded, like the POSSE destinations, so the
 // option read happens once WordPress is available.
+// Render image captions from the attachment. Core's Image block only emits a
+// figcaption when one is in the block markup, so a caption stored on the
+// attachment would otherwise never appear.
+Outpost_Image_Caption_Renderer::register();
+
 add_action(
 	'plugins_loaded',
 	static function (): void {
