@@ -34,7 +34,6 @@ const PLATFORM_HOMEPAGE: Record<string, string> = {
 	'pinterest':          'https://www.pinterest.com',
 	'reddit-manual':      'https://www.reddit.com',
 	'flickr-manual':      'https://www.flickr.com',
-	'tumblr':             'https://www.tumblr.com',
 };
 
 export const try_manual_fallback: IosStrategyFn = async ( payload, env ) => {
