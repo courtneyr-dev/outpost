@@ -13,6 +13,10 @@
 /.wordpress-org
 /scripts
 
+# Build artifacts. package.json's `files` allowlist already excludes these
+# from the zip; this is the belt to that pair of braces.
+*.zip
+
 # Dev/meta files
 .gitignore
 .gitkeep
