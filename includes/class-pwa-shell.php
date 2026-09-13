@@ -82,7 +82,7 @@ final class Outpost_PWA_Shell {
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<?php wp_styles()->do_items( $style_handles ); ?>
 </head>
-<body class="outpost-composer-shell">
+<body class="outpost-composer-shell <?php echo esc_attr( self::mode_class() ); ?>">
 	<main id="outpost-root" data-outpost-route="composer"></main>
 		<?php
 		wp_scripts()->do_items( $script_handles );
@@ -145,6 +145,29 @@ final class Outpost_PWA_Shell {
 			add_filter( 'script_loader_tag', array( self::class, 'filter_app_script_tag' ), 10, 2 );
 		}
 
+		/**
+		 * Filters the stylesheet handles printed in the composer shell.
+		 *
+		 * The shell prints only these handles (never the theme queue), so a
+		 * site integration that wants to paint the composer — for example to
+		 * follow the site's stored appearance preference — registers its own
+		 * handle and appends it here.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string[] $style_handles Registered style handles.
+		 */
+		$style_handles = (array) apply_filters( 'outpost_shell_style_handles', $style_handles );
+
+		/**
+		 * Filters the script handles printed at the end of the composer shell.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string[] $script_handles Registered script handles.
+		 */
+		$script_handles = (array) apply_filters( 'outpost_shell_script_handles', $script_handles );
+
 		return array( $style_handles, $script_handles );
 	}
 
@@ -156,6 +179,33 @@ final class Outpost_PWA_Shell {
 	 * no paint — per the Hard Contract. padding-top reserves the iOS status
 	 * bar in standalone mode, where black-translucent puts content under it.
 	 */
+	/**
+	 * Appearance mode class for the shell body.
+	 *
+	 * The stored per-user mode (day / night / system) becomes the
+	 * `outpost-mode-*` class the tokens already key on; until now the class
+	 * was computed but never printed. A site integration can map another
+	 * preference source onto it.
+	 *
+	 * @since 1.0.15
+	 *
+	 * @return string One of outpost-mode-day, outpost-mode-night, outpost-mode-system.
+	 */
+	private static function mode_class(): string {
+		$class = Outpost_Mode_Controller::root_class_for_user( get_current_user_id() );
+
+		/**
+		 * Filters the appearance mode class printed on the composer shell body.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string $class One of outpost-mode-day, outpost-mode-night, outpost-mode-system.
+		 */
+		$class = (string) apply_filters( 'outpost_shell_mode_class', $class );
+
+		return in_array( $class, array( 'outpost-mode-day', 'outpost-mode-night', 'outpost-mode-system' ), true ) ? $class : 'outpost-mode-system';
+	}
+
 	private static function critical_css(): string {
 		return 'body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }'
 			. ' #outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }';

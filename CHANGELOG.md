@@ -5,6 +5,13 @@ All notable changes to Outpost are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `outpost_shell_style_handles` and `outpost_shell_script_handles` filters so a site integration can paint the composer shell (the shell prints only its own handles).
+- The composer shell body now carries the stored appearance mode class (`outpost-mode-day|night|system`, filterable through `outpost_shell_mode_class`); the tokens already keyed on it, but the class was never printed.
+
 ## [1.0.11] - 2026-09-02
 
 ### Added
