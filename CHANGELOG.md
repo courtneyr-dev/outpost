@@ -7,6 +7,8 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-09-13
+
 ### Added
 
 - `outpost_shell_style_handles` and `outpost_shell_script_handles` filters so a site integration can paint the composer shell (the shell prints only its own handles).
