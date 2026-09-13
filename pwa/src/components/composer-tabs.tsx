@@ -48,6 +48,13 @@ import { peek_share_target } from '../lib/share-target';
  * ModeId union and the modes array would extend then.
  */
 
+/**
+ * Waits between composer-config retries after a failure that isn't an auth
+ * rejection. The schedule starts over when the browser comes back online or
+ * the user taps Try again.
+ */
+export const CONFIG_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+
 type ModeId = 'note' | 'reply' | 'photo' | 'listen' | 'life' | 'recipe' | 'about';
 
 interface ModeDefinition {
@@ -79,26 +86,48 @@ export function ComposerTabs({
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const [config_error, setConfigError] = useState<'unauthorized' | 'fetch_failed' | null>(null);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
+	// Bumped to fetch the composer config again.
+	const [config_attempt, setConfigAttempt] = useState(0);
+	const config_retry_step = useRef(0);
+	// True until a fetch succeeds or the site rejects the token; read by the
+	// `online` listener, which is attached once.
+	const config_needed = useRef(true);
 
-	// Fetch the composer config once on mount. On failure we surface a
-	// banner above the tab strip so the user can see WHY their More
-	// options + companion-gated fields aren't loading. The most common
-	// cause is an expired bearer token — the banner offers re-auth.
+	const retry_config_now = (): void => {
+		config_retry_step.current = 0;
+		setConfigAttempt((n) => n + 1);
+	};
+
+	// Fetch the composer config on mount, again on a bounded backoff after
+	// a network or server failure, and again when the browser comes back
+	// online. On failure we surface a banner above the tab strip so the user
+	// can see WHY their More options + companion-gated fields aren't loading.
+	// An auth rejection (expired bearer token) is not retried — the banner
+	// offers re-auth instead.
 	useEffect(() => {
 		let cancelled = false;
+		let retry_timer: ReturnType<typeof setTimeout> | null = null;
 		fetch_composer_config(token.accessToken, composerConfigEnv)
 			.then((cfg) => {
-				if (!cancelled) {
-					setComposerConfig(cfg);
-					setConfigError(null);
-				}
+				if (cancelled) return;
+				config_needed.current = false;
+				config_retry_step.current = 0;
+				setComposerConfig(cfg);
+				setConfigError(null);
 			})
 			.catch((err: { code?: string }) => {
 				if (cancelled) return;
 				if (err && err.code === 'unauthorized') {
+					config_needed.current = false;
 					setConfigError('unauthorized');
 				} else {
+					config_needed.current = true;
 					setConfigError('fetch_failed');
+					const delay = CONFIG_RETRY_DELAYS_MS[config_retry_step.current];
+					if (delay !== undefined) {
+						config_retry_step.current += 1;
+						retry_timer = setTimeout(() => setConfigAttempt((n) => n + 1), delay);
+					}
 				}
 				if (typeof console !== 'undefined') {
 					console.warn('Outpost: composer-config fetch failed', err);
@@ -106,8 +135,17 @@ export function ComposerTabs({
 			});
 		return (): void => {
 			cancelled = true;
+			if (retry_timer !== null) clearTimeout(retry_timer);
 		};
-	}, [token.accessToken, composerConfigEnv]);
+	}, [token.accessToken, composerConfigEnv, config_attempt]);
+
+	useEffect(() => {
+		const on_online = (): void => {
+			if (config_needed.current) retry_config_now();
+		};
+		window.addEventListener('online', on_online);
+		return (): void => window.removeEventListener('online', on_online);
+	}, []);
 
 	const modes: ModeDefinition[] = [
 		{
@@ -227,19 +265,29 @@ export function ComposerTabs({
 						<p>
 							{config_error === 'unauthorized'
 								? 'Your sign-in may have expired. Sign out and back in to refresh — your Yoast keyphrase, categories, tags, and XFN options will appear once your token is renewed.'
-								: 'The composer-config endpoint is unreachable. Check your connection and reload. The composer still works for posting; only the More options surface needs the config.'}
+								: 'The composer-config endpoint is unreachable. Outpost tries again on its own and as soon as your connection is back. The composer still works for posting; only the More options surface needs the config.'}
 						</p>
 					</div>
-					<button
-						class="outpost-button outpost-button--secondary"
-						type="button"
-						onClick={async (): Promise<void> => {
-							await clear_token(tokenStore);
-							window.location.reload();
-						}}
-					>
-						Sign out + back in
-					</button>
+					{config_error === 'unauthorized' ? (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={async (): Promise<void> => {
+								await clear_token(tokenStore);
+								window.location.reload();
+							}}
+						>
+							Sign out + back in
+						</button>
+					) : (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={retry_config_now}
+						>
+							Try again
+						</button>
+					)}
 				</aside>
 			)}
 			<div class="outpost-composer__header">
