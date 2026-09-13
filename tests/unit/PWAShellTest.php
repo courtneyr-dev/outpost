@@ -123,6 +123,61 @@ final class PWAShellTest extends TestCase {
 	}
 
 	/** @test */
+	public function render_uses_system_mode_class_when_current_user_id_is_null(): void {
+		$this->stub_ready_environment();
+		WP_Mock::userFunction( 'get_current_user_id' )
+			->andReturnUsing( static fn() => null );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-system',
+			$out,
+			'Null current-user IDs must fall back to system mode without errors.'
+		);
+	}
+
+	/** @test */
+	public function render_preserves_valid_filtered_mode_class(): void {
+		$this->stub_ready_environment();
+
+		WP_Mock::onFilter( 'outpost_shell_mode_class' )
+			->withAnyArgs()
+			->reply( 'outpost-mode-night' );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-night',
+			$out,
+			'Valid mode-class filter values must be preserved.'
+		);
+	}
+
+	/** @test */
+	public function render_falls_back_to_system_for_invalid_filtered_mode_class(): void {
+		$this->stub_ready_environment();
+
+		WP_Mock::onFilter( 'outpost_shell_mode_class' )
+			->withAnyArgs()
+			->reply( 'outpost-mode-invalid' );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-system',
+			$out,
+			'Invalid mode-class filter values must collapse to system mode.'
+		);
+	}
+
+	/** @test */
 	public function render_emits_install_prompt_when_indieauth_missing(): void {
 		$this->stub_indieauth_missing_environment();
 
