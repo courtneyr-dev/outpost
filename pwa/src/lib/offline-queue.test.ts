@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import {
@@ -7,8 +7,12 @@ import {
 	remove,
 	flush,
 	is_network_error,
+	is_retryable_error,
+	subscribe_queue_changes,
+	CLAIM_LEASE_MS,
 	type OfflineQueueEnvironment,
 } from './offline-queue';
+import { recall_endpoints } from './endpoint-cache';
 import { MicropubError, type MicropubEnvironment } from './micropub';
 
 function fresh_env(): OfflineQueueEnvironment {
@@ -193,5 +197,223 @@ describe('offline-queue: is_network_error', () => {
 	it('classifies plain Error as NOT a network error', () => {
 		const err = new Error('something else');
 		expect(is_network_error(err)).toBe(false);
+	});
+});
+
+function note_input(content = 'queued note'): Parameters<typeof enqueue>[0] {
+	return {
+		source: 'note',
+		properties: { content },
+		accessToken: 'tk',
+		micropubEndpoint: 'https://example.test/wp-json/micropub/1.0/endpoint',
+	};
+}
+
+function fetch_env(
+	handler: (url: string, init: RequestInit | undefined) => Response | Promise<Response>,
+): MicropubEnvironment {
+	return {
+		fetch: (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> =>
+			handler(String(input), init)) as typeof fetch,
+	};
+}
+
+describe('offline-queue: change notifications', () => {
+	it('fires after enqueue, a failed replay, and remove', async () => {
+		let events = 0;
+		const unsubscribe = subscribe_queue_changes(() => {
+			events += 1;
+		});
+		try {
+			const id = await enqueue(note_input(), env);
+			expect(events).toBe(1);
+			await flush(rejecting_fetch(), env);
+			expect(events).toBe(2);
+			await remove(id, env);
+			expect(events).toBe(3);
+		} finally {
+			unsubscribe();
+		}
+	});
+
+	it('notifies after the write commits, so a listener reads the new entry', async () => {
+		const counts: number[] = [];
+		const unsubscribe = subscribe_queue_changes(() => {
+			void list(env).then((entries) => counts.push(entries.length));
+		});
+		try {
+			await enqueue(note_input(), env);
+			await vi.waitFor(() => expect(counts).toEqual([1]));
+		} finally {
+			unsubscribe();
+		}
+	});
+
+	it('posts to the outpost-queue BroadcastChannel so other tabs refresh', async () => {
+		const other_tab = new BroadcastChannel('outpost-queue');
+		const received = new Promise<unknown>((resolve) => {
+			other_tab.onmessage = (event: MessageEvent): void => resolve(event.data);
+		});
+		try {
+			await enqueue(note_input(), env);
+			await expect(received).resolves.toBe('changed');
+		} finally {
+			other_tab.close();
+		}
+	});
+});
+
+describe('offline-queue: one replay per entry across tabs', () => {
+	it('publishes a queued entry once when two tabs flush at the same moment', async () => {
+		await enqueue(note_input(), env);
+		let posts = 0;
+		const slow_ok = fetch_env(async () => {
+			posts += 1;
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			return ok_response();
+		});
+		await Promise.all([flush(slow_ok, env), flush(slow_ok, env)]);
+		expect(posts).toBe(1);
+		expect(await list(env)).toHaveLength(0);
+	});
+
+	it('leaves an entry another tab holds, and replays it once the lease runs out', async () => {
+		await enqueue(note_input(), env);
+		let posts = 0;
+		const t0 = 1_000_000;
+		// The first tab claims the entry, then its request never answers.
+		void flush(
+			fetch_env(() => {
+				posts += 1;
+				return new Promise<Response>(() => {});
+			}),
+			env,
+			{ now: () => t0 },
+		);
+		await vi.waitFor(() => expect(posts).toBe(1));
+
+		const ok = fetch_env(() => {
+			posts += 1;
+			return ok_response();
+		});
+		expect(await flush(ok, env, { now: () => t0 + 1_000 })).toHaveLength(1);
+		expect(posts).toBe(1);
+		expect(await flush(ok, env, { now: () => t0 + CLAIM_LEASE_MS + 1 })).toHaveLength(0);
+		expect(posts).toBe(2);
+	});
+});
+
+describe('offline-queue: entries queued before discovery or upload', () => {
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('discovers the endpoint from me at replay, remembers it, and posts', async () => {
+		await enqueue(
+			{
+				source: 'note',
+				properties: { content: 'written offline' },
+				accessToken: 'tk',
+				micropubEndpoint: null,
+				me: 'https://example.test/',
+			},
+			env,
+		);
+		const calls: string[] = [];
+		const site = fetch_env((url, init) => {
+			calls.push((init?.method ?? 'GET') + ' ' + url);
+			if (init?.method === 'POST') return ok_response();
+			return new Response(
+				'<html><head><link rel="micropub" href="https://example.test/mp"></head></html>',
+				{ status: 200, headers: { 'Content-Type': 'text/html' } },
+			);
+		});
+		expect(await flush(site, env)).toHaveLength(0);
+		expect(calls).toEqual(['GET https://example.test/', 'POST https://example.test/mp']);
+		expect(recall_endpoints('https://example.test/').micropub).toBe('https://example.test/mp');
+	});
+
+	it('uploads queued photo bytes once, even when the post fails after the upload', async () => {
+		await enqueue(
+			{
+				source: 'photo',
+				properties: { 'mp-photo-alt': 'a red door' },
+				accessToken: 'tk',
+				micropubEndpoint: 'https://example.test/mp',
+				me: 'https://example.test/',
+				media: [
+					{ filename: 'photo-1.jpg', type: 'image/jpeg', bytes: new Uint8Array([1, 2, 3]).buffer },
+				],
+				mediaEndpoint: 'https://example.test/media',
+			},
+			env,
+		);
+		let uploads = 0;
+		let uploaded_size = -1;
+		let post_online = false;
+		let post_body = '';
+		const site = fetch_env((url, init) => {
+			if (url === 'https://example.test/media') {
+				uploads += 1;
+				const file = (init?.body as FormData).get('file');
+				uploaded_size = file instanceof Blob ? file.size : -1;
+				return new Response('', {
+					status: 201,
+					headers: { Location: 'https://example.test/uploads/photo-1.jpg' },
+				});
+			}
+			if (!post_online) throw new TypeError('Failed to fetch');
+			post_body = String(init?.body);
+			return ok_response();
+		});
+
+		const [kept] = await flush(site, env);
+		expect(kept?.media?.[0]?.url).toBe('https://example.test/uploads/photo-1.jpg');
+		expect(kept?.media?.[0]?.bytes).toBeUndefined();
+		expect(uploaded_size).toBe(3);
+
+		post_online = true;
+		expect(await flush(site, env)).toHaveLength(0);
+		expect(uploads).toBe(1);
+		const sent = new URLSearchParams(post_body);
+		expect(sent.get('photo')).toBe('https://example.test/uploads/photo-1.jpg');
+		expect(sent.get('mp-photo-alt')).toBe('a red door');
+	});
+});
+
+describe('offline-queue: retry classification', () => {
+	it('marks a 5xx failure retryable and a 4xx failure not', async () => {
+		await enqueue(note_input(), env);
+		const answer = (status: number): MicropubEnvironment =>
+			fetch_env(() => new Response('nope', { status }));
+
+		const [after_500] = await flush(answer(500), env);
+		expect(after_500?.retryable).toBe(true);
+		expect(after_500?.lastError).toContain('500');
+		expect(after_500?.claimedUntil).toBe(0);
+
+		const [after_400] = await flush(answer(400), env);
+		expect(after_400?.retryable).toBe(false);
+		expect(after_400?.attempts).toBe(2);
+	});
+
+	it('classifies errors for automatic retry', () => {
+		expect(is_retryable_error(new TypeError('Failed to fetch'))).toBe(true);
+		expect(is_retryable_error(new MicropubError('x', 'post_failed', 503))).toBe(true);
+		expect(is_retryable_error(new MicropubError('x', 'post_failed', 429))).toBe(true);
+		expect(is_retryable_error(new MicropubError('x', 'post_failed', 401))).toBe(false);
+		expect(is_retryable_error(new MicropubError('x', 'no_endpoint'))).toBe(false);
+	});
+
+	it('removes an entry whose post succeeded with an unsafe Location instead of posting it again', async () => {
+		await enqueue(note_input(), env);
+		let posts = 0;
+		const site = fetch_env(() => {
+			posts += 1;
+			return new Response('', { status: 201, headers: { Location: 'javascript:void(0)' } });
+		});
+		expect(await flush(site, env)).toHaveLength(0);
+		expect(await flush(site, env)).toHaveLength(0);
+		expect(posts).toBe(1);
 	});
 });

@@ -1,14 +1,12 @@
 import { useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
@@ -170,13 +168,6 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 		if (!trimmed_primary) return;
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
 			const trimmed_venue = venue_name.trim();
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
@@ -193,48 +184,39 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			};
 			const properties = merge_more_values(base, more_values);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
-				setTitle('');
+			const result = await post_or_queue(
+				{
+					source: 'life',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({
+							kind: stage.kind === 'discovering' ? 'discovering-endpoint' : 'posting',
+						}),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setPrimaryValue('');
 				setContent('');
 				resetMoreValues();
-				setPickedLocation(null);
-				setVenueName('');
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'life',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setPrimaryValue('');
-						setContent('');
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; surface the original post error below.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setTitle('');
+			setPrimaryValue('');
+			setContent('');
+			resetMoreValues();
+			setPickedLocation(null);
+			setVenueName('');
 		} catch (err) {
 			const message =
 				err instanceof MicropubError

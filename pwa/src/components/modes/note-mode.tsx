@@ -1,14 +1,12 @@
 import { useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
@@ -55,7 +53,8 @@ import {
  * pull-out, that wins (last-write in merge_more_values).
  *
  * Endpoint caching: discovers the micropub endpoint on first post,
- * holds it in component state for the session.
+ * holds it in component state for the session. post-or-queue.ts also
+ * keeps the last one per device, so a submit made offline still queues.
  */
 
 export interface NoteModeProps {
@@ -213,14 +212,6 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 		if (config.requiresTitle && !trimmed_title) return;
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
-			setStatus({ kind: 'posting' });
 			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
 				content: trimmed_content,
@@ -238,46 +229,36 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 			};
 			const properties = merge_more_values(base, more_values);
 
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
+			const result = await post_or_queue(
+				{
+					source: 'note',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({ kind: stage.kind === 'discovering' ? 'discovering' : 'posting' }),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setContent('');
 				setTitle('');
 				resetMoreValues();
-				setPickedLocation(null);
-				setVenueName('');
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'note',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setContent('');
-						setTitle('');
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setContent('');
+			setTitle('');
+			resetMoreValues();
+			setPickedLocation(null);
+			setVenueName('');
 		} catch (err) {
 			const message =
 				err instanceof MicropubError

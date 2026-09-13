@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	discover_media_endpoint,
-	upload_media,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -26,7 +22,7 @@ import {
 import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
@@ -797,59 +793,19 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		}
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
-			// Process + upload any user-attached photos. The pipeline mirrors
-			// PhotoMode: EXIF strip + canvas downscale + JPEG re-encode →
-			// per-photo POST to the Micropub media endpoint → collect Location
-			// header URLs for the final h-entry submission.
-			const uploaded_photo_urls: string[] = [];
-			let alt_values: string[] = [];
+			// Process any user-attached photos: EXIF strip + canvas downscale +
+			// JPEG re-encode, same pipeline as PhotoMode. post_or_queue uploads
+			// them to the media endpoint and sends their URLs as `photo`, or
+			// queues the processed bytes when the network is down.
+			const processed_blobs: Blob[] = [];
 			if (active_media.length > 0) {
 				setStatus({ kind: 'processing-photo' });
-				const processed_blobs: Blob[] = [];
 				for (const entry of active_media) {
 					const processed = await process_photo(entry.file);
 					processed_blobs.push(processed.blob);
 				}
-
-				let resolved_media_endpoint = media_endpoint;
-				if (!resolved_media_endpoint) {
-					setStatus({ kind: 'discovering-endpoint' });
-					resolved_media_endpoint = await discover_media_endpoint(
-						micropub_endpoint,
-						token.accessToken,
-						micropubEnv,
-					);
-					setMediaEndpoint(resolved_media_endpoint);
-				}
-
-				for (let i = 0; i < processed_blobs.length; i++) {
-					setStatus({
-						kind: 'uploading-photo',
-						current: i + 1,
-						total: processed_blobs.length,
-					});
-					const upload = await upload_media(
-						{
-							blob: processed_blobs[i]!,
-							filename: `photo-${String(i + 1)}.jpg`,
-							accessToken: token.accessToken,
-							mediaEndpoint: resolved_media_endpoint,
-						},
-						micropubEnv,
-					);
-					uploaded_photo_urls.push(upload.location);
-				}
-				alt_values = active_media.map((e) =>
-					e.decorative ? '' : e.alt.trim(),
-				);
 			}
+			const alt_values = active_media.map((e) => (e.decorative ? '' : e.alt.trim()));
 
 			// Build the h-entry properties. Routing is variant-aware:
 			//
@@ -927,11 +883,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			// always have cover_url empty (no source-preview flow), so the
 			// fallback only matters for URL-anchored variants like Listen /
 			// Watch / Read where cover_url comes from Spotify/YouTube oEmbed.
-			if (uploaded_photo_urls.length > 0) {
-				base.photo =
-					uploaded_photo_urls.length === 1
-						? uploaded_photo_urls[0]!
-						: uploaded_photo_urls;
+			if (processed_blobs.length > 0) {
 				base['mp-photo-alt'] =
 					alt_values.length === 1 ? alt_values[0]! : alt_values;
 			} else if (cover_url && !is_embeddable_media_url(trimmed_url)) {
@@ -974,65 +926,54 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			}
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
+			const result = await post_or_queue(
+				{
+					source: 'listen',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					photos: processed_blobs.map((blob, i) => ({
+						blob,
+						filename: `photo-${String(i + 1)}.jpg`,
+					})),
+					micropubEndpoint: endpoint,
+					mediaEndpoint: media_endpoint,
+					onStage: (stage): void =>
+						setStatus(
+							stage.kind === 'uploading'
+								? { kind: 'uploading-photo', current: stage.current, total: stage.total }
+								: stage.kind === 'discovering'
+									? { kind: 'discovering-endpoint' }
+									: { kind: 'posting' },
+						),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
+			} else {
 				setStatus({
 					kind: 'posted',
 					...(result.location ? { location: result.location } : {}),
 				});
 				mark_posted_once();
-				setTargetUrl('');
-				setPersonName('');
-				setWatchTitle('');
-				setReadStatus('');
-				setRating('');
-				setContent('');
-				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
-				for (const entry of media_entries) {
-					URL.revokeObjectURL(entry.preview_url);
-				}
-				setMediaEntries([]);
-				setVideoUrl('');
-				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'listen',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setTargetUrl('');
-						setPersonName('');
-						setWatchTitle('');
-						setReadStatus('');
-						setRating('');
-						setContent('');
-						resetMoreValues();
-						for (const entry of media_entries) {
-							URL.revokeObjectURL(entry.preview_url);
-						}
-						setMediaEntries([]);
-						setVideoUrl('');
-						return;
-					} catch (_q_err) {
-						// Queue write failed; fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setTargetUrl('');
+			setPersonName('');
+			setWatchTitle('');
+			setReadStatus('');
+			setRating('');
+			setContent('');
+			resetMoreValues();
+			for (const entry of media_entries) {
+				URL.revokeObjectURL(entry.preview_url);
+			}
+			setMediaEntries([]);
+			setVideoUrl('');
 		} catch (err) {
 			const message =
 				err instanceof PhotoError

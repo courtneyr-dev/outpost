@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { build_photo_properties } from '../../lib/photo-properties';
+import { build_photo_properties, type PhotoProperties } from '../../lib/photo-properties';
 import {
-	discover_micropub_endpoint,
-	discover_media_endpoint,
-	upload_media,
-	post_h_entry,
 	MicropubError,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import {
@@ -247,60 +243,19 @@ export function PhotoMode({
 				processed_blobs.push(processed.blob);
 			}
 
-			let mp = micropub_endpoint;
-			let media = media_endpoint;
-			if (!mp || !media) {
-				setStatus({ kind: 'discovering-endpoints' });
-				if (!mp) {
-					mp = await discover_micropub_endpoint(
-						token.me,
-						micropubEnv
-					);
-					setMicropubEndpoint(mp);
-				}
-				if (!media) {
-					media = await discover_media_endpoint(
-						mp,
-						token.accessToken,
-						micropubEnv
-					);
-					setMediaEndpoint(media);
-				}
-			}
-
-			// Upload each processed blob in sequence so the user sees
-			// progress and a single failure doesn't cascade.
-			const uploaded_urls: string[] = [];
-			for (let i = 0; i < processed_blobs.length; i++) {
-				setStatus({
-					kind: 'uploading-photo',
-					current: i + 1,
-					total: processed_blobs.length,
-				});
-				const upload = await upload_media(
-					{
-						blob: processed_blobs[i]!,
-						filename: `photo-${String(i + 1)}.jpg`,
-						accessToken: token.accessToken,
-						mediaEndpoint: media,
-					},
-					micropubEnv
-				);
-				uploaded_urls.push(upload.location);
-			}
-
-			setStatus({ kind: 'posting' });
-			// Single-photo posts retain the string-shape for back-compat.
-			// Multi-photo posts use the array shape per Micropub spec.
-			const photo_properties = build_photo_properties(
-				uploaded_urls,
+			// Alt text and captions pair with the photos by index, so they are
+			// built now; post_or_queue adds the uploaded URLs as `photo`, or
+			// queues the processed bytes when the network is down.
+			const photo_meta: Partial<PhotoProperties> = build_photo_properties(
+				entries.map(() => ''),
 				entries
 			);
+			delete photo_meta.photo;
 			const trimmed_content = content.trim();
 			const trimmed_name = name.trim();
 			const trimmed_venue = venue_name.trim();
 			const base = {
-				...photo_properties,
+				...photo_meta,
 				...pkiw_kind_hint(composerConfig, 'photo'),
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
@@ -315,32 +270,43 @@ export function PhotoMode({
 				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: mp,
-					},
-					micropubEnv
-				);
+			const result = await post_or_queue(
+				{
+					source: 'photo',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					photos: processed_blobs.map((blob, i) => ({
+						blob,
+						filename: `photo-${String(i + 1)}.jpg`,
+					})),
+					micropubEndpoint: micropub_endpoint,
+					mediaEndpoint: media_endpoint,
+					onStage: (stage): void =>
+						setStatus(
+							stage.kind === 'uploading'
+								? {
+										kind: 'uploading-photo',
+										current: stage.current,
+										total: stage.total,
+									}
+								: stage.kind === 'discovering'
+									? { kind: 'discovering-endpoints' }
+									: { kind: 'posting' }
+						),
+				},
+				micropubEnv
+			);
+			if (result.micropubEndpoint) setMicropubEndpoint(result.micropubEndpoint);
+			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
+			} else {
 				setStatus({
 					kind: 'posted',
 					...(result.location ? { location: result.location } : {}),
 				});
 				mark_posted_once();
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					await enqueue({
-						source: 'photo',
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: mp,
-					});
-					setStatus({ kind: 'queued' });
-				} else {
-					throw post_err;
-				}
 			}
 
 			// Reset for next post.

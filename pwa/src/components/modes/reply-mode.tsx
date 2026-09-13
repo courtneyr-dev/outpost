@@ -1,7 +1,5 @@
 import { useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -10,7 +8,7 @@ import { fetch_preview, PreviewError, type PreviewResult } from '../../lib/previ
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
@@ -329,13 +327,6 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 		}
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
 			const trimmed_venue = venue_name.trim();
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
@@ -351,50 +342,41 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			};
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
+			const result = await post_or_queue(
+				{
+					source: 'reply',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({
+							kind: stage.kind === 'discovering' ? 'discovering-endpoint' : 'posting',
+						}),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setContent('');
-				setTitle('');
 				setTargetUrl('');
-				setPickedLocation(null);
-				setVenueName('');
 				setPreview(null);
 				resetMoreValues();
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'reply',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setContent('');
-						setTargetUrl('');
-						setPreview(null);
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setContent('');
+			setTitle('');
+			setTargetUrl('');
+			setPickedLocation(null);
+			setVenueName('');
+			setPreview(null);
+			resetMoreValues();
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
