@@ -192,7 +192,7 @@ final class Outpost_PWA_Shell {
 	 * @return string One of outpost-mode-day, outpost-mode-night, outpost-mode-system.
 	 */
 	private static function mode_class(): string {
-		$class = Outpost_Mode_Controller::root_class_for_user( get_current_user_id() );
+		$class = Outpost_Mode_Controller::root_class_for_user( (int) get_current_user_id() );
 
 		/**
 		 * Filters the appearance mode class printed on the composer shell body.
