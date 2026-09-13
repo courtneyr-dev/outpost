@@ -172,14 +172,6 @@ final class Outpost_PWA_Shell {
 	}
 
 	/**
-	 * Critical layout CSS.
-	 *
-	 * Reserves space before the bundled CSS loads so mounting the .outpost-app
-	 * class onto #outpost-root doesn't shift layout. Layout primitives only —
-	 * no paint — per the Hard Contract. padding-top reserves the iOS status
-	 * bar in standalone mode, where black-translucent puts content under it.
-	 */
-	/**
 	 * Appearance mode class for the shell body.
 	 *
 	 * The stored per-user mode (day / night / system) becomes the
@@ -206,6 +198,14 @@ final class Outpost_PWA_Shell {
 		return in_array( $class, array( 'outpost-mode-day', 'outpost-mode-night', 'outpost-mode-system' ), true ) ? $class : 'outpost-mode-system';
 	}
 
+	/**
+	 * Critical layout CSS.
+	 *
+	 * Reserves space before the bundled CSS loads so mounting the .outpost-app
+	 * class onto #outpost-root doesn't shift layout. Layout primitives only —
+	 * no paint — per the Hard Contract. padding-top reserves the iOS status
+	 * bar in standalone mode, where black-translucent puts content under it.
+	 */
 	private static function critical_css(): string {
 		return 'body { margin: 0; min-height: 100dvh; min-height: 100vh; padding-top: env(safe-area-inset-top); }'
 			. ' #outpost-root { display: block; min-height: 100dvh; min-height: 100vh; }';

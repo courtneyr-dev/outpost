@@ -105,6 +105,12 @@ final class PWAShellTest extends TestCase {
 	/** @test */
 	public function render_emits_composer_shell_when_ready(): void {
 		$this->stub_ready_environment();
+		// The shell prints the stored appearance mode as a body class; the
+		// unit bootstrap defines neither user function, so stub both.
+		WP_Mock::userFunction( 'get_current_user_id' )
+			->andReturnUsing( static fn(): int => 7 );
+		WP_Mock::userFunction( 'get_user_meta' )
+			->andReturnUsing( static fn(): string => 'night' );
 
 		ob_start();
 		Outpost_PWA_Shell::render();
@@ -119,6 +125,11 @@ final class PWAShellTest extends TestCase {
 			'outpost-install-prompt',
 			$out,
 			'Ready state must NOT render the install-prompt fallback.'
+		);
+		$this->assertStringContainsString(
+			'outpost-mode-night',
+			$out,
+			'The stored per-user mode must reach the shell body class.'
 		);
 	}
 
