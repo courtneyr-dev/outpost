@@ -629,6 +629,16 @@ function is_static_asset(url) {
 		p.includes('/assets/icons/');
 }
 
+// Scripts and stylesheets the shell prints from outside the plugin's asset
+// paths, such as a theme's appearance bridge added through the
+// outpost_shell_script_handles filter. Fetch-initiated requests (endpoint
+// discovery, Micropub) have an empty destination and never match.
+function is_shell_subresource(request, url) {
+	if (url.origin !== self.location.origin) return false;
+	if (url.pathname.startsWith('/wp-json/')) return false;
+	return request.destination === 'script' || request.destination === 'style';
+}
+
 function is_outpost_rest(url) {
 	return url.origin === self.location.origin &&
 		url.pathname.startsWith('/wp-json/outpost/v1/');
@@ -759,8 +769,15 @@ self.addEventListener('fetch', (event) => {
 		return;
 	}
 
+	// Network-first with a cached copy, so an offline composer still runs a
+	// theme's shell script and keeps the site's light or dark preference.
+	if (is_shell_subresource(request, url)) {
+		event.respondWith(network_first_asset(request));
+		return;
+	}
+
 	// Everything else (Micropub endpoint discovery on the user's "me" URL,
-	// theme assets, etc.) — passthrough.
+	// images, etc.) — passthrough.
 });
 
 async function network_first(request, cache_key) {
@@ -791,6 +808,21 @@ async function network_first(request, cache_key) {
 			status: 503,
 			headers: { 'Content-Type': 'text/plain' },
 		});
+	}
+}
+
+async function network_first_asset(request) {
+	try {
+		const response = await fetch(request);
+		const cache_control = (response && response.headers.get('cache-control')) || '';
+		if (response && response.ok && !/no-store/i.test(cache_control)) {
+			const cache = await caches.open(CACHE_NAME);
+			await cache.put(request, response.clone());
+		}
+		return response;
+	} catch (_err) {
+		const cached = await caches.match(request);
+		return cached || Response.error();
 	}
 }
 
