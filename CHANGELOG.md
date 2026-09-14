@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.18] - 2026-09-14
+
+### Fixed
+
+- The built PWA bundle matches `pwa/src` again. The #218 merge carried source-only changes to `pwa/src/lib/pkiw-moods.ts` (token in the POST body only, no `_t` timestamp query), but the shipped `build/pwa/assets/index-BfrhogFQ.js` still sent `Authorization: Bearer` and `_t=`. It also re-added the unreferenced 1.0.16 bundle `index-EkfbTLS8.js` and its source map. The bundle is rebuilt and both stale files are gone.
+
 ## [1.0.17] - 2026-09-13
 
 ### Added
@@ -14,6 +20,7 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Life > Mood suggests Post Kinds' mood labels through a native `<datalist>` on the existing field. `pwa/src/lib/pkiw-moods.ts` reads `/wp-json/post-kinds-indieweb/v1/moods` (PKIW #207, #211), so labels follow Post Kinds' "Mood label spelling" setting and Outpost keeps no mood list or spelling map. The route is GET-only and IndieAuth reads a token only from the Authorization header or a POST body, so the request is a POST with the token in the body and `?_method=GET`, which keeps it working on hosts that strip the header. The field stays free text, and the typed or picked text is sent unchanged as Micropub `mood`.
 - The last good response is kept in `localStorage` (`outpost.pkiw.moods`) and replaced when its `version` changes. The composer asks again on load and on `online`, and a composer opened offline shows the stored copy. A 401, 403, 404 or off-contract response clears the copy and shows no suggestions; a network error or 5xx keeps it. Neither shows an error.
 - `Outpost_Post_Kinds_Adapter::mood_vocabulary()` returns `\PKIW\Mood_Vocabulary::get_moods()` for server-rendered surfaces, or an empty list when that class is missing.
+
 ## [1.0.16] - 2026-09-13
 
 ### Fixed
