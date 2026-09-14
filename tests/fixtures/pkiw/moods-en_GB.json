@@ -1,0 +1,146 @@
+{
+    "spelling": "en_GB",
+    "locale": "en_GB",
+    "version": "ab83457962a07aa406c8907c5eb3c34f",
+    "moods": [
+        {
+            "key": "happy",
+            "label": "Happy",
+            "variants": [
+                "Happy"
+            ]
+        },
+        {
+            "key": "excited",
+            "label": "Excited",
+            "variants": [
+                "Excited"
+            ]
+        },
+        {
+            "key": "grateful",
+            "label": "Grateful",
+            "variants": [
+                "Grateful"
+            ]
+        },
+        {
+            "key": "calm",
+            "label": "Calm",
+            "variants": [
+                "Calm"
+            ]
+        },
+        {
+            "key": "hopeful",
+            "label": "Hopeful",
+            "variants": [
+                "Hopeful"
+            ]
+        },
+        {
+            "key": "inspired",
+            "label": "Inspired",
+            "variants": [
+                "Inspired"
+            ]
+        },
+        {
+            "key": "energized",
+            "label": "Energised",
+            "variants": [
+                "Energized",
+                "Energised"
+            ]
+        },
+        {
+            "key": "honored",
+            "label": "Honoured",
+            "variants": [
+                "Honored",
+                "Honoured"
+            ]
+        },
+        {
+            "key": "mesmerized",
+            "label": "Mesmerised",
+            "variants": [
+                "Mesmerized",
+                "Mesmerised"
+            ]
+        },
+        {
+            "key": "revitalized",
+            "label": "Revitalised",
+            "variants": [
+                "Revitalized",
+                "Revitalised"
+            ]
+        },
+        {
+            "key": "organized",
+            "label": "Organised",
+            "variants": [
+                "Organized",
+                "Organised"
+            ]
+        },
+        {
+            "key": "thoughtful",
+            "label": "Thoughtful",
+            "variants": [
+                "Thoughtful"
+            ]
+        },
+        {
+            "key": "neutral",
+            "label": "Neutral",
+            "variants": [
+                "Neutral"
+            ]
+        },
+        {
+            "key": "tired",
+            "label": "Tired",
+            "variants": [
+                "Tired"
+            ]
+        },
+        {
+            "key": "sad",
+            "label": "Sad",
+            "variants": [
+                "Sad"
+            ]
+        },
+        {
+            "key": "anxious",
+            "label": "Anxious",
+            "variants": [
+                "Anxious"
+            ]
+        },
+        {
+            "key": "overwhelmed",
+            "label": "Overwhelmed",
+            "variants": [
+                "Overwhelmed"
+            ]
+        },
+        {
+            "key": "angry",
+            "label": "Angry",
+            "variants": [
+                "Angry"
+            ]
+        },
+        {
+            "key": "demoralized",
+            "label": "Demoralised",
+            "variants": [
+                "Demoralized",
+                "Demoralised"
+            ]
+        }
+    ]
+}

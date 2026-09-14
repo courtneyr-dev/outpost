@@ -13,6 +13,7 @@ import { peek_share_target, consume_share_target } from '../../lib/share-target'
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
+import { useMoodSuggestions, type MoodsEnvironment } from '../../lib/pkiw-moods';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -40,13 +41,20 @@ import {
  *
  * Each variant has a primary text input that becomes the property value, plus
  * an optional `content` body for additional context. No URL field.
+ *
+ * Mood offers Post Kinds' mood labels as native <datalist> suggestions
+ * (pwa/src/lib/pkiw-moods.ts). The field stays free text and posts exactly
+ * what was typed or picked.
  */
 
 export interface LifeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	moodsEnv?: MoodsEnvironment;
 }
+
+const MOOD_SUGGESTIONS_ID = 'outpost-life-mood-suggestions';
 
 type Variant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
@@ -145,7 +153,7 @@ function consume_share_target_for_life(): { variant?: Variant; content?: string 
 	return out;
 }
 
-export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) {
+export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeModeProps) {
 	const initial_share = consume_share_target_for_life();
 	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'mood');
 	const [title, setTitle] = useState('');
@@ -159,6 +167,16 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [venue_name, setVenueName] = useState('');
 
 	const config = VARIANTS[variant];
+	const mood_suggestions = useMoodSuggestions(
+		composerConfig === undefined
+			? 'unknown'
+			: composerConfig.companions['post-kinds'] === 'active'
+				? 'active'
+				: 'inactive',
+		token.accessToken,
+		moodsEnv,
+	);
+	const show_mood_suggestions = variant === 'mood' && mood_suggestions.length > 0;
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_submit = async (event: Event): Promise<void> => {
@@ -295,9 +313,17 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						setPrimaryValue((event.target as HTMLInputElement).value)
 					}
 					placeholder={config.primaryPlaceholder}
+					{...(show_mood_suggestions ? { list: MOOD_SUGGESTIONS_ID } : {})}
 					required
 					disabled={submitting}
 				/>
+				{show_mood_suggestions && (
+					<datalist id={MOOD_SUGGESTIONS_ID}>
+						{mood_suggestions.map((label) => (
+							<option key={label} value={label} />
+						))}
+					</datalist>
+				)}
 
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-life-content">
