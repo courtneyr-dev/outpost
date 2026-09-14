@@ -74,4 +74,46 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 			'post-kinds.craft',
 		);
 	}
+
+	/**
+	 * Mood vocabulary resolved by Post Kinds, for server-rendered surfaces.
+	 *
+	 * Post Kinds owns the mood labels and the site's spelling setting;
+	 * `\PKIW\Mood_Vocabulary` (PKIW 1.8.2-rc.1+, PKIW #211) is the one
+	 * source for PHP, the block editor and companions. Outpost keeps no mood
+	 * list of its own, so on an older Post Kinds without that class this
+	 * returns an empty list and the mood field stays free text.
+	 *
+	 * Entries that don't match the documented shape are dropped rather than
+	 * passed on.
+	 *
+	 * @return list<array{key: string, label: string, variants: list<string>}>
+	 */
+	public function mood_vocabulary(): array {
+		$callback = array( '\PKIW\Mood_Vocabulary', 'get_moods' );
+		if ( ! class_exists( $callback[0] ) || ! is_callable( $callback ) ) {
+			return array();
+		}
+
+		$moods = call_user_func( $callback );
+		if ( ! is_array( $moods ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $moods as $mood ) {
+			if ( ! is_array( $mood ) || ! isset( $mood['key'], $mood['label'] ) || ! is_string( $mood['key'] ) || ! is_string( $mood['label'] ) ) {
+				continue;
+			}
+			$variants = isset( $mood['variants'] ) && is_array( $mood['variants'] )
+				? array_values( array_filter( $mood['variants'], 'is_string' ) )
+				: array();
+			$out[]    = array(
+				'key'      => $mood['key'],
+				'label'    => $mood['label'],
+				'variants' => $variants,
+			);
+		}
+		return $out;
+	}
 }

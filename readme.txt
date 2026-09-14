@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.16
+Stable tag:        1.0.17
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -233,6 +233,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.17 =
+* New: with Post Kinds for IndieWeb 1.8.2 or later, Life > Mood suggests the site's mood labels as you type, in the spelling chosen under Post Kinds' "Mood label spelling" setting. You can still type any mood, and what you type or pick is posted as written. Older Post Kinds versions keep the plain text field.
 
 = 1.0.16 =
 * Fixed: a post written in a composer opened without a connection now waits in the offline queue in every tab of the composer. It used to fail with discovery_failed and keep nothing. Photos wait with the post and upload when the connection returns.
