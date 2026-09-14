@@ -7,6 +7,26 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.17] - 2026-09-13
+
+### Added
+
+- Life > Mood suggests Post Kinds' mood labels through a native `<datalist>` on the existing field. `pwa/src/lib/pkiw-moods.ts` reads `/wp-json/post-kinds-indieweb/v1/moods` (PKIW #207, #211), so labels follow Post Kinds' "Mood label spelling" setting and Outpost keeps no mood list or spelling map. The route is GET-only and IndieAuth reads a token only from the Authorization header or a POST body, so the request is a POST with the token in the body and `?_method=GET`, which keeps it working on hosts that strip the header. The field stays free text, and the typed or picked text is sent unchanged as Micropub `mood`.
+- The last good response is kept in `localStorage` (`outpost.pkiw.moods`) and replaced when its `version` changes. The composer asks again on load and on `online`, and a composer opened offline shows the stored copy. A 401, 403, 404 or off-contract response clears the copy and shows no suggestions; a network error or 5xx keeps it. Neither shows an error.
+- `Outpost_Post_Kinds_Adapter::mood_vocabulary()` returns `\PKIW\Mood_Vocabulary::get_moods()` for server-rendered surfaces, or an empty list when that class is missing.
+
+## [1.0.16] - 2026-09-13
+
+### Fixed
+
+- A post submitted from a composer opened offline now queues. Every mode discovered the Micropub endpoint before the step that queues on a network failure and kept the endpoint only in component state, so a fresh offline page failed with `discovery_failed` and kept nothing. All six modes now submit through `pwa/src/lib/post-or-queue.ts`: the last discovered endpoints are stored per signed-in `me` URL, and a post queued before any discovery finds its endpoint when it replays.
+- Photo, Doing and Recipe posts queue offline with their photos. The processed image bytes wait in the `outpost-queue` IndexedDB entry and upload when it replays; each photo's URL is written to the entry as soon as it uploads, so a retry never uploads it twice.
+- The queue badge re-reads the queue whenever any tab writes it (a window event in the same tab, a `BroadcastChannel` for the others). It used to read only on mount and on `online`, so a newly queued post stayed invisible until a reload.
+- Two open composers no longer publish the same queued post twice. `flush()` claims each entry with a 120-second lease inside one IndexedDB readwrite transaction before replaying it.
+- A queued post that fails with a network error, a 5xx, 408 or 429 retries after 5, 15, 45 and 120 seconds; a 4xx waits for Retry all now. A replay whose 2xx response carried a rejected `Location` is removed instead of kept, which would have posted it again. The badge also replays on mount when the browser is online.
+- The composer-config notice clears without a reload. The fetch retries after 2, 5, 15, 30 and 60 seconds and again on `online`, and a network or server failure offers Try again; "Sign out + back in" appears only for a 401 or 403.
+- The service worker caches same-origin scripts and stylesheets the shell prints from outside the plugin (network-first), such as a theme's appearance bridge, so a shell opened offline keeps the site's light or dark preference.
+
 ## [1.0.15] - 2026-09-13
 
 ### Added

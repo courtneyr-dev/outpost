@@ -303,6 +303,26 @@ final class PWAShellTest extends TestCase {
 	}
 
 	/** @test */
+	public function render_service_worker_keeps_shell_scripts_from_outside_the_plugin_for_offline_use(): void {
+		ob_start();
+		Outpost_PWA_Shell::render_service_worker();
+		$out = ob_get_clean();
+
+		// A theme's appearance bridge rides outpost_shell_script_handles from the
+		// theme directory, outside the plugin's cache-first asset paths. Without a
+		// cached copy, a shell opened offline loses the site's light/dark preference.
+		$this->assertStringContainsString( "request.destination === 'script' || request.destination === 'style'", $out );
+		$this->assertStringContainsString( "url.pathname.startsWith('/wp-json/')", $out, 'REST responses must never match the shell-asset branch.' );
+		$this->assertStringContainsString( 'event.respondWith(network_first_asset(request))', $out );
+
+		$static_branch = strpos( $out, 'if (is_static_asset(url))' );
+		$shell_branch  = strpos( $out, 'if (is_shell_subresource(request, url))' );
+		$this->assertNotFalse( $static_branch );
+		$this->assertNotFalse( $shell_branch );
+		$this->assertLessThan( $shell_branch, $static_branch, 'Plugin assets must keep the cache-first branch.' );
+	}
+
+	/** @test */
 	public function render_service_worker_emits_javascript_with_post_scope_only(): void {
 		ob_start();
 		Outpost_PWA_Shell::render_service_worker();

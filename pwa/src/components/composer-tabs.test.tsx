@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
-import { ComposerTabs } from './composer-tabs';
+import { ComposerTabs, CONFIG_RETRY_DELAYS_MS } from './composer-tabs';
 import type { StoredToken, TokenStoreEnvironment } from '../lib/token-store';
 
 const mock_token: StoredToken = {
@@ -184,5 +185,144 @@ describe('ComposerTabs', () => {
 		press_key(tabs()[0]!, 'Enter');
 		await flush();
 		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+	});
+});
+
+describe('ComposerTabs: composer-config notice', () => {
+	const valid_config = {
+		companions: {
+			'post-kinds': 'absent',
+			'post-formats': 'absent',
+			xfn: 'absent',
+			'syndication-links': 'absent',
+			yoast: 'absent',
+			activitypub: 'absent',
+			'accessibility-checker': 'absent',
+			'rss-chat-routing': 'absent',
+		},
+		postFormats: null,
+		xfnRels: [],
+		existingCategories: [],
+		existingTags: [],
+		bridgyHostMap: {},
+		siteSettings: { bridgyAutoSuggest: false, defaultPostVariant: 'note' },
+	};
+
+	const unreachable = (): Promise<Response> => Promise.reject(new TypeError('Failed to fetch'));
+	const loaded = (): Promise<Response> =>
+		Promise.resolve(
+			new Response(JSON.stringify(valid_config), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' },
+			}),
+		);
+	const rejected = (): Promise<Response> => Promise.resolve(new Response('{}', { status: 401 }));
+
+	function config_site(answers: Array<() => Promise<Response>>): {
+		env: { fetch: typeof fetch };
+		calls: () => number;
+	} {
+		let count = 0;
+		const env = {
+			fetch: ((): Promise<Response> => {
+				const answer = answers[Math.min(count, answers.length - 1)]!;
+				count += 1;
+				return answer();
+			}) as typeof fetch,
+		};
+		return { env, calls: () => count };
+	}
+
+	function mount_with(env: { fetch: typeof fetch }): void {
+		render(
+			<ComposerTabs
+				token={mock_token}
+				tokenStore={mock_token_store()}
+				composerConfigEnv={env}
+				queueEnv={{ indexedDB: new IDBFactory() }}
+			/>,
+			root,
+		);
+	}
+
+	function notice(): HTMLElement | null {
+		return root.querySelector('.outpost-config-error');
+	}
+
+	function notice_buttons(): Array<string | null> {
+		return Array.from(notice()?.querySelectorAll('button') ?? []).map((b) => b.textContent);
+	}
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('offers Try again, not sign-out, when the site is unreachable', async () => {
+		mount_with(config_site([unreachable]).env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		expect(notice_buttons()).toEqual(['Try again']);
+	});
+
+	it('fetches again when the browser comes back online and clears the notice', async () => {
+		const { env, calls } = config_site([unreachable, loaded]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+
+		window.dispatchEvent(new Event('online'));
+		await vi.waitFor(() => expect(notice()).toBeNull());
+		expect(calls()).toBe(2);
+	});
+
+	it('Try again fetches immediately', async () => {
+		const { env, calls } = config_site([unreachable, loaded]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+
+		(notice()?.querySelector('button') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(notice()).toBeNull());
+		expect(calls()).toBe(2);
+	});
+
+	it('retries on its own after the first backoff delay', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		const { env, calls } = config_site([unreachable, loaded]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		await vi.waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
+
+		// vi.waitFor advances fake timers while it polls, so check at half the delay.
+		await vi.advanceTimersByTimeAsync(CONFIG_RETRY_DELAYS_MS[0]! / 2);
+		expect(calls()).toBe(1);
+		await vi.advanceTimersByTimeAsync(CONFIG_RETRY_DELAYS_MS[0]! / 2);
+		await vi.waitFor(() => expect(notice()).toBeNull());
+		expect(calls()).toBe(2);
+	});
+
+	it('stops retrying after the last backoff delay', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		const { env, calls } = config_site([unreachable]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		for (let i = 0; i < CONFIG_RETRY_DELAYS_MS.length; i++) {
+			await vi.waitFor(() => expect(calls()).toBe(i + 1));
+			await vi.waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
+			await vi.advanceTimersByTimeAsync(CONFIG_RETRY_DELAYS_MS[i]!);
+		}
+		await vi.waitFor(() => expect(calls()).toBe(CONFIG_RETRY_DELAYS_MS.length + 1));
+		await vi.advanceTimersByTimeAsync(10 * 60_000);
+		expect(calls()).toBe(CONFIG_RETRY_DELAYS_MS.length + 1);
+		expect(notice_buttons()).toEqual(['Try again']);
+	});
+
+	it('keeps sign-out for a rejected token and does not retry it', async () => {
+		const { env, calls } = config_site([rejected, loaded]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		expect(notice_buttons()).toEqual(['Sign out + back in']);
+
+		window.dispatchEvent(new Event('online'));
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		expect(calls()).toBe(1);
+		expect(notice()).not.toBeNull();
 	});
 });

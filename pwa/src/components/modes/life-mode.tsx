@@ -1,20 +1,19 @@
 import { useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
+import { useMoodSuggestions, type MoodsEnvironment } from '../../lib/pkiw-moods';
 import { Drawer } from '../drawer';
 import {
 	MorePanel,
@@ -42,13 +41,20 @@ import {
  *
  * Each variant has a primary text input that becomes the property value, plus
  * an optional `content` body for additional context. No URL field.
+ *
+ * Mood offers Post Kinds' mood labels as native <datalist> suggestions
+ * (pwa/src/lib/pkiw-moods.ts). The field stays free text and posts exactly
+ * what was typed or picked.
  */
 
 export interface LifeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	moodsEnv?: MoodsEnvironment;
 }
+
+const MOOD_SUGGESTIONS_ID = 'outpost-life-mood-suggestions';
 
 type Variant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
@@ -147,7 +153,7 @@ function consume_share_target_for_life(): { variant?: Variant; content?: string 
 	return out;
 }
 
-export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) {
+export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeModeProps) {
 	const initial_share = consume_share_target_for_life();
 	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'mood');
 	const [title, setTitle] = useState('');
@@ -161,6 +167,16 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 	const [venue_name, setVenueName] = useState('');
 
 	const config = VARIANTS[variant];
+	const mood_suggestions = useMoodSuggestions(
+		composerConfig === undefined
+			? 'unknown'
+			: composerConfig.companions['post-kinds'] === 'active'
+				? 'active'
+				: 'inactive',
+		token.accessToken,
+		moodsEnv,
+	);
+	const show_mood_suggestions = variant === 'mood' && mood_suggestions.length > 0;
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_submit = async (event: Event): Promise<void> => {
@@ -170,13 +186,6 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 		if (!trimmed_primary) return;
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
 			const trimmed_venue = venue_name.trim();
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
@@ -193,48 +202,39 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			};
 			const properties = merge_more_values(base, more_values);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
-				setTitle('');
+			const result = await post_or_queue(
+				{
+					source: 'life',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({
+							kind: stage.kind === 'discovering' ? 'discovering-endpoint' : 'posting',
+						}),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setPrimaryValue('');
 				setContent('');
 				resetMoreValues();
-				setPickedLocation(null);
-				setVenueName('');
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'life',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setPrimaryValue('');
-						setContent('');
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; surface the original post error below.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setTitle('');
+			setPrimaryValue('');
+			setContent('');
+			resetMoreValues();
+			setPickedLocation(null);
+			setVenueName('');
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -313,9 +313,17 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						setPrimaryValue((event.target as HTMLInputElement).value)
 					}
 					placeholder={config.primaryPlaceholder}
+					{...(show_mood_suggestions ? { list: MOOD_SUGGESTIONS_ID } : {})}
 					required
 					disabled={submitting}
 				/>
+				{show_mood_suggestions && (
+					<datalist id={MOOD_SUGGESTIONS_ID}>
+						{mood_suggestions.map((label) => (
+							<option key={label} value={label} />
+						))}
+					</datalist>
+				)}
 
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-life-content">

@@ -38,6 +38,8 @@ export class MicropubError extends Error {
 			| 'post_failed'
 			| 'no_location'
 			| 'invalid_location',
+		/** HTTP status when the server answered; absent when fetch itself threw. */
+		public readonly status?: number,
 	) {
 		super(message);
 		this.name = 'MicropubError';
@@ -256,6 +258,7 @@ export async function discover_micropub_endpoint(
 		throw new MicropubError(
 			'discover_micropub_endpoint: fetch failed with status ' + String(response.status),
 			'discovery_failed',
+			response.status,
 		);
 	}
 
@@ -349,6 +352,7 @@ export async function post_h_entry(
 				String(response.status) +
 				(error_text ? ' — ' + error_text : ''),
 			'post_failed',
+			response.status,
 		);
 	}
 
@@ -479,6 +483,7 @@ export async function discover_media_endpoint(
 		throw new MicropubError(
 			'discover_media_endpoint: ' + String(response.status) + ' from config query',
 			'discovery_failed',
+			response.status,
 		);
 	}
 
@@ -598,6 +603,7 @@ export async function upload_media(
 				String(response.status) +
 				(error_text ? ' — ' + error_text : ''),
 			'post_failed',
+			response.status,
 		);
 	}
 
