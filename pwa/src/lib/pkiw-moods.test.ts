@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('fetch_pkiw_moods: request', () => {
-	it('POSTs to the PKIW moods route as GET with the token in the header and body, never the URL', async () => {
+	it('POSTs to the PKIW moods route as GET with the token in the body, never the URL', async () => {
 		const calls: Call[] = [];
 		await fetch_pkiw_moods('secret-token', site(() => json(en_us), calls));
 
@@ -50,7 +50,7 @@ describe('fetch_pkiw_moods: request', () => {
 		expect(call!.init?.method).toBe('POST');
 		expect(call!.init?.credentials).toBe('omit');
 		const headers = call!.init?.headers as Record<string, string>;
-		expect(headers.Authorization).toBe('Bearer secret-token');
+		expect(headers.Authorization).toBeUndefined();
 		expect(headers['Content-Type']).toBe('application/x-www-form-urlencoded');
 		expect(new URLSearchParams(String(call!.init?.body)).get('access_token')).toBe('secret-token');
 	});

@@ -13,9 +13,9 @@
  *
  * Auth: the route is GET-only, and IndieAuth reads a token only from the
  * Authorization header or a form-encoded POST `access_token`. Managed-WP
- * hosts (GoDaddy) strip the header, so the request is a POST carrying the
- * token in the body with `?_method=GET`, which WordPress's REST server
- * dispatches as the GET route. The token never goes in the URL, and
+ * hosts (GoDaddy) strip the header, so this request uses only the POST body
+ * token with `?_method=GET`, which WordPress's REST server dispatches as the
+ * GET route. The token never goes in the URL, and
  * `credentials: 'omit'` keeps the wp-admin cookie out of it.
  *
  * Every failure degrades to plain free text. 401, 403 and 404 (older Post
@@ -68,7 +68,6 @@ export async function fetch_pkiw_moods(
 			method: 'POST',
 			credentials: 'omit',
 			headers: {
-				Authorization: 'Bearer ' + access_token,
 				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
