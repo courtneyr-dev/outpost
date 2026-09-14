@@ -61,7 +61,7 @@ export async function fetch_pkiw_moods(
 	access_token: string,
 	env: MoodsEnvironment = default_env,
 ): Promise<MoodsFetchResult> {
-	const url = MOODS_PATH + '?_method=GET&_t=' + String(Date.now());
+	const url = MOODS_PATH + '?_method=GET';
 	let response: Response;
 	try {
 		response = await env.fetch(url, {
