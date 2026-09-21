@@ -12,7 +12,7 @@
     "check:a11y": "node scripts/a11y-check.mjs"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.10",
+    "@astrojs/starlight": "^0.42.2",
     "astro": "^7.2.9",
     "sharp": "^0.35.3"
   },
@@ -20,6 +20,6 @@
     "@axe-core/playwright": "^4.13.0",
     "linkinator": "^8.1.0",
     "markdownlint-cli2": "^0.23.0",
-    "playwright": "^1.62.1"
+    "playwright": "^1.63.0"
   }
 }
