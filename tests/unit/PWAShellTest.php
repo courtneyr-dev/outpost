@@ -246,6 +246,21 @@ final class PWAShellTest extends TestCase {
 	}
 
 	/** @test */
+	public function render_manifest_keeps_json_default_escaping(): void {
+		WP_Mock::userFunction( 'home_url' )
+			->andReturnUsing( static fn( string $path = '' ): string => 'https://example.test' . $path );
+
+		ob_start();
+		Outpost_PWA_Shell::render_manifest();
+		$out = (string) ob_get_clean();
+
+		// No JSON_UNESCAPED_* flag: slashes leave the encoder escaped, so a
+		// filtered value can never close a surrounding script context.
+		$this->assertStringContainsString( '"scope":"\/post\/"', $out );
+		$this->assertStringNotContainsString( '"/post/"', $out );
+	}
+
+	/** @test */
 	public function render_manifest_ships_raster_icons_for_webapk_minting(): void {
 		WP_Mock::userFunction( 'home_url' )
 			->andReturnUsing( static fn( string $path = '' ): string => 'https://example.test' . $path );

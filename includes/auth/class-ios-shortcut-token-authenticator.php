@@ -16,12 +16,15 @@
  *
  * AUTH FLOW
  *
- * 1. Hooks `rest_authentication_errors` at default priority.
+ * 1. Hooks `determine_current_user` (priority 20, beside core's
+ *    application-password validator) and `rest_authentication_errors`.
+ *    The first resolves the user; WordPress sets it. The second reports
+ *    the scope decision below.
  * 2. If the request has no Authorization Bearer header → returns
  *    null (passthrough; other auth filters handle cookie / IndieAuth).
  * 3. If the request IS for the shortcut endpoint AND the token
- *    resolves to a user → sets the current user, returns null
- *    (auth succeeded; downstream permission_callback runs).
+ *    resolves to the current user → returns true (auth succeeded;
+ *    downstream permission_callback runs).
  * 4. If the request IS for the shortcut endpoint AND the token
  *    does NOT resolve → returns WP_Error 401.
  * 5. If the request is for ANY OTHER endpoint AND the Bearer token
@@ -61,7 +64,37 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 	 * Hook registration. Called once during plugin bootstrap.
 	 */
 	public static function register(): void {
+		// Priority 20 matches core's wp_validate_application_password.
+		add_filter( 'determine_current_user', array( __CLASS__, 'determine_current_user' ), 20 );
 		add_filter( 'rest_authentication_errors', array( __CLASS__, 'authenticate' ) );
+	}
+
+	/**
+	 * Resolve an iOS Shortcut token to its user the way core resolves an
+	 * application password: return the user id from `determine_current_user`
+	 * and let WordPress set the user. This class never switches users itself.
+	 *
+	 * The filter first runs from `WP::init()`, before `parse_request` has
+	 * resolved the REST route, so the scope check fails closed on that pass.
+	 * `WP_REST_Server::serve_request()` then clears the cached anonymous user
+	 * and the filter runs again with the route resolved.
+	 *
+	 * @param int|false $user_id User id an earlier validator resolved, or false.
+	 * @return int|false
+	 */
+	public static function determine_current_user( $user_id ) {
+		if ( ! empty( $user_id ) ) {
+			return $user_id;
+		}
+		if ( ! self::request_targets_shortcut_endpoint() ) {
+			return $user_id;
+		}
+		$presented = self::extract_bearer_token();
+		if ( null === $presented ) {
+			return $user_id;
+		}
+		$resolved = Outpost_IOS_Shortcut_Token::resolve_token_to_user_id( $presented );
+		return null === $resolved ? $user_id : $resolved;
 	}
 
 	/**
@@ -105,9 +138,18 @@ final class Outpost_IOS_Shortcut_Token_Authenticator {
 			);
 		}
 
-		// Set the current user for the duration of this request so
-		// downstream permission_callback / capability checks see it.
-		wp_set_current_user( $user_id );
+		// determine_current_user() resolved this token and WordPress set the
+		// user from it. A different current user means another credential
+		// (a cookie session) won, so this token did not authenticate the
+		// request.
+		if ( get_current_user_id() !== $user_id ) {
+			return new \WP_Error(
+				'outpost_ios_shortcut_token_not_applied',
+				__( 'This request is already authenticated as a different user.', 'outpost-mobile-publishing' ),
+				array( 'status' => 401 )
+			);
+		}
+
 		Outpost_IOS_Shortcut_Token::record_first_seen_if_unset( $user_id );
 		return true;
 	}

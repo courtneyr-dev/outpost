@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.18
+Stable tag:        1.0.19
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -233,6 +233,13 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.19 =
+* Fixed: a link shared to Outpost keeps its percent-encoded characters. An address such as /caf%C3%A9 or ?q=hello%20world used to reach the composer with those characters removed, so the wrong page opened.
+* Security: the iOS Shortcut token resolves its user through WordPress's determine_current_user filter, the same one application passwords use, and WordPress sets the user. The token still works on the Shortcut route only.
+* Security: the connected-services (OAuth) callback no longer switches the request's user. Credentials are saved for the account that started the connection, by id.
+* Security: every request header Outpost reads is sanitized, and a token sent in a request body is read through the WordPress REST request instead of the raw body.
+* Changed: the web app manifest prints with default JSON escaping.
 
 = 1.0.18 =
 * Fixed: the mood suggestions request sends its token only in the request body and no longer adds a timestamp to the address, matching the source. The shipped app file also drops an unused copy of the previous app build.

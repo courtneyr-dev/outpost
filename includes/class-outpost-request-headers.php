@@ -26,34 +26,37 @@ final class Outpost_Request_Headers {
 	 * fallback some Apache/managed-host setups use.
 	 *
 	 * The value is a credential: callers regex-validate its shape and
-	 * compare tokens — it is never stored or echoed. It is unslashed but
-	 * deliberately NOT run through a sanitizer, because sanitizers can
-	 * alter token bytes and break constant-time comparison.
+	 * compare tokens — it is never stored or echoed. It is sanitized like
+	 * every other `$_SERVER` read. A bearer token is RFC 6750 `b64token`
+	 * (`A-Za-z0-9-._~+/=`), which sanitize_text_field() returns unchanged,
+	 * so only a malformed header is altered, and that header then fails
+	 * token validation.
 	 *
 	 * @since 1.0.1
 	 *
 	 * @return string Header value, or '' when absent.
 	 */
 	public static function authorization(): string {
-		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Credential compared/validated by callers; sanitizing would corrupt it. Unslashed here, never stored or output.
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
 			return self::server_string( 'HTTP_AUTHORIZATION' );
 		}
 		if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			return self::server_string( 'REDIRECT_HTTP_AUTHORIZATION' );
 		}
-		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		return '';
 	}
 
 	/**
-	 * A `$_SERVER` value as an unslashed string.
+	 * A `$_SERVER` value, unslashed and sanitized.
 	 *
-	 * For request metadata (REQUEST_URI, REQUEST_METHOD, REMOTE_ADDR,
-	 * HTTP_USER_AGENT, proxy IP headers) used for routing checks,
-	 * rate-limit keys, and diagnostics. Callers validate per use —
-	 * e.g. strpos route matching or IP-format checks — so no generic
-	 * sanitizer is applied here.
+	 * For request metadata (REQUEST_METHOD, REMOTE_ADDR, HTTP_USER_AGENT,
+	 * proxy IP headers, Authorization) used for routing checks, rate-limit
+	 * keys, and diagnostics. The sender controls all of it. Callers still
+	 * validate per use — IP-format checks, method allowlists, token
+	 * comparison.
+	 *
+	 * Not for percent-encoded values such as REQUEST_URI:
+	 * sanitize_text_field() strips `%XX` octets.
 	 *
 	 * @since 1.0.1
 	 *
@@ -65,8 +68,7 @@ final class Outpost_Request_Headers {
 		if ( ! isset( $_SERVER[ $key ] ) ) {
 			return $fallback;
 		}
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed request metadata; callers validate per use (route matching, IP keying). Never stored or output raw.
-		return (string) wp_unslash( $_SERVER[ $key ] );
+		return sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
 	}
 
 	/**

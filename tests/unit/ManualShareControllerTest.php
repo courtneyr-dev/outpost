@@ -37,6 +37,9 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
 		Outpost_Companion_Registry::reset_for_tests();
 		// F2 #10 / A2 #8 static-state reset.
@@ -119,7 +122,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Manual_Share_Controller::check_permission();
+		$result = Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -132,7 +135,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
 
-		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission() );
+		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	/**

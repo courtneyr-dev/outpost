@@ -458,11 +458,21 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 			return is_array( $decoded ) ? $decoded : null;
 		}
 
+		/** @var array<string, mixed> */
+		private $body_params = array();
+
+		/**
+		 * @param array<string, mixed> $params Form-encoded body parameters.
+		 */
+		public function set_body_params( array $params ): void {
+			$this->body_params = $params;
+		}
+
 		/**
 		 * @return array<string, mixed>
 		 */
 		public function get_body_params(): array {
-			return array();
+			return $this->body_params;
 		}
 	}
 }

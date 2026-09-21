@@ -19,6 +19,9 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 	}
 
 	public function tearDown(): void {
@@ -67,7 +70,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( false )
 			->reply( false );
-		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_permission_check_denies_anonymous_bearer_presence(): void {
@@ -90,7 +93,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 			static fn( $tag, $value ) => $value
 		);
 
-		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_permission_check_passes_for_user_with_edit_posts(): void {
@@ -101,7 +104,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( true )
 			->reply( true );
-		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
+		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_permission_check_denies_logged_in_user_without_edit_posts(): void {
@@ -119,7 +122,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 			static fn( $tag, $value ) => $value
 		);
 
-		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check() );
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_permission_check_filter_can_open_anonymous(): void {
@@ -132,7 +135,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_composer_config_permission' )
 			->with( false )
 			->reply( true );
-		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check() );
+		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_resolve_post_formats_returns_null_when_absent(): void {

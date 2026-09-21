@@ -29,6 +29,9 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 	}
 
 	public function tearDown(): void {
@@ -106,7 +109,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		$_GET['access_token'] = 'x'; // outpost-lint:fixture-credential
 		$this->prime_anonymous();
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
@@ -121,7 +124,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		$_GET['_o_token'] = 'anything'; // outpost-lint:fixture-credential
 		$this->prime_anonymous();
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
@@ -135,7 +138,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_denied_when_fully_unauthenticated(): void {
 		$this->prime_anonymous();
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$data = $result->get_error_data();
@@ -157,7 +160,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		// IndieAuth rejects the bogus token: determine_current_user resolves nobody.
 		$this->mock_filters( false );
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -170,15 +173,17 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 	 * accepted on presence.
 	 */
 	public function test_check_permission_rejects_unvalidated_body_token(): void {
-		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body( '{"access_token":"x"}' ); // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		$this->mock_filters( false );
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( $request );
 
+		$this->assertSame( 'Bearer x', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'The body token was read and handed to the validating filter.' );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
@@ -195,7 +200,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 
-		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	/**
@@ -206,7 +211,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		$this->mock_filters( false );
 
-		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	/**
@@ -219,7 +224,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Geocode_Endpoint::check_permission();
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );

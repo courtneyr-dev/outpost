@@ -95,4 +95,86 @@ final class ShareTargetControllerTest extends TestCase {
 		$this->assertSame( 303, $this->redirects[0][1] );
 		$this->assertStringStartsWith( '/post/?mode=note', $this->redirects[0][0] );
 	}
+
+	/**
+	 * Mock the two sanitizers with core's real behavior on the inputs these
+	 * tests use: sanitize_text_field() strips %XX octets and non-strings;
+	 * esc_url_raw() keeps an http(s) URL intact and empties anything else.
+	 */
+	private function mock_core_sanitizers(): void {
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $value ) => $value );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing(
+			static function ( $value ): string {
+				if ( ! is_string( $value ) ) {
+					return '';
+				}
+				return trim( (string) preg_replace( '/%[a-f0-9]{2}/i', '', $value ) );
+			}
+		);
+		WP_Mock::userFunction( 'esc_url_raw' )->andReturnUsing(
+			static function ( $value ): string {
+				// Core's esc_url() calls ltrim() on its argument: an array is a
+				// fatal TypeError, not an empty string.
+				if ( ! is_string( $value ) ) {
+					throw new \TypeError( 'ltrim(): Argument #1 ($string) must be of type string, array given' );
+				}
+				return 1 === preg_match( '#^https?://\S+$#i', $value ) ? $value : '';
+			}
+		);
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://site.test' );
+		WP_Mock::userFunction( 'wp_parse_url' )->andReturnUsing( static fn( $url ) => parse_url( $url ) );
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing( static fn( $hook, $value ) => $value );
+	}
+
+	public function test_shared_url_keeps_its_percent_encoding(): void {
+		$_POST = array( 'url' => 'https://example.com/a%20b/caf%C3%A9?q=hello%20world' );
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$this->assertCount( 1, $this->redirects );
+		$this->assertStringContainsString(
+			rawurlencode( 'https://example.com/a%20b/caf%C3%A9?q=hello%20world' ),
+			$this->redirects[0][0],
+			'The shared URL must reach the composer byte-for-byte; sanitize_text_field() strips %XX octets.'
+		);
+	}
+
+	public function test_url_field_holding_a_text_blob_still_yields_its_link(): void {
+		// iOS apps put a quote plus the link in the url field.
+		$_POST = array( 'url' => 'A good line. https://example.com/page' );
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$this->assertCount( 1, $this->redirects );
+		$this->assertStringContainsString( rawurlencode( 'https://example.com/page' ), $this->redirects[0][0] );
+	}
+
+	public function test_array_valued_fields_are_dropped(): void {
+		$_POST = array(
+			'url'   => array( 'https://example.com/page' ),
+			'text'  => array( 'x' ),
+			'title' => array( 'y' ),
+		);
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$this->assertSame( array(), $this->redirects, 'Array-valued fields carry no share data.' );
+	}
+
+	public function test_array_valued_query_string_fields_are_dropped(): void {
+		// Level 1 (GET) shape: /post/share-target?url[]=...
+		$_GET = array(
+			'url'  => array( 'https://example.com/page' ),
+			'text' => array( 'x' ),
+		);
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$this->assertSame( array(), $this->redirects );
+	}
 }
