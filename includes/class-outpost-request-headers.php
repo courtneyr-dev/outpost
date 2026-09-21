@@ -72,6 +72,38 @@ final class Outpost_Request_Headers {
 	}
 
 	/**
+	 * The REST nonce presented with this request, unslashed and sanitized, or
+	 * '' when none was sent.
+	 *
+	 * Mirrors core's `rest_cookie_check_errors()` resolution order exactly: the
+	 * `_wpnonce` request parameter first, then the `X-WP-Nonce` header. A
+	 * security decision that has to re-derive whether a cookie session carries a
+	 * valid nonce — because an earlier `rest_authentication_errors` filter made
+	 * core short-circuit before its own check ran — must resolve the nonce the
+	 * same way core would, or it will disagree with core on which requests are
+	 * nonce-protected.
+	 *
+	 * This returns the raw nonce for the caller to pass to
+	 * `wp_verify_nonce( ..., 'wp_rest' )`; reading it here is the read half of
+	 * that verification, not a standalone processing of request input.
+	 *
+	 * @since 1.0.21
+	 *
+	 * @return string
+	 */
+	public static function rest_nonce(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- returns the presented nonce for the caller to pass to wp_verify_nonce(); this is the read half of that verification, not a standalone action. sanitize_text_field() returns '' for a non-string (e.g. an array), so no is_scalar guard is needed.
+		$param = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
+		if ( '' !== $param ) {
+			return $param;
+		}
+		if ( isset( $_SERVER['HTTP_X_WP_NONCE'] ) ) {
+			return self::server_string( 'HTTP_X_WP_NONCE' );
+		}
+		return '';
+	}
+
+	/**
 	 * The REST route WordPress resolved for this request, normalized for exact
 	 * comparison, or null when none was resolved.
 	 *

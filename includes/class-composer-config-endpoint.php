@@ -202,16 +202,36 @@ final class Outpost_Composer_Config_Endpoint {
 	 *     this route. That error is WordPress's CSRF defense for cookie
 	 *     sessions; the opt-out exists for third-party blanket gates, not to
 	 *     disable core's own check.
+	 *   - It never clears ANY error for a cookie session that lacks a valid
+	 *     REST nonce. Core's own nonce check (rest_cookie_check_errors,
+	 *     priority 100) runs — and demotes the session to anonymous — ONLY
+	 *     when it is the first filter to see an error. An earlier
+	 *     rest_authentication_errors result short-circuits it: the iOS Shortcut
+	 *     authenticator's out-of-scope 401 (priority 10), a hardening plugin's
+	 *     blanket gate, any bearer-validation error. That leaves the wp-admin
+	 *     cookie user current with no nonce ever verified, so clearing the
+	 *     error would let a cross-origin request ride the cookie — the CSRF
+	 *     bypass core's nonce exists to stop (SEC-2026-09-21). Whitelisting
+	 *     only `rest_cookie_invalid_nonce` (above) misses this because that
+	 *     error is never the one raised. The guard returns `$result` unchanged,
+	 *     so it only ever preserves a decision the chain already made; the
+	 *     legitimate PWA bearer flow sends `credentials: 'omit'`, carries no
+	 *     cookie, and sets no earlier error, so `$result` is null there and the
+	 *     clear still happens for it.
 	 *
 	 * @param mixed $result Existing filter result (null, true, WP_Error).
-	 * @return mixed Cleared (null) when a third-party error stands on our
-	 *               own resolved route; unchanged otherwise.
+	 * @return mixed Cleared (null) when a third-party error stands on our own
+	 *               resolved route for a request that is not a nonce-less cookie
+	 *               session; unchanged otherwise.
 	 */
 	public static function allow_anonymous_for_self( $result ) {
 		if ( is_wp_error( $result ) && 'rest_cookie_invalid_nonce' === $result->get_error_code() ) {
 			return $result;
 		}
 		if ( ! Outpost_Request_Headers::is_rest_route( '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
+			return $result;
+		}
+		if ( is_user_logged_in() && ! wp_verify_nonce( Outpost_Request_Headers::rest_nonce(), 'wp_rest' ) ) {
 			return $result;
 		}
 		return null;

@@ -7,6 +7,12 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.21] - 2026-09-21
+
+### Security
+
+- `GET`/`POST /wp-json/outpost/v1/composer-config` could be read as a logged-in cookie user with no REST nonce, cross-origin, whenever an earlier `rest_authentication_errors` callback had already set an error — the iOS Shortcut authenticator's out-of-scope 401 (priority 10), a hardening plugin's blanket gate, or any bearer-validation error. Core's `rest_cookie_check_errors` (priority 100) runs its nonce check and its `wp_set_current_user( 0 )` demotion only when it is the first filter to see an error; an earlier error short-circuits it, leaving the wp-admin cookie user current with no nonce ever verified. The route's priority-999 opt-out (`allow_anonymous_for_self()`) then cleared that error and served the response, defeating WordPress's cookie-nonce CSRF defense on this route. Whitelisting only `rest_cookie_invalid_nonce` missed the gap, because that error is never the one raised in this path. The data is low-value (companion status, category and tag names, the Bridgy host map, composer settings) and the route is read-only, but the CSRF-defense bypass is real. `allow_anonymous_for_self()` now refuses to clear any error for a logged-in request that lacks a valid `wp_rest` nonce, so a nonce-less cookie session is never revived; the guard returns the chain's existing result, so it only preserves a decision already made. The legitimate PWA flow authenticates with a bearer token and `credentials: 'omit'` (no cookie), so it is unaffected. New `Outpost_Request_Headers::rest_nonce()` resolves the nonce the way core does — `_wpnonce` first, then the `X-WP-Nonce` header.
+
 ## [1.0.20] - 2026-09-21
 
 ### Fixed
