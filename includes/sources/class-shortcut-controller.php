@@ -57,10 +57,12 @@ final class Outpost_Shortcut_Controller {
 		// Normalize Shortcut JSON to the same payload shape the share-target
 		// extractor consumes. `shared_text` maps to `text` per the iOS
 		// Shortcut bridge research (concepts/capture-inbound-may-2026.md §6).
+		// The shared-field sanitizers keep %XX octets, which
+		// sanitize_text_field() deletes, and return '' for a non-string.
 		$normalized = array(
-			'url'   => isset( $payload['url'] ) && is_string( $payload['url'] ) ? sanitize_text_field( $payload['url'] ) : '',
-			'text'  => isset( $payload['shared_text'] ) && is_string( $payload['shared_text'] ) ? sanitize_text_field( $payload['shared_text'] ) : '',
-			'title' => isset( $payload['title'] ) && is_string( $payload['title'] ) ? sanitize_text_field( $payload['title'] ) : '',
+			'url'   => Outpost_Source_Detector::sanitize_shared_url( $payload['url'] ?? '' ),
+			'text'  => Outpost_Source_Detector::sanitize_shared_text( $payload['shared_text'] ?? '' ),
+			'title' => Outpost_Source_Detector::sanitize_shared_text( $payload['title'] ?? '' ),
 		);
 
 		$url = Outpost_Source_Detector::extract_url_from_payload( $normalized );
