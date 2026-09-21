@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.20
+Stable tag:        1.0.21
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -233,6 +233,9 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.21 =
+* Security: the composer settings endpoint no longer answers a logged-in browser request that arrives without WordPress's REST security token, in the case where another plugin's earlier error stopped WordPress from checking that token. A cross-site page could otherwise read the site's companion-plugin status and composer settings by riding the logged-in cookie. The endpoint is read-only and the data is low-value, but the check is now correct. Sign-in with an access token, which the app uses, is unaffected.
 
 = 1.0.20 =
 * Fixed: a link shared from Android keeps its percent-encoded characters. Android puts the link in the share text, often inside a sentence such as "Check this out https://example.com/caf%C3%A9", and Outpost removed those characters before it found the link. The title field and a quote plus a link in the address field had the same fault.

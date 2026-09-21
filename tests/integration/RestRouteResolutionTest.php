@@ -19,6 +19,14 @@
  * same flow does delete when the nonce is genuine, so the survival assertion
  * is calibrated.
  *
+ * The second audited defect (SEC-2026-09-21): the same opt-out only preserved
+ * core's `rest_cookie_invalid_nonce` error. Any OTHER earlier error — e.g. the
+ * iOS Shortcut authenticator's out-of-scope 401 (priority 10) — makes core's
+ * cookie check short-circuit before it ever raises the invalid-nonce error, so
+ * the opt-out cleared the out-of-scope error and revived a nonce-less cookie
+ * session. Those tests drive the full priority 10 → 100 → 999 chain with a real
+ * Shortcut token and assert the companion body is never built.
+ *
  * @package Outpost\Tests\Integration
  */
 
@@ -131,6 +139,91 @@ final class RestRouteResolutionTest extends TestCase {
 		$request = new WP_REST_Request( 'DELETE', '/wp/v2/posts/' . $post_id );
 		$server->dispatch( $request );
 		return $auth;
+	}
+
+	/**
+	 * The composer-config equivalent of serve_delete(): authenticate the way
+	 * WP_REST_Server::serve_request() does, and only dispatch the real route
+	 * when authentication passed. A denied request returns response => null, so
+	 * a test can prove the handler never built the companion body.
+	 *
+	 * @return array{auth: mixed, response: \WP_REST_Response|null}
+	 */
+	private function serve_composer_config(): array {
+		$server = rest_get_server();
+		$auth   = $server->check_authentication();
+		if ( is_wp_error( $auth ) ) {
+			return array(
+				'auth'     => $auth,
+				'response' => null,
+			);
+		}
+		$response = $server->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
+		return array(
+			'auth'     => $auth,
+			'response' => $response,
+		);
+	}
+
+	/**
+	 * The composer-config CSRF-defense bypass (SEC-2026-09-21).
+	 *
+	 * A cross-origin attacker who holds a valid iOS Shortcut token (their own)
+	 * presents it as a Bearer against composer-config while the victim's
+	 * wp-admin cookie rides along with NO REST nonce. The Shortcut
+	 * authenticator (priority 10) correctly rejects the out-of-scope token with
+	 * a 401, but that early error makes core's rest_cookie_check_errors
+	 * (priority 100) skip its nonce check and its wp_set_current_user( 0 ),
+	 * leaving the victim logged in. The opt-out (priority 999) must NOT clear
+	 * that error back to null: doing so revives a nonce-less cookie session and
+	 * serves the companion body — the CSRF defense core would otherwise apply.
+	 *
+	 * @test
+	 */
+	public function out_of_scope_shortcut_token_cannot_ride_a_nonceless_cookie_session_into_composer_config(): void {
+		$token                        = \Outpost_IOS_Shortcut_Token::regenerate( $this->admin_id );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config', '/outpost/v1/composer-config', null );
+		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
+
+		$served = $this->serve_composer_config();
+
+		$this->assertInstanceOf(
+			\WP_Error::class,
+			$served['auth'],
+			'A nonce-less cookie session must not be revived by clearing the out-of-scope error.'
+		);
+		$this->assertSame( 'outpost_ios_shortcut_token_out_of_scope', $served['auth']->get_error_code() );
+		$this->assertSame( 401, $served['auth']->get_error_data()['status'] ?? null );
+		$this->assertNull( $served['response'], 'The composer-config handler must never build a body for the denied request.' );
+		$this->assertFalse(
+			get_transient( 'outpost_config_rl_u_' . $this->admin_id ),
+			'The rate-limited handler must never run for the denied request (no transient written).'
+		);
+	}
+
+	/**
+	 * Positive control for the CSRF-bypass test above: the SAME shape carrying
+	 * a genuine wp_rest nonce is a legitimate same-origin cookie request, so it
+	 * clears the opt-out, reaches edit_posts, and serves the companion body.
+	 * Without this, the denial assertion could pass for the wrong reason.
+	 *
+	 * @test
+	 */
+	public function valid_nonce_lets_the_cookie_session_reach_composer_config_which_calibrates_the_denial(): void {
+		$token                        = \Outpost_IOS_Shortcut_Token::regenerate( $this->admin_id );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config', '/outpost/v1/composer-config', null );
+		$_REQUEST['_wpnonce'] = wp_create_nonce( 'wp_rest' );
+		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
+
+		$served = $this->serve_composer_config();
+		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
+
+		$this->assertNull( $served['auth'], 'A genuine nonce clears the opt-out and reaches the permission callback.' );
+		$this->assertInstanceOf( \WP_REST_Response::class, $served['response'] );
+		$this->assertSame( 200, $served['response']->get_status(), 'Positive control: the same flow serves with a real nonce.' );
+		$this->assertArrayHasKey( 'companions', (array) $served['response']->get_data() );
 	}
 
 	/**
