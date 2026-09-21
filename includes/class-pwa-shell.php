@@ -519,7 +519,7 @@ final class Outpost_PWA_Shell {
 		);
 
 		self::send_json_header();
-		echo wp_json_encode( $manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+		echo wp_json_encode( $manifest );
 		self::halt();
 	}
 

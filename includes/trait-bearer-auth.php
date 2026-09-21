@@ -21,12 +21,30 @@ trait Outpost_Bearer_Auth {
 	 * unvalidated token can never authorize the request. On managed-WP hosts
 	 * that strip the Authorization header (GoDaddy), the Micropub-spec body
 	 * `access_token` is restored to the header first so IndieAuth can read it.
+	 *
+	 * This is the plugin's one `wp_set_current_user()` call. WordPress
+	 * resolves the user once, before it dispatches the route, and two cases
+	 * leave a valid token unrecognized by then:
+	 *
+	 *   1. The host stripped the Authorization header and the PWA's token
+	 *      rides in a JSON body. IndieAuth's `determine_current_user`
+	 *      callback reads the header and form-encoded `$_POST` only.
+	 *   2. The request also carries a wp-admin cookie with no REST nonce, so
+	 *      core's `rest_cookie_check_errors()` already set the user to 0.
+	 *
+	 * Core has no hook that resolves the user again after that point, so
+	 * this re-runs the `determine_current_user` chain and applies its
+	 * answer. The user id only ever comes from that chain: this trait never
+	 * maps a token to a user. It lasts for the request; no cookie or session
+	 * is written.
+	 *
+	 * @param WP_REST_Request $request REST request.
 	 */
-	private static function authenticate_bearer_token(): void {
+	private static function authenticate_bearer_token( WP_REST_Request $request ): void {
 		if ( is_user_logged_in() ) {
 			return;
 		}
-		$token = self::bearer_token();
+		$token = self::bearer_token( $request );
 		if ( '' === $token ) {
 			return;
 		}
@@ -46,31 +64,25 @@ trait Outpost_Bearer_Auth {
 	 * Micropub-spec `access_token` request body on hosts that strip the
 	 * header. Returns '' when no token is present.
 	 *
-	 * Bodies don't appear in access logs, browser history, or CDN cache
-	 * keys, unlike query strings, so the body fallback is spec-compliant
-	 * and leak-safe.
+	 * The body is read through WP_REST_Request, which WordPress has already
+	 * parsed (form-encoded or JSON). Query-string parameters are never
+	 * consulted: bodies don't appear in access logs, browser history, or CDN
+	 * cache keys, unlike query strings.
+	 *
+	 * @param WP_REST_Request $request REST request.
 	 */
-	private static function bearer_token(): string {
+	private static function bearer_token( WP_REST_Request $request ): string {
 		$header = Outpost_Request_Headers::authorization();
 		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
 		}
-		// Bearer-token auth path; nonces don't apply to token-authenticated
-		// requests, and managed-WP hosts strip the header so the token rides
-		// in the body.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
-		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
-		if ( null === $body_token ) {
-			$raw = file_get_contents( 'php://input' );
-			if ( false !== $raw && '' !== $raw ) {
-				$decoded = json_decode( $raw, true );
-				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
-					$body_token = sanitize_text_field( $decoded['access_token'] );
+		foreach ( array( $request->get_body_params(), $request->get_json_params() ) as $body ) {
+			if ( is_array( $body ) && isset( $body['access_token'] ) && is_string( $body['access_token'] ) ) {
+				$body_token = sanitize_text_field( $body['access_token'] );
+				if ( '' !== $body_token ) {
+					return $body_token;
 				}
 			}
-		}
-		if ( is_string( $body_token ) && '' !== $body_token ) {
-			return $body_token;
 		}
 		return '';
 	}

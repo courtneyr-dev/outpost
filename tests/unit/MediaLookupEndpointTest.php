@@ -460,7 +460,7 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		// Absence of side effects: a denied request never dispatches to PKIW.
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
-		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$data = $result->get_error_data();
@@ -476,7 +476,7 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
-		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -486,11 +486,12 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
-		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_permission_rejects_unvalidated_body_access_token(): void {
-		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body_params( array( 'access_token' => 'x' ) ); // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
@@ -501,8 +502,9 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
-		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
 
+		$this->assertSame( 'Bearer x', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'The body token was read and handed to the validating filter.' );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
@@ -538,7 +540,8 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function test_permission_authenticates_a_body_token_via_determine_current_user(): void {
 		// Managed host stripped the header; the token rides in the form body.
-		$_POST['access_token'] = 'body-token'; // outpost-lint:fixture-credential
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body_params( array( 'access_token' => 'body-token' ) ); // outpost-lint:fixture-credential
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
@@ -550,13 +553,14 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 
-		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( $request ) );
 		$this->assertSame( 'Bearer body-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'Header restored for the validating filter.' );
 	}
 
 	public function test_permission_does_not_restore_header_when_one_is_present(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer already-here'; // outpost-lint:fixture-credential
-		$_POST['access_token']         = 'body-token'; // outpost-lint:fixture-credential
+		$request                       = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body_params( array( 'access_token' => 'body-token' ) ); // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
@@ -565,9 +569,44 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 
-		$result = Outpost_Media_Lookup_Endpoint::check_permission();
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'Bearer already-here', $_SERVER['HTTP_AUTHORIZATION'] );
+	}
+
+	public function test_permission_authenticates_a_json_body_token(): void {
+		// The PWA's real request shape: Content-Type application/json, the
+		// token in the JSON body, the header stripped by the host.
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body( '{"access_token":"json-token"}' ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 7 );
+		WP_Mock::userFunction( 'wp_set_current_user' )->once()->with( 7 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
+
+		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( $request ) );
+		$this->assertSame( 'Bearer json-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null );
+	}
+
+	public function test_permission_never_reads_a_token_from_the_query_string(): void {
+		// A token in the URL leaks through access logs, browser history, and
+		// CDN cache keys. Only the header and the request body are consulted.
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_param( 'access_token', 'url-token' ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
+
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'No header restored from a query-string token.' );
 	}
 }

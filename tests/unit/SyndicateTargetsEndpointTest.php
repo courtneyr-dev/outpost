@@ -27,6 +27,9 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		Outpost_Companion_Registry::reset_for_tests();
 		// WP_Mock filtersWithAnyArgs leak workaround (CLAUDE.md A2 #8).
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
@@ -63,7 +66,7 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Syndicate_Targets_Endpoint::check_permission();
+		$result = Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -76,7 +79,7 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		$this->mock_filters( 42 );
 
-		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	private function make_request( ?string $mode ): WP_REST_Request {

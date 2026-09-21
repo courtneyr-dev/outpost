@@ -98,25 +98,39 @@ final class Outpost_Share_Target_Controller {
 	 * @return array{title:string, text:string, url:string}
 	 */
 	private static function read_payload(): array {
+		// Every superglobal read below sits directly inside its sanitizer.
+		// sanitize_text_field() returns '' for a non-string (array) value.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Web Share Target spec; nonces don't apply to OS-initiated share intents.
-		$title = self::pick_string( $_POST, 'title' );
-		if ( '' === $title ) {
-			$title = self::pick_string( $_GET, 'title' );
+		$title = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+		if ( '' === $title && isset( $_GET['title'] ) ) {
+			$title = sanitize_text_field( wp_unslash( $_GET['title'] ) );
 		}
-		$text = self::pick_string( $_POST, 'text' );
-		if ( '' === $text ) {
-			$text = self::pick_string( $_GET, 'text' );
+		$text = isset( $_POST['text'] ) ? sanitize_text_field( wp_unslash( $_POST['text'] ) ) : '';
+		if ( '' === $text && isset( $_GET['text'] ) ) {
+			$text = sanitize_text_field( wp_unslash( $_GET['text'] ) );
 		}
-		$url = self::pick_string( $_POST, 'url' );
-		if ( '' === $url ) {
-			$url = self::pick_string( $_GET, 'url' );
+
+		// The url field is sanitized twice: as text, and as a URL.
+		// sanitize_text_field() strips %XX octets, which rewrites an encoded
+		// path or query (`/a%20b` becomes `/ab`); esc_url_raw() keeps them but
+		// empties a value that is not one bare URL. iOS apps put a quote plus
+		// the link in this field, so the text form stays the fallback and
+		// extract_url_from_payload() finds the link inside it. esc_url_raw()
+		// is fatal on an array (`?url[]=`), so it only ever sees a string.
+		$url_as_text = isset( $_POST['url'] ) ? sanitize_text_field( wp_unslash( $_POST['url'] ) ) : '';
+		$url_as_url  = isset( $_POST['url'] ) && is_string( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ), array( 'http', 'https' ) ) : '';
+		if ( '' === $url_as_text && isset( $_GET['url'] ) ) {
+			$url_as_text = sanitize_text_field( wp_unslash( $_GET['url'] ) );
+			$url_as_url  = is_string( $_GET['url'] ) ? esc_url_raw( wp_unslash( $_GET['url'] ), array( 'http', 'https' ) ) : '';
 		}
 		// phpcs:enable
+
+		$is_bare_url = 1 === preg_match( '#^https?://\S+$#i', $url_as_text );
 
 		return array(
 			'title' => $title,
 			'text'  => $text,
-			'url'   => $url,
+			'url'   => $is_bare_url && '' !== $url_as_url ? $url_as_url : $url_as_text,
 		);
 	}
 
@@ -130,27 +144,6 @@ final class Outpost_Share_Target_Controller {
 	private static function has_shared_files(): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Web Share Target spec; nonces don't apply to OS-initiated share intents.
 		return ! empty( $_FILES );
-	}
-
-	/**
-	 * Sanitize a string field from a request superglobal slice.
-	 *
-	 * @param array<string,mixed> $source Superglobal slice.
-	 * @param string              $key    Field name.
-	 * @return string
-	 */
-	private static function pick_string( array $source, string $key ): string {
-		if ( ! isset( $source[ $key ] ) ) {
-			return '';
-		}
-		$raw = $source[ $key ];
-		if ( ! is_string( $raw ) ) {
-			return '';
-		}
-		// `wp_unslash` reverses WP's auto-magic-quote slashing; sanitize_text_field
-		// strips control bytes / multi-line attempts. URL validation runs later in
-		// extract_url_from_payload via wp_parse_url.
-		return sanitize_text_field( wp_unslash( $raw ) );
 	}
 
 	/**

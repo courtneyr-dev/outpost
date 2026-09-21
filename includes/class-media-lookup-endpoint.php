@@ -130,8 +130,8 @@ final class Outpost_Media_Lookup_Endpoint {
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
+	public static function check_permission( WP_REST_Request $request ) {
+		self::authenticate_bearer_token( $request );
 		$allow = current_user_can( 'edit_posts' );
 		/**
 		 * Override the media-lookup permission decision.

@@ -183,10 +183,8 @@ final class Outpost_OAuth_Controller {
 		if ( null === $user_id ) {
 			return self::redirect_to_settings( $provider->id(), 'state_invalid' );
 		}
-		// Trust the user from the validated state for the rest of this
-		// request (credential persistence is per-user).
-		wp_set_current_user( $user_id );
-
+		// The request stays anonymous. Everything below takes the state's
+		// user by id, so no user switch is needed.
 		$exchange = $provider->exchange_code( $code );
 		if ( is_wp_error( $exchange ) ) {
 			return self::redirect_to_settings( $provider->id(), 'exchange_failed' );

@@ -7,6 +7,28 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.19] - 2026-09-21
+
+WordPress.org plugin review, round T9.
+
+### Fixed
+
+- `Outpost_Share_Target_Controller::read_payload()` ran the shared `url` field through `sanitize_text_field()`, which strips `%XX` octets: `https://example.com/a%20b/caf%C3%A9?q=hello%20world` reached the composer as `https://example.com/ab/caf?q=helloworld`. A value that is one bare http(s) URL now goes through `esc_url_raw()`; a text blob holding a link (the iOS share shape) keeps the text path and `extract_url_from_payload()` still finds the link. Each `$_POST`/`$_GET` read sits directly inside its sanitizer, and the `pick_string()` helper that took a whole superglobal is gone.
+
+### Security
+
+- `wp_set_current_user()` call sites drop from five to one.
+  - `Outpost_IOS_Shortcut_Token_Authenticator` hooks `determine_current_user` at priority 20 and returns the token's user id; WordPress sets the user, as it does for application passwords. The callback keys on the resolved REST route, so it fails closed on the `WP::init()` pass and resolves on the pass `WP_REST_Server::serve_request()` triggers. `rest_authentication_errors` still returns 401 for the token on any other route, and now also returns 401 when the request already runs as a different user.
+  - `Outpost_OAuth_Controller::handle_callback()` no longer switches users. `Outpost_Credentials_Store::set()` and `after_token_exchange()` already took the state's user by id.
+  - `Outpost_Preview_Endpoint` and `Outpost_Geocode_Endpoint` carried byte-identical copies of `Outpost_Bearer_Auth`; both now use the trait. The trait keeps the one remaining call, with the reason in its docblock: the PWA's token rides in a JSON body on header-stripping hosts, which IndieAuth's `determine_current_user` callback does not read, and core's `rest_cookie_check_errors()` zeroes a cookie user with no nonce before the permission callback runs.
+- `Outpost_Bearer_Auth::bearer_token()` reads a body token from `WP_REST_Request::get_body_params()` / `get_json_params()`. The `$_POST` read, the `php://input` read, and the `json_decode()` are gone. Permission callbacks on the eight bearer routes take the `WP_REST_Request`. A query-string `access_token` is never read.
+- `Outpost_Request_Headers::server_string()` returns `sanitize_text_field( wp_unslash( ... ) )` for every `$_SERVER` read, Authorization included. An RFC 6750 `b64token` passes through `sanitize_text_field()` unchanged, so only a malformed header is altered.
+- `render_manifest()` calls `wp_json_encode()` with no flags (was `JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT`).
+
+### Tests
+
+- New: `OAuthControllerCallbackTest` (the controller had no coverage), `RequestHeadersServerStringTest`, three share-target cases, four iOS authenticator cases, a JSON-body and a query-string case for the bearer trait, and a manifest escaping case. The iOS authenticator suite asserts `wp_set_current_user()` is never called.
+
 ## [1.0.18] - 2026-09-14
 
 ### Fixed
