@@ -201,20 +201,35 @@ final class ComposerConfigPermissionTest extends TestCase {
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 
 		try {
-			// The trait reads $_POST['access_token'] first; php://input has no
-			// test seam under dispatch, so this exercises the same body path.
-			$_POST['access_token'] = 'valid-editor-token';
-			$request               = new WP_REST_Request( 'POST', '/outpost/v1/composer-config' );
-			$ok                    = rest_get_server()->dispatch( $request );
+			// dispatch() skips WP_REST_Server::serve_request(), which is what
+			// copies $_POST and the raw body onto the request on a real HTTP
+			// call. The trait reads the token from the request, so each probe
+			// builds its request the way core would.
+			$ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => 'valid-editor-token' ) ) );
 
 			// Each real HTTP request is a fresh process; reset the user AND the
-			// header the trait restored so the bogus token is judged alone.
+			// header the trait restored so the next token is judged alone.
 			wp_set_current_user( 0 );
 			unset( $_SERVER['HTTP_AUTHORIZATION'] );
-			$_POST['access_token'] = 'not-a-real-token';
-			$bad                   = rest_get_server()->dispatch( new WP_REST_Request( 'POST', '/outpost/v1/composer-config' ) );
+			$bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => 'not-a-real-token' ) ) );
+
+			// The PWA's real shape: Content-Type application/json.
+			wp_set_current_user( 0 );
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$json_ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => 'valid-editor-token' ) ) );
+
+			wp_set_current_user( 0 );
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$json_bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => 'not-a-real-token' ) ) );
+
+			// A valid token in the URL must not authenticate: query strings
+			// reach access logs, browser history, and CDN cache keys.
+			wp_set_current_user( 0 );
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$query              = rest_get_server()->dispatch( $this->composer_config_request( array( 'query' => 'valid-editor-token' ) ) );
+			$header_after_query   = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
 		} finally {
-			unset( $_POST['access_token'], $_SERVER['HTTP_AUTHORIZATION'] );
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
 			remove_filter( 'determine_current_user', $validator, 15 );
 			wp_set_current_user( 0 );
 		}
@@ -222,5 +237,30 @@ final class ComposerConfigPermissionTest extends TestCase {
 		$this->assertSame( 200, $ok->get_status(), 'A valid body token must authenticate with no header and no cookie.' );
 		$this->assertArrayHasKey( 'companions', (array) $ok->get_data() );
 		$this->assertSame( 401, $bad->get_status(), 'A bogus body token must be rejected.' );
+		$this->assertSame( 200, $json_ok->get_status(), 'A valid token in a JSON body must authenticate.' );
+		$this->assertSame( 401, $json_bad->get_status(), 'A bogus token in a JSON body must be rejected.' );
+		$this->assertSame( 401, $query->get_status(), 'A token in the query string must not authenticate.' );
+		$this->assertNull( $header_after_query, 'A query-string token must not be restored to the Authorization header.' );
+	}
+
+	/**
+	 * Build a composer-config POST carrying a token the way
+	 * WP_REST_Server::serve_request() would have populated it.
+	 *
+	 * @param array<string, string> $token One of 'form', 'json', 'query' => token.
+	 */
+	private function composer_config_request( array $token ): WP_REST_Request {
+		$request = new WP_REST_Request( 'POST', '/outpost/v1/composer-config' );
+		if ( isset( $token['form'] ) ) {
+			$request->set_body_params( array( 'access_token' => $token['form'] ) );
+		}
+		if ( isset( $token['json'] ) ) {
+			$request->set_header( 'Content-Type', 'application/json' );
+			$request->set_body( (string) wp_json_encode( array( 'access_token' => $token['json'] ) ) );
+		}
+		if ( isset( $token['query'] ) ) {
+			$request->set_query_params( array( 'access_token' => $token['query'] ) );
+		}
+		return $request;
 	}
 }
