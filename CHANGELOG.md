@@ -7,6 +7,34 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.21] - 2026-09-21
+
+### Security
+
+- `GET`/`POST /wp-json/outpost/v1/composer-config` could be read as a logged-in cookie user with no REST nonce, cross-origin, whenever an earlier `rest_authentication_errors` callback had already set an error — the iOS Shortcut authenticator's out-of-scope 401 (priority 10), a hardening plugin's blanket gate, or any bearer-validation error. Core's `rest_cookie_check_errors` (priority 100) runs its nonce check and its `wp_set_current_user( 0 )` demotion only when it is the first filter to see an error; an earlier error short-circuits it, leaving the wp-admin cookie user current with no nonce ever verified. The route's priority-999 opt-out (`allow_anonymous_for_self()`) then cleared that error and served the response, defeating WordPress's cookie-nonce CSRF defense on this route. Whitelisting only `rest_cookie_invalid_nonce` missed the gap, because that error is never the one raised in this path. The data is low-value (companion status, category and tag names, the Bridgy host map, composer settings) and the route is read-only, but the CSRF-defense bypass is real. `allow_anonymous_for_self()` now refuses to clear any error for a logged-in request that lacks a valid `wp_rest` nonce, so a nonce-less cookie session is never revived; the guard returns the chain's existing result, so it only preserves a decision already made. The legitimate PWA flow authenticates with a bearer token and `credentials: 'omit'` (no cookie), so it is unaffected. New `Outpost_Request_Headers::rest_nonce()` resolves the nonce the way core does — `_wpnonce` first, then the `X-WP-Nonce` header.
+
+## [1.0.20] - 2026-09-21
+
+### Fixed
+
+- 1.0.19 fixed `%XX` loss for a bare URL in the share-target `url` field. Every other inbound share field still went through `sanitize_text_field()` or `sanitize_textarea_field()`, and both delete `%XX` octets: `Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world` reached `find_url_in_text()` as `…/ab/caf?q=helloworld`. Fixed in:
+  - `Outpost_Share_Target_Controller::read_payload()`: the `text` and `title` fields (Android share sheets put the link in `text`), and the `url` field when it holds a text blob (the iOS quote-plus-link shape), which 1.0.19 left on `sanitize_text_field()`.
+  - `Outpost_Shortcut_Controller::handle_request()`: the JSON `url`, `shared_text`, and `title`.
+  - `Outpost_IOS_Shortcut_REST_Controller`: the `sanitize_callback` for `url` (was `sanitize_textarea_field`), `shared_text`, and `title`.
+- A `<` that never closes, followed by a link with a query string (`I <3 this https://example.com/?a=1&b=2`), reached the composer as `?a=1&amp;b=2`. Core's `wp_pre_kses_less_than()` runs the rest of the string through `esc_html()`. This happened with or without `%XX` in the link.
+
+### Changed
+
+- New `Outpost_Source_Detector::sanitize_shared_text()` and `sanitize_shared_url()`; all three entry points use them. `sanitize_shared_text()` is `wp_check_invalid_utf8()` then `wp_kses( $value, array() )`, restores the `&amp;`, `&#039;`, and `&quot;` that `wp_kses()` wrote (none of the three can form a tag; `&lt;` and `&gt;` stay encoded), and collapses control characters and whitespace. `sanitize_shared_url()` applies the 1.0.19 split: `esc_url_raw( …, array( 'http', 'https' ) )` for one bare URL, the text path for a blob.
+- `wp_strip_all_tags()` was tried and rejected. On WordPress 7.1 it keeps `%XX` but returns `I` for `I <3 this https://example.com/a%20b`: everything after the unclosed `<` goes, link included.
+- In `read_payload()` each `$_POST` / `$_GET` read sits directly inside `wp_kses( wp_unslash( … ), array() )`, behind an `is_string()` check. `wp_kses()` and `esc_url_raw()` are a fatal `TypeError` on an array (`?text[]=`). Both helpers return `''` for a non-string; a REST `sanitize_callback` replaces core's type check, so an array reaches it.
+
+### Tests
+
+- New `tests/helpers/CoreSanitizerMocks.php`: WP_Mock models of `sanitize_text_field()`, `sanitize_textarea_field()`, `wp_kses()`, `wp_check_invalid_utf8()`, and `esc_url_raw()`. The models delete `%XX` and throw `TypeError` on a non-string, as core does. `CoreSanitizerMocksTest` holds them to output recorded from WordPress 7.1.
+- New `ShortcutControllerTest` and `IosShortcutRestControllerTest` (neither controller had unit coverage); the REST test runs the `sanitize_callback`s the route registers. New share-target cases for `text`, `title`, and the `url` blob over POST and GET. Cases cover `%20`, `%C3%A9`, a link inside a sentence, `<3` before the link, tags, control characters, invalid UTF-8, and array-valued input on every path. 90 new tests.
+- `tests/bootstrap.php` gains a `WP_REST_Server` stub for the method constants route registration reads.
+
 ## [1.0.19] - 2026-09-21
 
 WordPress.org plugin review, round T9.

@@ -372,4 +372,64 @@ final class ShareTargetDispatchTest extends TestCase {
 			. 'this is the SSRF defense the preview endpoint relies on, independent of dispatch.'
 		);
 	}
+
+	/**
+	 * The `url=` value a redirect carries, decoded once — what the PWA
+	 * reads from its query string.
+	 */
+	private function redirected_url_param( string $redirect_url ): ?string {
+		parse_str( (string) wp_parse_url( $redirect_url, PHP_URL_QUERY ), $query );
+		return isset( $query['url'] ) && is_string( $query['url'] ) ? $query['url'] : null;
+	}
+
+	/**
+	 * Android share sheets put the link in `text`, often mid-sentence.
+	 * Real core here, no mocks: sanitize_text_field() deletes %XX octets,
+	 * and after an unclosed `<` core entity-encodes the `&` in the link.
+	 *
+	 * @test
+	 * @dataProvider encoded_links_in_text
+	 */
+	public function link_in_text_field_reaches_the_composer_byte_for_byte( string $text, string $expected ): void {
+		$redirect_url = $this->dispatch_share_target_post( array( 'text' => $text ) );
+
+		$this->assertNotNull( $redirect_url, 'A link inside share text must produce a redirect.' );
+		$this->assertSame( 303, $this->captured_redirects[0]['status'] );
+		$this->assertSame( $expected, $this->redirected_url_param( $redirect_url ) );
+	}
+
+	/**
+	 * @return array<string, array{0:string, 1:string}>
+	 */
+	public function encoded_links_in_text(): array {
+		return array(
+			'sentence with an encoded link'  => array(
+				'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+				'https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+			),
+			'unclosed less-than before the link' => array(
+				'I <3 this https://example.com/a%20b?x=1&y=2',
+				'https://example.com/a%20b?x=1&y=2',
+			),
+		);
+	}
+
+	/**
+	 * wp_kses() and esc_url_raw() are a fatal TypeError on an array in real
+	 * core, so `?text[]=` must stop at the is_string() guard.
+	 *
+	 * @test
+	 */
+	public function array_valued_fields_carry_no_share_data(): void {
+		$redirect_url = $this->dispatch_share_target_post(
+			array(
+				'url'   => array( 'https://example.com/a%20b' ),
+				'text'  => array( 'https://example.com/a%20b' ),
+				'title' => array( 'https://example.com/a%20b' ),
+			)
+		);
+
+		$this->assertNull( $redirect_url, 'Array-valued fields are not share data.' );
+		$this->assertSame( array(), $this->captured_redirects );
+	}
 }

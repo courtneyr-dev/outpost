@@ -556,6 +556,14 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	}
 }
 
+// Minimal WP_REST_Server stub: route registration reads its method constants.
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE  = 'GET';
+		const CREATABLE = 'POST';
+	}
+}
+
 // Minimal PFBT_Format_Detector stub for unit tests. Real PFBT plugin supplies
 // the full class; Outpost's apply_post_format → mark_format_manual coordination
 // (C1 contract) calls the static API on this class only — `mark_as_manual()`.

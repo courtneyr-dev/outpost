@@ -17,13 +17,14 @@ use WP_Mock;
 
 final class RequestHeadersServerStringTest extends \WP_Mock\Tools\TestCase {
 
-	private const KEYS = array( 'HTTP_USER_AGENT', 'HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION' );
+	private const KEYS = array( 'HTTP_USER_AGENT', 'HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION', 'HTTP_X_WP_NONCE' );
 
 	public function setUp(): void {
 		WP_Mock::setUp();
 		foreach ( self::KEYS as $key ) {
 			unset( $_SERVER[ $key ] );
 		}
+		unset( $_REQUEST['_wpnonce'] );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $value ) => is_string( $value ) ? stripslashes( $value ) : $value );
 	}
 
@@ -31,6 +32,7 @@ final class RequestHeadersServerStringTest extends \WP_Mock\Tools\TestCase {
 		foreach ( self::KEYS as $key ) {
 			unset( $_SERVER[ $key ] );
 		}
+		unset( $_REQUEST['_wpnonce'] );
 		WP_Mock::tearDown();
 	}
 
@@ -62,5 +64,29 @@ final class RequestHeadersServerStringTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'Bearer xyz789' )->andReturn( 'Bearer xyz789' );
 
 		$this->assertSame( 'Bearer xyz789', Outpost_Request_Headers::authorization() );
+	}
+
+	public function test_rest_nonce_prefers_the_request_parameter(): void {
+		$_REQUEST['_wpnonce']         = 'abc123';
+		$_SERVER['HTTP_X_WP_NONCE']   = 'header-nonce';
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $value ) => is_string( $value ) ? trim( $value ) : '' );
+
+		// Mirrors core's rest_cookie_check_errors(): _wpnonce wins over the header.
+		$this->assertSame( 'abc123', Outpost_Request_Headers::rest_nonce() );
+	}
+
+	public function test_rest_nonce_falls_back_to_the_header(): void {
+		unset( $_REQUEST['_wpnonce'] );
+		$_SERVER['HTTP_X_WP_NONCE'] = 'header-nonce';
+		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'header-nonce' )->andReturn( 'header-nonce' );
+
+		$this->assertSame( 'header-nonce', Outpost_Request_Headers::rest_nonce() );
+	}
+
+	public function test_rest_nonce_is_empty_when_no_nonce_was_sent(): void {
+		unset( $_REQUEST['_wpnonce'], $_SERVER['HTTP_X_WP_NONCE'] );
+		WP_Mock::userFunction( 'sanitize_text_field' )->never();
+
+		$this->assertSame( '', Outpost_Request_Headers::rest_nonce() );
 	}
 }

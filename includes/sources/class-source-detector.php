@@ -139,6 +139,51 @@ final class Outpost_Source_Detector {
 	}
 
 	/**
+	 * Clean a shared free-text field — share-sheet `text` / `title`, Shortcut
+	 * `shared_text` — without rewriting a link inside it. Takes an
+	 * already-unslashed value; anything but a string comes back empty.
+	 *
+	 * sanitize_text_field() deletes every %XX octet, so `/a%20b` reaches
+	 * find_url_in_text() as `/ab`. wp_strip_all_tags() keeps the octets but
+	 * drops everything after an unclosed `<`: "I <3 this https://…" comes back
+	 * as "I". wp_kses() with no allowed tags keeps both, and strips C0 control
+	 * characters. It is a fatal TypeError on an array, hence the guard.
+	 *
+	 * @param mixed $value Unslashed field value.
+	 * @return string
+	 */
+	public static function sanitize_shared_text( mixed $value ): string {
+		if ( ! is_string( $value ) || '' === $value ) {
+			return '';
+		}
+		$value = wp_kses( wp_check_invalid_utf8( $value ), array() );
+		// wp_kses() entity-encodes a bare `&`, and the quotes after an unclosed
+		// `<`. A query string needs them back. None of the three can form a
+		// tag; `&lt;` and `&gt;` stay encoded.
+		$value = str_replace( array( '&amp;', '&#039;', '&quot;' ), array( '&', "'", '"' ), $value );
+		$value = (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $value );
+		return trim( (string) preg_replace( '/ {2,}/', ' ', $value ) );
+	}
+
+	/**
+	 * Clean a shared `url` field. One bare http(s) URL goes through
+	 * esc_url_raw(); a text blob stays text, because esc_url_raw() empties it
+	 * and iOS apps put a quote plus the link in this field —
+	 * extract_url_from_payload() finds the link inside it.
+	 *
+	 * @param mixed $value Unslashed field value.
+	 * @return string
+	 */
+	public static function sanitize_shared_url( mixed $value ): string {
+		$as_text = self::sanitize_shared_text( $value );
+		if ( 1 !== preg_match( '#^https?://\S+$#i', $as_text ) ) {
+			return $as_text;
+		}
+		$as_url = esc_url_raw( $as_text, array( 'http', 'https' ) );
+		return '' !== $as_url ? $as_url : $as_text;
+	}
+
+	/**
 	 * Whether a string is a syntactically valid http(s) URL with a host.
 	 *
 	 * @param string $candidate Candidate URL.

@@ -309,4 +309,47 @@ final class ShortcutDispatchTest extends TestCase {
 			'Extracted URL from shared_text must be carried through URL-encoded.'
 		);
 	}
+
+	/**
+	 * A link with percent-encoded octets inside `shared_text` reaches the
+	 * composer byte-for-byte. Real core, no mocks: sanitize_text_field()
+	 * deletes %XX octets.
+	 *
+	 * @test
+	 */
+	public function shared_text_link_keeps_its_percent_encoding(): void {
+		$body = wp_json_encode(
+			array(
+				'shared_text' => 'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+			)
+		);
+		$this->assertIsString( $body );
+
+		$redirect_url = $this->dispatch_shortcut( 'POST', $body );
+
+		$this->assertNotNull( $redirect_url );
+		parse_str( (string) wp_parse_url( $redirect_url, PHP_URL_QUERY ), $query );
+		$this->assertSame( 'https://example.com/a%20b/caf%C3%A9?q=hello%20world', $query['url'] ?? null );
+	}
+
+	/**
+	 * wp_kses() and esc_url_raw() are a fatal TypeError on an array in real
+	 * core; a JSON array in any field must end as "no URL", not a fatal.
+	 *
+	 * @test
+	 */
+	public function array_valued_json_fields_carry_no_link(): void {
+		$body = wp_json_encode(
+			array(
+				'url'         => array( 'https://example.com/a%20b' ),
+				'shared_text' => array( 'https://example.com/a%20b' ),
+				'title'       => array( 'https://example.com/a%20b' ),
+			)
+		);
+		$this->assertIsString( $body );
+
+		$redirect_url = $this->dispatch_shortcut( 'POST', $body );
+
+		$this->assertNull( $redirect_url, 'Array-valued fields are not share data.' );
+	}
 }
