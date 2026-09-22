@@ -1646,27 +1646,28 @@
 }
 
 /*
- * Connection banner — pure-CSS connectivity indicator.
+ * Connection banner — state-driven connectivity indicator.
  *
- * Visibility is driven by custom properties prop-for-that writes to :root
- * (--live-online 1/0, --live-net-save-data 1/0), sampled once in index.tsx.
- * No JS in the reaction path: each message is display:none until a style query
- * flips it on. Every element is a style-query container by default, so each
- * message reads the :root values it inherits. Style queries match on equality
- * only — one rule per discrete value. --live-net-save-data is Chromium-only
- * (Network Information API), so the Data Saver message only appears there; the
- * offline message works everywhere via navigator.onLine.
+ * Visibility is driven by the `hidden` attribute the component sets from
+ * `online`/`offline` window events and the Network Information API's
+ * `change` event (see connection-banner.tsx). The Network Information API is
+ * Chromium-only, so the Data Saver message only appears there; the offline
+ * message works everywhere via navigator.onLine.
  *
  * Paint goes through --outpost-* tokens with no hex fallback (tokens.css is the
  * single source of truth — B6 lint + FY-Theming).
  */
 .outpost-connection-banner__msg {
-	display: none;
+	display: block;
 	margin: 0;
 	padding: var(--outpost-space-xs) var(--outpost-space-sm);
 	font-size: var(--outpost-font-size-label);
 	font-weight: var(--outpost-font-weight-label);
 	text-align: center;
+}
+
+.outpost-connection-banner__msg[hidden] {
+	display: none;
 }
 
 .outpost-connection-banner__msg--offline {
@@ -1679,16 +1680,4 @@
 	background: var(--outpost-warning-bg);
 	color: var(--outpost-warning-fg);
 	border-block-end: 1px solid var(--outpost-warning-border);
-}
-
-@container style(--live-online: 0) {
-	.outpost-connection-banner__msg--offline {
-		display: block;
-	}
-}
-
-@container style(--live-net-save-data: 1) {
-	.outpost-connection-banner__msg--save-data {
-		display: block;
-	}
 }

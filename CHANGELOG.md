@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The connection banner (`/post/`) showed "You're offline" and "Data Saver is on" on an online desktop load. Visibility ran through a `prop-for-that` sample of `navigator.onLine`/the Network Information API into `--live-online`/`--live-net-save-data` custom properties, read by `@container style()` queries in `structure.css` — but those container-style queries never matched in the browsers tested, so both messages painted regardless of state. `ConnectionBanner` now listens to `online`/`offline` window events and the connection's `change` event directly and toggles the native `hidden` attribute on each message; CSS keeps only the `[hidden]` display rule and the token-based paint. `index.tsx` no longer registers the unused `--live-*` properties.
+
 ## [1.0.21] - 2026-09-21
 
 ### Security
