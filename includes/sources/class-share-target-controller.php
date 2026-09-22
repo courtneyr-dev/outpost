@@ -112,9 +112,19 @@ final class Outpost_Share_Target_Controller {
 		if ( '' === $text && isset( $_GET['text'] ) && is_string( $_GET['text'] ) ) {
 			$text = wp_kses( wp_unslash( $_GET['text'] ), array() );
 		}
-		$url = isset( $_POST['url'] ) && is_string( $_POST['url'] ) ? wp_kses( wp_unslash( $_POST['url'] ), array() ) : '';
+		// The url field is usually one bare URL, sanitized as one; share sheets
+		// sometimes put text there instead, which is kept as text and handed
+		// to the same detection the text field gets.
+		$url = '';
+		if ( isset( $_POST['url'] ) && is_string( $_POST['url'] ) ) {
+			$url = preg_match( '#^https?://\S+$#i', wp_unslash( $_POST['url'] ) )
+				? esc_url_raw( wp_unslash( $_POST['url'] ), array( 'http', 'https' ) )
+				: wp_kses( wp_unslash( $_POST['url'] ), array() );
+		}
 		if ( '' === $url && isset( $_GET['url'] ) && is_string( $_GET['url'] ) ) {
-			$url = wp_kses( wp_unslash( $_GET['url'] ), array() );
+			$url = preg_match( '#^https?://\S+$#i', wp_unslash( $_GET['url'] ) )
+				? esc_url_raw( wp_unslash( $_GET['url'] ), array( 'http', 'https' ) )
+				: wp_kses( wp_unslash( $_GET['url'] ), array() );
 		}
 		// phpcs:enable
 

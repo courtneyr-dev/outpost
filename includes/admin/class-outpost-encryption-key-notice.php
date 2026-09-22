@@ -105,7 +105,8 @@ final class Outpost_Encryption_Key_Notice {
 	 * @since 0.1.69
 	 */
 	public static function maybe_handle_dismissal(): void {
-		if ( empty( $_GET['action'] ) || self::DISMISS_QUERY_ACTION !== $_GET['action'] ) {
+		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( (string) $_GET['action'] ) ) : '';
+		if ( self::DISMISS_QUERY_ACTION !== $action ) {
 			return;
 		}
 		if ( ! current_user_can( 'manage_options' ) ) {
