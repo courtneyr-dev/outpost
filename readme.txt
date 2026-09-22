@@ -148,6 +148,8 @@ Yes, through companions. With Post Kinds for IndieWeb in Block Themes, the pages
 
 Outpost publishes to your own WordPress site through the Micropub plugin. It contacts the services below only for the specific feature named; nothing is sent until you use that feature. Each entry lists what is sent, when, and the service's terms and privacy policy.
 
+Outpost also recognizes links you share from many sites (YouTube, Reddit, TikTok, Instagram, Pinterest, Spotify, Medium and others) by matching the link's address against patterns on your own site. That recognition never contacts those sites; only the services listed below are ever sent a request.
+
 = Syndication (per post, only for chips you leave enabled) =
 
 * **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the Bridgy endpoint you configured: **brid.gy** (Flickr, GitHub, Reddit), **bsky.brid.gy** (Bluesky), or **fed.brid.gy** (the fediverse). Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
