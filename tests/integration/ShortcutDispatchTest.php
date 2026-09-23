@@ -73,6 +73,11 @@ final class ShortcutDispatchTest extends TestCase {
 		wp_set_current_user( $this->test_user_id );
 
 		$this->reset_request_globals();
+		// H7: is_authenticated() now requires a valid `outpost_shortcut`
+		// nonce. Set one by default so every test that isn't specifically
+		// about the nonce gate exercises its OWN gate instead of tripping
+		// this one first; cookie_post_without_nonce_is_blocked() clears it.
+		$_POST['_wpnonce']        = wp_create_nonce( 'outpost_shortcut' );
 		$this->captured_redirects = array();
 		$this->purge_prefill_transients();
 
@@ -127,6 +132,18 @@ final class ShortcutDispatchTest extends TestCase {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->query(
 			"DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%' OR option_name LIKE '_transient_timeout_outpost_prefill_%'"
+		);
+	}
+
+	/**
+	 * Count live prefill transients. Shared by every gate test below so the
+	 * absence-of-side-effects SQL lives in one place instead of four copies.
+	 */
+	private function prefill_transient_count(): int {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
 		);
 	}
 
@@ -188,14 +205,9 @@ final class ShortcutDispatchTest extends TestCase {
 			. 'A captured redirect here means is_post() check was skipped.'
 		);
 
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transient_count = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
-		);
 		$this->assertSame(
 			0,
-			$transient_count,
+			$this->prefill_transient_count(),
 			'Method gate must block prefill enqueue: no transient should exist after a GET request.'
 		);
 	}
@@ -218,14 +230,9 @@ final class ShortcutDispatchTest extends TestCase {
 			'Auth gate must block dispatch: no redirect should be issued for unauthenticated POST.'
 		);
 
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transient_count = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
-		);
 		$this->assertSame(
 			0,
-			$transient_count,
+			$this->prefill_transient_count(),
 			'Auth gate must block prefill enqueue: no transient should exist after unauthenticated POST.'
 		);
 	}
@@ -262,7 +269,9 @@ final class ShortcutDispatchTest extends TestCase {
 	 * @test
 	 */
 	public function cookie_post_without_nonce_is_blocked(): void {
-		// setUp already logged in an editor (can edit_posts) with no nonce set.
+		// setUp already logged in an editor (can edit_posts) and set a
+		// valid nonce by default (see setUp) — clear it to test this gate.
+		unset( $_POST['_wpnonce'] );
 		$body         = wp_json_encode( array( 'url' => self::EXAMPLE_URL ) );
 		$redirect_url = $this->dispatch_shortcut( 'POST', $body );
 
@@ -271,14 +280,9 @@ final class ShortcutDispatchTest extends TestCase {
 			'A cookie session without a valid outpost_shortcut nonce must not authorize dispatch.'
 		);
 
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transient_count = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
-		);
 		$this->assertSame(
 			0,
-			$transient_count,
+			$this->prefill_transient_count(),
 			'Nonce gate must block prefill enqueue: no transient should exist without a valid nonce.'
 		);
 	}
@@ -299,14 +303,9 @@ final class ShortcutDispatchTest extends TestCase {
 			'JSON-parse gate must block dispatch: no redirect should be issued for malformed bodies.'
 		);
 
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$transient_count = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
-		);
 		$this->assertSame(
 			0,
-			$transient_count,
+			$this->prefill_transient_count(),
 			'JSON-parse gate must block prefill enqueue: no transient should exist after malformed body.'
 		);
 	}

@@ -4,16 +4,24 @@
  *
  * iOS Shortcut bridge endpoint at `/post/shortcut`. The companion
  * Web Share Target API never landed in iOS Safari (WebKit bug
- * 194593), so iOS users hit this JSON endpoint via an Outpost-
- * generated iOS Shortcut instead. Same dispatch logic as the
- * Web Share Target controller; just JSON in / 303 redirect out.
+ * 194593), so iOS users hit
+ * `Outpost_IOS_Shortcut_REST_Controller` at
+ * `/wp-json/outpost/v1/shortcut` (Bearer token) instead — that REST
+ * endpoint is the supported iOS Shortcut path. Same dispatch logic as
+ * the Web Share Target controller; just JSON in / 303 redirect out.
+ *
+ * (H7, 1.0.22) This route now requires a WP cookie session,
+ * `edit_posts`, and a valid `outpost_shortcut` nonce (see
+ * `is_authenticated()` below) — no client is issued that nonce today,
+ * so the route is effectively closed and is expected to be retired in
+ * a follow-up. See `docs/decisions/session-fx-ios-shortcut.md` point 17.
  *
  * Request shape:
  *
  *     POST /post/shortcut
  *       Content-Type: application/json
- *       Authorization: Bearer <token>     # OR cookie session
- *       Body: { "url": string, "shared_text"?: string }
+ *       Cookie: <wp session>
+ *       Body: { "url": string, "shared_text"?: string, "_wpnonce": string }
  *
  * The Shortcut .plist generation is a separate session deliverable
  * (Phase E or later); F6 ships only the receiving endpoint so the
@@ -42,10 +50,10 @@ final class Outpost_Shortcut_Controller {
 			return;
 		}
 		if ( ! self::is_authenticated() ) {
-			// A capable, logged-in user who failed only on capability or
-			// nonce is authenticated but forbidden (403); everyone else
-			// (no session at all) is simply not authenticated (401) —
-			// mirrors core's own rest_authorization_required_code() convention.
+			// A logged-in user who failed on capability or nonce is
+			// authenticated but forbidden (403); everyone else (no session
+			// at all) is simply not authenticated (401) — mirrors core's
+			// own rest_authorization_required_code() convention.
 			self::send_status( is_user_logged_in() ? 403 : 401 );
 			Outpost_PWA_Shell::halt();
 			return;
@@ -149,9 +157,11 @@ final class Outpost_Shortcut_Controller {
 	/**
 	 * Cookie-session gate. The REST endpoint at
 	 * `Outpost_IOS_Shortcut_REST_Controller` (Bearer token, `edit_posts`)
-	 * is the supported iOS Shortcut path; this direct cookie route stays
-	 * for debugging in a regular browser, so it now demands the same
-	 * capability plus a nonce a real wp-admin session carries.
+	 * is the supported iOS Shortcut path. This direct cookie route
+	 * requires `edit_posts` plus a valid `outpost_shortcut` nonce, the
+	 * same pair a real wp-admin session carries — but no client is
+	 * issued that nonce today, so the route is effectively closed. See
+	 * the file header for the retirement note.
 	 *
 	 * @return bool
 	 */

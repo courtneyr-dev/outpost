@@ -50,8 +50,18 @@ final class ShortcutControllerTest extends TestCase {
 
 		CoreSanitizerMocks::register();
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
-		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing( fn() => $this->can_edit_posts );
-		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing( fn() => $this->nonce_is_valid );
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing(
+			function ( $capability ) {
+				$this->assertSame( 'edit_posts', $capability, 'is_authenticated() must check the edit_posts capability.' );
+				return $this->can_edit_posts;
+			}
+		);
+		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing(
+			function ( $nonce, $action ) {
+				$this->assertSame( 'outpost_shortcut', $action, 'is_authenticated() must verify the outpost_shortcut nonce action.' );
+				return $this->nonce_is_valid;
+			}
+		);
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 7 );
 		WP_Mock::userFunction( 'set_transient' )->andReturn( true );
 		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://site.test' );
