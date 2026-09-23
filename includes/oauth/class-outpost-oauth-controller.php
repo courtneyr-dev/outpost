@@ -8,9 +8,11 @@
  *   GET  /wp-json/outpost/v1/oauth/{provider}/callback   → exchange code, store creds
  *   POST /wp-json/outpost/v1/oauth/{provider}/disconnect → revoke + delete creds
  *
- * All three routes require manage_options + a logged-in user. The
- * callback URL pattern is fixed; each provider's app registration uses
- * its own callback URL with the provider id in the path.
+ * The start, disconnect and verify routes require a logged-in user with
+ * manage_options and refuse any request that carries an IndieAuth bearer
+ * token (see permission_check()). The callback URL pattern is fixed; each
+ * provider's app registration uses its own callback URL with the provider
+ * id in the path.
  *
  * Provider registration via add_provider(); G3.5a ships with Notion
  * registered.
@@ -26,6 +28,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_OAuth_Controller {
+
+	use Outpost_Bearer_Auth;
 
 	/**
 	 * Registered provider instances keyed by provider id.
@@ -136,8 +140,23 @@ final class Outpost_OAuth_Controller {
 		);
 	}
 
-	public static function permission_check(): bool {
-		return is_user_logged_in() && current_user_can( 'manage_options' );
+	/**
+	 * Permission for the start, disconnect and verify routes: a logged-in
+	 * user with manage_options, and never a bearer-token request.
+	 *
+	 * IndieAuth's map_meta_cap does not restrict manage_options, so an
+	 * admin's token of any scope would pass the capability check alone.
+	 * These are wp-admin actions with no token use case, so the required
+	 * scope list is empty: bearer_has_scope() refuses every bearer request,
+	 * and a cookie session with a valid REST nonce, or a request with no
+	 * credential, is decided by the capability check.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 */
+	public static function permission_check( \WP_REST_Request $request ): bool {
+		return is_user_logged_in()
+			&& current_user_can( 'manage_options' )
+			&& self::bearer_has_scope( $request, array() );
 	}
 
 	/**

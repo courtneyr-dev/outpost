@@ -56,6 +56,9 @@ define( 'OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE', 'rss-chat-routing/rss-chat-routi
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
+// Before every class that uses it: Outpost_OAuth_Controller (below) and the
+// REST endpoints further down.
+require_once OUTPOST_PLUGIN_DIR . 'includes/trait-bearer-auth.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-url-guard.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
 // G99-mock-server — test-time HTTP rewriter. No-op in production
@@ -220,7 +223,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-mataroa.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/trait-bearer-auth.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-geocode-endpoint.php';
