@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import {
@@ -88,34 +88,5 @@ describe('token-store', () => {
 		const second = await read_token(env);
 		expect(first?.accessToken).toBe('same-plaintext');
 		expect(second?.accessToken).toBe('same-plaintext');
-	});
-
-	it('signing out still succeeds, and logs a console error, when clearing the offline queue fails', async () => {
-		// A fake IDBFactory that opens the token store normally but throws for
-		// the queue store specifically — isolates the "queue clear fails"
-		// case from "token store fails" without touching the real database.
-		const real = new IDBFactory();
-		const breaks_the_queue_db = {
-			open: (name: string, version?: number): IDBOpenDBRequest => {
-				if (name === 'outpost-queue') throw new Error('boom: queue store unavailable');
-				return real.open(name, version);
-			},
-		} as unknown as IDBFactory;
-		const broken_env: TokenStoreEnvironment = {
-			indexedDB: breaks_the_queue_db,
-			crypto: globalThis.crypto,
-		};
-		await write_token({ accessToken: 'first', tokenType: 'Bearer', scope: '', me: '' }, broken_env);
-
-		const console_error = vi.spyOn(console, 'error').mockImplementation(() => {});
-		try {
-			await expect(clear_token(broken_env)).resolves.toBeUndefined();
-			// The token itself is still cleared — the queue-clear failure
-			// doesn't block or roll back the sign-out it's attached to.
-			expect(await read_token(broken_env)).toBeNull();
-			expect(console_error).toHaveBeenCalled();
-		} finally {
-			console_error.mockRestore();
-		}
 	});
 });

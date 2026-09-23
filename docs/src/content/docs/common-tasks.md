@@ -127,7 +127,7 @@ Choose the Article variant in the composer. Outpost hands off to the block edito
 
 ## Post while offline
 
-Just post — if the network is down, the draft queues on your device and Outpost submits it automatically when the connection returns. The queue shows pending entries with retry and dismiss controls. Note that signing out doesn't clear the queue; queued entries from a stale session will fail with an authorization error you can dismiss.
+Just post — if the network is down, the draft queues on your device and Outpost submits it automatically when the connection returns. The queue shows pending entries with retry and dismiss controls. Signing out doesn't clear the queue: once you sign back in to the same site, Retry all now in the queue sends the waiting posts. A post queued for a different site, or one queued before you signed in, stays in the queue with an error you can dismiss.
 
 ![Composer showing the offline connection banner and a queued draft badge](../../assets/screenshots/frontend-offline-queue.png)
 

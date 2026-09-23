@@ -121,6 +121,7 @@ describe('offline-queue: flush', () => {
 				source: 'note',
 				properties: { content: 'a' },
 				micropubEndpoint: 'https://example.test/m',
+				me: 'https://example.test/',
 			},
 			env,
 		);
@@ -129,6 +130,7 @@ describe('offline-queue: flush', () => {
 				source: 'reply',
 				properties: { content: 'b' },
 				micropubEndpoint: 'https://example.test/m',
+				me: 'https://example.test/',
 			},
 			env,
 		);
@@ -149,6 +151,7 @@ describe('offline-queue: flush', () => {
 				source: 'note',
 				properties: { content: 'a' },
 				micropubEndpoint: 'https://example.test/m',
+				me: 'https://example.test/',
 			},
 			env,
 		);
@@ -211,6 +214,7 @@ function note_input(content = 'queued note'): Parameters<typeof enqueue>[0] {
 		source: 'note',
 		properties: { content },
 		micropubEndpoint: 'https://example.test/wp-json/micropub/1.0/endpoint',
+		me: 'https://example.test/',
 	};
 }
 
@@ -570,6 +574,7 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(fetch_calls).toBe(0);
 		expect(kept?.retryable).toBe(false);
 		expect(kept?.lastError).toContain('signed in as a different site');
+		expect(kept?.lastError).not.toMatch(/sign out/i);
 	});
 
 	it('strips a legacy plaintext accessToken field left over from a 1.0.21-or-earlier row', async () => {
@@ -578,6 +583,7 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			properties: { content: 'queued before 1.0.22' },
 			accessToken: 'LEGACY-PLAINTEXT',
 			micropubEndpoint: 'https://example.test/m',
+			me: 'https://example.test/',
 			createdAt: Date.now(),
 			attempts: 0,
 		});
@@ -593,19 +599,50 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(JSON.stringify(rows)).not.toContain('LEGACY-PLAINTEXT');
 	});
 
-	it('empties the queue the moment clear_token() resolves', async () => {
-		// Default env on both sides (no `env` argument) — clear_token()
-		// threads its own env's indexedDB into offline-queue.ts's clear(),
-		// which for the default token-store env is the same global
-		// indexedDB the queue's own default env resolves to.
-		await enqueue(note_input('first'));
-		await enqueue(note_input('second'));
-		expect(await list()).toHaveLength(2);
-		await clear_token();
-		// No waitFor: clear_token() awaits the queue clear before resolving
-		// (fix round 1), so the queue must already be empty synchronously —
-		// both sign-out call sites reload the page on the very next line,
-		// which would otherwise race an unawaited clear and lose.
-		expect(await list()).toHaveLength(0);
+	it('keeps queued posts through a sign-out and sends them after signing back in to the same site', async () => {
+		// One IndexedDB for both stores, as in the browser, so a sign-out
+		// that emptied the queue would show up here.
+		const shared = new IDBFactory();
+		const queue_env: OfflineQueueEnvironment = { indexedDB: shared };
+		const token_env: TokenStoreEnvironment = { indexedDB: shared, crypto: globalThis.crypto };
+		const token = { accessToken: 't', tokenType: 'Bearer', scope: '', me: 'https://example.test/' };
+		await write_token(token, token_env);
+		await enqueue(note_input('written before the token expired'), queue_env);
+
+		await clear_token(token_env);
+		expect(await list(queue_env)).toHaveLength(1);
+
+		let posts = 0;
+		const site = fetch_env(() => {
+			posts += 1;
+			return ok_response();
+		});
+		const [waiting] = await flush(site, queue_env, { tokenStore: token_env });
+		expect(waiting?.lastError).toContain('sign in again');
+		expect(posts).toBe(0);
+
+		await write_token(token, token_env);
+		expect(await flush(site, queue_env, { tokenStore: token_env })).toHaveLength(0);
+		expect(posts).toBe(1);
+	});
+
+	it('never sends an entry queued without a site, and fails it non-retryably', async () => {
+		await enqueue(
+			{
+				source: 'note',
+				properties: { content: 'queued with no me' },
+				micropubEndpoint: 'https://example.test/mp',
+			},
+			env,
+		);
+		let fetch_calls = 0;
+		const site = fetch_env(() => {
+			fetch_calls += 1;
+			return ok_response();
+		});
+		const [kept] = await flush(site, env, { tokenStore: tokenEnv });
+		expect(fetch_calls).toBe(0);
+		expect(kept?.retryable).toBe(false);
+		expect(kept?.lastError).toContain('queued before sign-in; re-create this post');
 	});
 });

@@ -53,7 +53,7 @@ Nothing is contacted for services you haven't configured, connected, or pasted l
 
 The composer PWA uses client-side storage:
 
-- **IndexedDB** — the offline draft queue (queued posts include your access token so they can replay), and your IndieAuth token, which is encrypted at rest with a non-extractable AES-GCM key. The plugin's readme describes the draft queue as "encrypted IndexedDB"; we verified encryption for the token store but not for queued drafts, so that stronger claim is attributed to the readme.
+- **IndexedDB** — the offline draft queue (since 1.0.22, queued posts don't include your access token; a queued post sends with your current sign-in, and only to the site it was queued for), and your IndieAuth token, which is encrypted at rest with a non-extractable AES-GCM key. The plugin's readme describes the draft queue as "encrypted IndexedDB"; we verified encryption for the token store but not for queued drafts, so that stronger claim is attributed to the readme.
 - **localStorage and sessionStorage** — composer preferences and in-progress UI state.
 - **Cookies** — none written by the composer code we checked.
 

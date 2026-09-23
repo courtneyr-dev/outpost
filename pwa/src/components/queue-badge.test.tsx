@@ -31,6 +31,7 @@ function note(content: string): Parameters<typeof enqueue>[0] {
 		source: 'note',
 		properties: { content },
 		micropubEndpoint: 'https://example.test/mp',
+		me: 'https://example.test/',
 	};
 }
 

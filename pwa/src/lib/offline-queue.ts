@@ -32,9 +32,8 @@
  * a copy of the access token, so it sat in IndexedDB in plaintext for as
  * long as the entry was queued. `enqueue()` no longer stores one. Replay
  * reads the current token fresh from `token-store.ts` (`read_token()`)
- * each time, so a queued entry always sends under whoever is signed in
- * when it actually goes out. When no token is stored — signed out, or the
- * encrypted store was cleared — replay fails the entry with a `no_token`
+ * each time. When no token is stored — signed out, or the encrypted store
+ * was cleared — replay fails the entry with a `no_token`
  * `OfflineQueueError` ("sign in again") instead of sending it with a
  * stale or absent credential; `is_retryable_error()` marks that `false`
  * so the badge doesn't hammer retries a sign-in has to fix. A row queued
@@ -42,24 +41,17 @@
  * before this fix; `claim()` and `save()` both strip it the moment such a
  * row is next read and written back, so it doesn't keep re-persisting.
  *
- * Cross-account check (Task H5 fix round 1): replay also refuses to send
- * an entry queued under one account's `me` using a token that belongs to
- * a different one. If someone signs out, someone else signs in, and the
- * first person's post is still queued with its own `me`, replay compares
- * that `me`'s origin against the freshly-read token's `me` (both via
- * `me_origins_match` from auth-flow.ts) and fails the entry non-retryably
- * instead of sending the new account's token to the old account's site.
- * Entries with no `me` at all (queued before 1.0.16, or before any
- * endpoint discovery) skip the check — there is nothing to compare.
+ * Replay and the signed-in site: an entry only ever sends under a token
+ * for the site it was queued for. Replay refuses, non-retryably and before
+ * any request, an entry whose `me` origin differs from the stored token's
+ * `me` (compared with `me_origins_match` from auth-flow.ts), so one
+ * account's token never goes to another account's site. It also refuses
+ * an entry with no `me` at all (queued before 1.0.16, or before sign-in):
+ * with nothing to compare, the stored token could belong to anyone.
  *
- * `clear_token()` also empties this queue, awaited before it resolves:
- * once signed out, a queued entry can never replay, and a later sign-in —
- * as the same person or someone else — must not silently resume sending
- * content queued under the previous session. It reaches this module via a
- * dynamic `import()` from token-store.ts rather than a static one — this
- * file already imports `read_token` from token-store.ts, so a static
- * import the other way would cycle at load time; the dynamic import
- * resolves later, at call time, so it doesn't.
+ * Signing out leaves the queue as it is. `clear_token()` removes only the
+ * token, so posts waiting when a token expires send on the first replay
+ * after the next sign-in to the same site.
  */
 
 import {
@@ -296,20 +288,6 @@ export async function remove(
 }
 
 /**
- * Empty the queue immediately, discarding every entry regardless of state.
- * Called by `token-store.ts`'s `clear_token()` (via a dynamic import —
- * see the file docblock) when the session token is cleared — without a
- * token no queued entry can replay, and leaving it queued would let it
- * silently resume sending once someone signs back in.
- */
-export async function clear(env: OfflineQueueEnvironment = default_env): Promise<void> {
-	await in_transaction<null>(env, 'readwrite', 'clear', null, (store) => {
-		store.clear();
-	});
-	notify_queue_changed();
-}
-
-/**
  * Write an entry back in place (retry state, uploaded photo URLs, lease).
  * Strips a legacy `accessToken` field a pre-1.0.22 row may still carry
  * (see the file docblock) so it stops re-persisting the plaintext token
@@ -411,6 +389,14 @@ async function replay(
 	const renew = (): Promise<void> =>
 		save({ ...entry, claimedUntil: now() + CLAIM_LEASE_MS }, env);
 
+	// An entry with no `me` can't be matched to the signed-in site, so it
+	// never sends under whatever token is stored.
+	if (!entry.me) {
+		throw new OfflineQueueError(
+			'queue replay: queued before sign-in; re-create this post',
+			'wrong_account',
+		);
+	}
 	const stored_token = await read_token(tokenStoreEnv);
 	if (!stored_token) {
 		throw new OfflineQueueError(
@@ -418,16 +404,13 @@ async function replay(
 			'no_token',
 		);
 	}
-	// Refuse to send someone else's token to this entry's site. Entries
-	// queued with no `me` (pre-1.0.16, or never discovered) have nothing to
-	// compare, so they fall through unchecked — the token that's there is
-	// the only signal available.
-	if (entry.me && stored_token.me && !me_origins_match(entry.me, stored_token.me)) {
+	// Refuse to send someone else's token to this entry's site.
+	if (stored_token.me && !me_origins_match(entry.me, stored_token.me)) {
 		throw new OfflineQueueError(
-			'queue replay: signed in as a different site than this entry was queued under — ' +
-				'sign in as ' +
+			'queue replay: signed in as a different site than ' +
 				entry.me +
-				' to send it',
+				', where this post was queued — it stays queued and sends once you are ' +
+				'signed in to that site, or dismiss it',
 			'wrong_account',
 		);
 	}
@@ -435,12 +418,6 @@ async function replay(
 
 	let endpoint = entry.micropubEndpoint;
 	if (!endpoint) {
-		if (!entry.me) {
-			throw new MicropubError(
-				'queue replay: the entry has neither a Micropub endpoint nor a me URL',
-				'no_endpoint',
-			);
-		}
 		endpoint =
 			recall_endpoints(entry.me).micropub ??
 			(await discover_micropub_endpoint(entry.me, micropubEnv));
@@ -570,9 +547,9 @@ export function is_retryable_error(err: unknown): boolean {
 		);
 	}
 	if (err instanceof OfflineQueueError) {
-		// `no_token` needs a sign-in and `wrong_account` needs a sign-out and
-		// back in as the right site — neither is fixed by another automatic
-		// attempt.
+		// `no_token` waits for a sign-in, and `wrong_account` for a sign-in
+		// to the entry's own site (an entry with no site never sends) —
+		// neither is fixed by another automatic attempt.
 		return err.code !== 'no_token' && err.code !== 'wrong_account';
 	}
 	return false;

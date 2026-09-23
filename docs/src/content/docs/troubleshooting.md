@@ -21,7 +21,7 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Cause:** some managed WordPress hosts (GoDaddy is the documented case) strip the `Authorization` HTTP header before it reaches PHP, so IndieAuth never sees your token. Hosts can also rewrite response status codes at their gateway, which used to make successful posts look like failures.
 
-**Fix:** update Outpost. The plugin has shipped a series of workarounds (versions 0.1.105, 0.1.112, 0.1.113, and 1.0.5 in the changelog): tokens now also travel in the request body where hosts can't strip them — since 1.0.5 that includes the companion-options request behind the More panel (Yoast keyphrase, categories, tags, XFN) — and any 2xx response counts as success. If you still see the companion-options message on 1.0.5 or later, sign out and back in once so the app reloads.
+**Fix:** update Outpost. The plugin has shipped a series of workarounds (versions 0.1.105, 0.1.112, 0.1.113, and 1.0.5 in the changelog): tokens now also travel in the request body where hosts can't strip them — since 1.0.5 that includes the companion-options request behind the More panel (Yoast keyphrase, categories, tags, XFN) — and any 2xx response counts as success. If you still see the companion-options message on 1.0.5 or later, sign out and back in once so the app reloads. Signing out keeps posts waiting in the offline queue; once you're signed back in to the same site, Retry all now in the queue sends them.
 
 **Check next:** if you're on a managed host other than GoDaddy and still see auth failures on a current version, that host may need its own workaround — open an issue (below) with the host's name.
 
@@ -39,9 +39,9 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Symptom:** drafts sit in the queue with a growing attempt count instead of publishing.
 
-**Cause:** the queue captures posts when the network or the Micropub endpoint is unreachable, and replays them automatically when the browser comes back online. Each retry failure records the reason. One special case: signing out doesn't clear the queue, so entries queued under an old session will keep failing with an authorization (401) error.
+**Cause:** the queue captures posts when the network or the Micropub endpoint is unreachable, and replays them automatically when the browser comes back online. Each retry failure records the reason. Signing out doesn't clear the queue. Since 1.0.22 a queued post carries no token of its own: it sends with your current sign-in, and only to the site it was queued for.
 
-**Fix:** check the queue entry's error. For auth errors, dismiss the stale entries and re-post while signed in. For network errors, retry once you have a stable connection.
+**Fix:** check the queue entry's error. If it says "sign in again", sign back in to the same site and tap Retry all now. If it says "signed in as a different site", sign in to the site the post was queued for, or dismiss it. If it says "queued before sign-in", dismiss it and re-create the post. For network errors, retry once you have a stable connection.
 
 **Check next:** photo posts replay without re-uploading (the media uploaded before the post queued) — a stuck photo post is about the post, not the image.
 

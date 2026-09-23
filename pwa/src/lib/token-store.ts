@@ -141,22 +141,11 @@ export async function read_token(
  * Forget the token. Leaves the encryption key in place — re-login uses the
  * same key, which is fine because the IV randomises every ciphertext anyway.
  *
- * Also empties the offline queue, awaited before this resolves: a queued
- * entry can't replay without a token, and both sign-out call sites
- * (`note-mode.tsx`, `composer-tabs.tsx`) do `window.location.reload()` on
- * the very next line, which would abort an in-flight IndexedDB transaction
- * — an unawaited fire-and-forget clear could lose the race against the
- * reload and leave the queue populated (Task H5 fix round 1; a prior
- * version fired a `TOKEN_CLEARED_EVENT` and returned without waiting for
- * the listener, which is exactly this race). The queue clear uses a
- * dynamic `import()` of offline-queue.ts rather than a static one:
- * offline-queue.ts already imports `read_token` from this module, and a
- * static import here would cycle at load time; a dynamic import resolves
- * later, at call time, so it doesn't. Threads this call's own `env` through
- * (same indexedDB the token was just cleared from) rather than defaulting
- * to the global store, so a test-scoped `clear_token(env)` clears the
- * matching test-scoped queue. A failure to clear is logged, not thrown —
- * signing out must still succeed even if the queue clear fails.
+ * Leaves the offline queue alone. "Sign out and back in" is the composer's
+ * own advice when a token expires or is rejected, so a sign-out must not
+ * discard posts still waiting to send; a replay after the next sign-in to
+ * the same site sends them (see offline-queue.ts, "Replay and the
+ * signed-in site").
  */
 export async function clear_token(env: TokenStoreEnvironment = default_env): Promise<void> {
 	const db = await open_db(env);
@@ -164,12 +153,6 @@ export async function clear_token(env: TokenStoreEnvironment = default_env): Pro
 		await tx_delete(db, STORE_TOKENS, TOKEN_ID);
 	} finally {
 		db.close();
-	}
-	try {
-		const { clear } = await import('./offline-queue');
-		await clear({ indexedDB: env.indexedDB });
-	} catch (err) {
-		console.error('clear_token: failed to empty the offline queue after sign-out', err);
 	}
 }
 
