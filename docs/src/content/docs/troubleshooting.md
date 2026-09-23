@@ -41,7 +41,7 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Cause:** the queue captures posts when the network or the Micropub endpoint is unreachable, and replays them automatically when the browser comes back online. Each retry failure records the reason. Signing out doesn't clear the queue. Since 1.0.22 a queued post carries no token of its own: it sends with your current sign-in, and only to the site it was queued for.
 
-**Fix:** check the queue entry's error. If it says "sign in again", sign back in to the same site and tap Retry all now. If it says "signed in as a different site", sign in to the site the post was queued for, or dismiss it. If it says "queued before sign-in", dismiss it and re-create the post. For network errors, retry once you have a stable connection.
+**Fix:** check the queue entry's error. If it says "sign in again", sign back in to the same site and tap Retry all now. If it says "signed in as a different site", sign in to the site the post was queued for and tap Retry all now (or let the next reconnect send it), or dismiss it. If it says "no site recorded", the post was queued by an older version: dismiss it and re-create the post. None of these send on their own when you sign in. For network errors, retry once you have a stable connection.
 
 **Check next:** photo posts replay without re-uploading (the media uploaded before the post queued) — a stuck photo post is about the post, not the image.
 

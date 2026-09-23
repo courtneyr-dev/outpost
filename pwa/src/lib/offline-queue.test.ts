@@ -574,6 +574,7 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(fetch_calls).toBe(0);
 		expect(kept?.retryable).toBe(false);
 		expect(kept?.lastError).toContain('signed in as a different site');
+		expect(kept?.lastError).toContain('Retry all now or the next reconnect sends it');
 		expect(kept?.lastError).not.toMatch(/sign out/i);
 	});
 
@@ -643,6 +644,6 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		const [kept] = await flush(site, env, { tokenStore: tokenEnv });
 		expect(fetch_calls).toBe(0);
 		expect(kept?.retryable).toBe(false);
-		expect(kept?.lastError).toContain('queued before sign-in; re-create this post');
+		expect(kept?.lastError).toContain('queued by an older version with no site recorded; re-create this post');
 	});
 });

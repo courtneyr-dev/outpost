@@ -46,7 +46,7 @@
  * any request, an entry whose `me` origin differs from the stored token's
  * `me` (compared with `me_origins_match` from auth-flow.ts), so one
  * account's token never goes to another account's site. It also refuses
- * an entry with no `me` at all (queued before 1.0.16, or before sign-in):
+ * an entry with no `me` at all (queued by a build older than 1.0.16):
  * with nothing to compare, the stored token could belong to anyone.
  *
  * Signing out leaves the queue as it is. `clear_token()` removes only the
@@ -393,7 +393,7 @@ async function replay(
 	// never sends under whatever token is stored.
 	if (!entry.me) {
 		throw new OfflineQueueError(
-			'queue replay: queued before sign-in; re-create this post',
+			'queue replay: queued by an older version with no site recorded; re-create this post',
 			'wrong_account',
 		);
 	}
@@ -409,8 +409,8 @@ async function replay(
 		throw new OfflineQueueError(
 			'queue replay: signed in as a different site than ' +
 				entry.me +
-				', where this post was queued — it stays queued and sends once you are ' +
-				'signed in to that site, or dismiss it',
+				', where this post was queued — it stays queued; once you are signed in to that ' +
+				'site, Retry all now or the next reconnect sends it, or dismiss it',
 			'wrong_account',
 		);
 	}
