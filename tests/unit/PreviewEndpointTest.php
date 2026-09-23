@@ -226,7 +226,7 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock above — mock_filters()'s wholesale apply_filters override is
-		// inert for this call (see trait-bearer-auth.php discovery notes).
+		// inert for this call (see "Scope source" in trait-bearer-auth.php).
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
 		$this->assertTrue( Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
@@ -351,5 +351,17 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://example.test:8080/post', '93.184.216.34' ) );
 
 		$this->assertSame( 'example.test:8080:93.184.216.34', $entry );
+	}
+
+	/**
+	 * Requests lower-cases the URL host (its Iri class) before curl sees
+	 * it, so the pin entry must carry the same lower-case host.
+	 */
+	public function test_resolve_pin_entry_lower_cases_the_host(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://Example.TEST/Post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:443:93.184.216.34', $entry );
 	}
 }

@@ -21,7 +21,7 @@
  *     POST /post/shortcut
  *       Content-Type: application/json
  *       Cookie: <wp session>
- *       Body: { "url": string, "shared_text"?: string, "_wpnonce": string }
+ *       Body: { "url": string, "shared_text"?: string }
  *
  * The Shortcut .plist generation is a separate session deliverable
  * (Phase E or later); F6 ships only the receiving endpoint so the
@@ -158,10 +158,10 @@ final class Outpost_Shortcut_Controller {
 	 * Cookie-session gate. The REST endpoint at
 	 * `Outpost_IOS_Shortcut_REST_Controller` (Bearer token, `edit_posts`)
 	 * is the supported iOS Shortcut path. This direct cookie route
-	 * requires `edit_posts` plus a valid `outpost_shortcut` nonce, the
-	 * same pair a real wp-admin session carries — but no client is
-	 * issued that nonce today, so the route is effectively closed. See
-	 * the file header for the retirement note.
+	 * requires `edit_posts` plus a valid `outpost_shortcut` nonce in the
+	 * form-encoded `_wpnonce` field — but no client is issued that nonce
+	 * today, so the route is effectively closed. See the file header for
+	 * the retirement note.
 	 *
 	 * @return bool
 	 */

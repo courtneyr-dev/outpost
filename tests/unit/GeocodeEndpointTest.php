@@ -202,7 +202,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock above — mock_filters()'s wholesale apply_filters override is
-		// inert for this call (see trait-bearer-auth.php discovery notes).
+		// inert for this call (see "Scope source" in trait-bearer-auth.php).
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );

@@ -84,13 +84,19 @@ trait Outpost_Bearer_Auth {
 	 * derived from the cookie user's id and session token, so it already
 	 * binds the request to that browser session, which is all CSRF
 	 * protection needs. Scope is a property of a token, and a first-party
-	 * browser session has none. A stray header (an iOS Shortcut token sent
-	 * off its route, say) doesn't turn that session into a token request. A
-	 * token for the same user grants nothing the session doesn't already
-	 * have. A token for a different user makes IndieAuth switch the current
-	 * user to the token's, the nonce then fails for that user, and the
-	 * request falls through to the token checks below. A bearer-only client
-	 * sends no auth cookie, so this step never applies to it.
+	 * browser session has none. A stray token IndieAuth doesn't verify (an
+	 * iOS Shortcut token sent off its route, say, or one in a JSON body)
+	 * doesn't turn that session into a token request.
+	 *
+	 * An IndieAuth-verified token always meets the scope gate, whichever
+	 * user it belongs to. IndieAuth resolves it on `determine_current_user`
+	 * at priority 15; core's `wp_validate_logged_in_cookie()` (priority 20)
+	 * returns early once a user is set, so the logged-in cookie is never
+	 * validated, and the auth cookie that priority 10 reads is path-scoped
+	 * to wp-admin and the plugins directory, so it never reaches a REST URL.
+	 * Core therefore never sets `$wp_rest_auth_cookie` for that request and
+	 * this step doesn't apply. A bearer-only client sends no cookie, so it
+	 * never applies there either.
 	 *
 	 * Otherwise the request is a bearer request when either of two signals
 	 * is present, and whether a scope check applies never depends on which
