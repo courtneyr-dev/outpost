@@ -26,8 +26,8 @@ The forward-looking checklist below is what to verify before each new surface sh
 **Required primitives:**
 
 - [ ] `register_rest_route()` with explicit `permission_callback` (not `__return_true`)
-- [ ] `permission_callback` checks for an authenticated user OR a valid IndieAuth bearer token
-- [ ] Nonce verification on the request (`X-WP-Nonce` for cookie auth; bearer token for app auth)
+- [ ] `permission_callback` checks for an authenticated user OR a valid IndieAuth bearer token whose scope covers the route: `create`, `update` or `read` for this read-only route (writes need `create` or `update`); a bearer request with no IndieAuth scope list is refused (`Outpost_Bearer_Auth::bearer_has_scope()`, 1.0.22)
+- [ ] Nonce verification on the request (`X-WP-Nonce` for cookie auth, which skips the token-scope check; bearer token for app auth)
 - [ ] `esc_url_raw()` + scheme validation — reject anything not `http://` or `https://`
 - [ ] Reject loopback IPs (`127.0.0.0/8`, `::1`), private network ranges (`10/8`, `172.16/12`, `192.168/16`, link-local), and `.localhost`/`.local` hostnames
 - [ ] Use `wp_safe_remote_get()` (not `wp_remote_get()`) — automatically blocks loopback + private ranges
