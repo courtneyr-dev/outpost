@@ -490,6 +490,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public string $post_type      = '';
 		public int $post_parent       = 0;
 		public string $post_mime_type = '';
+		public string $post_password  = '';
 
 		public function __construct( array $fields = array() ) {
 			foreach ( $fields as $key => $value ) {
