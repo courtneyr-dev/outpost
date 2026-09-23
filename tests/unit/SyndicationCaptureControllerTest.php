@@ -129,6 +129,12 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->user_logged_in             = false;
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
+		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see trait-bearer-auth.php discovery notes). POST is the
+		// mutating branch on this controller, so `create`/`update` only.
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
 		$this->assertTrue( Outpost_Syndication_Capture_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
@@ -141,6 +147,23 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	// redefined) — determine_current_user and indieauth_scopes must be
 	// driven through WP_Mock::onFilter() instead, the mechanism the real
 	// apply_filters() shim consults.
+	//
+	// A note on scope choice for these cases: under real IndieAuth (see
+	// includes/class-scopes.php's Scopes::register_builtin_scopes()), `read`
+	// and `update` ALONE never satisfy `current_user_can('edit_posts')` in
+	// the first place — `read`'s only mapped capability is `read`, and
+	// `update`'s mapped capabilities are `edit_published_posts` /
+	// `edit_others_posts` (not the plural `edit_posts` this route's guard
+	// checks). Only `create` and `draft` map to `edit_posts`. That makes
+	// `draft` the one IndieAuth scope that reaches this trait's OWN 403
+	// branch on a mutating route in a real deployment — a `draft`-scoped
+	// token passes `current_user_can('edit_posts')` but is neither `create`
+	// nor `update`, so it isolates this trait's scope check as the actual
+	// blocker. The `read`-scope tests below are still useful as a unit-level
+	// check of `bearer_has_scope()`'s own logic, but in this suite
+	// `current_user_can` is manually stubbed and does not model IndieAuth's
+	// `map_meta_cap` filter, so they would not by themselves prove the
+	// gate matters against a real deployment the way the `draft` case does.
 	// =====================================================================
 
 	public function test_permission_denies_bearer_token_scoped_for_profile_only_on_capture(): void {
@@ -203,6 +226,50 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 				new \WP_REST_Request( 'GET', '/outpost/v1/manual-share/pending' )
 			)
 		);
+	}
+
+	public function test_permission_draft_scope_alone_is_insufficient_for_capture(): void {
+		// `draft` maps to `edit_posts` under real IndieAuth (see the note
+		// above the H6 section), so — unlike `read` — this genuinely
+		// isolates the trait's own create/update requirement as the reason
+		// a `draft`-scoped token is refused on the mutating /capture route.
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * H7 fix-round-1, Critical 1 regression: IndieAuth's own
+	 * `determine_current_user` runs globally at priority 15, during
+	 * WordPress's normal early current-user resolution — well before this
+	 * route's permission_callback runs. A header (or form-encoded) bearer
+	 * token is therefore routinely ALREADY resolved (`is_user_logged_in()`
+	 * already true) by the time `authenticate_bearer_token()` executes; its
+	 * early return means this trait's OWN resolution branch never fires,
+	 * even though a real bearer credential authenticated the request. The
+	 * scope check must still run — driven by the credential's presence on
+	 * the request, not by who resolved the current user.
+	 */
+	public function test_permission_refuses_already_logged_in_header_token_scoped_for_draft_on_capture(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = true;
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function build_capture_request( array $params ): WP_REST_Request {

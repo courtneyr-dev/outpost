@@ -14,24 +14,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait Outpost_Bearer_Auth {
 
 	/**
-	 * Whether this request's {@see self::authenticate_bearer_token()} call
-	 * actually resolved a WP user from a bearer token (header or the
-	 * Micropub-spec body fallback). False for a cookie-authenticated (nonce)
-	 * session — that path returns before any token is even looked at — for
-	 * a fully unauthenticated request, and for a token that failed to
-	 * resolve a user. Reset at the top of every
-	 * `authenticate_bearer_token()` call so a stale `true` from an earlier
-	 * request on the same worker (or, in a long-running PHPUnit process,
-	 * an earlier test) can never leak into the next permission check.
-	 *
-	 * {@see self::bearer_has_scope()} reads this to decide whether a scope
-	 * check applies at all: a cookie/nonce session was never issued an
-	 * IndieAuth scope, so it has nothing to check and keeps its existing
-	 * `edit_posts` (+ nonce) gate unchanged.
-	 */
-	private static bool $bearer_token_resolved_user = false;
-
-	/**
 	 * Resolve a bearer token to a real WP user before the capability check.
 	 *
 	 * Delegates validation to the `determine_current_user` filter (the same
@@ -59,7 +41,6 @@ trait Outpost_Bearer_Auth {
 	 * @param WP_REST_Request $request REST request.
 	 */
 	private static function authenticate_bearer_token( WP_REST_Request $request ): void {
-		self::$bearer_token_resolved_user = false;
 		if ( is_user_logged_in() ) {
 			return;
 		}
@@ -75,7 +56,6 @@ trait Outpost_Bearer_Auth {
 		$user_id = Outpost_Request_Headers::resolve_token_user();
 		if ( $user_id > 0 ) {
 			wp_set_current_user( $user_id );
-			self::$bearer_token_resolved_user = true;
 		}
 	}
 
@@ -92,25 +72,39 @@ trait Outpost_Bearer_Auth {
 	 * 9) to expose it: `$scopes ? $scopes : $this->scopes`. The plugin's own
 	 * public accessor, `indieauth_get_scopes()`, is exactly
 	 * `apply_filters( 'indieauth_scopes', null )` — there is no per-request
-	 * $_SERVER value or global; the filter is the only exposed source, and
-	 * it is only populated once `determine_current_user` has actually run
-	 * for a bearer credential (which `authenticate_bearer_token()` triggers
-	 * via `Outpost_Request_Headers::resolve_token_user()` before this can be
-	 * called).
+	 * $_SERVER value or global; the filter is the only exposed source.
 	 *
-	 * A cookie-authenticated (nonce) session never attempted bearer
-	 * resolution — `authenticate_bearer_token()` returns before touching a
-	 * token — so it carries no scope to check: `edit_posts` + the REST
-	 * nonce remain its whole gate, unchanged by this method. A bearer token
-	 * that DID resolve a user but exposes no scope (any
-	 * `determine_current_user` authority other than IndieAuth, or
-	 * IndieAuth's filter returning empty) is treated as scope-less and
-	 * rejected: an unscoped token must never fall through to full access.
+	 * H7 fix-round-1 (Critical 1): whether a scope check applies is decided
+	 * from the CREDENTIAL'S PRESENCE on this request — {@see self::bearer_token()}
+	 * — never from whether THIS trait's own `authenticate_bearer_token()}` did
+	 * the resolving. Because `Outpost_Request_Headers::authorization()` is a
+	 * real Authorization header (or a Micropub-spec body `access_token`),
+	 * IndieAuth's OWN `determine_current_user` callback is hooked at priority
+	 * 15 globally and runs during WordPress's normal, early current-user
+	 * resolution — well before any REST `permission_callback` executes. So a
+	 * header token (or IndieAuth's own form-encoded `$_POST['access_token']`
+	 * support) is routinely already resolved, and `is_user_logged_in()` is
+	 * already `true`, by the time `authenticate_bearer_token()` runs — its
+	 * early return skips token resolution entirely, but a real bearer
+	 * credential drove that authentication. Deciding "is this a bearer
+	 * request" from "did our own code resolve it" missed exactly that case:
+	 * a `draft`-scoped (or any under-scoped) token would sail through with no
+	 * scope check at all. Checking the request for a credential directly,
+	 * independent of who resolved the current user, closes that gap.
 	 *
-	 * @param array<int, string> $any_of Scopes to accept; any one present authorizes.
+	 * A request with NO bearer credential at all (pure cookie/nonce session,
+	 * or fully anonymous) carries no scope to check: `edit_posts` + the REST
+	 * nonce remain its whole gate, unchanged by this method. A bearer
+	 * credential that resolved a user but exposes no scope (any
+	 * `determine_current_user` authority other than IndieAuth, or IndieAuth's
+	 * filter returning empty) is treated as scope-less and rejected: an
+	 * unscoped token must never fall through to full access.
+	 *
+	 * @param WP_REST_Request     $request Current REST request.
+	 * @param array<int, string>  $any_of  Scopes to accept; any one present authorizes.
 	 */
-	protected static function bearer_has_scope( array $any_of ): bool {
-		if ( ! self::$bearer_token_resolved_user ) {
+	protected static function bearer_has_scope( WP_REST_Request $request, array $any_of ): bool {
+		if ( '' === self::bearer_token( $request ) ) {
 			return true;
 		}
 		$scopes = apply_filters( 'indieauth_scopes', null );

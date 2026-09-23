@@ -489,6 +489,66 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
+	// --- H7 fix-round-1, Critical 1 regression ------------------------------
+	//
+	// IndieAuth's own `determine_current_user` callback is hooked globally at
+	// priority 15 and runs during WordPress's normal, early current-user
+	// resolution — well before this route's permission_callback executes. A
+	// bearer credential (header, or IndieAuth's own form-encoded
+	// `$_POST['access_token']` support) is therefore routinely ALREADY
+	// resolved — `is_user_logged_in()` is already true — by the time
+	// `authenticate_bearer_token()` runs; its early return means THIS
+	// trait's own resolution branch never fires, even though a bearer
+	// credential is what authenticated the request. The scope check must
+	// still run in that case: it is driven by the credential's presence on
+	// the request, not by which code resolved the current user.
+
+	public function test_permission_refuses_when_already_logged_in_with_header_token_scoped_for_profile(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+		WP_Mock::userFunction( 'rest_do_request' )->never();
+
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_allows_when_already_logged_in_with_header_token_scoped_for_create(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+
+		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	public function test_permission_refuses_when_already_logged_in_with_form_token_scoped_for_profile(): void {
+		// Form-encoded access_token variant of the header-token case above —
+		// IndieAuth's get_provided_token() reads $_POST directly, so this
+		// path is ALSO routinely pre-resolved before dispatch.
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body_params( array( 'access_token' => 'valid' ) ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+		WP_Mock::userFunction( 'rest_do_request' )->never();
+
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
 	public function test_permission_rejects_unvalidated_body_access_token(): void {
 		$request = new \WP_REST_Request( 'POST', '/' );
 		$request->set_body_params( array( 'access_token' => 'x' ) ); // outpost-lint:fixture-credential

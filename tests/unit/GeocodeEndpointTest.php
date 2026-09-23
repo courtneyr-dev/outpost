@@ -199,8 +199,31 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		// determine_current_user validates the token to user 42, who can edit_posts.
 		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock above — mock_filters()'s wholesale apply_filters override is
+		// inert for this call (see trait-bearer-auth.php discovery notes).
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H7 fix-round-1, Important: an under-scoped (but otherwise validated)
+	 * bearer token is refused, distinct from an unvalidated-token refusal.
+	 */
+	public function test_check_permission_refuses_under_scoped_bearer_token(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		$this->mock_filters( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+
+		$result = Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	/**

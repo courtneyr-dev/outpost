@@ -140,8 +140,46 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->user_logged_in             = false;
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
+		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see trait-bearer-auth.php discovery notes). POST is the
+		// mutating branch on this controller, so `create`/`update` only.
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
 		$this->assertTrue( Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H7 fix-round-1, Important: method-split controller coverage — a
+	 * `read`-only token authorizes the GET routes (status, pending-summary).
+	 */
+	public function test_permission_read_scope_authorizes_get(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$this->assertTrue( Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'GET', '/' ) ) );
+	}
+
+	/**
+	 * H7 fix-round-1, Important: method-split controller coverage — a
+	 * `read`-only token does NOT authorize the mutating POST routes
+	 * (dismiss-reminder, snooze-all — both write reminder_dismissed_until).
+	 */
+	public function test_permission_read_scope_alone_refused_on_post(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$result = Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function build_request( array $params ): WP_REST_Request {

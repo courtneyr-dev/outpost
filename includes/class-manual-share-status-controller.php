@@ -121,7 +121,7 @@ final class Outpost_Manual_Share_Status_Controller {
 			? array( 'create', 'update', 'read' )
 			: array( 'create', 'update' );
 		$can_edit        = current_user_can( 'edit_posts' );
-		$has_scope       = self::bearer_has_scope( $required_scopes );
+		$has_scope       = self::bearer_has_scope( $request, $required_scopes );
 		$allow           = $can_edit && $has_scope;
 		/**
 		 * Override the manual-share status endpoint permission decision.

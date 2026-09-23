@@ -135,7 +135,7 @@ final class Outpost_Media_Lookup_Endpoint {
 		// Read-only: proxies a metadata lookup, writes nothing. A token
 		// scoped for `read` alone (as well as `create`/`update`) may use it.
 		$can_edit  = current_user_can( 'edit_posts' );
-		$has_scope = self::bearer_has_scope( array( 'create', 'update', 'read' ) );
+		$has_scope = self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
 		$allow     = $can_edit && $has_scope;
 		/**
 		 * Override the media-lookup permission decision.
