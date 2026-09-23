@@ -61,7 +61,7 @@ trait Outpost_Bearer_Auth {
 
 	/**
 	 * Whether the token that authenticated this request carries any of the
-	 * given IndieAuth scopes.
+	 * given IndieAuth scopes; true when no token authenticated it.
 	 *
 	 * Scope source (H6, read against the deployed IndieAuth 4.7.2 source,
 	 * includes/class-authorize.php and includes/functions.php): IndieAuth's
@@ -74,13 +74,29 @@ trait Outpost_Bearer_Auth {
 	 * exactly `apply_filters( ..., null )` on them. No `$_SERVER` value or
 	 * global carries either.
 	 *
-	 * Whether a scope check applies depends on whether a bearer credential
-	 * is on this request, never on which code resolved the current user.
-	 * IndieAuth's callback runs during WordPress's own early user
-	 * resolution, before any permission callback, so a header or
-	 * form-encoded token is usually resolved already and
-	 * `authenticate_bearer_token()` returns early without resolving
-	 * anything itself. Either of two signals marks the request as bearer:
+	 * The checks run in this order.
+	 *
+	 * First, a cookie session with a valid REST nonce skips the scope check,
+	 * whatever Authorization header rides along
+	 * ({@see self::is_cookie_session_with_rest_nonce()}). The nonce is
+	 * derived from the cookie user's id and session token, so it already
+	 * binds the request to that browser session, which is all CSRF
+	 * protection needs. Scope is a property of a token, and a first-party
+	 * browser session has none. A stray header (an iOS Shortcut token sent
+	 * off its route, say) doesn't turn that session into a token request. A
+	 * token for the same user grants nothing the session doesn't already
+	 * have. A token for a different user makes IndieAuth switch the current
+	 * user to the token's, the nonce then fails for that user, and the
+	 * request falls through to the token checks below. A bearer-only client
+	 * sends no auth cookie, so this step never applies to it.
+	 *
+	 * Otherwise the request is a bearer request when either of two signals
+	 * is present, and whether a scope check applies never depends on which
+	 * code resolved the current user. IndieAuth's callback runs during
+	 * WordPress's own early user resolution, before any permission callback,
+	 * so a header or form-encoded token is usually resolved already and
+	 * `authenticate_bearer_token()` returns early without resolving anything
+	 * itself.
 	 *
 	 *   1. {@see self::bearer_token()} finds a token in the Authorization
 	 *      header or in the `access_token` body parameter.
@@ -90,11 +106,17 @@ trait Outpost_Bearer_Auth {
 	 *      misses. IndieAuth's own `Scopes::map_meta_cap()` treats a request
 	 *      as token-authenticated on the same signal.
 	 *
-	 * A request with neither (a cookie session with its REST nonce, or an
-	 * anonymous request) has no scope to check: `edit_posts` and the nonce
-	 * stay its whole gate. A bearer request whose scope list is missing or
-	 * empty (IndieAuth inactive, or another `determine_current_user`
-	 * authority resolved the token) fails closed.
+	 * A bearer request whose scope list is missing or empty (IndieAuth
+	 * inactive, or another `determine_current_user` authority resolved the
+	 * token) fails closed.
+	 *
+	 * A request with no valid cookie nonce and neither signal (an anonymous
+	 * request, or a logged-in session with no valid nonce and no credential)
+	 * has no scope to check, so this returns true and the caller's
+	 * `current_user_can( 'edit_posts' )` decides alone, as every caller did
+	 * before H6. Core's `rest_cookie_check_errors()` normally demotes a
+	 * cookie session that sent no nonce to anonymous before any permission
+	 * callback runs.
 	 *
 	 * Interplay with the `edit_posts` check every caller makes: IndieAuth's
 	 * `Scopes::map_meta_cap()` grants `edit_posts` to a token only when one
@@ -109,6 +131,9 @@ trait Outpost_Bearer_Auth {
 	 * @param array<int, string> $any_of  Scopes to accept; any one present authorizes.
 	 */
 	protected static function bearer_has_scope( WP_REST_Request $request, array $any_of ): bool {
+		if ( self::is_cookie_session_with_rest_nonce() ) {
+			return true;
+		}
 		$is_bearer = '' !== self::bearer_token( $request )
 			|| ! empty( apply_filters( 'indieauth_response', null ) );
 		if ( ! $is_bearer ) {
@@ -124,6 +149,22 @@ trait Outpost_Bearer_Auth {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Whether core authenticated this request with the wp-admin auth cookie
+	 * and the request carries a valid REST nonce: the two conditions core's
+	 * `rest_cookie_check_errors()` checks for a cookie session.
+	 * `$wp_rest_auth_cookie` is core's own flag, which
+	 * `rest_cookie_collect_status()` sets to true when the auth cookie
+	 * validated, and {@see Outpost_Request_Headers::rest_nonce()} reads the
+	 * nonce in core's order (`_wpnonce`, then `X-WP-Nonce`).
+	 */
+	private static function is_cookie_session_with_rest_nonce(): bool {
+		global $wp_rest_auth_cookie;
+		return true === $wp_rest_auth_cookie
+			&& is_user_logged_in()
+			&& false !== wp_verify_nonce( Outpost_Request_Headers::rest_nonce(), 'wp_rest' );
 	}
 
 	/**

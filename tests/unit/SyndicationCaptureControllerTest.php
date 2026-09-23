@@ -93,7 +93,9 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Manual_Share_Pending_Capture_Detector::set_candidate_resolver_for_tests( null );
 		unset(
 			$_SERVER['HTTP_AUTHORIZATION'],
-			$_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+			$_SERVER['REDIRECT_HTTP_AUTHORIZATION'],
+			$_REQUEST['_wpnonce'],
+			$GLOBALS['wp_rest_auth_cookie']
 		);
 	}
 
@@ -409,6 +411,86 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
 			)
 		);
+	}
+
+	// =====================================================================
+	// H6 fix round 3: a cookie session with a valid REST nonce is a
+	// first-party browser request and skips the scope gate, whatever
+	// Authorization header rides along. The nonce is checked first, then
+	// the token signals. RestRouteResolutionTest's valid-nonce control
+	// (admin cookie + nonce + an iOS Shortcut bearer header) got 403 from
+	// the round 2 gate.
+	// =====================================================================
+
+	/**
+	 * Model the request core's auth-cookie validation leaves behind: the
+	 * `$wp_rest_auth_cookie` flag set, a logged-in user, and a `_wpnonce`
+	 * that wp_verify_nonce( ..., 'wp_rest' ) accepts or rejects.
+	 */
+	private function arrive_as_cookie_session( bool $nonce_valid ): void {
+		$GLOBALS['wp_rest_auth_cookie'] = true;
+		$this->user_logged_in           = true;
+		$_REQUEST['_wpnonce']           = $nonce_valid ? 'valid-rest-nonce' : 'bogus-rest-nonce';
+		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing(
+			static fn ( $nonce, $action ) => 'valid-rest-nonce' === $nonce && 'wp_rest' === $action ? 1 : false
+		);
+	}
+
+	public function test_permission_allows_cookie_session_with_valid_nonce_and_a_stray_shortcut_bearer_header(): void {
+		$this->arrive_as_cookie_session( true );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ShortcutToken0123456789abcdefABCDEF'; // outpost-lint:fixture-credential
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+			)
+		);
+	}
+
+	public function test_permission_refuses_cookie_session_with_invalid_nonce_and_a_profile_scoped_token(): void {
+		$this->arrive_as_cookie_session( false );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->mock_verified_indieauth_token( array( 'profile' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * No valid nonce and no credential: the capability check decides alone,
+	 * as it did before H6.
+	 */
+	public function test_permission_keeps_the_capability_result_for_cookie_session_with_invalid_nonce_and_no_credential(): void {
+		$this->arrive_as_cookie_session( false );
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+			)
+		);
+	}
+
+	/**
+	 * A valid `wp_rest` nonce without core's auth-cookie flag is not a
+	 * cookie session: a bearer-only client that somehow holds a nonce still
+	 * goes through the scope gate.
+	 */
+	public function test_permission_applies_the_scope_gate_to_a_valid_nonce_without_the_auth_cookie(): void {
+		$this->arrive_as_cookie_session( true );
+		unset( $GLOBALS['wp_rest_auth_cookie'] );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->mock_verified_indieauth_token( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function build_capture_request( array $params ): WP_REST_Request {
