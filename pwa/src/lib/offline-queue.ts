@@ -37,15 +37,29 @@
  * encrypted store was cleared — replay fails the entry with a `no_token`
  * `OfflineQueueError` ("sign in again") instead of sending it with a
  * stale or absent credential; `is_retryable_error()` marks that `false`
- * so the badge doesn't hammer retries a sign-in has to fix.
+ * so the badge doesn't hammer retries a sign-in has to fix. A row queued
+ * by 1.0.21 or earlier still carries a plaintext `accessToken` field from
+ * before this fix; `claim()` and `save()` both strip it the moment such a
+ * row is next read and written back, so it doesn't keep re-persisting.
  *
- * `clear_token()` also empties this queue: once signed out, a queued
- * entry can never replay, and a later sign-in — as the same person or
- * someone else — must not silently resume sending content queued under
- * the previous session. token-store.ts has no import of this module (that
- * would cycle back through this file's own import of `read_token`);
- * instead `clear_token()` fires `TOKEN_CLEARED_EVENT` and this module
- * listens for it, below.
+ * Cross-account check (Task H5 fix round 1): replay also refuses to send
+ * an entry queued under one account's `me` using a token that belongs to
+ * a different one. If someone signs out, someone else signs in, and the
+ * first person's post is still queued with its own `me`, replay compares
+ * that `me`'s origin against the freshly-read token's `me` (both via
+ * `me_origins_match` from auth-flow.ts) and fails the entry non-retryably
+ * instead of sending the new account's token to the old account's site.
+ * Entries with no `me` at all (queued before 1.0.16, or before any
+ * endpoint discovery) skip the check — there is nothing to compare.
+ *
+ * `clear_token()` also empties this queue, awaited before it resolves:
+ * once signed out, a queued entry can never replay, and a later sign-in —
+ * as the same person or someone else — must not silently resume sending
+ * content queued under the previous session. It reaches this module via a
+ * dynamic `import()` from token-store.ts rather than a static one — this
+ * file already imports `read_token` from token-store.ts, so a static
+ * import the other way would cycle at load time; the dynamic import
+ * resolves later, at call time, so it doesn't.
  */
 
 import {
@@ -58,7 +72,8 @@ import {
 	type MicropubEnvironment,
 } from './micropub';
 import { recall_endpoints, remember_endpoints } from './endpoint-cache';
-import { read_token, TOKEN_CLEARED_EVENT, type TokenStoreEnvironment } from './token-store';
+import { read_token, type TokenStoreEnvironment } from './token-store';
+import { me_origins_match } from './auth-flow';
 
 const DB_NAME = 'outpost-queue';
 const DB_VERSION = 1;
@@ -127,7 +142,7 @@ const default_env: OfflineQueueEnvironment = {
 export class OfflineQueueError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'open_failed' | 'tx_failed' | 'no_token',
+		public readonly code: 'open_failed' | 'tx_failed' | 'no_token' | 'wrong_account',
 	) {
 		super(message);
 		this.name = 'OfflineQueueError';
@@ -282,9 +297,10 @@ export async function remove(
 
 /**
  * Empty the queue immediately, discarding every entry regardless of state.
- * Called when the session token is cleared (see `TOKEN_CLEARED_EVENT`
- * below) — without a token no queued entry can replay, and leaving it
- * queued would let it silently resume sending once someone signs back in.
+ * Called by `token-store.ts`'s `clear_token()` (via a dynamic import —
+ * see the file docblock) when the session token is cleared — without a
+ * token no queued entry can replay, and leaving it queued would let it
+ * silently resume sending once someone signs back in.
  */
 export async function clear(env: OfflineQueueEnvironment = default_env): Promise<void> {
 	await in_transaction<null>(env, 'readwrite', 'clear', null, (store) => {
@@ -294,21 +310,13 @@ export async function clear(env: OfflineQueueEnvironment = default_env): Promise
 }
 
 /**
- * token-store.ts fires this after `clear_token()` removes the stored
- * token. Listening here — rather than token-store.ts importing `clear()`
- * directly — keeps the dependency one-directional: this module already
- * imports `read_token` from token-store.ts, so the reverse import would
- * cycle.
+ * Write an entry back in place (retry state, uploaded photo URLs, lease).
+ * Strips a legacy `accessToken` field a pre-1.0.22 row may still carry
+ * (see the file docblock) so it stops re-persisting the plaintext token
+ * on every subsequent write.
  */
-if (typeof window !== 'undefined') {
-	window.addEventListener(TOKEN_CLEARED_EVENT, () => {
-		void clear();
-	});
-}
-
-/** Write an entry back in place (retry state, uploaded photo URLs, lease). */
 async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<void> {
-	const { id, ...rest } = entry;
+	const { id, accessToken: _drop, ...rest } = entry as QueueEntry & { accessToken?: unknown };
 	await in_transaction<null>(env, 'readwrite', 'update', null, (store) => {
 		store.put(rest, id);
 	});
@@ -319,6 +327,9 @@ async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<vo
  * (another tab already posted it) or another tab holds an unexpired lease.
  * The read and the write share one readwrite transaction, which is what
  * makes the claim exclusive across tabs.
+ *
+ * Strips a legacy `accessToken` field a pre-1.0.22 row may still carry
+ * (see the file docblock) so the claim write doesn't re-persist it.
  */
 async function claim(
 	id: number,
@@ -328,8 +339,9 @@ async function claim(
 	return in_transaction<QueueEntry | null>(env, 'readwrite', 'claim', null, (store, set) => {
 		const request = store.get(id);
 		request.onsuccess = (): void => {
-			const value = request.result as Omit<QueueEntry, 'id'> | undefined;
-			if (!value || (value.claimedUntil ?? 0) > now) return;
+			const raw = request.result as (Omit<QueueEntry, 'id'> & { accessToken?: unknown }) | undefined;
+			if (!raw || (raw.claimedUntil ?? 0) > now) return;
+			const { accessToken: _drop, ...value } = raw;
 			const claimed = { ...value, claimedUntil: now + CLAIM_LEASE_MS };
 			store.put(claimed, id);
 			set({ id, ...claimed });
@@ -404,6 +416,19 @@ async function replay(
 		throw new OfflineQueueError(
 			'queue replay: no token in the encrypted store — sign in again to send this post',
 			'no_token',
+		);
+	}
+	// Refuse to send someone else's token to this entry's site. Entries
+	// queued with no `me` (pre-1.0.16, or never discovered) have nothing to
+	// compare, so they fall through unchecked — the token that's there is
+	// the only signal available.
+	if (entry.me && stored_token.me && !me_origins_match(entry.me, stored_token.me)) {
+		throw new OfflineQueueError(
+			'queue replay: signed in as a different site than this entry was queued under — ' +
+				'sign in as ' +
+				entry.me +
+				' to send it',
+			'wrong_account',
 		);
 	}
 	const accessToken = stored_token.accessToken;
@@ -545,8 +570,10 @@ export function is_retryable_error(err: unknown): boolean {
 		);
 	}
 	if (err instanceof OfflineQueueError) {
-		// `no_token` needs a sign-in, not another automatic attempt.
-		return err.code !== 'no_token';
+		// `no_token` needs a sign-in and `wrong_account` needs a sign-out and
+		// back in as the right site — neither is fixed by another automatic
+		// attempt.
+		return err.code !== 'no_token' && err.code !== 'wrong_account';
 	}
 	return false;
 }

@@ -150,8 +150,13 @@ export class AuthFlowError extends Error {
  * normalized trailing-slash treatment of the path. A server can return a
  * canonicalized `me` (e.g., promoting `http://victim.example` to
  * `https://victim.example/`), which is allowed; an origin swap is not.
+ *
+ * Exported for offline-queue.ts's replay-time check (Task H5 fix round 1):
+ * a queued entry only ever sends under the token currently in the store, so
+ * replay uses this same comparison to refuse sending a different account's
+ * token to the site an entry was queued under.
  */
-function me_origins_match(input_me: string, response_me: string): boolean {
+export function me_origins_match(input_me: string, response_me: string): boolean {
 	let a: URL;
 	let b: URL;
 	try {

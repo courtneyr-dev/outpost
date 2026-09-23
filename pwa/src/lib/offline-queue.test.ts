@@ -15,6 +15,7 @@ import {
 import { recall_endpoints } from './endpoint-cache';
 import { MicropubError, type MicropubEnvironment } from './micropub';
 import { write_token, clear_token, type TokenStoreEnvironment } from './token-store';
+import { post_or_queue } from './post-or-queue';
 
 function fresh_env(): OfflineQueueEnvironment {
 	return { indexedDB: new IDBFactory() };
@@ -43,8 +44,13 @@ beforeEach(async () => {
 	// replay() now reads the token fresh from token-store.ts (Task H5)
 	// instead of a copy on the entry; seed a fresh per-test store so flush()
 	// reaches the mock fetch instead of failing every entry with `no_token`.
+	// `me` matches the site every entry in this file that sets `.me` uses,
+	// so the cross-account check (fix round 1) doesn't fail them.
 	tokenEnv = { indexedDB: new IDBFactory(), crypto: globalThis.crypto };
-	await write_token({ accessToken: 't', tokenType: 'Bearer', scope: '', me: '' }, tokenEnv);
+	await write_token(
+		{ accessToken: 't', tokenType: 'Bearer', scope: '', me: 'https://example.test/' },
+		tokenEnv,
+	);
 });
 
 describe('offline-queue: enqueue + list + remove', () => {
@@ -422,6 +428,52 @@ describe('offline-queue: retry classification', () => {
 	});
 });
 
+/** Open the raw `outpost-queue` IDB and read every row exactly as stored. */
+async function raw_queue_rows(queue_env: OfflineQueueEnvironment): Promise<unknown[]> {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		const request = queue_env.indexedDB.open('outpost-queue');
+		request.onsuccess = (): void => resolve(request.result);
+		request.onerror = (): void => reject(request.error);
+	});
+	const rows = await new Promise<unknown[]>((resolve, reject) => {
+		const tx = db.transaction('queue');
+		const request = tx.objectStore('queue').getAll();
+		request.onsuccess = (): void => resolve(request.result);
+		request.onerror = (): void => reject(request.error);
+	});
+	db.close();
+	return rows;
+}
+
+/**
+ * Write a raw row straight into the `outpost-queue` IDB, bypassing
+ * `enqueue()` — which no longer accepts an `accessToken` field at all.
+ * Reproduces exactly what a pre-1.0.22 build's `enqueue()` used to write,
+ * for tests that need a legacy plaintext-token row already on disk.
+ */
+async function seed_legacy_row(
+	queue_env: OfflineQueueEnvironment,
+	row: Record<string, unknown>,
+): Promise<void> {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		const request = queue_env.indexedDB.open('outpost-queue', 1);
+		request.onupgradeneeded = (): void => {
+			if (!request.result.objectStoreNames.contains('queue')) {
+				request.result.createObjectStore('queue', { autoIncrement: true });
+			}
+		};
+		request.onsuccess = (): void => resolve(request.result);
+		request.onerror = (): void => reject(request.error);
+	});
+	await new Promise<void>((resolve, reject) => {
+		const tx = db.transaction('queue', 'readwrite');
+		tx.objectStore('queue').add(row);
+		tx.oncomplete = (): void => resolve();
+		tx.onerror = (): void => reject(tx.error);
+	});
+	db.close();
+}
+
 describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 	it('never stores the access token in the entry', async () => {
 		await enqueue(
@@ -432,21 +484,32 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			},
 			env,
 		);
-		const db = await new Promise<IDBDatabase>((resolve, reject) => {
-			const request = env.indexedDB.open('outpost-queue');
-			request.onsuccess = (): void => resolve(request.result);
-			request.onerror = (): void => reject(request.error);
-		});
-		const rows = await new Promise<unknown[]>((resolve, reject) => {
-			const tx = db.transaction('queue');
-			const request = tx.objectStore('queue').getAll();
-			request.onsuccess = (): void => resolve(request.result);
-			request.onerror = (): void => reject(request.error);
-		});
-		db.close();
+		const rows = await raw_queue_rows(env);
 		expect(rows).toHaveLength(1);
 		expect(rows[0]).not.toHaveProperty('accessToken');
 		expect(JSON.stringify(rows)).not.toContain('secret-token');
+	});
+
+	it('never stores the access token when post_or_queue queues a submit offline', async () => {
+		// Drives the actual production call site (post-or-queue.ts) with a
+		// real accessToken in the input and a network failure, rather than
+		// asserting a string that the test itself never puts in the entry.
+		const result = await post_or_queue(
+			{
+				source: 'note',
+				me: 'https://example.test/',
+				accessToken: 'secret-token-abc',
+				properties: { content: 'queued while offline' },
+				micropubEndpoint: 'https://example.test/mp',
+			},
+			rejecting_fetch(),
+			env,
+		);
+		expect(result.kind).toBe('queued');
+		const rows = await raw_queue_rows(env);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).not.toHaveProperty('accessToken');
+		expect(JSON.stringify(rows)).not.toContain('secret-token-abc');
 	});
 
 	it('fails the entry with a sign-in-again status when no token is stored', async () => {
@@ -461,14 +524,88 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(kept?.retryable).toBe(false);
 	});
 
-	it('empties the queue when the session token is cleared', async () => {
-		// Default env (no `env` argument) — the window event clear_token()
-		// fires is handled by a listener that clears offline-queue.ts's own
-		// default env, not whatever custom env a test constructed.
+	it('sends the Authorization header for the currently stored token on a matching-site entry', async () => {
+		await enqueue(
+			{
+				source: 'note',
+				properties: { content: 'hi' },
+				micropubEndpoint: 'https://example.test/mp',
+				me: 'https://example.test/',
+			},
+			env,
+		);
+		let auth_header: string | null = null;
+		const site = fetch_env((_url, init) => {
+			auth_header = (init?.headers as Record<string, string> | undefined)?.['Authorization'] ?? null;
+			return ok_response();
+		});
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toHaveLength(0);
+		expect(auth_header).toBe('Bearer t');
+	});
+
+	it('fails an entry non-retryably, without sending anything, when the stored token belongs to a different site', async () => {
+		await enqueue(
+			{
+				source: 'note',
+				properties: { content: 'hi' },
+				micropubEndpoint: 'https://a.test/mp',
+				me: 'https://a.test/',
+			},
+			env,
+		);
+		const other_site_token_env: TokenStoreEnvironment = {
+			indexedDB: new IDBFactory(),
+			crypto: globalThis.crypto,
+		};
+		await write_token(
+			{ accessToken: 'b-token', tokenType: 'Bearer', scope: '', me: 'https://b.test/' },
+			other_site_token_env,
+		);
+		let fetch_calls = 0;
+		const site = fetch_env(() => {
+			fetch_calls += 1;
+			return ok_response();
+		});
+		const [kept] = await flush(site, env, { tokenStore: other_site_token_env });
+		expect(fetch_calls).toBe(0);
+		expect(kept?.retryable).toBe(false);
+		expect(kept?.lastError).toContain('signed in as a different site');
+	});
+
+	it('strips a legacy plaintext accessToken field left over from a 1.0.21-or-earlier row', async () => {
+		await seed_legacy_row(env, {
+			source: 'note',
+			properties: { content: 'queued before 1.0.22' },
+			accessToken: 'LEGACY-PLAINTEXT',
+			micropubEndpoint: 'https://example.test/m',
+			createdAt: Date.now(),
+			attempts: 0,
+		});
+
+		// Fail the replay so the entry gets written back (via claim() then
+		// save()) instead of removed, exercising both of the two places that
+		// used to spread a legacy row's fields back unchanged.
+		await flush(rejecting_fetch(), env, { tokenStore: tokenEnv });
+
+		const rows = await raw_queue_rows(env);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).not.toHaveProperty('accessToken');
+		expect(JSON.stringify(rows)).not.toContain('LEGACY-PLAINTEXT');
+	});
+
+	it('empties the queue the moment clear_token() resolves', async () => {
+		// Default env on both sides (no `env` argument) — clear_token()
+		// threads its own env's indexedDB into offline-queue.ts's clear(),
+		// which for the default token-store env is the same global
+		// indexedDB the queue's own default env resolves to.
 		await enqueue(note_input('first'));
 		await enqueue(note_input('second'));
 		expect(await list()).toHaveLength(2);
 		await clear_token();
-		await vi.waitFor(async () => expect(await list()).toHaveLength(0));
+		// No waitFor: clear_token() awaits the queue clear before resolving
+		// (fix round 1), so the queue must already be empty synchronously —
+		// both sign-out call sites reload the page on the very next line,
+		// which would otherwise race an unawaited clear and lose.
+		expect(await list()).toHaveLength(0);
 	});
 });

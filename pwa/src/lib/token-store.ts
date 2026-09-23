@@ -34,15 +34,6 @@ const KEY_ID = 'token-encryption-key';
 const TOKEN_ID = 'micropub';
 const IV_LENGTH_BYTES = 12;
 
-/**
- * Window event fired after `clear_token()` removes the stored token.
- * offline-queue.ts listens for this to empty its queue (a queued entry
- * can't replay without a token) — as an event rather than an import, so
- * this module never has to import offline-queue.ts, which already imports
- * `read_token` from here.
- */
-export const TOKEN_CLEARED_EVENT = 'outpost:token-cleared';
-
 export interface StoredToken {
 	accessToken: string;
 	tokenType: string;
@@ -150,8 +141,22 @@ export async function read_token(
  * Forget the token. Leaves the encryption key in place — re-login uses the
  * same key, which is fine because the IV randomises every ciphertext anyway.
  *
- * Fires `TOKEN_CLEARED_EVENT` so the offline queue empties itself; that
- * happens asynchronously and this function does not wait for it.
+ * Also empties the offline queue, awaited before this resolves: a queued
+ * entry can't replay without a token, and both sign-out call sites
+ * (`note-mode.tsx`, `composer-tabs.tsx`) do `window.location.reload()` on
+ * the very next line, which would abort an in-flight IndexedDB transaction
+ * — an unawaited fire-and-forget clear could lose the race against the
+ * reload and leave the queue populated (Task H5 fix round 1; a prior
+ * version fired a `TOKEN_CLEARED_EVENT` and returned without waiting for
+ * the listener, which is exactly this race). The queue clear uses a
+ * dynamic `import()` of offline-queue.ts rather than a static one:
+ * offline-queue.ts already imports `read_token` from this module, and a
+ * static import here would cycle at load time; a dynamic import resolves
+ * later, at call time, so it doesn't. Threads this call's own `env` through
+ * (same indexedDB the token was just cleared from) rather than defaulting
+ * to the global store, so a test-scoped `clear_token(env)` clears the
+ * matching test-scoped queue. A failure to clear is logged, not thrown —
+ * signing out must still succeed even if the queue clear fails.
  */
 export async function clear_token(env: TokenStoreEnvironment = default_env): Promise<void> {
 	const db = await open_db(env);
@@ -160,8 +165,11 @@ export async function clear_token(env: TokenStoreEnvironment = default_env): Pro
 	} finally {
 		db.close();
 	}
-	if (typeof window !== 'undefined') {
-		window.dispatchEvent(new Event(TOKEN_CLEARED_EVENT));
+	try {
+		const { clear } = await import('./offline-queue');
+		await clear({ indexedDB: env.indexedDB });
+	} catch (err) {
+		console.error('clear_token: failed to empty the offline queue after sign-out', err);
 	}
 }
 
