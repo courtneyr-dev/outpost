@@ -72,7 +72,9 @@ trait Outpost_Bearer_Auth {
 	 * filters (both priority 9) expose those two values, and IndieAuth's
 	 * accessors `indieauth_get_response()` and `indieauth_get_scopes()` are
 	 * exactly `apply_filters( ..., null )` on them. No `$_SERVER` value or
-	 * global carries either.
+	 * global carries either. This method reads both through the accessors,
+	 * behind `function_exists()`: with IndieAuth inactive they are
+	 * undefined and both values are null.
 	 *
 	 * The checks run in this order.
 	 *
@@ -135,11 +137,11 @@ trait Outpost_Bearer_Auth {
 			return true;
 		}
 		$is_bearer = '' !== self::bearer_token( $request )
-			|| ! empty( apply_filters( 'indieauth_response', null ) );
+			|| ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null );
 		if ( ! $is_bearer ) {
 			return true;
 		}
-		$scopes = apply_filters( 'indieauth_scopes', null );
+		$scopes = function_exists( 'indieauth_get_scopes' ) ? indieauth_get_scopes() : null;
 		if ( ! is_array( $scopes ) || array() === $scopes ) {
 			return false;
 		}

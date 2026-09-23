@@ -212,3 +212,19 @@ tests_add_filter(
 );
 
 require_once $wp_tests_dir . '/includes/bootstrap.php';
+
+// Without IndieAuth (wp-env installs it; a bare WP test library may not),
+// IndieAuthTokenFixture's stand-in supplies the `indieauth_response` and
+// `indieauth_scopes` filters. Outpost_Bearer_Auth reads them through
+// IndieAuth's accessors, so define those as IndieAuth 4.7.2's functions.php
+// does: each is exactly an apply_filters() call.
+if ( ! function_exists( 'indieauth_get_scopes' ) ) {
+	function indieauth_get_scopes() {
+		return apply_filters( 'indieauth_scopes', null );
+	}
+}
+if ( ! function_exists( 'indieauth_get_response' ) ) {
+	function indieauth_get_response() {
+		return apply_filters( 'indieauth_response', null );
+	}
+}

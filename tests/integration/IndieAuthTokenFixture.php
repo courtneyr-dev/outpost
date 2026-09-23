@@ -8,7 +8,9 @@
  * `indieauth_scopes` and `map_meta_cap` behavior all apply. Without
  * IndieAuth, a stand-in supplies the parts Outpost reads: a
  * `determine_current_user` validator using IndieAuth's header pattern, and
- * the `indieauth_response` / `indieauth_scopes` filters.
+ * the `indieauth_response` / `indieauth_scopes` filters, which Outpost reads
+ * through the `indieauth_get_*()` accessors tests/integration/bootstrap.php
+ * defines when IndieAuth is absent.
  *
  * reset_indieauth_fixture() removes every filter the fixture added and
  * clears IndieAuth's per-request state; call it from setUp() and
