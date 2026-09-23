@@ -253,4 +253,48 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
+
+	// =====================================================================
+	// H9: safe_fetch() pins the connection to the address the SSRF guard
+	// vetted, instead of trusting a second DNS lookup at connect time.
+	//
+	// The happy path (guard passes, fetch proceeds) is NOT unit-testable
+	// here: mocking wp_safe_remote_get() via WP_Mock::userFunction()
+	// permanently defines it as a real global function for the rest of the
+	// PHP process (proven empirically -- WP_Mock::tearDown() does not undo
+	// it), which then makes every later integration test's
+	// `function_exists('wp_safe_remote_get')` environment-readiness guard
+	// misfire and try to run for real against a WordPress core that was
+	// never loaded. That coverage lives in the integration suite instead
+	// (tests/integration/PreviewSsrfTest.php's
+	// `public_host_pins_the_vetted_ip_during_the_fetch()` and pre-existing
+	// `public_host_is_fetched()`), matching this codebase's own documented
+	// convention (SourceSpotifyLiveTest.php's docblock) that fetch
+	// behavior belongs there.
+	//
+	// The blocked-address path below is safe to test here precisely
+	// because it must NOT call wp_safe_remote_get() at all: that name
+	// stays deliberately unmocked, so a regression that let the guard
+	// through would fatal with "Call to undefined function
+	// wp_safe_remote_get()" here instead of silently reaching the network.
+	// =====================================================================
+
+	private function stub_wp_parse_url(): void {
+		WP_Mock::userFunction( 'wp_parse_url' )->andReturnUsing(
+			static function ( $url, $component = -1 ) {
+				return -1 === $component ? parse_url( (string) $url ) : parse_url( (string) $url, $component );
+			}
+		);
+	}
+
+	public function test_safe_fetch_never_reaches_the_network_for_a_blocked_resolved_address(): void {
+		// A host that resolves to a blocked address (the DNS-rebinding shape
+		// the guard must fail closed on) must never reach the fetch at all.
+		WP_Mock::onFilter( 'outpost_resolve_host_ips' )->with( array(), 'rebind.example' )->reply( array( '169.254.169.254' ) );
+		$this->stub_wp_parse_url();
+
+		$response = $this->invoke_private( 'safe_fetch', array( 'http://rebind.example/post', array( 'text/html' ) ) );
+
+		$this->assertInstanceOf( WP_Error::class, $response );
+	}
 }

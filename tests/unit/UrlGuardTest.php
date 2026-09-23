@@ -142,6 +142,44 @@ final class UrlGuardTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( Outpost_Url_Guard::host_is_blocked( 'nxdomain.example' ) );
 	}
 
+	// =====================================================================
+	// H9: resolve_safe_ip() — the address a caller must pin its connection
+	// to, so a second DNS lookup at connect time cannot answer differently
+	// (DNS rebinding) from the one this guard vetted.
+	// =====================================================================
+
+	public function test_resolve_safe_ip_returns_null_for_a_blocked_literal_ip(): void {
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( '169.254.169.254' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_the_literal_ip_when_public(): void {
+		$this->assertSame( '93.184.216.34', Outpost_Url_Guard::resolve_safe_ip( '93.184.216.34' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_the_first_resolved_address_when_all_are_public(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'good.example' )
+			->reply( array( '93.184.216.34', '8.8.8.8' ) );
+
+		$this->assertSame( '93.184.216.34', Outpost_Url_Guard::resolve_safe_ip( 'good.example' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_null_when_any_resolved_address_is_blocked(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'rebind.example' )
+			->reply( array( '93.184.216.34', '169.254.169.254' ) );
+
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( 'rebind.example' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_null_when_resolution_returns_nothing(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'nxdomain.example' )
+			->reply( array() );
+
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( 'nxdomain.example' ) );
+	}
+
 	/**
 	 * Every spelling `inet_pton` accepts for one address must get the same
 	 * verdict. The guard previously classified from the text form, so

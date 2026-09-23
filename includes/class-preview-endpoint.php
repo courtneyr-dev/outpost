@@ -709,6 +709,12 @@ final class Outpost_Preview_Endpoint {
 	 * before the request, and returns a generic error on any failure so no
 	 * transport message, resolved address, or response fragment leaks.
 	 *
+	 * The guard's verdict and the actual connection must use the same address:
+	 * a hostname resolved again at connect time could answer differently (DNS
+	 * rebinding), serving the request from an address the guard never saw. A
+	 * one-shot `http_api_curl` handler pins curl to the address the guard just
+	 * vetted for this hop, and is removed again once the request completes.
+	 *
 	 * @param string   $url             Initial URL (already scheme/host-validated).
 	 * @param string[] $accept_prefixes Accept header content-type prefixes.
 	 * @return array<string,mixed>|WP_Error Raw wp_remote response array, or WP_Error.
@@ -717,18 +723,34 @@ final class Outpost_Preview_Endpoint {
 		$current = $url;
 		for ( $hop = 0; $hop <= self::MAX_REDIRECTS; $hop++ ) {
 			$host = (string) wp_parse_url( $current, PHP_URL_HOST );
-			if ( '' === $host || Outpost_Url_Guard::host_is_blocked( $host ) ) {
+			$ip   = '' === $host ? null : Outpost_Url_Guard::resolve_safe_ip( $host );
+			if ( null === $ip ) {
 				return self::generic_fetch_error();
 			}
 
-			$response = wp_safe_remote_get(
-				$current,
-				array(
-					'timeout'     => self::HTTP_TIMEOUT,
-					'redirection' => 0,
-					'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
-				)
-			);
+			$port = (int) wp_parse_url( $current, PHP_URL_PORT );
+			if ( 0 === $port ) {
+				$scheme_for_port = strtolower( (string) wp_parse_url( $current, PHP_URL_SCHEME ) );
+				$port            = 'https' === $scheme_for_port ? 443 : 80;
+			}
+			$pin_resolve = static function ( $handle ) use ( $host, $port, $ip ) {
+				curl_setopt( $handle, CURLOPT_RESOLVE, array( "{$host}:{$port}:{$ip}" ) );
+				return $handle;
+			};
+
+			add_filter( 'http_api_curl', $pin_resolve );
+			try {
+				$response = wp_safe_remote_get(
+					$current,
+					array(
+						'timeout'     => self::HTTP_TIMEOUT,
+						'redirection' => 0,
+						'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+					)
+				);
+			} finally {
+				remove_filter( 'http_api_curl', $pin_resolve );
+			}
 			if ( is_wp_error( $response ) ) {
 				return self::generic_fetch_error();
 			}
