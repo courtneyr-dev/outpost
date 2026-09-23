@@ -14,6 +14,7 @@ import {
 } from './offline-queue';
 import { recall_endpoints } from './endpoint-cache';
 import { MicropubError, type MicropubEnvironment } from './micropub';
+import { write_token, clear_token, type TokenStoreEnvironment } from './token-store';
 
 function fresh_env(): OfflineQueueEnvironment {
 	return { indexedDB: new IDBFactory() };
@@ -35,9 +36,15 @@ function rejecting_fetch(message = 'TypeError: Failed to fetch'): MicropubEnviro
 }
 
 let env: OfflineQueueEnvironment;
+let tokenEnv: TokenStoreEnvironment;
 
-beforeEach(() => {
+beforeEach(async () => {
 	env = fresh_env();
+	// replay() now reads the token fresh from token-store.ts (Task H5)
+	// instead of a copy on the entry; seed a fresh per-test store so flush()
+	// reaches the mock fetch instead of failing every entry with `no_token`.
+	tokenEnv = { indexedDB: new IDBFactory(), crypto: globalThis.crypto };
+	await write_token({ accessToken: 't', tokenType: 'Bearer', scope: '', me: '' }, tokenEnv);
 });
 
 describe('offline-queue: enqueue + list + remove', () => {
@@ -46,7 +53,6 @@ describe('offline-queue: enqueue + list + remove', () => {
 			{
 				source: 'note',
 				properties: { content: 'hi' },
-				accessToken: 'tk',
 				micropubEndpoint: 'https://example.test/wp-json/micropub/1.0/endpoint',
 			},
 			env,
@@ -71,7 +77,6 @@ describe('offline-queue: enqueue + list + remove', () => {
 			{
 				source: 'note',
 				properties: { content: 'first' },
-				accessToken: 't',
 				micropubEndpoint: 'e',
 			},
 			env,
@@ -80,7 +85,6 @@ describe('offline-queue: enqueue + list + remove', () => {
 			{
 				source: 'reply',
 				properties: { content: 'second' },
-				accessToken: 't',
 				micropubEndpoint: 'e',
 			},
 			env,
@@ -94,7 +98,6 @@ describe('offline-queue: enqueue + list + remove', () => {
 			{
 				source: 'note',
 				properties: { content: 'hi' },
-				accessToken: 't',
 				micropubEndpoint: 'e',
 			},
 			env,
@@ -111,7 +114,6 @@ describe('offline-queue: flush', () => {
 			{
 				source: 'note',
 				properties: { content: 'a' },
-				accessToken: 't',
 				micropubEndpoint: 'https://example.test/m',
 			},
 			env,
@@ -120,7 +122,6 @@ describe('offline-queue: flush', () => {
 			{
 				source: 'reply',
 				properties: { content: 'b' },
-				accessToken: 't',
 				micropubEndpoint: 'https://example.test/m',
 			},
 			env,
@@ -130,7 +131,7 @@ describe('offline-queue: flush', () => {
 			fetch: ((): Promise<Response> => Promise.resolve(ok_response())) as typeof fetch,
 		};
 
-		const remaining = await flush(m_env, env);
+		const remaining = await flush(m_env, env, { tokenStore: tokenEnv });
 		expect(remaining).toEqual([]);
 		const entries = await list(env);
 		expect(entries).toEqual([]);
@@ -141,13 +142,12 @@ describe('offline-queue: flush', () => {
 			{
 				source: 'note',
 				properties: { content: 'a' },
-				accessToken: 't',
 				micropubEndpoint: 'https://example.test/m',
 			},
 			env,
 		);
 
-		const remaining = await flush(rejecting_fetch(), env);
+		const remaining = await flush(rejecting_fetch(), env, { tokenStore: tokenEnv });
 		expect(remaining).toHaveLength(1);
 		expect(remaining[0]?.attempts).toBe(1);
 		expect(remaining[0]?.lastError).toContain('post_failed');
@@ -204,7 +204,6 @@ function note_input(content = 'queued note'): Parameters<typeof enqueue>[0] {
 	return {
 		source: 'note',
 		properties: { content },
-		accessToken: 'tk',
 		micropubEndpoint: 'https://example.test/wp-json/micropub/1.0/endpoint',
 	};
 }
@@ -227,7 +226,7 @@ describe('offline-queue: change notifications', () => {
 		try {
 			const id = await enqueue(note_input(), env);
 			expect(events).toBe(1);
-			await flush(rejecting_fetch(), env);
+			await flush(rejecting_fetch(), env, { tokenStore: tokenEnv });
 			expect(events).toBe(2);
 			await remove(id, env);
 			expect(events).toBe(3);
@@ -272,7 +271,10 @@ describe('offline-queue: one replay per entry across tabs', () => {
 			await new Promise((resolve) => setTimeout(resolve, 20));
 			return ok_response();
 		});
-		await Promise.all([flush(slow_ok, env), flush(slow_ok, env)]);
+		await Promise.all([
+			flush(slow_ok, env, { tokenStore: tokenEnv }),
+			flush(slow_ok, env, { tokenStore: tokenEnv }),
+		]);
 		expect(posts).toBe(1);
 		expect(await list(env)).toHaveLength(0);
 	});
@@ -288,7 +290,7 @@ describe('offline-queue: one replay per entry across tabs', () => {
 				return new Promise<Response>(() => {});
 			}),
 			env,
-			{ now: () => t0 },
+			{ now: () => t0, tokenStore: tokenEnv },
 		);
 		await vi.waitFor(() => expect(posts).toBe(1));
 
@@ -296,9 +298,13 @@ describe('offline-queue: one replay per entry across tabs', () => {
 			posts += 1;
 			return ok_response();
 		});
-		expect(await flush(ok, env, { now: () => t0 + 1_000 })).toHaveLength(1);
+		expect(
+			await flush(ok, env, { now: () => t0 + 1_000, tokenStore: tokenEnv }),
+		).toHaveLength(1);
 		expect(posts).toBe(1);
-		expect(await flush(ok, env, { now: () => t0 + CLAIM_LEASE_MS + 1 })).toHaveLength(0);
+		expect(
+			await flush(ok, env, { now: () => t0 + CLAIM_LEASE_MS + 1, tokenStore: tokenEnv }),
+		).toHaveLength(0);
 		expect(posts).toBe(2);
 	});
 });
@@ -313,7 +319,6 @@ describe('offline-queue: entries queued before discovery or upload', () => {
 			{
 				source: 'note',
 				properties: { content: 'written offline' },
-				accessToken: 'tk',
 				micropubEndpoint: null,
 				me: 'https://example.test/',
 			},
@@ -328,7 +333,7 @@ describe('offline-queue: entries queued before discovery or upload', () => {
 				{ status: 200, headers: { 'Content-Type': 'text/html' } },
 			);
 		});
-		expect(await flush(site, env)).toHaveLength(0);
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toHaveLength(0);
 		expect(calls).toEqual(['GET https://example.test/', 'POST https://example.test/mp']);
 		expect(recall_endpoints('https://example.test/').micropub).toBe('https://example.test/mp');
 	});
@@ -338,7 +343,6 @@ describe('offline-queue: entries queued before discovery or upload', () => {
 			{
 				source: 'photo',
 				properties: { 'mp-photo-alt': 'a red door' },
-				accessToken: 'tk',
 				micropubEndpoint: 'https://example.test/mp',
 				me: 'https://example.test/',
 				media: [
@@ -367,13 +371,13 @@ describe('offline-queue: entries queued before discovery or upload', () => {
 			return ok_response();
 		});
 
-		const [kept] = await flush(site, env);
+		const [kept] = await flush(site, env, { tokenStore: tokenEnv });
 		expect(kept?.media?.[0]?.url).toBe('https://example.test/uploads/photo-1.jpg');
 		expect(kept?.media?.[0]?.bytes).toBeUndefined();
 		expect(uploaded_size).toBe(3);
 
 		post_online = true;
-		expect(await flush(site, env)).toHaveLength(0);
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toHaveLength(0);
 		expect(uploads).toBe(1);
 		const sent = new URLSearchParams(post_body);
 		expect(sent.get('photo')).toBe('https://example.test/uploads/photo-1.jpg');
@@ -387,12 +391,12 @@ describe('offline-queue: retry classification', () => {
 		const answer = (status: number): MicropubEnvironment =>
 			fetch_env(() => new Response('nope', { status }));
 
-		const [after_500] = await flush(answer(500), env);
+		const [after_500] = await flush(answer(500), env, { tokenStore: tokenEnv });
 		expect(after_500?.retryable).toBe(true);
 		expect(after_500?.lastError).toContain('500');
 		expect(after_500?.claimedUntil).toBe(0);
 
-		const [after_400] = await flush(answer(400), env);
+		const [after_400] = await flush(answer(400), env, { tokenStore: tokenEnv });
 		expect(after_400?.retryable).toBe(false);
 		expect(after_400?.attempts).toBe(2);
 	});
@@ -412,8 +416,59 @@ describe('offline-queue: retry classification', () => {
 			posts += 1;
 			return new Response('', { status: 201, headers: { Location: 'javascript:void(0)' } });
 		});
-		expect(await flush(site, env)).toHaveLength(0);
-		expect(await flush(site, env)).toHaveLength(0);
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toHaveLength(0);
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toHaveLength(0);
 		expect(posts).toBe(1);
+	});
+});
+
+describe('offline-queue: no plaintext token in storage (Task H5)', () => {
+	it('never stores the access token in the entry', async () => {
+		await enqueue(
+			{
+				source: 'note',
+				properties: { content: 'hi' },
+				micropubEndpoint: 'https://example.test/wp-json/micropub/1.0/endpoint',
+			},
+			env,
+		);
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const request = env.indexedDB.open('outpost-queue');
+			request.onsuccess = (): void => resolve(request.result);
+			request.onerror = (): void => reject(request.error);
+		});
+		const rows = await new Promise<unknown[]>((resolve, reject) => {
+			const tx = db.transaction('queue');
+			const request = tx.objectStore('queue').getAll();
+			request.onsuccess = (): void => resolve(request.result);
+			request.onerror = (): void => reject(request.error);
+		});
+		db.close();
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).not.toHaveProperty('accessToken');
+		expect(JSON.stringify(rows)).not.toContain('secret-token');
+	});
+
+	it('fails the entry with a sign-in-again status when no token is stored', async () => {
+		await enqueue(note_input(), env);
+		// An empty token store (fresh IDBFactory, nothing ever written).
+		const empty_token_env: TokenStoreEnvironment = {
+			indexedDB: new IDBFactory(),
+			crypto: globalThis.crypto,
+		};
+		const [kept] = await flush(rejecting_fetch(), env, { tokenStore: empty_token_env });
+		expect(kept?.lastError).toContain('sign in again');
+		expect(kept?.retryable).toBe(false);
+	});
+
+	it('empties the queue when the session token is cleared', async () => {
+		// Default env (no `env` argument) — the window event clear_token()
+		// fires is handled by a listener that clears offline-queue.ts's own
+		// default env, not whatever custom env a test constructed.
+		await enqueue(note_input('first'));
+		await enqueue(note_input('second'));
+		expect(await list()).toHaveLength(2);
+		await clear_token();
+		await vi.waitFor(async () => expect(await list()).toHaveLength(0));
 	});
 });

@@ -5,14 +5,19 @@ import { render } from 'preact';
 import { QueueBadge, QUEUE_RETRY_DELAYS_MS } from './queue-badge';
 import { enqueue, list, remove, type OfflineQueueEnvironment } from '../lib/offline-queue';
 import type { MicropubEnvironment } from '../lib/micropub';
+import { write_token } from '../lib/token-store';
 
 let root: HTMLDivElement;
 let queueEnv: OfflineQueueEnvironment;
 
-beforeEach(() => {
+beforeEach(async () => {
 	root = document.createElement('div');
 	document.body.appendChild(root);
 	queueEnv = { indexedDB: new IDBFactory() };
+	// replay() reads the token fresh from token-store.ts; seed the default
+	// (fake-indexeddb-polyfilled) store so a queued entry's replay can reach
+	// the mock fetch in these tests instead of failing with no_token.
+	await write_token({ accessToken: 'tk', tokenType: 'Bearer', scope: '', me: '' });
 });
 
 afterEach(() => {
@@ -25,7 +30,6 @@ function note(content: string): Parameters<typeof enqueue>[0] {
 	return {
 		source: 'note',
 		properties: { content },
-		accessToken: 'tk',
 		micropubEndpoint: 'https://example.test/mp',
 	};
 }

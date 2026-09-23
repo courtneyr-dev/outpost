@@ -34,6 +34,15 @@ const KEY_ID = 'token-encryption-key';
 const TOKEN_ID = 'micropub';
 const IV_LENGTH_BYTES = 12;
 
+/**
+ * Window event fired after `clear_token()` removes the stored token.
+ * offline-queue.ts listens for this to empty its queue (a queued entry
+ * can't replay without a token) — as an event rather than an import, so
+ * this module never has to import offline-queue.ts, which already imports
+ * `read_token` from here.
+ */
+export const TOKEN_CLEARED_EVENT = 'outpost:token-cleared';
+
 export interface StoredToken {
 	accessToken: string;
 	tokenType: string;
@@ -140,6 +149,9 @@ export async function read_token(
 /**
  * Forget the token. Leaves the encryption key in place — re-login uses the
  * same key, which is fine because the IV randomises every ciphertext anyway.
+ *
+ * Fires `TOKEN_CLEARED_EVENT` so the offline queue empties itself; that
+ * happens asynchronously and this function does not wait for it.
  */
 export async function clear_token(env: TokenStoreEnvironment = default_env): Promise<void> {
 	const db = await open_db(env);
@@ -147,6 +159,9 @@ export async function clear_token(env: TokenStoreEnvironment = default_env): Pro
 		await tx_delete(db, STORE_TOKENS, TOKEN_ID);
 	} finally {
 		db.close();
+	}
+	if (typeof window !== 'undefined') {
+		window.dispatchEvent(new Event(TOKEN_CLEARED_EVENT));
 	}
 }
 

@@ -8,10 +8,11 @@
  *
  * IDB schema: database `outpost-queue` (version 1), one auto-keyed object
  * store `queue` of `QueueEntry` records. Each entry carries what a replay
- * needs: the h-entry properties, the access token, and the Micropub
- * endpoint, or the signed-in "me" URL to discover it from when the post was
- * queued on a device that never discovered one. Fields added in 1.0.16 are
- * optional, so entries an older build queued still replay.
+ * needs: the h-entry properties and the Micropub endpoint, or the signed-in
+ * "me" URL to discover it from when the post was queued on a device that
+ * never discovered one. Fields added in 1.0.16 are optional, so entries an
+ * older build queued still replay. The access token is never one of those
+ * fields — see below.
  *
  * Photos: a post queued before its photos uploaded keeps the processed
  * image bytes in `media`. The replay uploads each one, writes its URL onto
@@ -27,11 +28,24 @@
  * Every write notifies listeners in this tab (a DOM event) and in other
  * tabs (a BroadcastChannel), so the badge updates without polling.
  *
- * Why per-token storage isn't required: the token in storage is the same
- * one used at enqueue time. If the user signs out, `clear_token()` does
- * not clear the queue — but the next flush will fail with a 401 from the
- * server, marked in `lastError`, and the user can dismiss those entries
- * from the UI.
+ * No plaintext token in the queue (Task H5): a queued entry used to carry
+ * a copy of the access token, so it sat in IndexedDB in plaintext for as
+ * long as the entry was queued. `enqueue()` no longer stores one. Replay
+ * reads the current token fresh from `token-store.ts` (`read_token()`)
+ * each time, so a queued entry always sends under whoever is signed in
+ * when it actually goes out. When no token is stored — signed out, or the
+ * encrypted store was cleared — replay fails the entry with a `no_token`
+ * `OfflineQueueError` ("sign in again") instead of sending it with a
+ * stale or absent credential; `is_retryable_error()` marks that `false`
+ * so the badge doesn't hammer retries a sign-in has to fix.
+ *
+ * `clear_token()` also empties this queue: once signed out, a queued
+ * entry can never replay, and a later sign-in — as the same person or
+ * someone else — must not silently resume sending content queued under
+ * the previous session. token-store.ts has no import of this module (that
+ * would cycle back through this file's own import of `read_token`);
+ * instead `clear_token()` fires `TOKEN_CLEARED_EVENT` and this module
+ * listens for it, below.
  */
 
 import {
@@ -44,6 +58,7 @@ import {
 	type MicropubEnvironment,
 } from './micropub';
 import { recall_endpoints, remember_endpoints } from './endpoint-cache';
+import { read_token, TOKEN_CLEARED_EVENT, type TokenStoreEnvironment } from './token-store';
 
 const DB_NAME = 'outpost-queue';
 const DB_VERSION = 1;
@@ -79,7 +94,6 @@ export interface QueueEntry {
 	source: QueueSource;
 	/** h-entry properties. Entries with `media` get `photo` added at replay. */
 	properties: HEntryProperties;
-	accessToken: string;
 	/** Null when the post was queued before any endpoint was discovered. */
 	micropubEndpoint: string | null;
 	/** Signed-in "me" URL the replay discovers endpoints from. Absent on 1.0.15 entries. */
@@ -99,10 +113,7 @@ export interface QueueEntry {
 	claimedUntil?: number;
 }
 
-export type QueueEnqueueInput = Pick<
-	QueueEntry,
-	'source' | 'properties' | 'accessToken' | 'micropubEndpoint'
-> &
+export type QueueEnqueueInput = Pick<QueueEntry, 'source' | 'properties' | 'micropubEndpoint'> &
 	Partial<Pick<QueueEntry, 'me' | 'media' | 'mediaEndpoint'>>;
 
 export interface OfflineQueueEnvironment {
@@ -116,7 +127,7 @@ const default_env: OfflineQueueEnvironment = {
 export class OfflineQueueError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'open_failed' | 'tx_failed',
+		public readonly code: 'open_failed' | 'tx_failed' | 'no_token',
 	) {
 		super(message);
 		this.name = 'OfflineQueueError';
@@ -217,7 +228,6 @@ export async function enqueue(
 	const value: Omit<QueueEntry, 'id'> = {
 		source: input.source,
 		properties: input.properties,
-		accessToken: input.accessToken,
 		micropubEndpoint: input.micropubEndpoint,
 		...(input.me !== undefined ? { me: input.me } : {}),
 		...(input.media !== undefined ? { media: input.media } : {}),
@@ -270,6 +280,32 @@ export async function remove(
 	notify_queue_changed();
 }
 
+/**
+ * Empty the queue immediately, discarding every entry regardless of state.
+ * Called when the session token is cleared (see `TOKEN_CLEARED_EVENT`
+ * below) — without a token no queued entry can replay, and leaving it
+ * queued would let it silently resume sending once someone signs back in.
+ */
+export async function clear(env: OfflineQueueEnvironment = default_env): Promise<void> {
+	await in_transaction<null>(env, 'readwrite', 'clear', null, (store) => {
+		store.clear();
+	});
+	notify_queue_changed();
+}
+
+/**
+ * token-store.ts fires this after `clear_token()` removes the stored
+ * token. Listening here — rather than token-store.ts importing `clear()`
+ * directly — keeps the dependency one-directional: this module already
+ * imports `read_token` from token-store.ts, so the reverse import would
+ * cycle.
+ */
+if (typeof window !== 'undefined') {
+	window.addEventListener(TOKEN_CLEARED_EVENT, () => {
+		void clear();
+	});
+}
+
 /** Write an entry back in place (retry state, uploaded photo URLs, lease). */
 async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<void> {
 	const { id, ...rest } = entry;
@@ -304,6 +340,8 @@ async function claim(
 export interface FlushOptions {
 	/** Clock for claim leases. Tests pass a fixed one. */
 	now?: () => number;
+	/** Token-store environment for replay's `read_token()` call. Tests pass a fixed one. */
+	tokenStore?: TokenStoreEnvironment;
 }
 
 /**
@@ -326,7 +364,7 @@ export async function flush(
 		const entry = await claim(listed.id, now(), env);
 		if (!entry) continue;
 		try {
-			await replay(entry, micropubEnv, env, now);
+			await replay(entry, micropubEnv, env, now, options.tokenStore);
 		} catch (err) {
 			await save(
 				{
@@ -356,9 +394,19 @@ async function replay(
 	micropubEnv: MicropubEnvironment | undefined,
 	env: OfflineQueueEnvironment,
 	now: () => number,
+	tokenStoreEnv?: TokenStoreEnvironment,
 ): Promise<void> {
 	const renew = (): Promise<void> =>
 		save({ ...entry, claimedUntil: now() + CLAIM_LEASE_MS }, env);
+
+	const stored_token = await read_token(tokenStoreEnv);
+	if (!stored_token) {
+		throw new OfflineQueueError(
+			'queue replay: no token in the encrypted store — sign in again to send this post',
+			'no_token',
+		);
+	}
+	const accessToken = stored_token.accessToken;
 
 	let endpoint = entry.micropubEndpoint;
 	if (!endpoint) {
@@ -392,7 +440,7 @@ async function replay(
 				if (!media_endpoint) {
 					media_endpoint = await discover_media_endpoint(
 						endpoint,
-						entry.accessToken,
+						accessToken,
 						micropubEnv,
 					);
 					if (entry.me) remember_endpoints(entry.me, { media: media_endpoint });
@@ -402,7 +450,7 @@ async function replay(
 					{
 						blob: new Blob([item.bytes], { type: item.type }),
 						filename: item.filename,
-						accessToken: entry.accessToken,
+						accessToken,
 						mediaEndpoint: media_endpoint,
 					},
 					micropubEnv,
@@ -418,7 +466,7 @@ async function replay(
 
 	try {
 		await post_h_entry(
-			{ properties, accessToken: entry.accessToken, micropubEndpoint: endpoint },
+			{ properties, accessToken, micropubEndpoint: endpoint },
 			micropubEnv,
 		);
 	} catch (err) {
@@ -496,5 +544,9 @@ export function is_retryable_error(err: unknown): boolean {
 			(err.status >= 500 || err.status === 408 || err.status === 429)
 		);
 	}
-	return err instanceof OfflineQueueError;
+	if (err instanceof OfflineQueueError) {
+		// `no_token` needs a sign-in, not another automatic attempt.
+		return err.code !== 'no_token';
+	}
+	return false;
 }
