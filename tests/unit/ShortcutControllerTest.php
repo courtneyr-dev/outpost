@@ -22,6 +22,17 @@ final class ShortcutControllerTest extends TestCase {
 	/** @var array<int, array{0:string,1:int}> */
 	private array $redirects = array();
 
+	/**
+	 * Backs the `current_user_can`/`wp_verify_nonce` mocks via a single
+	 * `andReturnUsing` closure each, so a test can flip the outcome after
+	 * setUp without a second, competing `WP_Mock::userFunction()` call
+	 * (WP_Mock/Mockery resolves same-function expectations in registration
+	 * order, so a later unconstrained override never wins over setUp's).
+	 */
+	private bool $can_edit_posts = true;
+
+	private bool $nonce_is_valid = true;
+
 	public function setUp(): void {
 		WP_Mock::setUp();
 		Outpost_Source_Registry::reset_for_tests();
@@ -29,6 +40,8 @@ final class ShortcutControllerTest extends TestCase {
 
 		$_SERVER['REQUEST_METHOD'] = 'POST';
 		$this->redirects           = array();
+		$this->can_edit_posts      = true;
+		$this->nonce_is_valid      = true;
 		Outpost_Shortcut_Controller::set_redirect_callback_for_tests(
 			function ( string $url, int $status ): void {
 				$this->redirects[] = array( $url, $status );
@@ -37,6 +50,8 @@ final class ShortcutControllerTest extends TestCase {
 
 		CoreSanitizerMocks::register();
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing( fn() => $this->can_edit_posts );
+		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing( fn() => $this->nonce_is_valid );
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 7 );
 		WP_Mock::userFunction( 'set_transient' )->andReturn( true );
 		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://site.test' );
@@ -157,5 +172,31 @@ final class ShortcutControllerTest extends TestCase {
 		);
 
 		$this->assertSame( 'https://example.com/a%20b', $this->redirected_url_param() );
+	}
+
+	// =====================================================================
+	// H7: cookie route requires edit_posts + a valid outpost_shortcut nonce
+	// =====================================================================
+
+	public function test_cookie_post_without_nonce_is_blocked(): void {
+		$this->nonce_is_valid = false;
+
+		$this->post_json( array( 'url' => 'https://example.com/a' ) );
+
+		$this->assertSame( array(), $this->redirects, 'A missing/invalid nonce must block dispatch.' );
+	}
+
+	public function test_cookie_post_without_edit_posts_capability_is_blocked(): void {
+		$this->can_edit_posts = false;
+
+		$this->post_json( array( 'url' => 'https://example.com/a' ) );
+
+		$this->assertSame( array(), $this->redirects, 'A user lacking edit_posts must be blocked even with cookies.' );
+	}
+
+	public function test_cookie_post_with_capability_and_nonce_still_routes(): void {
+		$this->post_json( array( 'url' => 'https://example.com/a' ) );
+
+		$this->assertSame( 'https://example.com/a', $this->redirected_url_param() );
 	}
 }

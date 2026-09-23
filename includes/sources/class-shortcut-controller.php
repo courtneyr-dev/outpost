@@ -42,7 +42,11 @@ final class Outpost_Shortcut_Controller {
 			return;
 		}
 		if ( ! self::is_authenticated() ) {
-			self::send_status( 401 );
+			// A capable, logged-in user who failed only on capability or
+			// nonce is authenticated but forbidden (403); everyone else
+			// (no session at all) is simply not authenticated (401) —
+			// mirrors core's own rest_authorization_required_code() convention.
+			self::send_status( is_user_logged_in() ? 403 : 401 );
 			Outpost_PWA_Shell::halt();
 			return;
 		}
@@ -143,10 +147,18 @@ final class Outpost_Shortcut_Controller {
 	}
 
 	/**
+	 * Cookie-session gate. The REST endpoint at
+	 * `Outpost_IOS_Shortcut_REST_Controller` (Bearer token, `edit_posts`)
+	 * is the supported iOS Shortcut path; this direct cookie route stays
+	 * for debugging in a regular browser, so it now demands the same
+	 * capability plus a nonce a real wp-admin session carries.
+	 *
 	 * @return bool
 	 */
 	private static function is_authenticated(): bool {
-		return is_user_logged_in();
+		return is_user_logged_in()
+			&& current_user_can( 'edit_posts' )
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) ), 'outpost_shortcut' );
 	}
 
 	/**

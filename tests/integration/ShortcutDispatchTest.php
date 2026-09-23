@@ -253,6 +253,37 @@ final class ShortcutDispatchTest extends TestCase {
 	}
 
 	/**
+	 * Test 3c (H7): a cookie-authenticated POST with no `_wpnonce` is
+	 * blocked (403) even though the user can edit_posts. The REST
+	 * endpoint (Bearer token) is the supported iOS Shortcut path; this
+	 * direct cookie route now demands the same nonce a real wp-admin
+	 * session carries. Per Rule 2, asserts NO redirect AND NO transient.
+	 *
+	 * @test
+	 */
+	public function cookie_post_without_nonce_is_blocked(): void {
+		// setUp already logged in an editor (can edit_posts) with no nonce set.
+		$body         = wp_json_encode( array( 'url' => self::EXAMPLE_URL ) );
+		$redirect_url = $this->dispatch_shortcut( 'POST', $body );
+
+		$this->assertNull(
+			$redirect_url,
+			'A cookie session without a valid outpost_shortcut nonce must not authorize dispatch.'
+		);
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$transient_count = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%'"
+		);
+		$this->assertSame(
+			0,
+			$transient_count,
+			'Nonce gate must block prefill enqueue: no transient should exist without a valid nonce.'
+		);
+	}
+
+	/**
 	 * Test 4: Malformed (non-JSON) body returns 400. Per Rule 2,
 	 * asserts NO redirect AND NO transient — gates fire before dispatch.
 	 *
