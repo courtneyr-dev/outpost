@@ -66,6 +66,25 @@ final class RequestHeadersServerStringTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'Bearer xyz789', Outpost_Request_Headers::authorization() );
 	}
 
+	public function test_authorization_falls_back_to_getallheaders_matching_the_name_case_insensitively(): void {
+		WP_Mock::userFunction( 'getallheaders' )->andReturn(
+			array(
+				'Host'          => 'example.test',
+				'AUTHORIZATION' => 'Bearer sapi-token', // outpost-lint:fixture-credential
+			)
+		);
+		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'Bearer sapi-token' )->andReturn( 'Bearer sapi-token' );
+
+		$this->assertSame( 'Bearer sapi-token', Outpost_Request_Headers::authorization() );
+	}
+
+	public function test_authorization_is_empty_when_getallheaders_has_no_authorization(): void {
+		WP_Mock::userFunction( 'getallheaders' )->andReturn( array( 'Host' => 'example.test' ) );
+		WP_Mock::userFunction( 'sanitize_text_field' )->never();
+
+		$this->assertSame( '', Outpost_Request_Headers::authorization() );
+	}
+
 	public function test_rest_nonce_prefers_the_request_parameter(): void {
 		$_REQUEST['_wpnonce']         = 'abc123';
 		$_SERVER['HTTP_X_WP_NONCE']   = 'header-nonce';

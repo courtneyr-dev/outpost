@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Unit;
 
+use Outpost_Encryption_Key_Resolver;
 use Outpost_Telegraph_Adapter;
 use WP_Mock;
 
@@ -254,5 +255,122 @@ final class G9TelegraphTest extends \WP_Mock\Tools\TestCase {
 	public function test_empty_block_list_returns_empty(): void {
 		$out = Outpost_Telegraph_Adapter::convert_blocks_to_telegraph_dom( array() );
 		$this->assertSame( array(), $out );
+	}
+
+	// --- H8: password-protected posts never syndicate -------------------
+
+	/**
+	 * Telegraph publishes a public copy of the post; a password-protected
+	 * post must never reach the fake Telegraph client, let alone leave a
+	 * `outpost_telegraph_post_url` meta behind. Telegraph is enabled and
+	 * the fake client is wired to succeed, so a passing test proves the
+	 * guard -- not that syndication was unreachable for some other reason.
+	 */
+	public function test_password_protected_post_never_syndicates_to_telegraph(): void {
+		Outpost_Encryption_Key_Resolver::reset_for_tests();
+
+		$post_meta    = array();
+		$user_meta    = array();
+		$option_store = array();
+
+		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing( static fn( $hook, $value ) => $value );
+		WP_Mock::userFunction( '__' )->andReturnUsing( static fn( $s ) => $s );
+		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static fn( $s ) => $s );
+		WP_Mock::userFunction( 'wp_json_encode' )->andReturnUsing( static fn( $d ) => json_encode( $d ) );
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn( array() );
+		WP_Mock::userFunction( 'get_permalink' )->andReturn( 'https://example.com/p/42' );
+		WP_Mock::userFunction( 'get_bloginfo' )->andReturn( 'Test Site' );
+		WP_Mock::userFunction( 'get_home_url' )->andReturn( 'https://example.com' );
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 0 );
+
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
+			static function ( $key, $default = false ) use ( &$option_store ) {
+				if ( Outpost_Telegraph_Adapter::ENABLED_OPTION === $key ) {
+					return true;
+				}
+				return $option_store[ $key ] ?? $default;
+			}
+		);
+		WP_Mock::userFunction( 'update_option' )->andReturnUsing(
+			static function ( $key, $value ) use ( &$option_store ) {
+				$option_store[ $key ] = $value;
+				return true;
+			}
+		);
+		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
+			static function ( $uid, $key, $single ) use ( &$user_meta ) {
+				return $user_meta[ $uid . '|' . $key ] ?? '';
+			}
+		);
+		WP_Mock::userFunction( 'update_user_meta' )->andReturnUsing(
+			static function ( $uid, $key, $value ) use ( &$user_meta ) {
+				$user_meta[ $uid . '|' . $key ] = $value;
+				return true;
+			}
+		);
+		WP_Mock::userFunction( 'delete_user_meta' )->andReturnUsing(
+			static function ( $uid, $key ) use ( &$user_meta ) {
+				unset( $user_meta[ $uid . '|' . $key ] );
+				return true;
+			}
+		);
+		WP_Mock::userFunction( 'get_post_meta' )->andReturnUsing(
+			static function ( $post_id, $key, $single ) use ( &$post_meta ) {
+				return $post_meta[ $post_id ][ $key ] ?? '';
+			}
+		);
+		WP_Mock::userFunction( 'update_post_meta' )->andReturnUsing(
+			static function ( $post_id, $key, $value ) use ( &$post_meta ) {
+				$post_meta[ $post_id ][ $key ] = $value;
+				return true;
+			}
+		);
+
+		// Fake Telegraph client: models a server that would happily accept
+		// the post if the password guard let the request through. Same
+		// response shape answers both createAccount and createPage.
+		WP_Mock::userFunction( 'wp_remote_post' )->andReturnUsing(
+			static function ( $url ) {
+				$is_account = false !== strpos( (string) $url, '/createAccount' );
+				$result     = $is_account
+					? array( 'access_token' => 'fake-token' )
+					: array(
+						'url'  => 'https://telegra.ph/Fake-01-01',
+						'path' => 'Fake-01-01',
+					);
+				return array(
+					'response' => array( 'code' => 200 ),
+					'body'     => json_encode(
+						array(
+							'ok'     => true,
+							'result' => $result,
+						)
+					),
+				);
+			}
+		);
+		WP_Mock::userFunction( 'wp_remote_retrieve_response_code' )->andReturnUsing(
+			static fn( $response ) => $response['response']['code'] ?? 0
+		);
+		WP_Mock::userFunction( 'wp_remote_retrieve_body' )->andReturnUsing(
+			static fn( $response ) => $response['body'] ?? ''
+		);
+
+		$post = new \WP_Post(
+			array(
+				'ID'            => 42,
+				'post_type'     => 'post',
+				'post_author'   => 7,
+				'post_password' => 'secret',
+			)
+		);
+
+		Outpost_Telegraph_Adapter::maybe_syndicate_on_publish( 'publish', 'draft', $post );
+
+		$this->assertArrayNotHasKey(
+			'outpost_telegraph_post_url',
+			$post_meta[42] ?? array(),
+			'A password-protected post must never syndicate to Telegraph.'
+		);
 	}
 }

@@ -128,7 +128,12 @@ final class Outpost_Preview_Endpoint {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// Read-only: fetches and sanitizes a target URL, writes nothing.
+		// A token scoped for `read` alone (as well as `create`/`update`)
+		// may use it.
+		$can_edit  = current_user_can( 'edit_posts' );
+		$has_scope = self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
+		$allow     = $can_edit && $has_scope;
 		/**
 		 * Override the preview-endpoint permission decision.
 		 *
@@ -139,7 +144,11 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// A capable user whose bearer token lacks scope is
+				// authenticated but forbidden (403); everyone else is
+				// simply not authenticated (401) — mirrors core's own
+				// rest_authorization_required_code() convention.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;
@@ -691,6 +700,30 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
+	 * Build the `host:port:ip` entry for `CURLOPT_RESOLVE`, pinning the
+	 * host and port `$url` will be requested on to `$ip` — the address
+	 * {@see Outpost_Url_Guard::resolve_safe_ip()} already vetted for this
+	 * hop. Pure and side-effect free so the port-default logic (443/80 when
+	 * `$url` carries no explicit port) is unit-testable on its own. The host
+	 * is lower-cased because Requests lower-cases the URL host (its Iri
+	 * class) before handing the URL to curl, and the entry must name the
+	 * host curl is asked for.
+	 *
+	 * @param string $url Absolute URL for this hop (already scheme/host-validated).
+	 * @param string $ip  The vetted IP address to pin the connection to.
+	 * @return string `host:port:ip`, ready for `CURLOPT_RESOLVE`.
+	 */
+	private static function resolve_pin_entry( string $url, string $ip ): string {
+		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		$port = (int) wp_parse_url( $url, PHP_URL_PORT );
+		if ( 0 === $port ) {
+			$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+			$port   = 'https' === $scheme ? 443 : 80;
+		}
+		return "{$host}:{$port}:{$ip}";
+	}
+
+	/**
 	 * Fetch a URL with SSRF-safe, per-hop redirect validation.
 	 *
 	 * `wp_safe_remote_get()` blocks loopback + RFC1918 but not the ranges
@@ -700,6 +733,19 @@ final class Outpost_Preview_Endpoint {
 	 * before the request, and returns a generic error on any failure so no
 	 * transport message, resolved address, or response fragment leaks.
 	 *
+	 * The guard's verdict and the actual connection must use the same address:
+	 * a hostname resolved again at connect time could answer differently (DNS
+	 * rebinding), serving the request from an address the guard never saw. A
+	 * one-shot `http_api_curl` handler pins curl to the address the guard just
+	 * vetted for this hop, and is removed again once the request completes.
+	 * `WP_Http::request()` sends through Requests, and the action fires from
+	 * `WP_Http_Requests_Hooks::dispatch()` on Requests' `curl.before_send`
+	 * hook, so the pin only takes effect when Requests uses its curl
+	 * transport — if the curl extension is unavailable, Requests falls back
+	 * to `fsockopen`, and a configured `WP_PROXY_HOST` routes the connection
+	 * through a proxy instead; in both cases this pin has no effect and the
+	 * guard's per-hop revalidation is the only protection for that hop.
+	 *
 	 * @param string   $url             Initial URL (already scheme/host-validated).
 	 * @param string[] $accept_prefixes Accept header content-type prefixes.
 	 * @return array<string,mixed>|WP_Error Raw wp_remote response array, or WP_Error.
@@ -708,18 +754,34 @@ final class Outpost_Preview_Endpoint {
 		$current = $url;
 		for ( $hop = 0; $hop <= self::MAX_REDIRECTS; $hop++ ) {
 			$host = (string) wp_parse_url( $current, PHP_URL_HOST );
-			if ( '' === $host || Outpost_Url_Guard::host_is_blocked( $host ) ) {
+			$ip   = '' === $host ? null : Outpost_Url_Guard::resolve_safe_ip( $host );
+			if ( null === $ip ) {
 				return self::generic_fetch_error();
 			}
 
-			$response = wp_safe_remote_get(
-				$current,
-				array(
-					'timeout'     => self::HTTP_TIMEOUT,
-					'redirection' => 0,
-					'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
-				)
-			);
+			$pin_entry   = self::resolve_pin_entry( $current, $ip );
+			$pin_resolve = static function ( $handle ) use ( $pin_entry ): void {
+				// WP_Http has no DNS-pin option, so set CURLOPT_RESOLVE directly: curl connects only to the IP the SSRF guard vetted.
+				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) );
+			};
+
+			// `http_api_curl` is an action (`do_action_ref_array()` in
+			// WP_Http_Requests_Hooks::dispatch()), not a filter — it hands
+			// the handle by reference and does not collect or use a return
+			// value.
+			add_action( 'http_api_curl', $pin_resolve );
+			try {
+				$response = wp_safe_remote_get(
+					$current,
+					array(
+						'timeout'     => self::HTTP_TIMEOUT,
+						'redirection' => 0,
+						'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+					)
+				);
+			} finally {
+				remove_action( 'http_api_curl', $pin_resolve );
+			}
 			if ( is_wp_error( $response ) ) {
 				return self::generic_fetch_error();
 			}

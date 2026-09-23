@@ -139,6 +139,45 @@ final class PreviewSsrfTest extends TestCase {
 
 	/**
 	 * @test
+	 * H9: the connection is pinned to the address the guard just vetted for
+	 * this host, so a second, independent DNS lookup at connect time cannot
+	 * answer differently (DNS rebinding) and serve the request from an
+	 * address the guard never saw. `http_api_curl` must be attached only
+	 * while the request to `wp_safe_remote_get()` is actually in flight.
+	 */
+	public function public_host_pins_the_vetted_ip_during_the_fetch(): void {
+		$this->dns['pin.attacker.test'] = array( '93.184.216.34' );
+
+		$pinned_during_fetch = null;
+		remove_filter( 'pre_http_request', array( $this, 'spy_http' ), 10 );
+		$spy = function ( $pre, $args, $url ) use ( &$pinned_during_fetch ) {
+			$this->fetched[]      = (string) $url;
+			$pinned_during_fetch = has_filter( 'http_api_curl' );
+			return array(
+				'headers'  => array( 'content-type' => 'text/html; charset=utf-8' ),
+				'body'     => '<html><head><title>Fetched</title></head><body><p>ok</p></body></html>',
+				'response' => array( 'code' => 200, 'message' => 'OK' ),
+				'cookies'  => array(),
+				'filename' => null,
+			);
+		};
+		add_filter( 'pre_http_request', $spy, 10, 3 );
+
+		$this->assertFalse( has_filter( 'http_api_curl' ), 'Precondition: nothing pinned before the fetch.' );
+
+		try {
+			$response = $this->dispatch( 'https://pin.attacker.test/post' );
+		} finally {
+			remove_filter( 'pre_http_request', $spy, 10 );
+		}
+
+		$this->assertTrue( $pinned_during_fetch, 'The vetted-IP pin must be attached while the request is in flight.' );
+		$this->assertFalse( has_filter( 'http_api_curl' ), 'The pin must be removed once the fetch returns.' );
+		$this->assertFalse( $response->is_error() );
+	}
+
+	/**
+	 * @test
 	 * A redirect to an internal host is not followed.
 	 */
 	public function redirect_to_internal_host_is_not_followed(): void {

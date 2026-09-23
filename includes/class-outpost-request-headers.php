@@ -23,7 +23,12 @@ final class Outpost_Request_Headers {
 
 	/**
 	 * Raw Authorization header, with the REDIRECT_HTTP_AUTHORIZATION
-	 * fallback some Apache/managed-host setups use.
+	 * fallback some Apache/managed-host setups use, then the SAPI's own
+	 * header list for hosts that never copy the header into `$_SERVER`.
+	 *
+	 * IndieAuth's `Authorize::get_authorization_header()` reads the same
+	 * three sources in the same order, so any header IndieAuth
+	 * authenticates from is one Outpost can see too.
 	 *
 	 * The value is a credential: callers regex-validate its shape and
 	 * compare tokens — it is never stored or echoed. It is sanitized like
@@ -42,6 +47,28 @@ final class Outpost_Request_Headers {
 		}
 		if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			return self::server_string( 'REDIRECT_HTTP_AUTHORIZATION' );
+		}
+		return self::authorization_from_sapi_headers();
+	}
+
+	/**
+	 * The Authorization header from `getallheaders()`, matched on name
+	 * case-insensitively, or '' when the function or the header is absent.
+	 *
+	 * `getallheaders()` is not defined under the CLI SAPI, and its values
+	 * never pass through wp_magic_quotes(), so there is nothing to unslash.
+	 *
+	 * @return string
+	 */
+	private static function authorization_from_sapi_headers(): string {
+		$headers = function_exists( 'getallheaders' ) ? getallheaders() : null;
+		if ( ! is_array( $headers ) ) {
+			return '';
+		}
+		foreach ( $headers as $name => $value ) {
+			if ( is_string( $value ) && 0 === strcasecmp( (string) $name, 'authorization' ) ) {
+				return sanitize_text_field( $value );
+			}
 		}
 		return '';
 	}

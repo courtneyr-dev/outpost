@@ -98,6 +98,22 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
+	/**
+	 * H6 fix round 1, Important: an under-scoped (but otherwise validated)
+	 * bearer token is refused, distinct from an unvalidated-token refusal.
+	 */
+	public function test_permission_check_refuses_under_scoped_bearer_token(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+		WP_Mock::onFilter( 'outpost_composer_config_permission' )->with( false )->reply( false );
+
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
 	public function test_permission_check_passes_for_user_with_edit_posts(): void {
 		WP_Mock::userFunction( 'current_user_can' )
 			->with( 'edit_posts' )

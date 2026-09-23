@@ -7,6 +7,33 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.22] - 2026-09-23
+
+### Security
+
+- The offline queue no longer stores the access token. Through 1.0.21 each queued post carried a plaintext copy of the IndieAuth token in the `outpost-queue` IndexedDB store for as long as it waited, beside the AES-GCM-encrypted copy in the token store. `enqueue()` no longer writes one, and replay reads the token from the encrypted store (`read_token()`) for each entry as it sends. A row queued by 1.0.21 or earlier loses its `accessToken` field the next time replay claims or saves it. Replay refuses, before any request and without automatic retries, an entry whose `me` origin differs from the signed-in site's, so one account's token never reaches another account's site, and an entry with no `me` at all ("queued by an older version with no site recorded; re-create this post"). With no token stored, an entry waits with "sign in again". Signing out removes only the token: the queue stays, and posts waiting when a token expired send on the first replay after signing back in to the same site.
+- The eight REST controllers that authenticate with `Outpost_Bearer_Auth` (preview, media lookup, geocode, syndicate targets, composer config, manual-share status, syndication capture, manual share) check the IndieAuth token's scope. Read routes accept `create`, `update` or `read`. Routes that write need `create` or `update`: `POST /manual-share/capture`, `/manual-share/dismiss-reminder`, `/manual-share/snooze-all`, `/manual-share/intent/log`, and `/manual-share/intent`, which writes an audit-log entry.
+  - A request is a bearer request when it carries a token in the Authorization header (matched anywhere in the header, as IndieAuth matches it), a token in the `access_token` body parameter, or a non-empty IndieAuth token response (`indieauth_get_response()`), which covers every token IndieAuth verified. Which code resolved the current user no longer matters.
+  - A bearer request with no scope list (IndieAuth inactive, or another `determine_current_user` authority resolved the token) is refused.
+  - A cookie session with a valid REST nonce skips the scope check: core's `$wp_rest_auth_cookie` flag set, a logged-in user, and a `wp_rest` nonce that verifies. Core never sets that flag for a user IndieAuth resolved from a token, so an IndieAuth-verified token always meets the check.
+  - A user who passes `edit_posts` but whose token scope doesn't cover the route gets 403; every other refusal stays 401. IndieAuth's `map_meta_cap` grants `edit_posts` only to tokens carrying `create` or `draft`, so a real token with neither fails the capability check first and gets 401. In practice the 403 is a `draft`-only token.
+  - `Outpost_Request_Headers::authorization()` falls back to `getallheaders()`, matching the header name case-insensitively, when `$_SERVER` has no Authorization value. The iOS Shortcut token authenticator reads the header through the same method, so on a host that exposes Authorization only through `getallheaders()` it now sees the Shortcut's token too; its pattern and route scoping are unchanged.
+- `/oauth/{provider}/start`, `/disconnect` and `/verify` refuse every bearer request. They required `manage_options`, which IndieAuth's `map_meta_cap` never restricts, so an administrator's token of any scope could start, disconnect or verify a service connection. A cookie session with a valid REST nonce is unaffected.
+- `POST /post/shortcut`, the cookie-session iOS Shortcut route, requires `edit_posts` and a valid `outpost_shortcut` nonce in the form-encoded `_wpnonce` field. No client is issued that nonce, so the route is closed; a logged-in user it refuses gets 403, anyone else 401. `/wp-json/outpost/v1/shortcut`, authenticated by the Shortcut's own token, is the supported path and is unchanged.
+- Telegraph never syndicates a password-protected post. `maybe_syndicate_on_publish()` returns before any other check when `post_password` is set. Before, with Telegraph enabled, publishing a protected post sent its content to a public telegra.ph page.
+- Preview fetches connect to the address the SSRF guard vetted. The guard resolved each hop's host and curl resolved it again at connect time, so a DNS answer that changed in between (DNS rebinding) could serve the fetch from an address the guard never saw. Each hop now pins curl to the vetted IP with `CURLOPT_RESOLVE`, through a one-shot `http_api_curl` action removed after the request; the entry uses the lower-cased host, as Requests sends it. The pin has no effect when the curl extension is unavailable (Requests falls back to `fsockopen`) or when `WP_PROXY_HOST` routes the request through a proxy; the guard's per-hop check still runs there.
+
+### Fixed
+
+- The connection banner (`/post/`) showed "You're offline" and "Data Saver is on" on an online desktop load. Visibility ran through a `prop-for-that` sample of `navigator.onLine`/the Network Information API into `--live-online`/`--live-net-save-data` custom properties, read by `@container style()` queries in `structure.css` — but those container-style queries never matched in the browsers tested, so both messages painted regardless of state. `ConnectionBanner` now listens to `online`/`offline` window events and the connection's `change` event directly and toggles the native `hidden` attribute on each message; CSS keeps only the `[hidden]` display rule and the token-based paint. `index.tsx` no longer registers the unused `--live-*` properties.
+
+### Changed
+
+- Bearer clients of the eight routes above need a token with `create` or `update` to write. A `draft`-only token is refused on all eight, as is a bearer token IndieAuth didn't issue. Outpost's composer requests `create profile update media` and is unaffected.
+- The cookie-session `POST /post/shortcut` route is closed; use `/wp-json/outpost/v1/shortcut`.
+- Posts queued offline by 1.0.21 or earlier drop their stored token and send with the current sign-in. Entries queued for another site, or with no site (queued by 1.0.15 or earlier), are refused and stay in the queue until dismissed.
+- New `Outpost_Url_Guard::resolve_safe_ip( string $host ): ?string` returns the address the guard vetted (a literal IP, or the first resolved address once every resolved address passes), or null when the host is blocked or doesn't resolve. `host_is_blocked()` is now a wrapper around it.
+
 ## [1.0.21] - 2026-09-21
 
 ### Security

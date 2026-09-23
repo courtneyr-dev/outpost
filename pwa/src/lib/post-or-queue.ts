@@ -139,7 +139,6 @@ export async function post_or_queue(
 				{
 					source: input.source,
 					properties: input.properties,
-					accessToken: input.accessToken,
 					micropubEndpoint: endpoint,
 					me: input.me,
 					...(photos.length > 0 ? { media: queued_media, mediaEndpoint: media } : {}),

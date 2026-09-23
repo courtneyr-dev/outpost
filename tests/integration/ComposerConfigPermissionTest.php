@@ -31,6 +31,8 @@ use WP_REST_Request;
  */
 final class ComposerConfigPermissionTest extends TestCase {
 
+	use IndieAuthTokenFixture;
+
 	private int $subscriber_id = 0;
 	private int $editor_id     = 0;
 
@@ -42,6 +44,7 @@ final class ComposerConfigPermissionTest extends TestCase {
 			);
 		}
 
+		$this->reset_indieauth_fixture();
 		$this->subscriber_id = (int) wp_insert_user(
 			array(
 				'user_login' => 'config_sub_' . uniqid(),
@@ -61,6 +64,7 @@ final class ComposerConfigPermissionTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		$this->reset_indieauth_fixture();
 		require_once ABSPATH . 'wp-admin/includes/user.php';
 		if ( $this->subscriber_id > 0 ) {
 			delete_transient( 'outpost_config_rl_u_' . $this->subscriber_id );
@@ -183,20 +187,17 @@ final class ComposerConfigPermissionTest extends TestCase {
 	 * 1.0.4 CSRF fix removed the cookie fallback: the token now authenticates
 	 * through Outpost_Bearer_Auth, with no wp-admin cookie involved.
 	 *
+	 * The token is `create`-scoped: H6's scope gate refuses a bearer
+	 * request whose token carries no create/update/read scope, and under
+	 * real IndieAuth only `create` (or `draft`) grants `edit_posts`.
+	 *
 	 * @test
 	 */
 	public function body_token_authenticates_when_the_header_is_stripped(): void {
-		$editor = $this->editor_id;
-		// Stand in for IndieAuth's determine_current_user validator: it reads
-		// the Authorization header the trait restores from the body token.
-		$validator = static function ( $user ) use ( $editor ) {
-			if ( $user ) {
-				return $user;
-			}
-			$auth = isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? (string) $_SERVER['HTTP_AUTHORIZATION'] : '';
-			return ( false !== stripos( $auth, 'Bearer valid-editor-token' ) ) ? $editor : $user;
-		};
-		add_filter( 'determine_current_user', $validator, 15 );
+		// IndieAuthTokenFixture: a real IndieAuth token when IndieAuth is
+		// loaded, otherwise a stand-in whose determine_current_user validator
+		// reads the Authorization header the trait restores from the body.
+		$token = $this->issue_indieauth_token( $this->editor_id, array( 'create' ) );
 		wp_set_current_user( 0 );
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 
@@ -205,32 +206,32 @@ final class ComposerConfigPermissionTest extends TestCase {
 			// copies $_POST and the raw body onto the request on a real HTTP
 			// call. The trait reads the token from the request, so each probe
 			// builds its request the way core would.
-			$ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => 'valid-editor-token' ) ) );
+			$ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => $token ) ) );
 
-			// Each real HTTP request is a fresh process; reset the user AND the
-			// header the trait restored so the next token is judged alone.
+			// Each real HTTP request is a fresh process; reset the user, the
+			// header the trait restored, and IndieAuth's verified-token state
+			// so the next token is judged alone.
 			wp_set_current_user( 0 );
-			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$this->reset_indieauth_request_state();
 			$bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => 'not-a-real-token' ) ) );
 
 			// The PWA's real shape: Content-Type application/json.
 			wp_set_current_user( 0 );
-			unset( $_SERVER['HTTP_AUTHORIZATION'] );
-			$json_ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => 'valid-editor-token' ) ) );
+			$this->reset_indieauth_request_state();
+			$json_ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => $token ) ) );
 
 			wp_set_current_user( 0 );
-			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+			$this->reset_indieauth_request_state();
 			$json_bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => 'not-a-real-token' ) ) );
 
 			// A valid token in the URL must not authenticate: query strings
 			// reach access logs, browser history, and CDN cache keys.
 			wp_set_current_user( 0 );
-			unset( $_SERVER['HTTP_AUTHORIZATION'] );
-			$query              = rest_get_server()->dispatch( $this->composer_config_request( array( 'query' => 'valid-editor-token' ) ) );
-			$header_after_query   = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+			$this->reset_indieauth_request_state();
+			$query              = rest_get_server()->dispatch( $this->composer_config_request( array( 'query' => $token ) ) );
+			$header_after_query = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
 		} finally {
-			unset( $_SERVER['HTTP_AUTHORIZATION'] );
-			remove_filter( 'determine_current_user', $validator, 15 );
+			$this->reset_indieauth_request_state();
 			wp_set_current_user( 0 );
 		}
 

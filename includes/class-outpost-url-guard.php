@@ -76,9 +76,26 @@ final class Outpost_Url_Guard {
 	 * @return bool
 	 */
 	public static function host_is_blocked( string $host ): bool {
+		return null === self::resolve_safe_ip( $host );
+	}
+
+	/**
+	 * Resolve a host to the single address this guard vetted as safe.
+	 *
+	 * A caller that goes on to fetch the host must connect to exactly this
+	 * address rather than trust a second, independent DNS lookup — a
+	 * resolver can answer differently between the check and the connect
+	 * (DNS rebinding), which would let a vetted-safe hostname serve the
+	 * request from an address this guard never saw.
+	 *
+	 * @param string $host Hostname or bracketed/plain IP literal.
+	 * @return string|null The vetted IP, or null when the host is blocked
+	 *                      or could not be resolved.
+	 */
+	public static function resolve_safe_ip( string $host ): ?string {
 		$host = trim( $host );
 		if ( '' === $host ) {
-			return true;
+			return null;
 		}
 		// Strip IPv6 brackets: [::1] → ::1.
 		if ( isset( $host[0] ) && '[' === $host[0] && ']' === substr( $host, -1 ) ) {
@@ -87,20 +104,20 @@ final class Outpost_Url_Guard {
 
 		// Literal IP host: classify directly, no DNS.
 		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
-			return self::is_blocked_ip( $host );
+			return self::is_blocked_ip( $host ) ? null : $host;
 		}
 
 		$ips = self::resolve_host_ips( $host );
 		if ( empty( $ips ) ) {
 			// Could not prove the host is safe — fail closed.
-			return true;
+			return null;
 		}
 		foreach ( $ips as $ip ) {
 			if ( self::is_blocked_ip( (string) $ip ) ) {
-				return true;
+				return null;
 			}
 		}
-		return false;
+		return (string) $ips[0];
 	}
 
 	/**

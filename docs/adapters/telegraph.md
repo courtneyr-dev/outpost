@@ -43,6 +43,10 @@ Per-post overrides via post-meta (no UI; set via WP CLI or programmatically):
 | `outpost_telegraph_author_name_override` | Use this author name instead of the site default |
 | `outpost_telegraph_author_url_override` | Use this URL instead of the site default |
 
+## Password-protected posts
+
+A post with a password is never syndicated. `maybe_syndicate_on_publish()` returns before any other check when `post_password` is non-empty (1.0.22), ahead of the enabled check, the post-type filter, and `_outpost_skip_telegraph`. Telegraph pages are public, so syndicating a protected post would publish its content to anyone with the link.
+
 ## Per-post output
 
 After a successful first publish:

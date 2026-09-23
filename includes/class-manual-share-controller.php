@@ -153,7 +153,28 @@ final class Outpost_Manual_Share_Controller {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// This callback guards all three routes. GET /manual-share-chips
+		// returns static chip metadata — read-only, so a `read` scope
+		// suffices in addition to `create`/`update`. Both POST routes
+		// mutate: /intent/log explicitly updates the audit log's
+		// `outcome`, and /intent — despite looking like a computed
+		// payload — calls Outpost_Manual_Share_Intent_Payload_Builder::
+		// build_for_android()/build_for_ios(), which both call
+		// Outpost_Manual_Share_Audit_Log::add_entry() -> update_post_meta()
+		// (H6 fix round 1, Critical 2: /intent was misclassified read-only).
+		// A prior per-route match on /intent/log (case-sensitive string
+		// comparison against $request->get_route()) was also a bypass: core
+		// matches REST routes case-insensitively, so /intent/LOG would
+		// dispatch to the same mutating handler while failing that
+		// comparison and falling through to the read-only scope. A plain
+		// method split has no such mismatch — both POSTs need the same
+		// scope regardless of which one they are.
+		$required_scopes = 'GET' === $request->get_method()
+			? array( 'create', 'update', 'read' )
+			: array( 'create', 'update' );
+		$can_edit        = current_user_can( 'edit_posts' );
+		$has_scope       = self::bearer_has_scope( $request, $required_scopes );
+		$allow           = $can_edit && $has_scope;
 		/**
 		 * Override the manual-share intent endpoint permission decision.
 		 *
@@ -164,7 +185,9 @@ final class Outpost_Manual_Share_Controller {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// See Outpost_Preview_Endpoint::check_permission() for the
+				// 401-vs-403 rationale.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;

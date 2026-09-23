@@ -8,10 +8,11 @@
  *
  * IDB schema: database `outpost-queue` (version 1), one auto-keyed object
  * store `queue` of `QueueEntry` records. Each entry carries what a replay
- * needs: the h-entry properties, the access token, and the Micropub
- * endpoint, or the signed-in "me" URL to discover it from when the post was
- * queued on a device that never discovered one. Fields added in 1.0.16 are
- * optional, so entries an older build queued still replay.
+ * needs: the h-entry properties and the Micropub endpoint, or the signed-in
+ * "me" URL to discover it from when the post was queued on a device that
+ * never discovered one. Fields added in 1.0.16 are optional, so entries an
+ * older build queued still replay. The access token is never one of those
+ * fields — see below.
  *
  * Photos: a post queued before its photos uploaded keeps the processed
  * image bytes in `media`. The replay uploads each one, writes its URL onto
@@ -27,11 +28,30 @@
  * Every write notifies listeners in this tab (a DOM event) and in other
  * tabs (a BroadcastChannel), so the badge updates without polling.
  *
- * Why per-token storage isn't required: the token in storage is the same
- * one used at enqueue time. If the user signs out, `clear_token()` does
- * not clear the queue — but the next flush will fail with a 401 from the
- * server, marked in `lastError`, and the user can dismiss those entries
- * from the UI.
+ * No plaintext token in the queue (Task H5): a queued entry used to carry
+ * a copy of the access token, so it sat in IndexedDB in plaintext for as
+ * long as the entry was queued. `enqueue()` no longer stores one. Replay
+ * reads the current token fresh from `token-store.ts` (`read_token()`)
+ * each time. When no token is stored — signed out, or the encrypted store
+ * was cleared — replay fails the entry with a `no_token`
+ * `OfflineQueueError` ("sign in again") instead of sending it with a
+ * stale or absent credential; `is_retryable_error()` marks that `false`
+ * so the badge doesn't hammer retries a sign-in has to fix. A row queued
+ * by 1.0.21 or earlier still carries a plaintext `accessToken` field from
+ * before this fix; `claim()` and `save()` both strip it the moment such a
+ * row is next read and written back, so it doesn't keep re-persisting.
+ *
+ * Replay and the signed-in site: an entry only ever sends under a token
+ * for the site it was queued for. Replay refuses, non-retryably and before
+ * any request, an entry whose `me` origin differs from the stored token's
+ * `me` (compared with `me_origins_match` from auth-flow.ts), so one
+ * account's token never goes to another account's site. It also refuses
+ * an entry with no `me` at all (queued by a build older than 1.0.16):
+ * with nothing to compare, the stored token could belong to anyone.
+ *
+ * Signing out leaves the queue as it is. `clear_token()` removes only the
+ * token, so posts waiting when a token expires send on the first replay
+ * after the next sign-in to the same site.
  */
 
 import {
@@ -44,6 +64,8 @@ import {
 	type MicropubEnvironment,
 } from './micropub';
 import { recall_endpoints, remember_endpoints } from './endpoint-cache';
+import { read_token, type TokenStoreEnvironment } from './token-store';
+import { me_origins_match } from './auth-flow';
 
 const DB_NAME = 'outpost-queue';
 const DB_VERSION = 1;
@@ -79,7 +101,6 @@ export interface QueueEntry {
 	source: QueueSource;
 	/** h-entry properties. Entries with `media` get `photo` added at replay. */
 	properties: HEntryProperties;
-	accessToken: string;
 	/** Null when the post was queued before any endpoint was discovered. */
 	micropubEndpoint: string | null;
 	/** Signed-in "me" URL the replay discovers endpoints from. Absent on 1.0.15 entries. */
@@ -99,10 +120,7 @@ export interface QueueEntry {
 	claimedUntil?: number;
 }
 
-export type QueueEnqueueInput = Pick<
-	QueueEntry,
-	'source' | 'properties' | 'accessToken' | 'micropubEndpoint'
-> &
+export type QueueEnqueueInput = Pick<QueueEntry, 'source' | 'properties' | 'micropubEndpoint'> &
 	Partial<Pick<QueueEntry, 'me' | 'media' | 'mediaEndpoint'>>;
 
 export interface OfflineQueueEnvironment {
@@ -116,7 +134,7 @@ const default_env: OfflineQueueEnvironment = {
 export class OfflineQueueError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'open_failed' | 'tx_failed',
+		public readonly code: 'open_failed' | 'tx_failed' | 'no_token' | 'wrong_account',
 	) {
 		super(message);
 		this.name = 'OfflineQueueError';
@@ -217,7 +235,6 @@ export async function enqueue(
 	const value: Omit<QueueEntry, 'id'> = {
 		source: input.source,
 		properties: input.properties,
-		accessToken: input.accessToken,
 		micropubEndpoint: input.micropubEndpoint,
 		...(input.me !== undefined ? { me: input.me } : {}),
 		...(input.media !== undefined ? { media: input.media } : {}),
@@ -270,9 +287,14 @@ export async function remove(
 	notify_queue_changed();
 }
 
-/** Write an entry back in place (retry state, uploaded photo URLs, lease). */
+/**
+ * Write an entry back in place (retry state, uploaded photo URLs, lease).
+ * Strips a legacy `accessToken` field a pre-1.0.22 row may still carry
+ * (see the file docblock) so it stops re-persisting the plaintext token
+ * on every subsequent write.
+ */
 async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<void> {
-	const { id, ...rest } = entry;
+	const { id, accessToken: _drop, ...rest } = entry as QueueEntry & { accessToken?: unknown };
 	await in_transaction<null>(env, 'readwrite', 'update', null, (store) => {
 		store.put(rest, id);
 	});
@@ -283,6 +305,9 @@ async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<vo
  * (another tab already posted it) or another tab holds an unexpired lease.
  * The read and the write share one readwrite transaction, which is what
  * makes the claim exclusive across tabs.
+ *
+ * Strips a legacy `accessToken` field a pre-1.0.22 row may still carry
+ * (see the file docblock) so the claim write doesn't re-persist it.
  */
 async function claim(
 	id: number,
@@ -292,8 +317,9 @@ async function claim(
 	return in_transaction<QueueEntry | null>(env, 'readwrite', 'claim', null, (store, set) => {
 		const request = store.get(id);
 		request.onsuccess = (): void => {
-			const value = request.result as Omit<QueueEntry, 'id'> | undefined;
-			if (!value || (value.claimedUntil ?? 0) > now) return;
+			const raw = request.result as (Omit<QueueEntry, 'id'> & { accessToken?: unknown }) | undefined;
+			if (!raw || (raw.claimedUntil ?? 0) > now) return;
+			const { accessToken: _drop, ...value } = raw;
 			const claimed = { ...value, claimedUntil: now + CLAIM_LEASE_MS };
 			store.put(claimed, id);
 			set({ id, ...claimed });
@@ -304,6 +330,8 @@ async function claim(
 export interface FlushOptions {
 	/** Clock for claim leases. Tests pass a fixed one. */
 	now?: () => number;
+	/** Token-store environment for replay's `read_token()` call. Tests pass a fixed one. */
+	tokenStore?: TokenStoreEnvironment;
 }
 
 /**
@@ -326,7 +354,7 @@ export async function flush(
 		const entry = await claim(listed.id, now(), env);
 		if (!entry) continue;
 		try {
-			await replay(entry, micropubEnv, env, now);
+			await replay(entry, micropubEnv, env, now, options.tokenStore);
 		} catch (err) {
 			await save(
 				{
@@ -356,18 +384,40 @@ async function replay(
 	micropubEnv: MicropubEnvironment | undefined,
 	env: OfflineQueueEnvironment,
 	now: () => number,
+	tokenStoreEnv?: TokenStoreEnvironment,
 ): Promise<void> {
 	const renew = (): Promise<void> =>
 		save({ ...entry, claimedUntil: now() + CLAIM_LEASE_MS }, env);
 
+	// An entry with no `me` can't be matched to the signed-in site, so it
+	// never sends under whatever token is stored.
+	if (!entry.me) {
+		throw new OfflineQueueError(
+			'queue replay: queued by an older version with no site recorded; re-create this post',
+			'wrong_account',
+		);
+	}
+	const stored_token = await read_token(tokenStoreEnv);
+	if (!stored_token) {
+		throw new OfflineQueueError(
+			'queue replay: no token in the encrypted store — sign in again to send this post',
+			'no_token',
+		);
+	}
+	// Refuse to send someone else's token to this entry's site.
+	if (stored_token.me && !me_origins_match(entry.me, stored_token.me)) {
+		throw new OfflineQueueError(
+			'queue replay: signed in as a different site than ' +
+				entry.me +
+				', where this post was queued — it stays queued; once you are signed in to that ' +
+				'site, Retry all now or the next reconnect sends it, or dismiss it',
+			'wrong_account',
+		);
+	}
+	const accessToken = stored_token.accessToken;
+
 	let endpoint = entry.micropubEndpoint;
 	if (!endpoint) {
-		if (!entry.me) {
-			throw new MicropubError(
-				'queue replay: the entry has neither a Micropub endpoint nor a me URL',
-				'no_endpoint',
-			);
-		}
 		endpoint =
 			recall_endpoints(entry.me).micropub ??
 			(await discover_micropub_endpoint(entry.me, micropubEnv));
@@ -392,7 +442,7 @@ async function replay(
 				if (!media_endpoint) {
 					media_endpoint = await discover_media_endpoint(
 						endpoint,
-						entry.accessToken,
+						accessToken,
 						micropubEnv,
 					);
 					if (entry.me) remember_endpoints(entry.me, { media: media_endpoint });
@@ -402,7 +452,7 @@ async function replay(
 					{
 						blob: new Blob([item.bytes], { type: item.type }),
 						filename: item.filename,
-						accessToken: entry.accessToken,
+						accessToken,
 						mediaEndpoint: media_endpoint,
 					},
 					micropubEnv,
@@ -418,7 +468,7 @@ async function replay(
 
 	try {
 		await post_h_entry(
-			{ properties, accessToken: entry.accessToken, micropubEndpoint: endpoint },
+			{ properties, accessToken, micropubEndpoint: endpoint },
 			micropubEnv,
 		);
 	} catch (err) {
@@ -496,5 +546,11 @@ export function is_retryable_error(err: unknown): boolean {
 			(err.status >= 500 || err.status === 408 || err.status === 429)
 		);
 	}
-	return err instanceof OfflineQueueError;
+	if (err instanceof OfflineQueueError) {
+		// `no_token` waits for a sign-in, and `wrong_account` for a sign-in
+		// to the entry's own site (an entry with no site never sends) —
+		// neither is fixed by another automatic attempt.
+		return err.code !== 'no_token' && err.code !== 'wrong_account';
+	}
+	return false;
 }

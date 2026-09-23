@@ -344,6 +344,21 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 	}
 }
 
+// IndieAuth's accessors, as IndieAuth 4.7.2 defines them (functions.php):
+// each is exactly an apply_filters() call. Outpost_Bearer_Auth reads scopes
+// and the token response through them, so tests keep driving both with
+// WP_Mock::onFilter( 'indieauth_scopes' / 'indieauth_response' ).
+if ( ! function_exists( 'indieauth_get_scopes' ) ) {
+	function indieauth_get_scopes() {
+		return apply_filters( 'indieauth_scopes', null );
+	}
+}
+if ( ! function_exists( 'indieauth_get_response' ) ) {
+	function indieauth_get_response() {
+		return apply_filters( 'indieauth_response', null );
+	}
+}
+
 // Minimal WP_Error stub for unit tests. Real WP supplies the full class via
 // wp-includes/class-wp-error.php; here we just need code/message/data round-trip.
 if ( ! class_exists( 'WP_Error' ) ) {
@@ -490,6 +505,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public string $post_type      = '';
 		public int $post_parent       = 0;
 		public string $post_mime_type = '';
+		public string $post_password  = '';
 
 		public function __construct( array $fields = array() ) {
 			foreach ( $fields as $key => $value ) {

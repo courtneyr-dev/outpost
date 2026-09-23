@@ -1,37 +1,64 @@
+import { useEffect, useState } from 'preact/hooks';
+
 /**
- * Connection banner — a purely CSS-reactive connectivity indicator.
+ * Connection banner — a state-driven connectivity indicator.
  *
- * There is no online/offline JavaScript in this component. `prop-for-that`
- * samples connectivity in the PWA entry and keeps `--live-online` (1/0) and
- * `--live-net-save-data` (1/0) current on `:root`; CSS reveals the matching
- * message via `@container style()` (see structure.css). Keeping the reaction
- * path in the stylesheet is the whole point — the component just renders the
- * two messages, always present in the DOM, hidden until CSS shows one.
+ * Listens for the browser's `online`/`offline` events and the Network
+ * Information API's `change` event directly, and reflects that state as the
+ * native `hidden` attribute on each message. Both messages are always
+ * present in the DOM; `hidden` toggles which one (if any) is visible.
  *
  * Complements the offline *queue* (queue-badge.tsx): this says "you're offline
  * right now," the badge shows how many posts are waiting to send.
  *
- * `--live-net-save-data` comes from the Network Information API (Chromium-only),
- * so the Data Saver message only appears there; the offline message works
+ * `saveData` comes from the Network Information API (Chromium-only), so the
+ * Data Saver message only appears there; the offline message works
  * everywhere via `navigator.onLine`.
  *
- * Accessibility: each message carries `role="status"`. Visibility flips via CSS
- * `display`, and screen-reader announcement of a display change is best-effort —
- * a JS-mirrored `aria-live` update is the follow-up if guaranteed announcement
- * is needed.
+ * Accessibility: each message carries `role="status"`, so assistive tech
+ * announces it as soon as `hidden` is cleared — no separate `aria-live`
+ * mirroring needed.
  */
+type Connection = {
+	saveData?: boolean;
+	addEventListener?: (type: string, listener: () => void) => void;
+	removeEventListener?: (type: string, listener: () => void) => void;
+};
+
+const connection = (): Connection | undefined =>
+	(navigator as Navigator & { connection?: Connection }).connection;
+
 export function ConnectionBanner() {
+	const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+	const [saveData, setSaveData] = useState(Boolean(connection()?.saveData));
+
+	useEffect(() => {
+		const goOnline = () => setOnline(true);
+		const goOffline = () => setOnline(false);
+		const netChange = () => setSaveData(Boolean(connection()?.saveData));
+		window.addEventListener('online', goOnline);
+		window.addEventListener('offline', goOffline);
+		connection()?.addEventListener?.('change', netChange);
+		return () => {
+			window.removeEventListener('online', goOnline);
+			window.removeEventListener('offline', goOffline);
+			connection()?.removeEventListener?.('change', netChange);
+		};
+	}, []);
+
 	return (
 		<div class="outpost-connection-banner">
 			<p
 				class="outpost-connection-banner__msg outpost-connection-banner__msg--offline"
 				role="status"
+				hidden={online}
 			>
 				You're offline. Posts will be queued and sent when you reconnect.
 			</p>
 			<p
 				class="outpost-connection-banner__msg outpost-connection-banner__msg--save-data"
 				role="status"
+				hidden={!saveData}
 			>
 				Data Saver is on — showing the lightweight view.
 			</p>

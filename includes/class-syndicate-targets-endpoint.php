@@ -83,7 +83,12 @@ final class Outpost_Syndicate_Targets_Endpoint {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// Read-only: static companion-chip metadata, writes nothing. A
+		// token scoped for `read` alone (as well as `create`/`update`) may
+		// use it.
+		$can_edit  = current_user_can( 'edit_posts' );
+		$has_scope = self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
+		$allow     = $can_edit && $has_scope;
 		/**
 		 * Override the syndicate-targets endpoint permission decision.
 		 *
@@ -94,7 +99,9 @@ final class Outpost_Syndicate_Targets_Endpoint {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost syndication targets require an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// See Outpost_Preview_Endpoint::check_permission() for the
+				// 401-vs-403 rationale.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;

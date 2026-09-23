@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.21
+Stable tag:        1.0.22
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -97,7 +97,7 @@ Mostly, with one known pitfall: some managed hosts strip the Authorization heade
 
 = Does Outpost work offline? =
 
-Yes, for composing. Drafts written offline queue in your browser's IndexedDB and submit when the connection returns. Sign-in tokens are encrypted (AES-GCM) in the browser.
+Yes, for composing. Drafts written offline queue in your browser's IndexedDB and submit when the connection returns. Sign-in tokens are encrypted (AES-GCM) in the browser. A queued draft keeps no copy of your token: it sends with your current sign-in, only to the site it was queued for, and signing out leaves it in the queue.
 
 = What sends data where? =
 
@@ -153,7 +153,7 @@ Outpost also recognizes links you share from many sites (YouTube, Reddit, TikTok
 = Syndication (per post, only for chips you leave enabled) =
 
 * **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the Bridgy endpoint you configured: **brid.gy** (Flickr, GitHub, Reddit), **bsky.brid.gy** (Bluesky), or **fed.brid.gy** (the fediverse). Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
-* **Telegraph (a Telegram service)** — off, and there is no settings screen for it yet; it stays off unless a site owner deliberately sets the `outpost_telegraph_enabled` option. While it is on, each post you publish is sent to api.telegra.ph, which creates a public copy of it at a telegra.ph address. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
+* **Telegraph (a Telegram service)** — off, and there is no settings screen for it yet; it stays off unless a site owner deliberately sets the `outpost_telegraph_enabled` option. While it is on, each post you publish is sent to api.telegra.ph, which creates a public copy of it at a telegra.ph address. Password-protected posts are never sent. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
 * **Beehiiv** — newsletter destination; when configured with an API key and enabled on a post, the post's content is sent to api.beehiiv.com. [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy).
 * **Buttondown** — newsletter destination; sends the post's content to api.buttondown.email when enabled. [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy).
 * **Kit (formerly ConvertKit)** — newsletter destination; sends the post's content to api.convertkit.com when enabled, and records the resulting broadcast’s app.kit.com URL on the post (that URL is stored and displayed, never requested). [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy).
@@ -235,6 +235,15 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.22 =
+* Security: posts waiting in the offline queue no longer keep a copy of your sign-in token. They send with your current sign-in, and only to the site they were queued for. Signing out keeps them in the queue.
+* Security: apps that post through Outpost's endpoints with an IndieAuth token need the create or update permission to make changes. Tokens with only the draft permission, and tokens IndieAuth didn't issue, are refused.
+* Security: the connected-services (OAuth) routes refuse requests made with an app token. They work from the logged-in WordPress admin only.
+* Security: the older iOS Shortcut address, /post/shortcut, is closed. The Shortcut's REST address, /wp-json/outpost/v1/shortcut, is the supported path.
+* Security: password-protected posts are never sent to Telegraph.
+* Security: link previews connect only to the address Outpost checked, so a DNS answer that changes mid-request can't point the fetch at another address.
+* Fixed: the connection banner no longer says "You're offline" or "Data Saver is on" while you're online.
 
 = 1.0.21 =
 * Security: the composer settings endpoint no longer answers a logged-in browser request that arrives without WordPress's REST security token, in the case where another plugin's earlier error stopped WordPress from checking that token. A cross-site page could otherwise read the site's companion-plugin status and composer settings by riding the logged-in cookie. The endpoint is read-only and the data is low-value, but the check is now correct. Sign-in with an access token, which the app uses, is unaffected.
@@ -338,6 +347,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
+
+= 1.0.22 =
+Security release. Apps that post through Outpost's endpoints with an IndieAuth token need the create or update permission. Posts queued offline before this update send with your current sign-in.
 
 = 1.0.0 =
 First stable release.

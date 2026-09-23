@@ -78,8 +78,31 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		$this->mock_filters( 42 );
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see "Scope source" in trait-bearer-auth.php).
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
 		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Important: an under-scoped (but otherwise validated)
+	 * bearer token is refused, distinct from an unvalidated-token refusal.
+	 */
+	public function test_permission_refuses_under_scoped_bearer_token(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+
+		$result = Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function make_request( ?string $mode ): WP_REST_Request {

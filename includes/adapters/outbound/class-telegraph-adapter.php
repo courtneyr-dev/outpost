@@ -107,6 +107,13 @@ final class Outpost_Telegraph_Adapter {
 	 * @param WP_Post $post       Post object.
 	 */
 	public static function maybe_syndicate_on_publish( string $new_status, string $old_status, $post ): void {
+		// Telegraph publishes a public copy of the post; a password
+		// protected post must never leave the site through it. Check the
+		// type first so a non-WP_Post value (the hook's $post argument is
+		// untyped) never reaches the property read below.
+		if ( ! $post instanceof \WP_Post || '' !== (string) $post->post_password ) {
+			return;
+		}
 		// Fail closed. Registration is gated too, but syndicate() is also
 		// reachable directly (WP-CLI, a site's own code), so consent is
 		// checked here rather than only at hook-registration time.
@@ -114,9 +121,6 @@ final class Outpost_Telegraph_Adapter {
 			return;
 		}
 		if ( 'publish' !== $new_status || 'publish' === $old_status ) {
-			return;
-		}
-		if ( ! $post instanceof \WP_Post ) {
 			return;
 		}
 		/**
