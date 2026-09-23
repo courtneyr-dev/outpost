@@ -104,7 +104,17 @@ final class Outpost_Syndication_Capture_Controller {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// This callback guards both the read-only GET /pending route and
+		// the mutating POST /capture route (writes completed_at + silo_url
+		// to the audit log and outpost_syndication_links). GET requests
+		// accept a `read` scope in addition to `create`/`update`; POST
+		// requires `create`/`update`.
+		$required_scopes = 'GET' === $request->get_method()
+			? array( 'create', 'update', 'read' )
+			: array( 'create', 'update' );
+		$can_edit        = current_user_can( 'edit_posts' );
+		$has_scope       = self::bearer_has_scope( $required_scopes );
+		$allow           = $can_edit && $has_scope;
 		/**
 		 * Override the syndication-capture endpoint permission decision.
 		 *
@@ -115,7 +125,9 @@ final class Outpost_Syndication_Capture_Controller {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// See Outpost_Preview_Endpoint::check_permission() for the
+				// 401-vs-403 rationale.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;

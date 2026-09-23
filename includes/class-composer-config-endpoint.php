@@ -294,7 +294,10 @@ final class Outpost_Composer_Config_Endpoint {
 		// the cookie path was the CSRF surface the 1.0.4 fix closed, and it
 		// never reached this endpoint on a header-stripping host anyway.
 		self::authenticate_bearer_token( $request );
-		$allow = current_user_can( 'edit_posts' );
+		// Read-only: aggregates companion-plugin status + taxonomy terms +
+		// settings, writes nothing but a rate-limit transient. A token
+		// scoped for `read` alone (as well as `create`/`update`) may use it.
+		$allow = current_user_can( 'edit_posts' ) && self::bearer_has_scope( array( 'create', 'update', 'read' ) );
 		/**
 		 * Override the composer-config permission decision.
 		 *

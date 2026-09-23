@@ -133,6 +133,78 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( Outpost_Syndication_Capture_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
+	// =====================================================================
+	// H6: bearer-authenticated /manual-share/capture requires create/update
+	// scope. `mock_filters()` above stubs `apply_filters` wholesale, which
+	// WP_Mock never actually routes `apply_filters()` calls through (that
+	// function is on WP_Mock's built-in list and is never Patchwork-
+	// redefined) — determine_current_user and indieauth_scopes must be
+	// driven through WP_Mock::onFilter() instead, the mechanism the real
+	// apply_filters() shim consults.
+	// =====================================================================
+
+	public function test_permission_denies_bearer_token_scoped_for_profile_only_on_capture(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_allows_bearer_token_scoped_for_create_on_capture(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+			)
+		);
+	}
+
+	public function test_permission_read_scope_alone_is_insufficient_for_capture(): void {
+		// /capture mutates (writes completed_at + silo_url); unlike the
+		// read-only GET /pending route on this same controller, a `read`
+		// scope alone must not authorize it.
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_read_scope_authorizes_get_pending(): void {
+		// GET /pending is read-only, so a `read`-only token is enough.
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'GET', '/outpost/v1/manual-share/pending' )
+			)
+		);
+	}
+
 	private function build_capture_request( array $params ): WP_REST_Request {
 		$request = $this->createMock( WP_REST_Request::class );
 		$request->method( 'get_param' )->willReturnCallback(

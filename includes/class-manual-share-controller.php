@@ -153,7 +153,20 @@ final class Outpost_Manual_Share_Controller {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// This callback guards all three routes. POST /intent computes and
+		// returns a share-intent payload (no persistence) and GET
+		// /manual-share-chips returns static chip metadata — both
+		// read-only, so a `read` scope suffices in addition to
+		// `create`/`update`. POST /intent/log is the one mutating route
+		// (writes the audit log's `outcome`); method alone can't
+		// distinguish it from the also-POST /intent, so it's matched by
+		// route.
+		$required_scopes = self::is_log_route( $request )
+			? array( 'create', 'update' )
+			: array( 'create', 'update', 'read' );
+		$can_edit        = current_user_can( 'edit_posts' );
+		$has_scope       = self::bearer_has_scope( $required_scopes );
+		$allow           = $can_edit && $has_scope;
 		/**
 		 * Override the manual-share intent endpoint permission decision.
 		 *
@@ -164,10 +177,22 @@ final class Outpost_Manual_Share_Controller {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// See Outpost_Preview_Endpoint::check_permission() for the
+				// 401-vs-403 rationale.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;
+	}
+
+	/**
+	 * Whether this request matches the mutating /manual-share/intent/log
+	 * route, as distinct from the also-POST but read-only /manual-share/intent.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 */
+	private static function is_log_route( WP_REST_Request $request ): bool {
+		return '/' . self::ROUTE_NAMESPACE . self::ROUTE_LOG_PATH === $request->get_route();
 	}
 
 	/**

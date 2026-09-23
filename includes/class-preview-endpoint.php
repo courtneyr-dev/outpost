@@ -128,7 +128,12 @@ final class Outpost_Preview_Endpoint {
 	public static function check_permission( WP_REST_Request $request ) {
 		self::authenticate_bearer_token( $request );
 
-		$allow = current_user_can( 'edit_posts' );
+		// Read-only: fetches and sanitizes a target URL, writes nothing.
+		// A token scoped for `read` alone (as well as `create`/`update`)
+		// may use it.
+		$can_edit  = current_user_can( 'edit_posts' );
+		$has_scope = self::bearer_has_scope( array( 'create', 'update', 'read' ) );
+		$allow     = $can_edit && $has_scope;
 		/**
 		 * Override the preview-endpoint permission decision.
 		 *
@@ -139,7 +144,11 @@ final class Outpost_Preview_Endpoint {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' ),
-				array( 'status' => 401 )
+				// A capable user whose bearer token lacks scope is
+				// authenticated but forbidden (403); everyone else is
+				// simply not authenticated (401) — mirrors core's own
+				// rest_authorization_required_code() convention.
+				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
 			);
 		}
 		return true;
