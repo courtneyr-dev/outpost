@@ -134,7 +134,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
-		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock mock_filters() sets up — that override is inert for this
 		// call (see trait-bearer-auth.php discovery notes). POST is now
@@ -146,7 +146,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Important: method-split controller coverage — a
+	 * H6 fix round 1, Important: method-split controller coverage — a
 	 * `read`-only token authorizes the read-only GET /manual-share-chips
 	 * route.
 	 */
@@ -161,7 +161,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Critical 2 + Important: a `read`-only token does NOT
+	 * H6 fix round 1, Critical 2 + Important: a `read`-only token does NOT
 	 * authorize either mutating POST route. /intent looks like a computed
 	 * payload but its Android/iOS builders write an audit log entry (see
 	 * Outpost_Manual_Share_Intent_Payload_Builder::build_for_android()/

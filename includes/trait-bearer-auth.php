@@ -63,48 +63,55 @@ trait Outpost_Bearer_Auth {
 	 * Whether the token that authenticated this request carries any of the
 	 * given IndieAuth scopes.
 	 *
-	 * Discovery (H6, read-only against the deployed IndieAuth 4.7.2 source
-	 * at includes/class-authorize.php + includes/functions.php): IndieAuth's
+	 * Scope source (H6, read against the deployed IndieAuth 4.7.2 source,
+	 * includes/class-authorize.php and includes/functions.php): IndieAuth's
 	 * `determine_current_user` callback (`Authorize::determine_current_user()`,
-	 * hooked at priority 15) explodes the token response's `scope` string
-	 * onto `$this->scopes` on its own singleton, and separately hooks the
-	 * `indieauth_scopes` filter (`Authorize::get_indieauth_scopes()`, priority
-	 * 9) to expose it: `$scopes ? $scopes : $this->scopes`. The plugin's own
-	 * public accessor, `indieauth_get_scopes()`, is exactly
-	 * `apply_filters( 'indieauth_scopes', null )` — there is no per-request
-	 * $_SERVER value or global; the filter is the only exposed source.
+	 * priority 15) stores a verified token's response on its own instance
+	 * (`$this->response`) and splits the response's `scope` string onto
+	 * `$this->scopes`. The `indieauth_response` and `indieauth_scopes`
+	 * filters (both priority 9) expose those two values, and IndieAuth's
+	 * accessors `indieauth_get_response()` and `indieauth_get_scopes()` are
+	 * exactly `apply_filters( ..., null )` on them. No `$_SERVER` value or
+	 * global carries either.
 	 *
-	 * H7 fix-round-1 (Critical 1): whether a scope check applies is decided
-	 * from the CREDENTIAL'S PRESENCE on this request — {@see self::bearer_token()}
-	 * — never from whether THIS trait's own `authenticate_bearer_token()}` did
-	 * the resolving. Because `Outpost_Request_Headers::authorization()` is a
-	 * real Authorization header (or a Micropub-spec body `access_token`),
-	 * IndieAuth's OWN `determine_current_user` callback is hooked at priority
-	 * 15 globally and runs during WordPress's normal, early current-user
-	 * resolution — well before any REST `permission_callback` executes. So a
-	 * header token (or IndieAuth's own form-encoded `$_POST['access_token']`
-	 * support) is routinely already resolved, and `is_user_logged_in()` is
-	 * already `true`, by the time `authenticate_bearer_token()` runs — its
-	 * early return skips token resolution entirely, but a real bearer
-	 * credential drove that authentication. Deciding "is this a bearer
-	 * request" from "did our own code resolve it" missed exactly that case:
-	 * a `draft`-scoped (or any under-scoped) token would sail through with no
-	 * scope check at all. Checking the request for a credential directly,
-	 * independent of who resolved the current user, closes that gap.
+	 * Whether a scope check applies depends on whether a bearer credential
+	 * is on this request, never on which code resolved the current user.
+	 * IndieAuth's callback runs during WordPress's own early user
+	 * resolution, before any permission callback, so a header or
+	 * form-encoded token is usually resolved already and
+	 * `authenticate_bearer_token()` returns early without resolving
+	 * anything itself. Either of two signals marks the request as bearer:
 	 *
-	 * A request with NO bearer credential at all (pure cookie/nonce session,
-	 * or fully anonymous) carries no scope to check: `edit_posts` + the REST
-	 * nonce remain its whole gate, unchanged by this method. A bearer
-	 * credential that resolved a user but exposes no scope (any
-	 * `determine_current_user` authority other than IndieAuth, or IndieAuth's
-	 * filter returning empty) is treated as scope-less and rejected: an
-	 * unscoped token must never fall through to full access.
+	 *   1. {@see self::bearer_token()} finds a token in the Authorization
+	 *      header or in the `access_token` body parameter.
+	 *   2. `indieauth_response` is non-empty. IndieAuth sets it only after a
+	 *      token verified, so it covers every token source IndieAuth accepts,
+	 *      including any header form or header source this trait's reader
+	 *      misses. IndieAuth's own `Scopes::map_meta_cap()` treats a request
+	 *      as token-authenticated on the same signal.
 	 *
-	 * @param WP_REST_Request     $request Current REST request.
-	 * @param array<int, string>  $any_of  Scopes to accept; any one present authorizes.
+	 * A request with neither (a cookie session with its REST nonce, or an
+	 * anonymous request) has no scope to check: `edit_posts` and the nonce
+	 * stay its whole gate. A bearer request whose scope list is missing or
+	 * empty (IndieAuth inactive, or another `determine_current_user`
+	 * authority resolved the token) fails closed.
+	 *
+	 * Interplay with the `edit_posts` check every caller makes: IndieAuth's
+	 * `Scopes::map_meta_cap()` grants `edit_posts` to a token only when one
+	 * of its scopes maps to it. Of the built-in scopes, `create` and `draft`
+	 * do; `read` and `update` alone never do (`update` maps to
+	 * `edit_published_posts` and `edit_others_posts`). So a real `draft`
+	 * token passes the capability check and is refused on mutating routes
+	 * by this method alone, while a real `read`-only token is refused by
+	 * the capability check before this method's answer matters.
+	 *
+	 * @param WP_REST_Request    $request Current REST request.
+	 * @param array<int, string> $any_of  Scopes to accept; any one present authorizes.
 	 */
 	protected static function bearer_has_scope( WP_REST_Request $request, array $any_of ): bool {
-		if ( '' === self::bearer_token( $request ) ) {
+		$is_bearer = '' !== self::bearer_token( $request )
+			|| ! empty( apply_filters( 'indieauth_response', null ) );
+		if ( ! $is_bearer ) {
 			return true;
 		}
 		$scopes = apply_filters( 'indieauth_scopes', null );
@@ -124,6 +131,17 @@ trait Outpost_Bearer_Auth {
 	 * Micropub-spec `access_token` request body on hosts that strip the
 	 * header. Returns '' when no token is present.
 	 *
+	 * The header pattern matches every header text IndieAuth's
+	 * `Authorize::get_token_from_bearer_header()` matches. IndieAuth's
+	 * pattern, `/Bearer ([\x20-\x7E]+)/`, is unanchored, so it reads a token
+	 * after any prefix (`X Bearer <token>`); this one is unanchored too, and
+	 * case-insensitive. A `Basic` credential never matches: its base64
+	 * payload contains no whitespace, so `Bearer` followed by whitespace
+	 * cannot appear in it. IndieAuth reads the header raw while
+	 * `Outpost_Request_Headers::authorization()` sanitizes it, which can
+	 * drop tag-like text or invalid UTF-8; for those, the
+	 * `indieauth_response` signal in bearer_has_scope() marks the request.
+	 *
 	 * The body is read through WP_REST_Request, which WordPress has already
 	 * parsed (form-encoded or JSON). Query-string parameters are never
 	 * consulted: bodies don't appear in access logs, browser history, or CDN
@@ -133,7 +151,7 @@ trait Outpost_Bearer_Auth {
 	 */
 	private static function bearer_token( WP_REST_Request $request ): string {
 		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
+		if ( '' !== $header && preg_match( '/Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
 		}
 		foreach ( array( $request->get_body_params(), $request->get_json_params() ) as $body ) {

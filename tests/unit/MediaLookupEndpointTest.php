@@ -489,7 +489,7 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
-	// --- H7 fix-round-1, Critical 1 regression ------------------------------
+	// --- H6 fix round 1, Critical 1 regression ------------------------------
 	//
 	// IndieAuth's own `determine_current_user` callback is hooked globally at
 	// priority 15 and runs during WordPress's normal, early current-user

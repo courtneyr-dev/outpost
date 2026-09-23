@@ -161,7 +161,7 @@ final class Outpost_Manual_Share_Controller {
 		// payload — calls Outpost_Manual_Share_Intent_Payload_Builder::
 		// build_for_android()/build_for_ios(), which both call
 		// Outpost_Manual_Share_Audit_Log::add_entry() -> update_post_meta()
-		// (H7 fix-round-1, Critical 2: /intent was misclassified read-only).
+		// (H6 fix round 1, Critical 2: /intent was misclassified read-only).
 		// A prior per-route match on /intent/log (case-sensitive string
 		// comparison against $request->get_route()) was also a bypass: core
 		// matches REST routes case-insensitively, so /intent/LOG would

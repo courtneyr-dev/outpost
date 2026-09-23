@@ -99,7 +99,7 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Important: an under-scoped (but otherwise validated)
+	 * H6 fix round 1, Important: an under-scoped (but otherwise validated)
 	 * bearer token is refused, distinct from an unvalidated-token refusal.
 	 */
 	public function test_permission_check_refuses_under_scoped_bearer_token(): void {

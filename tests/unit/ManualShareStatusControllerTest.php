@@ -140,7 +140,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->user_logged_in             = false;
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
-		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock mock_filters() sets up — that override is inert for this
 		// call (see trait-bearer-auth.php discovery notes). POST is the
@@ -151,7 +151,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Important: method-split controller coverage — a
+	 * H6 fix round 1, Important: method-split controller coverage — a
 	 * `read`-only token authorizes the GET routes (status, pending-summary).
 	 */
 	public function test_permission_read_scope_authorizes_get(): void {
@@ -165,7 +165,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Important: method-split controller coverage — a
+	 * H6 fix round 1, Important: method-split controller coverage — a
 	 * `read`-only token does NOT authorize the mutating POST routes
 	 * (dismiss-reminder, snooze-all — both write reminder_dismissed_until).
 	 */

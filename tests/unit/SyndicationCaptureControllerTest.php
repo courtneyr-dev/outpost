@@ -129,7 +129,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->user_logged_in             = false;
 		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
 		$this->mock_filters( 42 );
-		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock mock_filters() sets up — that override is inert for this
 		// call (see trait-bearer-auth.php discovery notes). POST is the
@@ -248,7 +248,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * H7 fix-round-1, Critical 1 regression: IndieAuth's own
+	 * H6 fix round 1, Critical 1 regression: IndieAuth's own
 	 * `determine_current_user` runs globally at priority 15, during
 	 * WordPress's normal early current-user resolution — well before this
 	 * route's permission_callback runs. A header (or form-encoded) bearer
@@ -270,6 +270,145 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	// =====================================================================
+	// H6 fix round 2: the trait must see every credential IndieAuth
+	// authenticates. IndieAuth reads the header with an unanchored
+	// `/Bearer ([\x20-\x7E]+)/` and falls back to getallheaders(). Round 1
+	// matched only `^\s*Bearer` in $_SERVER, so `Authorization: X Bearer
+	// <draft token>` logged the user in through IndieAuth (and its
+	// map_meta_cap grants `draft` edit_posts) while bearer_has_scope() saw
+	// no credential and skipped the scope check on every mutating route.
+	// =====================================================================
+
+	/**
+	 * Model the state IndieAuth's determine_current_user leaves behind after
+	 * it verified a token: a non-empty `indieauth_response` and the token's
+	 * scopes on `indieauth_scopes`.
+	 *
+	 * @param string[] $scopes Token scopes.
+	 */
+	private function mock_verified_indieauth_token( array $scopes ): void {
+		WP_Mock::onFilter( 'indieauth_response' )->with( null )->reply(
+			array(
+				'scope' => implode( ' ', $scopes ),
+				'user'  => 7,
+			)
+		);
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( $scopes );
+	}
+
+	public function test_permission_refuses_prefixed_bearer_header_scoped_for_draft_on_capture(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'X Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in          = true;
+		$this->mock_verified_indieauth_token( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	public function test_permission_allows_prefixed_bearer_header_scoped_for_create_on_capture(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'X Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in          = true;
+		$this->mock_verified_indieauth_token( array( 'create' ) );
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+			)
+		);
+	}
+
+	/**
+	 * Isolates the `indieauth_response` signal: no header or body token the
+	 * trait can read, yet IndieAuth verified one (a token source or header
+	 * shape the trait's own reader does not cover).
+	 */
+	public function test_permission_refuses_indieauth_verified_request_with_no_readable_credential(): void {
+		$this->user_logged_in = true;
+		$this->mock_verified_indieauth_token( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * Isolates the header regex: `indieauth_response` has no callback, so
+	 * only the trait's own reader can mark `X Bearer <token>` as bearer.
+	 */
+	public function test_permission_reads_a_prefixed_bearer_header_without_indieauth_response(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'X Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in          = true;
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * Isolates the getallheaders() fallback: $_SERVER carries no
+	 * Authorization and `indieauth_response` has no callback, so only the
+	 * trait's own reader can mark the request as bearer.
+	 */
+	public function test_permission_reads_a_header_only_getallheaders_exposes(): void {
+		$this->user_logged_in = true;
+		WP_Mock::userFunction( 'getallheaders' )->andReturn(
+			array( 'authorization' => 'Bearer valid' ) // outpost-lint:fixture-credential
+		);
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'draft' ) );
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * IndieAuth inactive: a credential is present but neither
+	 * `indieauth_response` nor `indieauth_scopes` has a callback, so both
+	 * return null. Another `determine_current_user` authority logged the
+	 * user in; the gate fails closed.
+	 */
+	public function test_permission_fails_closed_when_a_credential_has_no_scope_source(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in          = true;
+
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
+	}
+
+	/**
+	 * An application-password `Basic` header is not a bearer credential: a
+	 * cookie session carrying one keeps the plain `edit_posts` gate.
+	 */
+	public function test_permission_does_not_treat_a_basic_header_as_bearer(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Basic ' . base64_encode( 'editor:abcd EFGH ijkl MNOP qrst UVWX' ); // outpost-lint:fixture-credential
+		$this->user_logged_in          = true;
+
+		$this->assertTrue(
+			Outpost_Syndication_Capture_Controller::check_permission(
+				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
+			)
+		);
 	}
 
 	private function build_capture_request( array $params ): WP_REST_Request {
