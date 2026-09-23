@@ -31,6 +31,17 @@
 	</rule>
 	<rule ref="PHPCompatibilityWP"/>
 
+	<!-- safe_fetch() pins each preview fetch to the IP Outpost_Url_Guard vetted
+	     by calling curl_setopt( $handle, CURLOPT_RESOLVE, ... ) inside the
+	     http_api_curl action, which hands it the curl handle WordPress's HTTP
+	     API created. The HTTP API has no option for this (without it, curl
+	     re-resolves the host, which allows DNS rebinding), so the call can't be
+	     replaced with wp_remote_get(). Excluded for this one file only; every
+	     other file still gets the warning. -->
+	<rule ref="WordPress.WP.AlternativeFunctions.curl_curl_setopt">
+		<exclude-pattern>*/includes/class-preview-endpoint.php</exclude-pattern>
+	</rule>
+
 	<config name="testVersion" value="8.2-"/>
 	<config name="minimum_wp_version" value="6.5"/>
 
