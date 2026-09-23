@@ -320,4 +320,36 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertInstanceOf( WP_Error::class, $response );
 	}
+
+	// =====================================================================
+	// H9 fix round 1: resolve_pin_entry() is the pure host:port:ip builder
+	// safe_fetch() hands to CURLOPT_RESOLVE via http_api_curl. Extracted so
+	// the port-default logic is directly unit-tested — nothing here
+	// previously checked the actual pin value, only that the hook was
+	// attached and detached (tests/integration/PreviewSsrfTest.php).
+	// =====================================================================
+
+	public function test_resolve_pin_entry_defaults_to_443_for_https(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://example.test/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:443:93.184.216.34', $entry );
+	}
+
+	public function test_resolve_pin_entry_defaults_to_80_for_http(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'http://example.test/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:80:93.184.216.34', $entry );
+	}
+
+	public function test_resolve_pin_entry_keeps_an_explicit_port(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://example.test:8080/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:8080:93.184.216.34', $entry );
+	}
 }

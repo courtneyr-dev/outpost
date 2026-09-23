@@ -700,6 +700,27 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
+	 * Build the `host:port:ip` entry for `CURLOPT_RESOLVE`, pinning the
+	 * host and port `$url` will be requested on to `$ip` — the address
+	 * {@see Outpost_Url_Guard::resolve_safe_ip()} already vetted for this
+	 * hop. Pure and side-effect free so the port-default logic (443/80 when
+	 * `$url` carries no explicit port) is unit-testable on its own.
+	 *
+	 * @param string $url Absolute URL for this hop (already scheme/host-validated).
+	 * @param string $ip  The vetted IP address to pin the connection to.
+	 * @return string `host:port:ip`, ready for `CURLOPT_RESOLVE`.
+	 */
+	private static function resolve_pin_entry( string $url, string $ip ): string {
+		$host = (string) wp_parse_url( $url, PHP_URL_HOST );
+		$port = (int) wp_parse_url( $url, PHP_URL_PORT );
+		if ( 0 === $port ) {
+			$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+			$port   = 'https' === $scheme ? 443 : 80;
+		}
+		return "{$host}:{$port}:{$ip}";
+	}
+
+	/**
 	 * Fetch a URL with SSRF-safe, per-hop redirect validation.
 	 *
 	 * `wp_safe_remote_get()` blocks loopback + RFC1918 but not the ranges
@@ -714,6 +735,11 @@ final class Outpost_Preview_Endpoint {
 	 * rebinding), serving the request from an address the guard never saw. A
 	 * one-shot `http_api_curl` handler pins curl to the address the guard just
 	 * vetted for this hop, and is removed again once the request completes.
+	 * The pin only takes effect when `WP_Http`'s Curl transport is actually
+	 * used — if the curl extension is unavailable, Requests falls back to
+	 * `fsockopen`, and a configured `WP_PROXY_HOST` routes the connection
+	 * through a proxy instead; in both cases this pin has no effect and the
+	 * guard's per-hop revalidation is the only protection for that hop.
 	 *
 	 * @param string   $url             Initial URL (already scheme/host-validated).
 	 * @param string[] $accept_prefixes Accept header content-type prefixes.
@@ -728,17 +754,15 @@ final class Outpost_Preview_Endpoint {
 				return self::generic_fetch_error();
 			}
 
-			$port = (int) wp_parse_url( $current, PHP_URL_PORT );
-			if ( 0 === $port ) {
-				$scheme_for_port = strtolower( (string) wp_parse_url( $current, PHP_URL_SCHEME ) );
-				$port            = 'https' === $scheme_for_port ? 443 : 80;
-			}
-			$pin_resolve = static function ( $handle ) use ( $host, $port, $ip ) {
-				curl_setopt( $handle, CURLOPT_RESOLVE, array( "{$host}:{$port}:{$ip}" ) );
-				return $handle;
+			$pin_entry   = self::resolve_pin_entry( $current, $ip );
+			$pin_resolve = static function ( $handle ) use ( $pin_entry ): void {
+				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) );
 			};
 
-			add_filter( 'http_api_curl', $pin_resolve );
+			// `http_api_curl` is an action (`do_action_ref_array()` in
+			// WP_Http_Curl), not a filter — it hands the handle by
+			// reference and does not collect or use a return value.
+			add_action( 'http_api_curl', $pin_resolve );
 			try {
 				$response = wp_safe_remote_get(
 					$current,
@@ -749,7 +773,7 @@ final class Outpost_Preview_Endpoint {
 					)
 				);
 			} finally {
-				remove_filter( 'http_api_curl', $pin_resolve );
+				remove_action( 'http_api_curl', $pin_resolve );
 			}
 			if ( is_wp_error( $response ) ) {
 				return self::generic_fetch_error();
