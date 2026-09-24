@@ -105,11 +105,14 @@ final class Outpost_Encryption_Key_Notice {
 	 * @since 0.1.69
 	 */
 	public static function maybe_handle_dismissal(): void {
-		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( (string) $_GET['action'] ) ) : '';
-		if ( self::DISMISS_QUERY_ACTION !== $action ) {
+		// Capability first, then the request read, then the nonce: the order the
+		// Plugins Team reads for, even though the value is only compared to a
+		// constant before any guard.
+		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		if ( ! current_user_can( 'manage_options' ) ) {
+		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( (string) $_GET['action'] ) ) : '';
+		if ( self::DISMISS_QUERY_ACTION !== $action ) {
 			return;
 		}
 		check_admin_referer( self::DISMISS_NONCE_ACTION );

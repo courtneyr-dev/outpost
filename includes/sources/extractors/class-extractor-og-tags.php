@@ -125,11 +125,13 @@ final class Outpost_Source_Extractor_Og_Tags extends Outpost_Source_Extractor_Ba
 
 		$properties = $this->extract_og_properties( $head );
 
-		// Return decoded values per the entity-decoding contract above.
-		return array_map(
-			static fn ( string $value ): string => self::decode_html_entities( $value ),
-			$properties
-		);
+		// Return decoded values per the entity-decoding contract above. The
+		// key travels with the value so URL-valued properties get URL rules.
+		$decoded = array();
+		foreach ( $properties as $key => $value ) {
+			$decoded[ $key ] = self::decode_html_entities( $value, (string) $key );
+		}
+		return $decoded;
 	}
 
 	/**
@@ -219,8 +221,18 @@ final class Outpost_Source_Extractor_Og_Tags extends Outpost_Source_Extractor_Ba
 	/**
 	 * Decode HTML entities the way a browser would for an attribute value.
 	 * ENT_QUOTES handles &quot; and &apos;; ENT_HTML5 handles &hellip; etc.
+	 *
+	 * @param string $value Raw attribute value.
+	 * @param string $key   OG property name, used to pick URL vs text rules.
 	 */
-	private static function decode_html_entities( string $value ): string {
-		return html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	private static function decode_html_entities( string $value, string $key = '' ): string {
+		$decoded = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// A shared page's OG text ends up as post_title/summary through Micropub,
+		// which stores the title unfiltered; strip markup here so a hostile page
+		// cannot plant HTML, and keep URL-valued keys to safe URLs.
+		if ( '' !== $key && preg_match( '/:(image|url|video|audio)(:(url|secure_url))?$/', $key ) ) {
+			return esc_url_raw( trim( $decoded ), array( 'http', 'https' ) );
+		}
+		return trim( wp_strip_all_tags( $decoded ) );
 	}
 }

@@ -22,9 +22,18 @@ describe('ConnectionBanner', () => {
 		act(() => {
 			render(<ConnectionBanner />, root);
 		});
+		// Both live regions stay mounted at all times (so iOS VoiceOver reliably
+		// picks up later text changes) — the empty state is an empty, zero-space
+		// element, not one removed from the DOM via `hidden`.
 		const msgs = root.querySelectorAll('.outpost-connection-banner__msg');
 		expect(msgs.length).toBe(2);
-		msgs.forEach((m) => expect((m as HTMLElement).hidden).toBe(true));
+		msgs.forEach((m) => {
+			expect((m as HTMLElement).hidden).toBe(false);
+			expect((m as HTMLElement).classList.contains('outpost-connection-banner__msg--empty')).toBe(
+				true,
+			);
+			expect((m as HTMLElement).textContent).toBe('');
+		});
 	});
 
 	it('shows the offline message after an offline event and hides it on online', () => {
@@ -36,15 +45,16 @@ describe('ConnectionBanner', () => {
 		act(() => {
 			window.dispatchEvent(new Event('offline'));
 		});
-		expect(
-			(root.querySelector('.outpost-connection-banner__msg--offline') as HTMLElement).hidden,
-		).toBe(false);
+		const offline_msg = root.querySelector(
+			'.outpost-connection-banner__msg--offline',
+		) as HTMLElement;
+		expect(offline_msg.classList.contains('outpost-connection-banner__msg--empty')).toBe(false);
+		expect(offline_msg.textContent).toContain("You're offline");
 		setOnline(true);
 		act(() => {
 			window.dispatchEvent(new Event('online'));
 		});
-		expect(
-			(root.querySelector('.outpost-connection-banner__msg--offline') as HTMLElement).hidden,
-		).toBe(true);
+		expect(offline_msg.classList.contains('outpost-connection-banner__msg--empty')).toBe(true);
+		expect(offline_msg.textContent).toBe('');
 	});
 });

@@ -175,10 +175,8 @@ export function MediaPicker({
 							<img
 								class="outpost-photo-list__thumb"
 								src={entry.preview_url}
-								alt={
-									entry.alt ||
-									`Photo ${String(index + 1)} (alt text not yet entered)`
-								}
+								alt={entry.alt}
+								aria-hidden={!entry.alt}
 							/>
 							<div class="outpost-photo-list__fields">
 								<label

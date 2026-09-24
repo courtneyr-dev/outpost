@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.22
+Stable tag:        1.0.23
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -235,6 +235,17 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.23 =
+* Fixed: several color combinations that were hard to read — the over-limit character counter and the offline-queue error message in dark ("night") mode, the focus outline on light backgrounds, white text on an orange background on result buttons (location and media lookups), field borders in dark mode, and tab text on the washi-tape strip in dark mode.
+* Fixed: status and error messages under each composer form (Note, Reply, Photo, Doing, Life, Recipe) now announce reliably to screen readers, including iOS VoiceOver, instead of sometimes going unannounced.
+* Fixed: the Like/Repost/Bookmark/RSVP-style sub-mode picker works correctly with a screen reader again; the visible option label had been replaced by different text.
+* Fixed: links that open in a new tab now say so, and the "posted to" link no longer reads out the raw web address to a screen reader.
+* Fixed: the bookmarklet drag/copy instructions are announced without hiding the bookmarklet's own name.
+* Fixed: opening "More options" from a different composer tab no longer confuses assistive tech about which panel is which.
+* Fixed: a newly-added photo no longer gets a placeholder description read aloud before you've written your own alt text.
+* Fixed: in "day" appearance mode, the round radio-button artwork sizes correctly instead of shrinking the whole option row.
+* Improved: the composer now has a screen-reader heading, and the browser tab title updates with the mode you're using.
 
 = 1.0.22 =
 * Security: posts waiting in the offline queue no longer keep a copy of your sign-in token. They send with your current sign-in, and only to the site they were queued for. Signing out keeps them in the queue.

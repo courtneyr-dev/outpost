@@ -11,6 +11,7 @@ namespace Outpost\Tests\Unit;
 
 use Outpost_Source_Unknown;
 use Outpost_Source_Extractor_Og_Tags;
+use Outpost\Tests\Helpers\CoreSanitizerMocks;
 use Outpost\Tests\Helpers\SourceFixtureLoader;
 use WP_Mock;
 
@@ -18,6 +19,7 @@ final class SourceUnknownTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		CoreSanitizerMocks::register();
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setValue( null, array() );

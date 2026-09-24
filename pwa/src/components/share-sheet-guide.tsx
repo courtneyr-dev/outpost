@@ -15,27 +15,17 @@
  *     wp-admin setup page is not published in every build.
  *
  * URLs are generated from `location.origin` so the examples point at the
- * reader's own site. Links open in a new tab (matching the About tab) so the
- * reader doesn't lose a composer they were mid-typing in.
+ * reader's own site. Links open in a new tab (matching the About tab) via
+ * the shared `ExternalLink` component so the reader doesn't lose a composer
+ * they were mid-typing in, and gets a spoken heads-up before the tab switch.
  */
+
+import { ExternalLink } from './external-link';
 
 function origin(): string {
 	return typeof window !== 'undefined' && window.location
 		? window.location.origin
 		: '';
-}
-
-interface OutLinkProps {
-	href: string;
-	children: preact.ComponentChildren;
-}
-
-function OutLink({ href, children }: OutLinkProps): preact.JSX.Element {
-	return (
-		<a href={href} target="_blank" rel="noopener noreferrer">
-			{children}
-		</a>
-	);
 }
 
 export function ShareSheetGuide(): preact.JSX.Element {
@@ -111,9 +101,9 @@ export function ShareSheetGuide(): preact.JSX.Element {
 			<p>
 				<strong>Guided setup.</strong> Your site has a setup page in
 				wp-admin —{' '}
-				<OutLink href={shortcutAdmin}>
+				<ExternalLink href={shortcutAdmin}>
 					Settings → Outpost iOS Shortcut
-				</OutLink>{' '}
+				</ExternalLink>{' '}
 				— that hands you a ready-made Shortcut and the token it needs.
 				If the one-tap Shortcut link there isn&apos;t published in your
 				version yet, use the manual steps below; they work today.
@@ -179,9 +169,9 @@ export function ShareSheetGuide(): preact.JSX.Element {
 				sheet. It opens the composer prefilled so you review before
 				posting, using the sign-in you already have in the app — no
 				token to manage. The{' '}
-				<OutLink href={howto}>
+				<ExternalLink href={howto}>
 					full walkthrough in the documentation
-				</OutLink>{' '}
+				</ExternalLink>{' '}
 				covers the same steps for both platforms.
 			</p>
 			<p>

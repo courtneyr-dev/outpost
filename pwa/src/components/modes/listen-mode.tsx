@@ -14,6 +14,7 @@ import {
 import { GeocodePicker } from '../geocode-picker';
 import { MediaLookup } from '../media-lookup';
 import type { MediaLookupResult, MediaLookupEnvironment } from '../../lib/media-lookup';
+import { ExternalLink } from '../external-link';
 import {
 	MediaPicker,
 	all_entries_have_alt,
@@ -1385,38 +1386,35 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				{/* Live regions are rendered unconditionally so iOS VoiceOver
 				    reliably picks up announcements; previously these mounted
 				    only on state change, which the iOS AT misses. The empty
-				    string content stays in the DOM as the no-op state. */}
+				    string content stays in the DOM as the no-op state.
+				    `--empty` collapses the box visually instead of `hidden`,
+				    which would pull the region back out of the accessibility
+				    tree between announcements. */}
 				<div
-					class="outpost-error"
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
 					role="alert"
 					aria-live="assertive"
-					hidden={status.kind !== 'error'}
 				>
 					{status.kind === 'error' ? status.message : ''}
 				</div>
 
 				<p
-					class="outpost-status"
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
 					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
 				>
 					{status.kind === 'posted' ? (
 						status.location ? (
 							<>
 								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
+								<ExternalLink href={status.location}>View published post</ExternalLink>
 								{a11y_active && (
 									<>
 										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
+										<ExternalLink href={`${status.location}?edac_view=1`}>
 											View accessibility report
-										</a>
+										</ExternalLink>
 									</>
 								)}
 							</>
@@ -1435,6 +1433,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-listen"
 					>
 						<MorePanel
 							token={token}

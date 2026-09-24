@@ -7,6 +7,29 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.23] - 2026-09-24
+
+### Changed
+
+- The encryption-key notice's dismissal handler checks `manage_options` before it reads the `action` query argument; the read was already sanitized and compared to a constant, so this is a review-legibility change with no behavior change.
+
+### Fixed (Accessibility — WCAG 2.2 AA source review)
+
+- Night mode never overrode `--outpost-error-fg`/`-bg`/`-border`, so the over-limit character counter and the offline-queue "Last try:" error rendered at roughly 1:1 contrast on the dark surface. Added night and system-dark token overrides (`#f2c4b8` fg / `#4a221b` bg / `#e07a66` border) in both `pwa/src/styles/tokens.css` and `styles/outpost-tokens.css`.
+- The day/system-light focus ring (`--outpost-focus-ring-color: #fb8500`) cleared only 2.38:1 against the day background. Changed to `#241c4a` in the day/system-light token block (both token files); night keeps the orange ring, which already clears 3:1 on the dark surface. `.outpost-input:focus` in `structure.css` now adds a `box-shadow` halo (`var(--outpost-surface-bg)`, not a hardcoded white — the B6 lint bans hex fallbacks in `structure.css`) so the ring reads clearly regardless of adjacent surfaces.
+- Day chip-pressed styling put white text on the orange press color (2.48:1). `--outpost-chip-fg-pressed` in the day/system-light block is now `#241c4a`, which also fixes the same contrast on the geocode/media-lookup result buttons that inherit it via `--outpost-chip-active-fg`.
+- Night `--outpost-input-border` (`#3a322c`) gave roughly 1.3:1 field-boundary contrast; changed to `#8b7d6e` in night and system-dark blocks.
+- Night tab text on the washi-tape strip read at 3.62:1 against `--outpost-tape`; lowered the tape alpha from 0.75 to 0.35 in night and system-dark blocks (the hex-recolor alternative would have violated the B6 no-hex-in-`structure.css` lint).
+- Retargeted the Field Notes radio-art selectors in `structure.css` from the `<label class="outpost-radio">` wrapper to its child `input[type="radio"]` — the previous selectors sized the whole label as a 1.25rem box and could never match `:checked` (that pseudo-class doesn't apply to a `<label>`), so the day/night/system radio artwork never rendered as checked and squeezed the option's text.
+- `ConnectionBanner` and the per-mode `.outpost-error`/`.outpost-status` live regions (note/reply/photo/listen/life/recipe) now stay permanently mounted and only their text content changes; a `--empty` modifier class collapses the box to zero visual space. Toggling `hidden`/`display: none` to reveal a live region is unreliable for assistive tech (notably iOS VoiceOver), which can miss the region going from removed-from-tree to present-with-text in one step.
+- `structure.css`'s day radio-art bug (above) was paired with the same live-region pattern already flagged in 1.0.22's connection-banner fix; both are now consistent.
+- Added a shared `ExternalLink` component (`pwa/src/components/external-link.tsx`) that appends a visually-hidden "(opens in new tab)" hint, and switched every `target="_blank"` link to it. The "posted to" / silo-syndication links that previously showed the raw URL as their only accessible text now show descriptive text ("View published post", "View source page", "View syndicated post").
+- `bookmarklet-list.tsx`: removed an `aria-label` on the bookmarklet link that silently replaced its visible text with different wording (WCAG 2.5.3 Label in Name); added `aria-describedby` pointing at a paragraph with the drag/copy instructions instead. Also dropped a `role="list"` on a `<div>` of `<article>` cards that had no corresponding `role="listitem"` children.
+- `Drawer` accepts a new `idPrefix` prop. Every composer mode's "More options" drawer shared the literal title "More options", and since all mode panels render eagerly (toggled via `hidden`, not unmounted), every mode produced the exact same `id="outpost-drawer-title-more-options"` — a duplicate-id bug that left `aria-labelledby` pointing at whichever drawer instance matched first in the DOM. Each mode now passes a distinct prefix (`outpost-note`, `outpost-reply`, etc.).
+- `media-picker.tsx` and `photo-mode.tsx`: a freshly-picked photo's thumbnail `alt` used to read "Photo N (alt text not yet entered)" to a screen reader before the user had written real alt text. It now uses the entry's actual `alt` value and sets `aria-hidden` while that's empty — the adjacent required alt-text field already conveys the state.
+- `includes/class-pwa-shell.php` served a static `<title>Outpost</title>` with no page heading anywhere in the composer. Added a visually-hidden `<h1>Outpost composer</h1>` above the tab list in `composer-tabs.tsx`, and `document.title` now updates to `${mode.label} – Outpost` when the active tab changes.
+- `composer-tabs.tsx`: removed `tabIndex={0}` from tabpanels, which already contain focusable content and don't need to be a tab stop themselves; changed the composer-config error `<aside>`'s `role="alert"` to `role="status"` (its content isn't urgent enough to interrupt, and it renders unconditionally rather than only on a state transition).
+
 ## [1.0.22] - 2026-09-23
 
 ### Security

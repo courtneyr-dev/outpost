@@ -1,4 +1,5 @@
 import { BookmarkletList } from '../bookmarklet-list';
+import { ExternalLink } from '../external-link';
 import { ShareSheetGuide } from '../share-sheet-guide';
 
 /**
@@ -19,21 +20,9 @@ import { ShareSheetGuide } from '../share-sheet-guide';
  * rendering. Renders once when the tab is opened.
  *
  * Links open in a new tab so users don't lose the composer they were
- * mid-typing in. `rel="noopener noreferrer"` per the existing pattern.
+ * mid-typing in, via the shared `ExternalLink` component (adds the
+ * `rel="noopener noreferrer"` and the visually-hidden new-tab hint).
  */
-
-interface ExternalLinkProps {
-	href: string;
-	children: preact.ComponentChildren;
-}
-
-function ExternalLink({ href, children }: ExternalLinkProps): preact.JSX.Element {
-	return (
-		<a href={href} target="_blank" rel="noopener noreferrer">
-			{children}
-		</a>
-	);
-}
 
 export function AboutTab(): preact.JSX.Element {
 	return (

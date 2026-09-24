@@ -18,6 +18,7 @@
  */
 
 import { type FunctionComponent } from 'preact';
+import { ExternalLink } from './external-link';
 import type { ManualModalProps, StrategyOutcome } from '../lib/manual-share/strategies/types';
 
 export interface ManualShareFallbackModalProps extends ManualModalProps {
@@ -58,16 +59,14 @@ export const ManualShareFallbackModal: FunctionComponent<ManualShareFallbackModa
 						</button>
 					) }
 					{ app_homepage_url !== null && (
-						<a
+						<ExternalLink
 							class="outpost-manual-share-modal__action outpost-manual-share-modal__action--open"
 							data-action="open-app"
 							href={ app_homepage_url }
-							target="_blank"
-							rel="noopener noreferrer"
 							onClick={ () => on_dismiss( 'fired' ) }
 						>
 							Open { platform_label }
-						</a>
+						</ExternalLink>
 					) }
 					<button
 						type="button"

@@ -196,6 +196,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 				open={open}
 				onClose={(): void => setOpen(false)}
 				title={count === 1 ? '1 post saved for later' : `${String(count)} posts saved for later`}
+				idPrefix="outpost-queue"
 			>
 				<div class="outpost-queue-inspector">
 					<div class="outpost-queue-inspector__actions">
