@@ -240,11 +240,11 @@
 	--outpost-chip-fg: #241c4a;
 	--outpost-chip-border: #2a2622;
 	--outpost-chip-bg-pressed: #fb8500;
-	--outpost-chip-fg-pressed: #ffffff;
+	--outpost-chip-fg-pressed: #241c4a;
 	--outpost-card-bg: #ffffff;
 	--outpost-card-fg: #241c4a;
 	--outpost-card-border: #2a2622;
-	--outpost-focus-ring-color: #fb8500;
+	--outpost-focus-ring-color: #241c4a;
 	--outpost-text-muted: #6b6358;
 	--outpost-border: #2a2622;
 	--outpost-tape: rgba(251, 133, 0, 0.85);
@@ -258,7 +258,7 @@
 	--outpost-surface-fg: #fbfaf5;
 	--outpost-input-bg: #1a1614;
 	--outpost-input-fg: #fbfaf5;
-	--outpost-input-border: #3a322c;
+	--outpost-input-border: #8b7d6e;
 	--outpost-input-border-focus: #fb8500;
 	--outpost-input-placeholder: #a9a097;
 	--outpost-button-primary-bg: #fb8500;
@@ -281,9 +281,12 @@
 	--outpost-focus-ring-color: #fb8500;
 	--outpost-text-muted: #a9a097;
 	--outpost-border: #3a322c;
-	--outpost-tape: rgba(251, 133, 0, 0.75);
+	--outpost-tape: rgba(251, 133, 0, 0.35);
 	--outpost-halftone: rgba(255, 255, 255, 0.03);
 	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
+	--outpost-error-fg: #f2c4b8;
+	--outpost-error-bg: #4a221b;
+	--outpost-error-border: #e07a66;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -293,7 +296,7 @@
 		--outpost-surface-fg: #fbfaf5;
 		--outpost-input-bg: #1a1614;
 		--outpost-input-fg: #fbfaf5;
-		--outpost-input-border: #3a322c;
+		--outpost-input-border: #8b7d6e;
 		--outpost-input-border-focus: #fb8500;
 		--outpost-input-placeholder: #a9a097;
 		--outpost-button-primary-bg: #fb8500;
@@ -316,7 +319,10 @@
 		--outpost-focus-ring-color: #fb8500;
 		--outpost-text-muted: #a9a097;
 		--outpost-border: #3a322c;
-		--outpost-tape: rgba(251, 133, 0, 0.75);
+		--outpost-tape: rgba(251, 133, 0, 0.35);
 		--outpost-halftone: rgba(255, 255, 255, 0.03);
+		--outpost-error-fg: #f2c4b8;
+		--outpost-error-bg: #4a221b;
+		--outpost-error-border: #e07a66;
 	}
 }
