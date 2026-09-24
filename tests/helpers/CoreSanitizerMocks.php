@@ -41,6 +41,20 @@ final class CoreSanitizerMocks {
 		WP_Mock::userFunction( 'wp_check_invalid_utf8' )->andReturnUsing( array( self::class, 'wp_check_invalid_utf8' ) );
 		WP_Mock::userFunction( 'wp_kses' )->andReturnUsing( array( self::class, 'wp_kses' ) );
 		WP_Mock::userFunction( 'esc_url_raw' )->andReturnUsing( array( self::class, 'esc_url_raw' ) );
+		WP_Mock::userFunction( 'wp_strip_all_tags' )->andReturnUsing( array( self::class, 'wp_strip_all_tags' ) );
+	}
+
+	public static function wp_strip_all_tags( $value, bool $remove_breaks = false ): string {
+		if ( ! is_string( $value ) ) {
+			return '';
+		}
+		// Core drops <script>/<style> bodies, then every tag, then trims.
+		$value = (string) preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $value );
+		$value = strip_tags( $value );
+		if ( $remove_breaks ) {
+			$value = (string) preg_replace( '/[\r\n\t ]+/', ' ', $value );
+		}
+		return trim( $value );
 	}
 
 	/**

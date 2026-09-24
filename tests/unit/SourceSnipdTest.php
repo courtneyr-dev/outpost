@@ -12,6 +12,7 @@ namespace Outpost\Tests\Unit;
 use Outpost_Source_Snipd;
 use Outpost_Source_Registry;
 use Outpost_Source_Extractor_Og_Tags;
+use Outpost\Tests\Helpers\CoreSanitizerMocks;
 use Outpost\Tests\Helpers\SourceFixtureLoader;
 use WP_Mock;
 
@@ -19,6 +20,7 @@ final class SourceSnipdTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		CoreSanitizerMocks::register();
 		Outpost_Source_Registry::reset_for_tests();
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
