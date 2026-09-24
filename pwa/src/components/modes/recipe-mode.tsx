@@ -18,6 +18,7 @@ import { useMoreOpen } from '../../lib/composer-prefs';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -386,38 +387,35 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
+				{/* Persistent live regions so iOS VoiceOver picks up announcements. Always
+				    mounted; only the text content changes (empty when there's nothing to
+				    say). `--empty` collapses the box instead of `hidden`, which would pull
+				    the region out of the accessibility tree between announcements. */}
 				<div
-					class="outpost-error"
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
 					role="alert"
 					aria-live="assertive"
-					hidden={status.kind !== 'error'}
 				>
 					{status.kind === 'error' ? status.message : ''}
 				</div>
 
 				<p
-					class="outpost-status"
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
 					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
 				>
 					{status.kind === 'posted' ? (
 						status.location ? (
 							<>
 								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
+								<ExternalLink href={status.location}>View published post</ExternalLink>
 								{a11y_active && (
 									<>
 										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
+										<ExternalLink href={`${status.location}?edac_view=1`}>
 											View accessibility report
-										</a>
+										</ExternalLink>
 									</>
 								)}
 							</>
@@ -436,6 +434,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-recipe"
 					>
 						<MorePanel
 							token={token}

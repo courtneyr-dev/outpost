@@ -15,9 +15,15 @@ import { useEffect, useState } from 'preact/hooks';
  * Data Saver message only appears there; the offline message works
  * everywhere via `navigator.onLine`.
  *
- * Accessibility: each message carries `role="status"`, so assistive tech
- * announces it as soon as `hidden` is cleared — no separate `aria-live`
- * mirroring needed.
+ * Accessibility: each message is a `role="status"` region that stays
+ * mounted at all times — only its text content changes (empty string when
+ * there's nothing to say). Toggling `hidden`/`display: none` to reveal a
+ * live region is unreliable (notably on iOS VoiceOver, which frequently
+ * misses a region that goes from removed-from-tree to present-with-text
+ * in one step); a persistently-mounted region whose text mutates is the
+ * reliable pattern. The empty state is styled to take up no visual space
+ * via `.outpost-connection-banner__msg--empty` rather than removed from
+ * the DOM.
  */
 type Connection = {
 	saveData?: boolean;
@@ -49,18 +55,20 @@ export function ConnectionBanner() {
 	return (
 		<div class="outpost-connection-banner">
 			<p
-				class="outpost-connection-banner__msg outpost-connection-banner__msg--offline"
+				class={`outpost-connection-banner__msg outpost-connection-banner__msg--offline${
+					online ? ' outpost-connection-banner__msg--empty' : ''
+				}`}
 				role="status"
-				hidden={online}
 			>
-				You're offline. Posts will be queued and sent when you reconnect.
+				{online ? '' : "You're offline. Posts will be queued and sent when you reconnect."}
 			</p>
 			<p
-				class="outpost-connection-banner__msg outpost-connection-banner__msg--save-data"
+				class={`outpost-connection-banner__msg outpost-connection-banner__msg--save-data${
+					saveData ? '' : ' outpost-connection-banner__msg--empty'
+				}`}
 				role="status"
-				hidden={!saveData}
 			>
-				Data Saver is on — showing the lightweight view.
+				{saveData ? 'Data Saver is on — showing the lightweight view.' : ''}
 			</p>
 		</div>
 	);

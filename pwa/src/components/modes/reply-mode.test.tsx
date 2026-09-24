@@ -237,12 +237,16 @@ describe('ReplyMode variant picker', () => {
 		await flush();
 		await flush();
 
+		// The status region stays mounted at all times (so iOS VoiceOver
+		// reliably picks up the text change) — cleared means empty text
+		// content plus the `--empty` modifier, not `hidden`.
 		const banner = root.querySelector('p.outpost-status') as HTMLParagraphElement;
-		expect(banner.hidden).toBe(false);
+		expect(banner.classList.contains('outpost-status--empty')).toBe(false);
 		expect(banner.textContent).toContain('Posted to');
 
 		variant_radios()[3]?.click(); // Bookmark
 		await flush();
-		expect(banner.hidden).toBe(true);
+		expect(banner.classList.contains('outpost-status--empty')).toBe(true);
+		expect(banner.textContent).toBe('');
 	});
 });

@@ -147,6 +147,17 @@ export function ComposerTabs({
 		return (): void => window.removeEventListener('online', on_online);
 	}, []);
 
+	// Page title tracks the active mode so the browser tab / tab-switcher UI
+	// and screen-reader users navigating by document title get a meaningful
+	// label instead of a static "Outpost" for the whole session.
+	useEffect(() => {
+		const current_mode = modes.find((mode) => mode.id === active);
+		if (current_mode) {
+			document.title = `${current_mode.label} – Outpost`;
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- `modes` is a fresh array every render, but its id/label pairs are static; only `active` should retrigger this.
+	}, [active]);
+
 	const modes: ModeDefinition[] = [
 		{
 			id: 'note',
@@ -255,7 +266,7 @@ export function ComposerTabs({
 		<div class="outpost-composer">
 			<InstallPrompt />
 			{config_error && (
-				<aside class="outpost-config-error" role="alert">
+				<aside class="outpost-config-error" role="status">
 					<div class="outpost-config-error__body">
 						<strong>
 							{config_error === 'unauthorized'
@@ -296,6 +307,7 @@ export function ComposerTabs({
 					{...(queueEnv ? { queueEnv } : {})}
 				/>
 			</div>
+			<h1 class="outpost-visually-hidden">Outpost composer</h1>
 			<div role="tablist" aria-label="Composer modes" class="outpost-tablist">
 				{modes.map((mode, index) => (
 					<button
@@ -324,7 +336,6 @@ export function ComposerTabs({
 					role="tabpanel"
 					aria-labelledby={`outpost-tab-${mode.id}`}
 					hidden={active !== mode.id}
-					tabIndex={0}
 				>
 					{mode.render()}
 				</div>

@@ -135,8 +135,11 @@ function submit(): void {
 }
 
 function expect_no_error_ui(): void {
+	// The error live region stays mounted at all times (so iOS VoiceOver
+	// reliably picks up a later error) — "no error" means empty text plus
+	// the `--empty` modifier, not `hidden`.
 	const alert = root.querySelector('[role="alert"]') as HTMLElement;
-	expect(alert.hidden).toBe(true);
+	expect(alert.classList.contains('outpost-error--empty')).toBe(true);
 	expect(alert.textContent).toBe('');
 }
 
