@@ -9,6 +9,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.23] - 2026-09-24
 
+### Changed
+
+- The encryption-key notice's dismissal handler checks `manage_options` before it reads the `action` query argument; the read was already sanitized and compared to a constant, so this is a review-legibility change with no behavior change.
+
 ### Fixed (Accessibility — WCAG 2.2 AA source review)
 
 - Night mode never overrode `--outpost-error-fg`/`-bg`/`-border`, so the over-limit character counter and the offline-queue "Last try:" error rendered at roughly 1:1 contrast on the dark surface. Added night and system-dark token overrides (`#f2c4b8` fg / `#4a221b` bg / `#e07a66` border) in both `pwa/src/styles/tokens.css` and `styles/outpost-tokens.css`.
