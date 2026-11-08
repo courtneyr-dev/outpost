@@ -42,7 +42,7 @@ final class PWAShellTest extends TestCase {
 		// poison every subsequent apply_filters() call for that filter name —
 		// the static gets read on apply() and the input value is replaced with
 		// a random integer, which then fails any downstream array lookup.
-		$ref = new \ReflectionClass( \WP_Mock\Filter::class );
+		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setValue( null, array() );
 	}
@@ -110,11 +110,37 @@ final class PWAShellTest extends TestCase {
 		WP_Mock::userFunction( 'get_current_user_id' )
 			->andReturnUsing( static fn(): int => 7 );
 		WP_Mock::userFunction( 'get_user_meta' )
-			->andReturnUsing( static fn(): string => 'night' );
+			->andReturnUsing(
+				static fn( int $user_id, string $key ): string => array(
+					'outpost_appearance_mode'   => 'night',
+					'outpost_appearance_source' => 'outpost',
+				)[ $key ] ?? ''
+			);
 
 		ob_start();
 		Outpost_PWA_Shell::render();
 		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-source-outpost',
+			$out,
+			'The stored style source must reach the shell body class.'
+		);
+		$this->assertStringNotContainsString(
+			'outpost-appearance-user',
+			$out,
+			'Outpost Default without overrides prints no per-user token CSS.'
+		);
+		$this->assertStringContainsString(
+			'assets/js/appearance-boot.js',
+			$out,
+			'The appearance boot script must load before the composer root.'
+		);
+		$this->assertLessThan(
+			strpos( $out, 'id="outpost-root"' ),
+			strpos( $out, 'appearance-boot.js' ),
+			'The boot script must run before the composer root is parsed.'
+		);
 
 		$this->assertStringContainsString(
 			'outpost-composer-shell',

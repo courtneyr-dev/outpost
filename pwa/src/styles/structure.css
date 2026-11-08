@@ -22,7 +22,7 @@
 	min-height: 100dvh;
 	display: flex;
 	flex-direction: column;
-	font-family: var(--outpost-font-body, inherit);
+	font-family: var(--outpost-font-family-body);
 	background: var(--outpost-surface-bg, transparent);
 	color: var(--outpost-surface-fg, inherit);
 }
@@ -40,7 +40,7 @@
 	margin: 0;
 	font-size: 1.5rem;
 	line-height: 1.2;
-	font-family: var(--outpost-font-heading, inherit);
+	font-family: var(--outpost-font-family-display);
 }
 
 .outpost-card__lede {
@@ -1379,7 +1379,7 @@
 }
 
 .outpost-geocode-picked__coords {
-	font-family: var(--outpost-font-mono, ui-monospace, monospace);
+	font-family: var(--outpost-font-family-mono);
 	font-size: 0.85rem;
 	flex: 1 1 auto;
 	min-inline-size: 0;

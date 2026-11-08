@@ -1,148 +1,134 @@
 /*
  * Outpost CSS custom-property defaults — server-rendered, not bundled.
  *
- * Per the Outpost Design System v1.0:
+ * Outpost owns layout, interaction, accessibility, and these default
+ * design tokens (Outpost Default). The person's selected style source
+ * supplies paint through the same `--outpost-*` names: Outpost Default
+ * uses this file; Use Site Theme gets resolver output derived from the
+ * active theme. Components never hardcode paint (B6 lint). Decision:
+ * docs/decisions/session-pwa-ui-appearance.md, which amends the FY
+ * theming default (docs/decisions/session-fy-theming.md).
  *
- *   Plugin owns layout. Theme owns paint. Every paint property routes
- *   through `var(--outpost-{token}, fallback)`. Themes that override
- *   tokens win; sites with no theme overrides see the brand palette
- *   below as the working out-of-box experience.
+ * Palette (Outpost Default):
+ *   paper       #fbfaf5 — light page surface
+ *   white       #ffffff — light fields and cards
+ *   violet ink  #241c4a — light text, focus, logo (15.0:1 on paper)
+ *   violet mid  #5b4a9e — links (7.2:1 on white)
+ *   muted       #5f5873 — light secondary text (6.4:1 on paper)
+ *   border      #7a70b0 — light field boundaries (4.4:1 on white)
+ *   orange      #fb8500 — light primary action fill, violet-ink label (6.3:1)
+ *   night       #1e1838 — dark page surface
+ *   night field #2a2350 — dark fields and cards
+ *   moonlight   #f7f4ff — dark text (13.3:1 on night field)
+ *   lilac       #c9c1ef — dark secondary text (8.5:1 on night field)
+ *   dusk border #9a90cf — dark field boundaries (5.0:1 on night field)
+ *   ember       #ff9a2e — dark primary action and focus (8.0:1 label)
  *
- * The DS-1 commit briefly shipped fully-neutral defaults
- * (transparent / currentColor / Canvas) per the strictest reading of
- * the design law. That made the composer "disappear" but also
- * stripped the link/button visual identity on real-world deploys.
- * This file restores a brand palette as defaults under the DS-1
- * taxonomy — themes can still override every token, and the
- * structural tokens (space, radius, shadow, animation, focus,
- * z-index scale) stay design-system-aligned.
+ * Every pair above is measured; tests/theming/TokenFileParityTest.php
+ * re-checks the component pairs. A theme or override that replaces
+ * these values goes through the resolver's contrast checks.
  *
- * --------------------------------------------------------------------
- * Palette (Outpost & Co. brand — claude.ai/design handoff, May 2026):
- *   forest-900   #1c2e25 — near-black green, primary dark surface
- *   forest-700   #2a4a39 — primary brand green
- *   forest-600   #34604a — brand hover
- *   forest-800   #213a2d — brand press
- *   forest-500   #4a7a62 — secondary green
- *   forest-300   #9bbba9 — disabled green fill
- *   cream-50     #faf6ec — highest light surface (cards)
- *   cream-100    #f5efe4 — primary light surface (page bg)
- *   cream-200    #ece3d1 — subtle alt surface / hover
- *   walnut-900   #2b1f14 — body text on cream
- *   walnut-500   #7a5c3e — muted body, captions, placeholder
- *   walnut-300   #b59a78 — hint, low-contrast border
- *   amber-500    #a87a3e — single accent (muted ochre)
- *   amber-600    #855c2a — press / active ochre, focus ring
- *   line         #d4c8b1 — 1px warm-taupe border on cream
- *   danger       #a8412f · success #4a7a4e · info #34604a
- *
- * Verified WCAG contrast ratios:
- *   walnut-900 on cream-100      → 11:1  ✓ (AA + AAA)
- *   cream-50 on forest-700       → 9:1   ✓ (AA + AAA)
- *   walnut-900 on soft status bg → 10:1+ ✓
- *   amber-600 focus on cream-100 → 4.3:1 ✓ (clears 3:1 UI / WCAG 2.2)
- *   amber-600 focus on white     → 5:1   ✓
- *
- * --------------------------------------------------------------------
- * Theme overrides MUST themselves meet WCAG 4.5:1 contrast (per
- * A3-REQUIREMENTS.md A3-4). Token names are public API per design-
- * system Section 11; renaming/removing a token is a major version bump.
- *
- * This file MUST stay in parity with `pwa/src/styles/tokens.css` (the
- * bundled mirror that lets Vite dev mode resolve tokens before the
- * server-rendered file is fetched). CI verifies parity via
- * `bin/check-tokens-parity.mjs` on every build.
- *
- * The `.outpost-mode-*` blocks below remain the FY-Theming "Field
- * Notes" per-user appearance themes — a separate, opt-in aesthetic
- * pinned by the Token_Resolver tests. The brand rebrand above touches
- * only the out-of-box `:root` defaults.
+ * Token names are public API; renaming or removing one is a major
+ * version bump.
  */
 
 :root {
-	/* Surface — cream canvas, walnut ink (Outpost & Co. brand) */
-	--outpost-surface-bg: #f5efe4;
-	--outpost-surface-fg: #2b1f14;
+	/* Outpost Default, light scheme. The mode blocks below repeat these
+	 * paint values per scheme; :root covers documents with no mode class
+	 * (Vite dev, the admin preview). */
+	--outpost-surface-bg: #fbfaf5;
+	--outpost-surface-fg: #241c4a;
 	--outpost-surface-border: transparent;
 
 	/* Input (textarea, text input, select, datetime) */
 	--outpost-input-bg: #ffffff;
-	--outpost-input-fg: #2b1f14;
-	--outpost-input-border: #b59a78;
-	--outpost-input-border-focus: #855c2a;
-	--outpost-input-placeholder: #7a5c3e;
+	--outpost-input-fg: #241c4a;
+	--outpost-input-border: #7a70b0;
+	--outpost-input-border-focus: #241c4a;
+	--outpost-input-placeholder: #5f5873;
 	--outpost-input-radius: var(--outpost-radius-sm);
 
-	/* Button — primary (submit). Forest-700 on cream — ~9:1 contrast. */
-	--outpost-button-primary-bg: #2a4a39;
-	--outpost-button-primary-fg: #faf6ec;
-	--outpost-button-primary-border: #2a4a39;
-	--outpost-button-primary-bg-hover: #34604a;
-	--outpost-button-primary-bg-active: #213a2d;
-	--outpost-button-primary-bg-disabled: #9bbba9;
-	--outpost-button-primary-fg-disabled: #4a7a62;
+	/* Button — primary. Orange fill with violet-ink label, 6.31:1.
+	 * (White on #fb8500 is 2.48:1 and fails.) */
+	--outpost-button-primary-bg: #fb8500;
+	--outpost-button-primary-fg: #241c4a;
+	--outpost-button-primary-border: #fb8500;
+	--outpost-button-primary-bg-hover: #e67a00;
+	--outpost-button-primary-bg-active: #d16f00;
+	--outpost-button-primary-bg-disabled: #ece8f5;
+	--outpost-button-primary-fg-disabled: #5f5873;
 	--outpost-button-primary-radius: var(--outpost-radius-md);
 
-	/* Button — secondary (cancel, edit, link-style). Outline style. */
+	/* Button — secondary (outline) */
 	--outpost-button-secondary-bg: transparent;
-	--outpost-button-secondary-fg: #2b1f14;
-	--outpost-button-secondary-border: #d4c8b1;
-	--outpost-button-secondary-bg-hover: #ece3d1;
+	--outpost-button-secondary-fg: #241c4a;
+	--outpost-button-secondary-border: #7a70b0;
+	--outpost-button-secondary-bg-hover: #efeaff;
 	--outpost-button-secondary-radius: var(--outpost-radius-sm);
 
 	/* Button — ghost (icon-only: mic, close, settings) */
 	--outpost-button-ghost-bg: transparent;
-	--outpost-button-ghost-fg: #2b1f14;
+	--outpost-button-ghost-fg: #241c4a;
 	--outpost-button-ghost-border: transparent;
-	--outpost-button-ghost-bg-hover: #ece3d1;
+	--outpost-button-ghost-bg-hover: #efeaff;
 	--outpost-button-ghost-radius: var(--outpost-radius-sm);
 
 	/* Tab */
 	--outpost-tab-bg: transparent;
-	--outpost-tab-fg: #7a5c3e;
-	--outpost-tab-bg-active: transparent;
-	--outpost-tab-fg-active: #1c2e25;
-	--outpost-tab-indicator: #2a4a39;
+	--outpost-tab-fg: #5f5873;
+	--outpost-tab-bg-active: #fb8500;
+	--outpost-tab-fg-active: #241c4a;
+	--outpost-tab-indicator: #241c4a;
 	--outpost-tab-indicator-size: 2px;
 
 	/* Chip (syndication, sub-mode picker, XFN) */
 	--outpost-chip-bg: transparent;
-	--outpost-chip-fg: #2b1f14;
-	--outpost-chip-border: #b59a78;
-	--outpost-chip-bg-pressed: #2a4a39;
-	--outpost-chip-fg-pressed: #faf6ec;
+	--outpost-chip-fg: #241c4a;
+	--outpost-chip-border: #7a70b0;
+	--outpost-chip-bg-pressed: #fb8500;
+	--outpost-chip-fg-pressed: #241c4a;
 	--outpost-chip-radius: var(--outpost-radius-pill);
 
 	/* Card (preview, install prompt, error banner, queue inspector) */
-	--outpost-card-bg: #faf6ec;
-	--outpost-card-fg: #2b1f14;
-	--outpost-card-border: #d4c8b1;
+	--outpost-card-bg: #ffffff;
+	--outpost-card-fg: #241c4a;
+	--outpost-card-border: #7a70b0;
 	--outpost-card-shadow: var(--outpost-shadow-sm);
 	--outpost-card-radius: var(--outpost-radius-md);
 
-	/* Status — soft warm bands, walnut-900 text reads 10:1+ */
-	--outpost-error-bg: #f4ddd5;
-	--outpost-error-fg: #2b1f14;
-	--outpost-error-border: #a8412f;
-	--outpost-success-bg: #e3ede1;
-	--outpost-success-fg: #2b1f14;
-	--outpost-success-border: #4a7a4e;
-	--outpost-warning-bg: #f3e6cc;
-	--outpost-warning-fg: #2b1f14;
-	--outpost-warning-border: #a87a3e;
-	--outpost-info-bg: #e2ebe4;
-	--outpost-info-fg: #2b1f14;
-	--outpost-info-border: #34604a;
+	/* Status — soft bands with violet-ink text */
+	--outpost-error-bg: #fbe9e4;
+	--outpost-error-fg: #241c4a;
+	--outpost-error-border: #b23a1e;
+	--outpost-success-bg: #e6f2e8;
+	--outpost-success-fg: #241c4a;
+	--outpost-success-border: #2f7a45;
+	--outpost-warning-bg: #fdf0dc;
+	--outpost-warning-fg: #241c4a;
+	--outpost-warning-border: #a85d00;
+	--outpost-info-bg: #efeaff;
+	--outpost-info-fg: #241c4a;
+	--outpost-info-border: #5b4a9e;
 
-	/* Focus — ochre amber-600 clears 3:1 on cream + white per WCAG 2.2 */
-	--outpost-focus-ring-color: #855c2a;
+	/* Focus — violet ink, 15:1 on paper. Orange is 2.38:1 on paper and
+	 * can't carry focus in the light scheme. */
+	--outpost-focus-ring-color: #241c4a;
 	--outpost-focus-ring-width: 2px;
 	--outpost-focus-ring-offset: 2px;
 	--outpost-focus-ring-style: solid;
 
-	/* Type — Outpost & Co. families (named, not force-loaded; graceful fallback) */
+	/* Identity, links, decorative scenery */
+	--outpost-link: #5b4a9e;
+	--outpost-logo: #241c4a;
+	--outpost-scenery-far: #5b4a9e;
+	--outpost-scenery-near: #241c4a;
+
+	/* Type. No web fonts ship (font-src 'self'; no font files in the
+	 * plugin): IBM Plex and Newsreader render when installed on the
+	 * device, otherwise the system stacks below. */
 	--outpost-font-family-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	--outpost-font-family-ui: var(--outpost-font-family-body);
+	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
 	--outpost-font-family-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	--outpost-font-size-body: 1rem;
 	--outpost-font-size-label: 0.875rem;
@@ -164,14 +150,14 @@
 
 	/* Radius */
 	--outpost-radius-sm: 0.375rem;
-	--outpost-radius-md: 0.5rem;
-	--outpost-radius-lg: 0.75rem;
+	--outpost-radius-md: 0.625rem;
+	--outpost-radius-lg: 0.875rem;
 	--outpost-radius-pill: 999px;
 
-	/* Shadow — warm walnut tint */
-	--outpost-shadow-sm: 0 1px 2px rgba(43, 31, 20, 0.08);
-	--outpost-shadow-md: 0 4px 12px rgba(43, 31, 20, 0.12);
-	--outpost-shadow-toolbar: 0 -2px 8px rgba(43, 31, 20, 0.08);
+	/* Shadow — flat by default; one soft lift for sheets */
+	--outpost-shadow-sm: 0 1px 2px rgba(36, 28, 74, 0.08);
+	--outpost-shadow-md: 0 6px 18px rgba(36, 28, 74, 0.16);
+	--outpost-shadow-toolbar: 0 -2px 8px rgba(36, 28, 74, 0.08);
 
 	/* Animation */
 	--outpost-duration-fast: 120ms;
@@ -181,148 +167,182 @@
 	--outpost-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
 	--outpost-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 
-	/* --- Compatibility aliases (transitional) ---------------------------
-	 * Legacy token names existing component CSS still references. Resolved
-	 * against the new taxonomy. Will be removed in v0.3.0 once components
-	 * fully migrate.
-	 */
+	/* --- Compatibility aliases (transitional) --------------------------- */
 	--outpost-border: var(--outpost-card-border);
 	--outpost-radius: var(--outpost-radius-md);
 	--outpost-focus: var(--outpost-focus-ring-color);
-	--outpost-text-muted: #7a5c3e;
+	--outpost-text-muted: #5f5873;
 	--outpost-primary-bg: var(--outpost-button-primary-bg);
 	--outpost-primary-fg: var(--outpost-button-primary-fg);
 	--outpost-primary-border: var(--outpost-button-primary-border);
 	--outpost-chip-active-bg: var(--outpost-chip-bg-pressed);
 	--outpost-chip-active-fg: var(--outpost-chip-fg-pressed);
-	--outpost-scrim: rgba(43, 31, 20, 0.45);
+	--outpost-scrim: rgba(36, 28, 74, 0.45);
 }
 
 /* ----------------------------------------------------------------------
- * FY-Theming day/night/system mode scopes
+ * Outpost Default per-scheme tokens. Light = .outpost-mode-day, and
+ * .outpost-mode-system under a light OS preference; dark =
+ * .outpost-mode-night, and .outpost-mode-system under a dark preference.
  *
- * Field Notes / Indie Zine aesthetic. Warm-paper neutrals replace the
- * cool brand palette inside the composer subtree when a mode class is
- * present on the root. Class is set by `Outpost_Mode_Controller`
- * (per-user meta, defaults to 'system'). Tokens redeclare here; the
- * cascade picks the active mode's value at paint time.
- *
- * Token defaults are CC0 warm-paper neutrals — not attributable to any
- * specific user's site. Per-user overrides via the appearance settings
- * page layer on top through `Outpost_Token_Resolver::to_css()` which
- * emits an additional, higher-specificity `.outpost-mode-{mode}` block
- * scoped to the resolver's per-user payload.
- *
- * `color-scheme` cues UA-rendered scrollbars, form controls, and the
- * computed `prefers-color-scheme` value to match the active mode so
- * native widgets render correctly inside the composer subtree.
+ * The component values below equal
+ * Outpost_Token_Resolver::component_tokens( DEFAULTS[ scheme ] ), pinned
+ * by tests/theming/TokenFileParityTest.php. Use Site Theme and user
+ * overrides emit the same token set from the resolver, scoped to
+ * `.outpost-source-*` (two classes, so it outranks these blocks).
  * ---------------------------------------------------------------------- */
 .outpost-mode-day,
 .outpost-mode-system {
 	color-scheme: light;
 	--outpost-surface-bg: #fbfaf5;
 	--outpost-surface-fg: #241c4a;
-	--outpost-input-bg: #ffffff;
-	--outpost-input-fg: #241c4a;
-	--outpost-input-border: #2a2622;
-	--outpost-input-border-focus: #fb8500;
-	--outpost-input-placeholder: #6b6358;
-	--outpost-button-primary-bg: #241c4a;
-	--outpost-button-primary-fg: #ffffff;
-	--outpost-button-primary-border: #241c4a;
-	--outpost-button-secondary-bg: transparent;
-	--outpost-button-secondary-fg: #241c4a;
-	--outpost-button-secondary-border: #2a2622;
-	--outpost-button-ghost-fg: #241c4a;
-	--outpost-tab-fg: #6b6358;
-	--outpost-tab-fg-active: #241c4a;
-	--outpost-tab-indicator: #fb8500;
-	--outpost-chip-fg: #241c4a;
-	--outpost-chip-border: #2a2622;
-	--outpost-chip-bg-pressed: #fb8500;
-	--outpost-chip-fg-pressed: #241c4a;
 	--outpost-card-bg: #ffffff;
 	--outpost-card-fg: #241c4a;
-	--outpost-card-border: #2a2622;
+	--outpost-card-border: #7a70b0;
+	--outpost-input-bg: #ffffff;
+	--outpost-input-fg: #241c4a;
+	--outpost-input-border: #7a70b0;
+	--outpost-input-border-focus: #241c4a;
+	--outpost-input-placeholder: #5f5873;
+	--outpost-button-primary-bg: #fb8500;
+	--outpost-button-primary-fg: #241c4a;
+	--outpost-button-primary-border: #fb8500;
+	--outpost-button-secondary-fg: #241c4a;
+	--outpost-button-secondary-border: #7a70b0;
+	--outpost-button-ghost-fg: #241c4a;
+	--outpost-tab-fg: #5f5873;
+	--outpost-tab-fg-active: #241c4a;
+	--outpost-tab-bg-active: #fb8500;
+	--outpost-tab-indicator: #241c4a;
+	--outpost-chip-fg: #241c4a;
+	--outpost-chip-border: #7a70b0;
+	--outpost-chip-bg-pressed: #fb8500;
+	--outpost-chip-fg-pressed: #241c4a;
 	--outpost-focus-ring-color: #241c4a;
-	--outpost-text-muted: #6b6358;
-	--outpost-border: #2a2622;
+	--outpost-text-muted: #5f5873;
+	--outpost-border: #7a70b0;
+	--outpost-link: #5b4a9e;
+	--outpost-logo: #241c4a;
+	--outpost-scenery-far: #5b4a9e;
+	--outpost-scenery-near: #241c4a;
 	--outpost-tape: rgba(251, 133, 0, 0.85);
 	--outpost-halftone: rgba(36, 28, 74, 0.04);
 	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
+	--outpost-error-bg: #fbe9e4;
+	--outpost-error-fg: #241c4a;
+	--outpost-error-border: #b23a1e;
+	--outpost-success-bg: #e6f2e8;
+	--outpost-success-fg: #241c4a;
+	--outpost-success-border: #2f7a45;
+	--outpost-warning-bg: #fdf0dc;
+	--outpost-warning-fg: #241c4a;
+	--outpost-warning-border: #a85d00;
+	--outpost-info-bg: #efeaff;
+	--outpost-info-fg: #241c4a;
+	--outpost-info-border: #5b4a9e;
+	--outpost-scrim: rgba(36, 28, 74, 0.45);
 }
 
 .outpost-mode-night {
 	color-scheme: dark;
-	--outpost-surface-bg: #251f1c;
-	--outpost-surface-fg: #fbfaf5;
-	--outpost-input-bg: #1a1614;
-	--outpost-input-fg: #fbfaf5;
-	--outpost-input-border: #8b7d6e;
-	--outpost-input-border-focus: #fb8500;
-	--outpost-input-placeholder: #a9a097;
-	--outpost-button-primary-bg: #fb8500;
-	--outpost-button-primary-fg: #251f1c;
-	--outpost-button-primary-border: #fb8500;
-	--outpost-button-secondary-bg: transparent;
-	--outpost-button-secondary-fg: #fbfaf5;
-	--outpost-button-secondary-border: #3a322c;
-	--outpost-button-ghost-fg: #fbfaf5;
-	--outpost-tab-fg: #a9a097;
-	--outpost-tab-fg-active: #fbfaf5;
-	--outpost-tab-indicator: #fb8500;
-	--outpost-chip-fg: #fbfaf5;
-	--outpost-chip-border: #3a322c;
-	--outpost-chip-bg-pressed: #fb8500;
-	--outpost-chip-fg-pressed: #251f1c;
-	--outpost-card-bg: #1a1614;
-	--outpost-card-fg: #fbfaf5;
-	--outpost-card-border: #3a322c;
-	--outpost-focus-ring-color: #fb8500;
-	--outpost-text-muted: #a9a097;
-	--outpost-border: #3a322c;
-	--outpost-tape: rgba(251, 133, 0, 0.35);
+	--outpost-surface-bg: #1e1838;
+	--outpost-surface-fg: #f7f4ff;
+	--outpost-card-bg: #2a2350;
+	--outpost-card-fg: #f7f4ff;
+	--outpost-card-border: #9a90cf;
+	--outpost-input-bg: #2a2350;
+	--outpost-input-fg: #f7f4ff;
+	--outpost-input-border: #9a90cf;
+	--outpost-input-border-focus: #ff9a2e;
+	--outpost-input-placeholder: #c9c1ef;
+	--outpost-button-primary-bg: #ff9a2e;
+	--outpost-button-primary-fg: #1e1838;
+	--outpost-button-primary-border: #ff9a2e;
+	--outpost-button-secondary-fg: #f7f4ff;
+	--outpost-button-secondary-border: #9a90cf;
+	--outpost-button-ghost-fg: #f7f4ff;
+	--outpost-tab-fg: #c9c1ef;
+	--outpost-tab-fg-active: #1e1838;
+	--outpost-tab-bg-active: #ff9a2e;
+	--outpost-tab-indicator: #f7f4ff;
+	--outpost-chip-fg: #f7f4ff;
+	--outpost-chip-border: #9a90cf;
+	--outpost-chip-bg-pressed: #ff9a2e;
+	--outpost-chip-fg-pressed: #1e1838;
+	--outpost-focus-ring-color: #ff9a2e;
+	--outpost-text-muted: #c9c1ef;
+	--outpost-border: #9a90cf;
+	--outpost-link: #a59bd6;
+	--outpost-logo: #f7f4ff;
+	--outpost-scenery-far: #a59bd6;
+	--outpost-scenery-near: #f7f4ff;
+	--outpost-tape: rgba(255, 154, 46, 0.35);
 	--outpost-halftone: rgba(255, 255, 255, 0.03);
 	--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
-	--outpost-error-fg: #f2c4b8;
-	--outpost-error-bg: #4a221b;
-	--outpost-error-border: #e07a66;
+	--outpost-error-bg: #4a1f2a;
+	--outpost-error-fg: #ffd9d2;
+	--outpost-error-border: #ff8a75;
+	--outpost-success-bg: #1f3a2e;
+	--outpost-success-fg: #d6f5df;
+	--outpost-success-border: #6fd08f;
+	--outpost-warning-bg: #43301a;
+	--outpost-warning-fg: #ffe2b8;
+	--outpost-warning-border: #ff9a2e;
+	--outpost-info-bg: #2f2860;
+	--outpost-info-fg: #e9e5ff;
+	--outpost-info-border: #a59bd6;
+	--outpost-scrim: rgba(10, 8, 24, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
 	.outpost-mode-system {
 		color-scheme: dark;
-		--outpost-surface-bg: #251f1c;
-		--outpost-surface-fg: #fbfaf5;
-		--outpost-input-bg: #1a1614;
-		--outpost-input-fg: #fbfaf5;
-		--outpost-input-border: #8b7d6e;
-		--outpost-input-border-focus: #fb8500;
-		--outpost-input-placeholder: #a9a097;
-		--outpost-button-primary-bg: #fb8500;
-		--outpost-button-primary-fg: #251f1c;
-		--outpost-button-primary-border: #fb8500;
-		--outpost-button-secondary-bg: transparent;
-		--outpost-button-secondary-fg: #fbfaf5;
-		--outpost-button-secondary-border: #3a322c;
-		--outpost-button-ghost-fg: #fbfaf5;
-		--outpost-tab-fg: #a9a097;
-		--outpost-tab-fg-active: #fbfaf5;
-		--outpost-tab-indicator: #fb8500;
-		--outpost-chip-fg: #fbfaf5;
-		--outpost-chip-border: #3a322c;
-		--outpost-chip-bg-pressed: #fb8500;
-		--outpost-chip-fg-pressed: #251f1c;
-		--outpost-card-bg: #1a1614;
-		--outpost-card-fg: #fbfaf5;
-		--outpost-card-border: #3a322c;
-		--outpost-focus-ring-color: #fb8500;
-		--outpost-text-muted: #a9a097;
-		--outpost-border: #3a322c;
-		--outpost-tape: rgba(251, 133, 0, 0.35);
+		--outpost-surface-bg: #1e1838;
+		--outpost-surface-fg: #f7f4ff;
+		--outpost-card-bg: #2a2350;
+		--outpost-card-fg: #f7f4ff;
+		--outpost-card-border: #9a90cf;
+		--outpost-input-bg: #2a2350;
+		--outpost-input-fg: #f7f4ff;
+		--outpost-input-border: #9a90cf;
+		--outpost-input-border-focus: #ff9a2e;
+		--outpost-input-placeholder: #c9c1ef;
+		--outpost-button-primary-bg: #ff9a2e;
+		--outpost-button-primary-fg: #1e1838;
+		--outpost-button-primary-border: #ff9a2e;
+		--outpost-button-secondary-fg: #f7f4ff;
+		--outpost-button-secondary-border: #9a90cf;
+		--outpost-button-ghost-fg: #f7f4ff;
+		--outpost-tab-fg: #c9c1ef;
+		--outpost-tab-fg-active: #1e1838;
+		--outpost-tab-bg-active: #ff9a2e;
+		--outpost-tab-indicator: #f7f4ff;
+		--outpost-chip-fg: #f7f4ff;
+		--outpost-chip-border: #9a90cf;
+		--outpost-chip-bg-pressed: #ff9a2e;
+		--outpost-chip-fg-pressed: #1e1838;
+		--outpost-focus-ring-color: #ff9a2e;
+		--outpost-text-muted: #c9c1ef;
+		--outpost-border: #9a90cf;
+		--outpost-link: #a59bd6;
+		--outpost-logo: #f7f4ff;
+		--outpost-scenery-far: #a59bd6;
+		--outpost-scenery-near: #f7f4ff;
+		--outpost-tape: rgba(255, 154, 46, 0.35);
 		--outpost-halftone: rgba(255, 255, 255, 0.03);
-		--outpost-error-fg: #f2c4b8;
-		--outpost-error-bg: #4a221b;
-		--outpost-error-border: #e07a66;
+		--outpost-font-family-display: "Newsreader", "Source Serif Pro", Georgia, serif;
+		--outpost-error-bg: #4a1f2a;
+		--outpost-error-fg: #ffd9d2;
+		--outpost-error-border: #ff8a75;
+		--outpost-success-bg: #1f3a2e;
+		--outpost-success-fg: #d6f5df;
+		--outpost-success-border: #6fd08f;
+		--outpost-warning-bg: #43301a;
+		--outpost-warning-fg: #ffe2b8;
+		--outpost-warning-border: #ff9a2e;
+		--outpost-info-bg: #2f2860;
+		--outpost-info-fg: #e9e5ff;
+		--outpost-info-border: #a59bd6;
+		--outpost-scrim: rgba(10, 8, 24, 0.6);
 	}
 }

@@ -17,9 +17,11 @@ Mobile-first PWA composer at `/post` (configurable). Five modes: Note, Reply/Lik
 
 Uses Micropub as the API and IndieAuth for browser-side auth. PWA frontend uses Vite + TypeScript + Preact, output to `/build/pwa/`.
 
-## Hard Contract — plugin owns layout, theme owns paint
+## Hard Contract — plugin owns layout, the selected style source owns paint
 
 If anything else in this file contradicts this rule, the rule wins.
+
+**Amended 2026-11-07** ([decision](docs/decisions/session-pwa-ui-appearance.md)): Outpost owns layout, interaction, accessibility, and the default design tokens. Each person's selected style source supplies paint through `--outpost-*` tokens: **Outpost Default** (the token files) or **Use Site Theme** (the resolver's theme-derived tokens). Components never hardcode paint. Site Theme stays optional and portable. B6, token parity, shell isolation, and the seven `--plain` opt-outs are unchanged. Where the sections below say "theme", read "the selected style source"; under Use Site Theme they apply as written.
 
 ### Plugin always owns
 
@@ -54,7 +56,7 @@ Plugin structural CSS only references colors and fonts through `var(--outpost-*,
 }
 ```
 
-If a theme sets the variable, the plugin uses it. Otherwise the composer inherits the theme's normal styling. **No part of Outpost ever forces a color the theme didn't ask for.**
+If a theme sets the variable, the plugin uses it. Under Outpost Default the token files supply the value; under Use Site Theme the resolver supplies it from the theme. **Component CSS never hardcodes a color; paint always comes from the selected source's tokens.**
 
 One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the iOS bottom toolbar. Structural, not paint.
 
@@ -326,7 +328,11 @@ iOS Shortcut bridge (parallel session): a per-user long-lived token authenticate
 
 ## Phase F parallel work — FY-Theming (shipped)
 
-Theme inheritance + Field Notes treatments (three stacked PRs). Token priority chain override → theme → default with per-token WCAG contrast enforcement; per-user mode and overrides live in user-meta; the B6 lint bans hex literals in `structure.css` — the tokens.css files are the single source of truth, with no fallback hexes in components; `--plain` modifier classes are public opt-out API; stacked-PR lesson: retarget downstream PRs to main before merging/deleting the upstream branch. Full decisions: [docs/decisions/session-fy-theming.md](docs/decisions/session-fy-theming.md).
+Theme inheritance + Field Notes treatments (three stacked PRs). Token priority chain override → theme → default with per-token WCAG contrast enforcement (the theme layer now applies only under Use Site Theme; see the PWA UI appearance amendment); per-user mode and overrides live in user-meta; the B6 lint bans hex literals in `structure.css` — the tokens.css files are the single source of truth, with no fallback hexes in components; `--plain` modifier classes are public opt-out API; stacked-PR lesson: retarget downstream PRs to main before merging/deleting the upstream branch. Full decisions: [docs/decisions/session-fy-theming.md](docs/decisions/session-fy-theming.md).
+
+## PWA UI appearance — Locked Decisions (in progress, 2026-11-07)
+
+Outpost Default ships the paper/violet/orange design; Use Site Theme is a per-user option (`outpost_appearance_source`), independent of Light/Dark/System (`outpost_appearance_mode`). Upgrades keep Site Theme for users registered before the `outpost_appearance_schema` cutoff; fresh installs and later users get Outpost Default + System. The resolver derives the full component token set (`component_tokens()`, contrast-checked final pairs) and emits it scoped to `.outpost-source-*` (`to_scoped_css()`); the shell prints it for cookie users and `assets/js/appearance-boot.js` applies the device cache before first paint; `/appearance/tokens` accepts bearer tokens and answers `no-store`. Full decisions: [docs/decisions/session-pwa-ui-appearance.md](docs/decisions/session-pwa-ui-appearance.md).
 
 ## Build Order (40 sessions)
 

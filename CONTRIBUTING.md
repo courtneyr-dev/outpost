@@ -4,7 +4,7 @@ Thanks for your interest. Outpost is a single-maintainer project today, but cont
 
 ## Before you start
 
-1. Read [`CLAUDE.md`](CLAUDE.md). It documents the hard contract (plugin owns layout, theme owns paint), the companion strategy, naming conventions, and the forbidden vocabulary list.
+1. Read [`CLAUDE.md`](CLAUDE.md). It documents the hard contract (plugin owns layout and the default design; the selected style source owns paint), the companion strategy, naming conventions, and the forbidden vocabulary list.
 2. Read the relevant phase in the build plan. Outpost is being built across ~40 small sessions, each scoped to a specific deliverable. PRs that span phases will be asked to split.
 3. Check open issues to avoid duplicating work.
 
@@ -97,7 +97,7 @@ Outpost is published on WordPress.org and serves any IndieWeb user — never jus
 
 #### Why B6 matters
 
-The Hard Contract in `CLAUDE.md` says *plugin owns layout, theme owns paint*. Token files (`pwa/src/styles/tokens.css`, `styles/outpost-tokens.css`) are the single source of truth for paint values. When component CSS uses `var(--outpost-foo, #abc123)`, the fallback hex is still hex code in a non-token block — and it shadows theme overrides whenever the token isn't set (service-worker cache misses, stale builds, or a theme that legitimately wants the token undefined). B6 catches both forms:
+The Hard Contract in `CLAUDE.md` says *plugin owns layout; the selected style source owns paint*. Token files (`pwa/src/styles/tokens.css`, `styles/outpost-tokens.css`) are the single source of truth for paint values. When component CSS uses `var(--outpost-foo, #abc123)`, the fallback hex is still hex code in a non-token block — and it shadows theme overrides whenever the token isn't set (service-worker cache misses, stale builds, or a theme that legitimately wants the token undefined). B6 catches both forms:
 
 ```css
 /* ❌ direct hex in component CSS */

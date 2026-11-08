@@ -106,6 +106,9 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 			}
 		);
 		WP_Mock::userFunction( 'wp_safe_redirect' )->andReturn( true );
+		// Style-source lookups: a fresh install with no stored source.
+		WP_Mock::userFunction( 'get_option' )->andReturn( false );
+		WP_Mock::userFunction( 'get_userdata' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_die' )->andReturnUsing(
 			static function ( string $msg ) {
 				throw new \RuntimeException( 'wp_die: ' . $msg );

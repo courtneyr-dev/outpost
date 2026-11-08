@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.23
+ * Version:           1.0.24
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.23' );
+define( 'OUTPOST_VERSION', '1.0.24' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -249,6 +249,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-ios-shortcut-settings-pa
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-contrast.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-theme-json-reader.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-mode-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-style-source.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-appearance-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-appearance-settings-page.php';
@@ -856,6 +857,11 @@ function outpost_maybe_flush_rewrite_rules(): void {
 }
 add_action( 'init', 'outpost_maybe_flush_rewrite_rules', 11 );
 
+// Records whether this site predates per-user style sources. Runs before
+// the rewrite flush above writes `outpost_rewrite_version` for a new
+// version, so an upgraded site is still recognized as one.
+add_action( 'init', array( 'Outpost_Style_Source', 'ensure_schema' ), 10 );
+
 /**
  * Activation hook. Registers the rewrite rules immediately, then flushes so
  * the freshly-registered rules land in the rewrite rule cache without
@@ -864,6 +870,7 @@ add_action( 'init', 'outpost_maybe_flush_rewrite_rules', 11 );
  * @since 0.1.0
  */
 function outpost_activate(): void {
+	Outpost_Style_Source::ensure_schema();
 	Outpost_Route_Handler::register_rewrite_rules();
 	flush_rewrite_rules();
 }
