@@ -62,7 +62,7 @@ Realistic worst case: ~12 HTTP roundtrips per modal open. Acceptable for a one-t
 
 Polar requires the user be registered with the AccessLink app before any data API call works. PR #50's `after_token_exchange()` hook handles this during the OAuth connect flow. PR #50's `verify_connection()` also auto-retries registration if it failed silently.
 
-The fetch-recent callback assumes the user is already registered. If registration silently failed and was never auto-retried, the POST `/exercise-transactions` will return 404. The picker surfaces that as an empty list — modal renders "No recent items available." User can re-trigger registration by hitting the OAuth verify endpoint via Settings.
+The fetch-recent callback assumes the user is already registered. If registration silently failed and was never auto-retried, the POST `/exercise-transactions` will return 404. The picker surfaces that as an empty list — modal renders "No recent items available." No admin screen calls the verify endpoint. To re-trigger registration, request `GET /wp-json/outpost/v1/oauth/polar/verify` as a logged-in administrator (cookie auth with a REST nonce), or disconnect and reconnect Polar under Outpost → OAuth Connections.
 
 ## No icon URL
 

@@ -1,14 +1,14 @@
 # Settings UI tabs (G3.5d)
 
-Multi-tab settings page foundation. Other phases (scripture API keys in G10b, self-hosted Pretalx URL in G13b, Sessionize per-event URLs in G13c, future per-platform credential UI) register their fields into existing tabs without editing core.
+Multi-tab settings page under **Outpost → Settings** (`admin.php?page=outpost-settings`). Code registers tabs and fields through filters without editing core. Today Outpost registers one tab, **API Keys**, and the four POSSE destinations (Beehiiv, Buttondown, Kit, write.as) are the only code that adds fields to it.
 
 ## Components
 
 - **`Outpost_Settings_Registry`** — declarative tab + field registry. Tabs register via `outpost_settings_tabs` filter; per-tab fields register via `outpost_settings_fields_{tab_id}` filters. Defensive against malformed callers (drops entries missing required keys).
 - **`Outpost_Settings_Fields`** — five field-type renderers + sanitizers: text, password, url, checkbox, select. Sensitive fields encrypt via `Outpost_Encryption` from G3.5a.
 - **`Outpost_Settings_Handler`** — admin-post.php save handler. Verifies per-tab nonce + capability, sanitizes per type, encrypts sensitive fields, persists to `outpost_settings_{tab_id}` option.
-- **`Outpost_Settings_Page`** — top-level "Outpost" admin menu page. Renders tab navigation + active tab body. Surfaces "Settings saved" notice after successful redirects.
-- **`Outpost_Settings_Tab_Api_Keys`** — demonstration tab. Renders empty by default; concrete platforms add fields via the per-tab filter.
+- **`Outpost_Settings_Page`** — the **Settings** submenu under the Outpost admin menu (`PARENT_SLUG = 'outpost'`; a top-level menu before 1.0.7). Renders tab navigation + active tab body. Surfaces "Settings saved" notice after successful redirects.
+- **`Outpost_Settings_Tab_Api_Keys`** — the API Keys tab. Its fields come from the `outpost_settings_fields_api_keys` filter; the POSSE destinations register theirs there.
 
 ## Why server-rendered, not React
 
@@ -16,7 +16,7 @@ Matches F-phase + the disconnect-button-fix pattern from G99. The Settings page 
 
 ## Why separate from the OAuth Connections page
 
-The G3.5a OAuth Connections page (`outpost-oauth`) stays where it is for v1. Migrating it into this tab system is a separate follow-up — refactoring shipped UI inside a foundation PR adds risk without a corresponding feature. When the migration lands, OAuth Connections becomes the default tab and this PR's "API Keys" tab moves second.
+The G3.5a OAuth Connections page (`outpost-oauth`, **Outpost → OAuth Connections**) is a separate submenu page, not a tab here. Moving it into this tab system wasn't done in G3.5d because refactoring shipped UI inside a foundation PR adds risk without a corresponding feature.
 
 ## Storage shape
 
@@ -24,9 +24,9 @@ Each tab persists to its own option:
 
 ```
 outpost_settings_api_keys = [
-    'api_bible_key'  => [ 'encrypted' => '<base64>' ],   // sensitive
-    'enable_caching' => true,                             // checkbox, plaintext
-    'cache_ttl_url'  => 'https://example.com/cache',     // url, plaintext
+    'beehiiv_enabled'        => true,                          // checkbox, plaintext
+    'beehiiv_api_key'        => [ 'encrypted' => '<base64>' ], // sensitive
+    'beehiiv_publication_id' => 'pub_123',                     // text, plaintext
 ]
 ```
 
@@ -37,7 +37,7 @@ Sensitive fields are stored as `[ 'encrypted' => '<base64>' ]` rather than as pl
 ```php
 add_filter( 'outpost_settings_tabs', function( $tabs ) {
     $tabs['instances'] = [
-        'label'      => __( 'Self-hosted instances', 'outpost' ),
+        'label'      => __( 'Self-hosted instances', 'outpost-mobile-publishing' ),
         'callback'   => [ My_Plugin_Instances_Tab::class, 'render' ],
         'capability' => 'manage_options',
     ];
@@ -49,7 +49,7 @@ The callback receives the tab id as its single argument and is responsible for r
 
 ```php
 public static function render( string $tab_id ): void {
-    $intro  = __( 'Configure self-hosted instance URLs.', 'outpost' );
+    $intro  = __( 'Configure self-hosted instance URLs.', 'outpost-mobile-publishing' );
     $fields = Outpost_Settings_Registry::get_fields( $tab_id );
     Outpost_Settings_Page::render_tab_form( $tab_id, $fields, $intro );
 }
@@ -59,31 +59,30 @@ public static function render( string $tab_id ): void {
 
 ```php
 add_filter( 'outpost_settings_fields_api_keys', function( $fields ) {
-    $fields['api_bible_key'] = [
-        'label'       => __( 'API.Bible API key', 'outpost' ),
+    $fields['example_api_key'] = [
+        'label'       => __( 'Example service API key', 'outpost-mobile-publishing' ),
         'type'        => 'password',
         'sensitive'   => true,
-        'description' => __( 'Get a free key at scripture.api.bible.', 'outpost' ),
+        'description' => __( 'Stored encrypted.', 'outpost-mobile-publishing' ),
         'default'     => '',
     ];
     return $fields;
 } );
 ```
 
-Supported field types in v1: `text`, `password`, `url`, `checkbox`, `select`. Textarea, file, and complex types deferred until a registered platform needs them.
+Supported field types: `text`, `password`, `url`, `checkbox`, `select`. Textarea, file, and complex types aren't available.
 
 For `select` fields, also pass `options`:
 
 ```php
-$fields['edition'] = [
-    'label'   => __( 'Edition', 'outpost' ),
+$fields['example_format'] = [
+    'label'   => __( 'Body format', 'outpost-mobile-publishing' ),
     'type'    => 'select',
     'options' => [
-        'esv' => __( 'ESV', 'outpost' ),
-        'web' => __( 'WEB', 'outpost' ),
-        'kjv' => __( 'KJV', 'outpost' ),
+        'html'     => __( 'HTML', 'outpost-mobile-publishing' ),
+        'markdown' => __( 'Markdown', 'outpost-mobile-publishing' ),
     ],
-    'default' => 'web',
+    'default' => 'html',
 ];
 ```
 
@@ -91,7 +90,7 @@ $fields['edition'] = [
 
 ```php
 $values = Outpost_Settings_Handler::read_tab( 'api_keys' );
-$key    = $values['api_bible_key']; // already decrypted if sensitive
+$key    = $values['beehiiv_api_key']; // already decrypted if sensitive
 ```
 
 The handler decrypts sensitive fields transparently. Code that consumes settings doesn't need to know which fields are encrypted.
@@ -100,16 +99,9 @@ The handler decrypts sensitive fields transparently. Code that consumes settings
 
 - **Nonces.** Every save POST carries `outpost_settings_save_{tab_id}` nonce. `Outpost_Settings_Handler::handle_save()` verifies before any write.
 - **Capability.** Tab-level capability check (default `manage_options`); enforced both on render and on save. A user without the capability can't see the tab nav entry, can't view the body, can't save.
-- **Encryption-at-rest.** `Outpost_Encryption` (G3.5a) wraps sensitive values with AES-GCM via the resolved encryption key. If the key isn't configured (no constant + no stashed option), the page renders an admin notice and disables form submission rather than silently dropping sensitive data.
+- **Encryption-at-rest.** `Outpost_Encryption` (G3.5a) wraps sensitive values with `sodium_crypto_secretbox()` (XSalsa20-Poly1305) via the resolved encryption key. If a tab has a sensitive field and no key exists (no `OUTPOST_ENCRYPTION_KEY` constant and no `outpost_encryption_key` option), `render_tab_form()` prints "Outpost encryption key is not configured" and doesn't render the form at all, rather than silently dropping sensitive data. See [Encryption key](encryption-key.md).
 - **No SSRF.** The settings UI never fetches URLs entered by users — `url`-type fields are stored, not dereferenced. Concrete consumers that DO fetch (preview endpoint, source extractors) carry their own SSRF defenses.
 
-## Deferred OAuth migration
+## Two admin surfaces
 
-Outpost has TWO admin settings surfaces today: the G3.5a OAuth Connections page (`outpost-oauth`) and this G3.5d multi-tab page (`outpost-settings`). The migration plan is:
-
-1. Future PR adds an "OAuth Connections" tab to `outpost-settings`.
-2. Migrates the per-provider connect/disconnect buttons from `outpost-oauth`'s render method into the new tab's render callback.
-3. Redirects `outpost-oauth` requests to `outpost-settings?tab=oauth_connections`.
-4. After one minor version with the redirect, removes `outpost-oauth` entirely.
-
-The migration is mechanical but unrelated to G3.5d's foundation. Keeping it out of this PR keeps the diff small and the two surfaces independent.
+Outpost keeps third-party credentials on two admin pages: the G3.5a OAuth Connections page (`outpost-oauth`) and this G3.5d multi-tab page (`outpost-settings`). Both are submenus of the Outpost menu. There's no redirect between them and no OAuth Connections tab on `outpost-settings`.

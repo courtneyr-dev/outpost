@@ -1,6 +1,6 @@
 # Ravelry adapter
 
-G14b ships the Ravelry OAuth 2.0 provider. Reads from Ravelry's API for the connected user's patterns library, projects, and queue. Future PRs add the source class.
+G14b ships the Ravelry OAuth 2.0 provider: you can connect a Ravelry account and check it with the verify endpoint. Nothing else in Outpost uses the connection yet. There's no Ravelry source class, so a shared Ravelry URL gets the generic preview, and there's no fetch-recent provider.
 
 ## Setup
 
@@ -13,7 +13,7 @@ G14b ships the Ravelry OAuth 2.0 provider. Reads from Ravelry's API for the conn
    define( 'OUTPOST_RAVELRY_CLIENT_SECRET', 'yyy' );
    ```
 
-4. Visit Settings → OAuth Connections in wp-admin and click **Connect Ravelry**.
+4. In wp-admin, go to **Outpost → OAuth Connections** and click **Connect Ravelry**.
 
 ## Scopes — verify before production
 
@@ -35,8 +35,8 @@ add_filter( 'outpost_oauth_provider_ravelry_scopes', static function () {
 
 ## OAuth quirks Outpost handles
 
-- **Standard OAuth 2.0** with refresh_token — the `offline` scope triggers refresh-token issuance per Ravelry docs.
-- **No RFC 7009 revocation** — `revocation_endpoint()` returns null at the time of writing. Disconnect falls through to local credential delete. If Ravelry adds revocation support in a future API revision, override this method.
+- **Standard OAuth 2.0** with refresh_token — the `offline` scope triggers refresh-token issuance per Ravelry docs. Outpost stores the refresh token but doesn't use it: `refresh_access_token()` has no caller. When the token expires, disconnect and reconnect under Outpost → OAuth Connections.
+- **No RFC 7009 revocation** — `revocation_endpoint()` returns null at the time of writing. Disconnect falls through to local credential delete. Revoke the app's access in Ravelry to fully disconnect.
 - **Tolerates both nested `{user: {...}}` and flat `{...}` response shapes** on `current_user.json` — Ravelry's API has had both at various revisions.
 
 ## Verify-connection endpoint
@@ -56,6 +56,6 @@ Per-user storage by default. Site-wide via `add_filter('outpost_credentials_stor
 
 ## What's NOT in G14b
 
-- **Source class** for Ravelry URL pattern detection (e.g., `ravelry.com/patterns/library/{id}`, `ravelry.com/projects/{user}/{slug}`) + content fetch + composer integration. Deferred to a follow-up PR.
-- **Outbound** (write/update Ravelry projects from Outpost) — out of scope for the foundation; future PR if needed.
+- **Source class** for Ravelry URLs (`ravelry.com/patterns/library/{id}`, `ravelry.com/projects/{user}/{slug}`). Not available yet.
+- **Outbound** (write or update Ravelry projects from Outpost). Not available.
 - **OAuth 1.0a** — explicitly dropped per design call.

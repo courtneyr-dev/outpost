@@ -40,7 +40,7 @@ The apex `bearblog.dev` is intentionally NOT claimed — that's the company's ma
 
 ## RSS-as-primary deferred
 
-The G6 prompt specifies RSS as the primary fetch path with OG fallback. The F-phase RSS extractor stub is not yet implemented (per F5 #6), so this PR ships og_tags-only following the F17 pattern. RSS-as-primary lands alongside the RSS extractor implementation in a future Phase G session — additive, doesn't change the response shape.
+The G6 prompt specifies RSS as the primary fetch path with OG fallback. The F-phase RSS extractor stub is not yet implemented (per F5 #6), so this PR ships og_tags-only following the F17 pattern. The RSS extractor (`includes/sources/extractors/class-extractor-rss.php`) still throws a not-implemented exception, so RSS-as-primary isn't available yet.
 
 ## Open-source recommendation
 

@@ -31,13 +31,13 @@ The capabilities-level mapping uses `u-quotation-of` since the dominant case is 
 
 ## What's NOT in G13a
 
-- **Self-hosted Pretalx instances** (G13b). Self-hosted instances run at custom domains (`cfp.example.com`, etc.) and require user configuration. Wait on the G3.5 settings-UI foundation.
-- **Sessionize** (G13c). Sessionize requires per-event endpoint URLs configured in settings (the URL is the auth secret). Same settings-UI dependency.
+- **Self-hosted Pretalx instances** (G13b). Self-hosted instances run at custom domains (`cfp.example.com`, etc.) and require user configuration. Not available yet: the settings UI exists (Outpost → Settings), but no Pretalx instance field is registered.
+- **Sessionize** (G13c). Sessionize requires per-event endpoint URLs configured in settings (the URL is the auth secret). Not available yet; Outpost has no Sessionize source.
 - **Pretalx REST API** (`/api/...`). The og_tags path is sufficient for v1; the API path lands when api_json extractor (F5 #6) is implemented.
 
 ## Open-source recommendation
 
-Pretalx is the open-source self-hostable alternative to Sessionize. Outpost recommends Pretalx for self-hosting conferences in the [open-source alternatives doc page](../concepts/why-we-recommend-these-platforms.md) (PR #38 once it merges).
+Pretalx is the open-source self-hostable alternative to Sessionize. Outpost recommends Pretalx for self-hosting conferences in the [open-source alternatives doc page](../concepts/why-we-recommend-these-platforms.md).
 
 ## Why Pretalx specifically
 

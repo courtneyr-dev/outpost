@@ -10,7 +10,7 @@ POSSE-outbound adapter for Telegraph (https://telegra.ph/) — Telegram's anonym
 
 ## URL immutability
 
-Telegraph pages have **immutable URLs**. Editing a page replaces its content but never its URL. This adapter stores the resulting URL + path in post-meta on first publish so subsequent publishes can call `editPage` with the correct path.
+Telegraph pages have **immutable URLs**. Editing a page replaces its content but never its URL. This adapter stores the resulting URL + path in post-meta on first publish. Outpost doesn't call `editPage`, so later edits to the WordPress post don't reach the Telegraph copy.
 
 ## Limited tag set
 
@@ -27,13 +27,22 @@ Anything else gets stripped or downgraded by the converter:
 
 ## Settings
 
-The G9 PR ships the adapter + converter only. Settings UI is out of scope for this PR — configure for v1 via WP options:
+Telegraph has no settings screen. Configure it with WordPress options, for example through WP-CLI.
+
+**Turn it on first.** Telegraph publishes a public copy of each post to a third party, so it's off by default. Outpost registers the publish hook only when `outpost_telegraph_enabled` is truthy (`outpost.php`, on `plugins_loaded`), and `maybe_syndicate_on_publish()` checks the option again:
+
+```bash
+wp option update outpost_telegraph_enabled 1
+```
 
 | Option | Purpose | Default |
 |---|---|---|
-| `outpost_telegraph_short_name` | Shown on Telegraph as the account short name | site name (`get_bloginfo('name')`) |
-| `outpost_telegraph_author_name` | Default author shown on each Telegraph page | site name |
-| `outpost_telegraph_author_url` | Default link out from Telegraph (canonical link) | site home URL |
+| `outpost_telegraph_enabled` | Opt-in switch. Nothing syndicates while it's false. | `false` |
+| `outpost_telegraph_short_name` | Account short name, set when Outpost creates the Telegraph account | site name (`get_bloginfo('name')`) |
+| `outpost_telegraph_author_name` | Author shown on each Telegraph page | `''` (no author) on pages; the account's author name falls back to the short name |
+| `outpost_telegraph_author_url` | Link out from each Telegraph page | the post's permalink on pages; the account's URL falls back to the site home URL |
+
+Outpost reads the short name, author name, and author URL into the Telegraph account only when it creates the account on first publish, so changing them later affects new pages but not the account.
 
 Per-post overrides via post-meta (no UI; set via WP CLI or programmatically):
 
@@ -56,11 +65,11 @@ After a successful first publish:
 | `outpost_telegraph_post_url` | `https://telegra.ph/...` |
 | `outpost_telegraph_page_path` | The path component (used by `editPage`) |
 
-## Update path deferred
+## Updates aren't available yet
 
-The G9 PR ships the **first-publish** path. Updates (calling `editPage` with the stored path on subsequent post saves) are a focused follow-up — the adapter stores everything `editPage` needs (`outpost_telegraph_page_path`).
+Outpost publishes each post to Telegraph once. A post that already has `outpost_telegraph_post_url` is skipped on later transitions into `publish`, and edits don't call `editPage`. The adapter stores `outpost_telegraph_page_path`, which `editPage` would need.
 
-## Encryption deferred
+## Token encryption
 
 Per-user access tokens live in the encrypted credentials store (`Outpost_Credentials_Store`, provider `telegraph`) as of 1.0.1. Tokens written by earlier versions to plain user meta migrate automatically on first use, and the plaintext copy is deleted once the encrypted write succeeds.
 
@@ -79,6 +88,6 @@ add_filter( 'outpost_telegraph_post_types', function () {
 
 ## What's NOT in G9
 
-- Settings page UI (configure via wp-cli for v1)
-- Update / editPage path (first-publish only — adapter stores what's needed for updates)
-- Posse_Adapter_Base extension — Telegraph hooks `transition_post_status` directly. The `Posse_Adapter_Base` from G5 prompt does not yet exist; once it lands, refactoring Telegraph to extend it is a small mechanical change.
+- Settings page UI (configure with WP-CLI or `update_option()`)
+- Update / editPage path (first publish only)
+- POSSE dispatcher integration. Telegraph hooks `transition_post_status` directly and doesn't extend `Outpost_POSSE_Destination_Base`, so it has no retry, no `_outpost_posse_targets` selection, and no `_outpost_posse_failures` record. See [POSSE outbound base class](../concepts/posse-base-class.md).

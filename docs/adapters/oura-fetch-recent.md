@@ -15,7 +15,7 @@ Filter: `outpost_fetch_recent_providers`
 ]
 ```
 
-When the user isn't connected to Oura the picker hides the "Add from Oura" button automatically — the picker primitive checks `oauth_provider` against `Outpost_Credentials_Store`.
+The "Add from Oura" button shows for every user with `publish_posts`, connected or not: the list endpoint (`Outpost_Fetch_Recent_REST::handle_list_request()`) filters only on capability. When a user who isn't connected opens the picker, the fetch returns `reason: "not_connected"` and the modal shows a notice to connect under Outpost → OAuth Connections.
 
 ## Fetch behavior
 
@@ -71,7 +71,7 @@ Oura's v2 API doesn't expose generic activity icons. The default item renderer (
 
 When the Oura API returns any non-2xx status (or `wp_remote_get` returns a `WP_Error`), `api_get()` returns null. Both `fetch_workouts` and `fetch_sleep` then return empty arrays, and the picker modal renders "No recent items available."
 
-This includes the membership-lapsed case: Oura returns 403 when a previously-connected account no longer has the active subscription required for v2 API access. The graceful empty-list outcome means the user sees a clean "no items" rather than an error toast.
+This includes the membership-lapsed case. The consumer doesn't check which status Oura sends; `Outpost_OAuth_Provider_Oura::verify_connection()` treats a 401 with membership wording as `membership_required`. The user sees "No recent items available." rather than an error, and nothing tells them the membership lapsed.
 
 ## What this consumer does NOT do
 
