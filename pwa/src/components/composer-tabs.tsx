@@ -105,9 +105,22 @@ function useTabOverflow(active: string): {
 			window.removeEventListener('resize', measure);
 		};
 	}, []);
+	// Scroll only the strip, and only after the first render: calling
+	// scrollIntoView() on load moved the browser's sequential-focus
+	// starting point past the header, so Tab skipped it.
+	const first_render = useRef(true);
 	useEffect(() => {
-		const selected = ref.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-		selected?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+		if (first_render.current) {
+			first_render.current = false;
+			return;
+		}
+		const strip = ref.current;
+		const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+		if (!strip || !selected) return;
+		const left = selected.offsetLeft - strip.offsetLeft;
+		if (left < strip.scrollLeft || left + selected.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+			strip.scrollTo?.({ left: Math.max(0, left - 24) });
+		}
 	}, [active]);
 	return { ref, ...edges };
 }

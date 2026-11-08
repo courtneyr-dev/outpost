@@ -19,8 +19,9 @@
   320,
   320
  ],
- "focus-after-3-tabs": "<button type=\"button\" class=\"outpost-voice-button\" aria-label=\"Start voice input\" aria-pressed=\"false\"><span aria-hidden=\"true\">🎤</span></button>",
+ "focus-after-3-tabs": "<button type=\"button\" class=\"outpost-icon-button\" aria-haspopup=\"dialog\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" strok",
  "tab-end-key-selects": "outpost-tab-about",
+ "selected-tab-fully-visible": true,
  "offline-status": "Applied on this device; not saved to your site because you're offline. Outpost tries again when it can.",
  "offline-body-class": "outpost-composer-shell outpost-mode-night outpost-source-outpost",
  "inert-while-open": true,
