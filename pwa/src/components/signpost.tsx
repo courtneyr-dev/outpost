@@ -29,6 +29,10 @@ const LOWER_BOARD = 'M 204 116 L 88 116 L 64 131 L 88 146 L 204 146 Z';
 export function Signpost({ size = 32, label, class: className }: SignpostProps): preact.JSX.Element {
 	const mask_id = `outpost-signpost-mask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 	const labelled = typeof label === 'string' && label !== '';
+	// The derivative's 5-unit stroke is 0.47 CSS px at 24px. Coordinates
+	// stay canonical; only the stroke grows so it never renders under
+	// 1.5 CSS px.
+	const stroke = Math.max(5, (256 * 1.5) / size).toFixed(2);
 	return (
 		<svg
 			class={['outpost-signpost', className].filter(Boolean).join(' ')}
@@ -47,7 +51,7 @@ export function Signpost({ size = 32, label, class: className }: SignpostProps):
 					<rect x="97" y="200" width="62" height="12" fill="black" />
 				</mask>
 			</defs>
-			<g fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round">
+			<g fill="none" stroke="currentColor" stroke-width={stroke} stroke-linejoin="round">
 				<rect x="121" y="44" width="14" height="164" mask={`url(#${mask_id})`} />
 				<rect x="97" y="200" width="62" height="12" />
 				<path d={UPPER_BOARD} />

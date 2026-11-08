@@ -44,6 +44,15 @@ describe('Signpost', () => {
 		expect(svg?.outerHTML).not.toMatch(/#[0-9a-f]{3,6}/i);
 	});
 
+	it('keeps the stroke at least 1.5 CSS px at small sizes without moving geometry', () => {
+		for (const size of [24, 32, 48, 64]) {
+			const g = mount(<Signpost size={size} />).querySelector('g');
+			const rendered = (Number(g?.getAttribute('stroke-width')) * size) / 256;
+			expect(rendered).toBeGreaterThanOrEqual(1.5);
+		}
+		expect(mount(<Signpost size={256} />).querySelector('g')?.getAttribute('stroke-width')).toBe('5.00');
+	});
+
 	it('gives each instance its own mask id', () => {
 		const root = mount(
 			<>
