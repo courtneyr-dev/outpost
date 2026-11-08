@@ -7,6 +7,30 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.24] - Unreleased (feature branch `feature/pwa-ui-appearance`)
+
+### Added
+
+- **Outpost Default design and a per-person style source.** The composer ships the approved paper, violet, and orange design (light) and a violet dark scheme. Each person picks **Outpost Default** or **Use Site Theme** in the composer's new Settings sheet or on wp-admin → Outpost → Appearance, independent of **Light / Dark / System**. Decision: `docs/decisions/session-pwa-ui-appearance.md`, which amends the Hard Contract.
+- Header with the outline signpost (canonical icon geometry), wordmark, connected site, a Light / Dark / System shortcut, and a settings button.
+- About now starts with the site, connection state, Micropub and IndieAuth status, and version from runtime data, then help links, redacted diagnostics, and the existing guides behind disclosures.
+- A choice made offline applies on the device and is sent on the next successful contact; the sheet says when a choice is saved only on the device.
+
+### Changed
+
+- People who used Outpost before 1.0.24 keep Use Site Theme until they choose otherwise; new installs and people added later start on Outpost Default + System.
+- Use Site Theme now reaches the installed PWA: the shell prints the person's resolved tokens for cookie sessions, a boot script applies the device's cached appearance before first paint, and `/wp-json/outpost/v1/appearance/tokens` accepts the PWA's bearer token and answers `no-store`.
+- The resolver derives the component tokens the composer reads and checks every final pair (text, muted text, button label, link, borders, focus, logo) against WCAG 2.2 AA. It reads semantic Global Styles colors first, no longer treats a `primary` slug as body text, keeps dark surfaces for themes without a dark variation, and invalidates its cache on Site Editor palette edits.
+- Field Notes treatments keep their public `--plain` opt-outs but draw the flat approved design: display-italic tabs, boxed fields, native radios, and a flat primary button. Variant pickers are wrapping 44px tiles; the tab strip shows an overflow cue and keeps the selected tab in view; the body field no longer forces 18rem.
+- Composer-config errors distinguish an expired sign-in (401) from a permission limit (403) and an unreachable site.
+
+### Fixed
+
+- Text fell back to the browser serif: `structure.css` read `--outpost-font-body`, `--outpost-font-heading`, and `--outpost-font-mono`, which no token file defined.
+- Saving the mode a person already had returned 400 "Invalid mode_preference".
+- Closing a drawer could leave focus inside it; a closed drawer is now inert.
+- Disabled buttons used opacity, which lowered contrast against unknown surfaces; they use tokens now.
+
 ## [1.0.23] - 2026-09-24
 
 ### Changed
