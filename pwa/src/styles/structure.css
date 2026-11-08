@@ -3,10 +3,10 @@
 /*
  * Outpost structural CSS.
  *
- * Per the Hard Contract, the plugin owns layout (this file) and the theme
- * owns paint (every color, font, radius, shadow). Every paintable property
- * goes through `var(--outpost-*, neutral-fallback)` so a theme that defines
- * the token wins, and a theme that doesn't gets the inherited cascade.
+ * Per the Hard Contract (amended: docs/decisions/session-pwa-ui-appearance.md),
+ * the plugin owns layout (this file) and the person's selected style
+ * source owns paint (Outpost Default tokens or Use Site Theme tokens).
+ * Every paintable property goes through `var(--outpost-*)`; no hex here.
  *
  * One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the
  * iOS bottom toolbar when the composer modes land. None of B0b's surfaces
@@ -17,12 +17,21 @@
  * Vite bundle.
  */
 
+/* The shell body carries the mode and source classes, so tokens resolve
+ * here; painting it too keeps overscroll and safe areas on-palette. */
+.outpost-composer-shell {
+	background: var(--outpost-surface-bg);
+	color: var(--outpost-surface-fg);
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
 .outpost-app {
 	min-height: 100vh;
 	min-height: 100dvh;
 	display: flex;
 	flex-direction: column;
-	font-family: var(--outpost-font-body, inherit);
+	font-family: var(--outpost-font-family-body);
 	background: var(--outpost-surface-bg, transparent);
 	color: var(--outpost-surface-fg, inherit);
 }
@@ -40,7 +49,7 @@
 	margin: 0;
 	font-size: 1.5rem;
 	line-height: 1.2;
-	font-family: var(--outpost-font-heading, inherit);
+	font-family: var(--outpost-font-family-display);
 }
 
 .outpost-card__lede {
@@ -58,6 +67,13 @@
 .outpost-label {
 	font-weight: 600;
 	font-size: 0.9rem;
+}
+
+/* Fields never exceed their row, file inputs included. */
+.outpost-input,
+.outpost-textarea {
+	box-sizing: border-box;
+	max-width: 100%;
 }
 
 .outpost-input {
@@ -95,7 +111,9 @@
 
 .outpost-button[disabled] {
 	cursor: not-allowed;
-	opacity: 0.6;
+	background: var(--outpost-button-primary-bg-disabled);
+	color: var(--outpost-button-primary-fg-disabled);
+	border: 1.5px dashed var(--outpost-border);
 }
 
 .outpost-button--secondary {
@@ -150,8 +168,13 @@
 	outline-offset: 2px;
 }
 
+/* Long-form body: room for a paragraph, grows with the text where the
+ * browser supports field-sizing, and never takes more than half the
+ * screen, so the actions below stay reachable with the keyboard open. */
 .outpost-textarea--tall {
-	min-height: 18rem;
+	min-height: 9rem;
+	max-height: 50dvh;
+	field-sizing: content;
 }
 
 /*
@@ -296,6 +319,38 @@
 	);
 }
 
+.outpost-tablist-wrap {
+	position: relative;
+	border-block-end: 1px solid var(--outpost-border);
+}
+
+.outpost-tablist-cue {
+	position: absolute;
+	inset-block: 0;
+	display: none;
+	align-items: center;
+	padding-inline: 0.25rem;
+	font-size: 1.375rem;
+	font-weight: 700;
+	line-height: 1;
+	pointer-events: none;
+	background: var(--outpost-surface-bg);
+	color: var(--outpost-surface-fg);
+}
+
+.outpost-tablist-cue--start {
+	inset-inline-start: 0;
+}
+
+.outpost-tablist-cue--end {
+	inset-inline-end: 0;
+}
+
+.outpost-tablist-wrap[data-overflow-start="true"] .outpost-tablist-cue--start,
+.outpost-tablist-wrap[data-overflow-end="true"] .outpost-tablist-cue--end {
+	display: flex;
+}
+
 .outpost-tablist {
 	display: flex;
 	/* Single-row horizontal scroll on narrow screens. With 7 tabs
@@ -308,8 +363,15 @@
 	scroll-snap-type: x proximity;
 	-webkit-overflow-scrolling: touch;
 	gap: 0.25rem;
-	padding: 0.75rem 1.25rem 0;
-	border-block-end: 1px solid var(--outpost-border, currentColor);
+	padding: 0.5rem 1.5rem 0;
+	/* Snap points respect the side padding, so the strip rests at 0
+	 * and the start cue only shows after the person scrolls. */
+	scroll-padding-inline: 1.5rem;
+	scrollbar-width: none;
+}
+
+.outpost-tablist::-webkit-scrollbar {
+	display: none;
 }
 
 .outpost-tab {
@@ -336,10 +398,19 @@
 	outline-offset: -2px;
 }
 
+/* Selected: the action fill plus a 3px foreground edge and heavier
+ * weight, so the state never rests on the fill color alone (the light
+ * orange is 2.38:1 against paper). */
 .outpost-tab[aria-selected="true"] {
-	border-color: var(--outpost-border, currentColor);
-	border-block-end-color: var(--outpost-surface-bg, transparent);
-	font-weight: 600;
+	background: var(--outpost-tab-bg-active);
+	color: var(--outpost-tab-fg-active);
+	border-color: var(--outpost-tab-indicator);
+	box-shadow: inset 0 -3px 0 var(--outpost-tab-indicator);
+	font-weight: 700;
+}
+
+.outpost-tab[aria-selected="false"] {
+	color: var(--outpost-tab-fg);
 }
 
 [role="tabpanel"][hidden] {
@@ -376,34 +447,50 @@
 	border: none;
 	padding: 0;
 	margin: 0;
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 6.5rem), 1fr));
 	gap: 0.5rem;
-	align-items: center;
 }
 
 .outpost-variant-picker legend {
 	font-weight: 600;
-	font-size: 0.9rem;
-	margin-inline-end: 0.25rem;
+	font-size: 0.9375rem;
 	padding: 0;
+	margin-block-end: 0.375rem;
 }
 
+/* Every option is a whole-label hit target at least 44px tall; long
+ * labels wrap inside the tile instead of colliding with neighbors. */
 .outpost-radio {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
-	gap: 0.375rem;
-	padding: 0.375rem 0.625rem;
-	border: 1px solid transparent;
-	border-radius: var(--outpost-radius, 0.375rem);
+	gap: 0.5rem;
+	min-height: 2.75rem;
+	min-width: 0;
+	padding: 0.5rem 0.625rem;
+	border: 1px solid var(--outpost-border);
+	border-radius: var(--outpost-radius-md);
+	background: var(--outpost-input-bg);
+	color: var(--outpost-input-fg);
 	cursor: pointer;
 	user-select: none;
+	overflow-wrap: anywhere;
+	line-height: 1.25;
+}
+
+.outpost-radio input[type="radio"] {
+	flex: 0 0 auto;
+	margin: 0;
+	inline-size: 1.125rem;
+	block-size: 1.125rem;
+	accent-color: var(--outpost-tab-indicator);
 }
 
 .outpost-radio:has(input:checked) {
-	border-color: var(--outpost-border, currentColor);
-	background: var(--outpost-input-bg, transparent);
-	font-weight: 600;
+	border-color: var(--outpost-tab-indicator);
+	box-shadow: inset 0 0 0 1px var(--outpost-tab-indicator);
+	background: var(--outpost-surface-bg);
+	font-weight: 700;
 }
 
 .outpost-radio:has(input:focus-visible) {
@@ -1379,7 +1466,7 @@
 }
 
 .outpost-geocode-picked__coords {
-	font-family: var(--outpost-font-mono, ui-monospace, monospace);
+	font-family: var(--outpost-font-family-mono);
 	font-size: 0.85rem;
 	flex: 1 1 auto;
 	min-inline-size: 0;
@@ -1553,98 +1640,77 @@
 	background-size: contain;
 }
 
-/* Tab bar — washi-tape strips. Each tab tilts a degree, picks up the
- * tape color from --outpost-tape (orange-translucent in both modes).
- * Active tab tilts the opposite way to read as "the one that's been
- * stuck on top." Tabs without `.outpost-tab--plain` get the treatment. */
+/* Tab bar — display-italic labels (the approved 2026-11-07 design; the
+ * earlier tilted washi-tape strips are retired). `.outpost-tab--plain`
+ * keeps the UI face. */
 .outpost-mode-day .outpost-tab:not(.outpost-tab--plain),
 .outpost-mode-night .outpost-tab:not(.outpost-tab--plain),
 .outpost-mode-system .outpost-tab:not(.outpost-tab--plain) {
-	position: relative;
-	background-color: var(--outpost-tape);
-	transform: rotate(-1deg);
+	font-family: var(--outpost-font-family-display);
+	font-style: italic;
+	font-size: 1.0625rem;
 	padding-inline: 0.875rem;
-	padding-block: 0.5rem;
 }
 
-.outpost-mode-day .outpost-tab[aria-selected='true']:not(.outpost-tab--plain),
-.outpost-mode-night .outpost-tab[aria-selected='true']:not(.outpost-tab--plain),
-.outpost-mode-system .outpost-tab[aria-selected='true']:not(.outpost-tab--plain) {
-	transform: rotate(1deg);
-	z-index: 1;
-}
-
-/* Form inputs — underline-only treatment. Replaces the four-sided box
- * with a hand-drawn baseline so inputs read like a worksheet rather
- * than a software form. Focus thickens the underline; the
- * focus-ring-color token still drives accent. */
+/* Form inputs — flat boxed fields on the field surface (the approved
+ * 2026-11-07 design; the earlier underline-only worksheet look is
+ * retired because a lone baseline is a weak field boundary). Focus keeps
+ * a 2px ring outside the border. `--plain` keeps the base input. */
 .outpost-mode-day .outpost-input:not(.outpost-input--plain),
 .outpost-mode-night .outpost-input:not(.outpost-input--plain),
 .outpost-mode-system .outpost-input:not(.outpost-input--plain),
 .outpost-mode-day .outpost-textarea:not(.outpost-textarea--plain),
 .outpost-mode-night .outpost-textarea:not(.outpost-textarea--plain),
 .outpost-mode-system .outpost-textarea:not(.outpost-textarea--plain) {
-	border: 0;
-	border-block-end: 2px solid var(--outpost-input-border);
-	border-radius: 0;
-	background-color: transparent;
-	padding-inline: 0.25rem;
+	border: 1.5px solid var(--outpost-input-border);
+	border-radius: var(--outpost-radius-md);
+	background-color: var(--outpost-input-bg);
+	color: var(--outpost-input-fg);
+	font-size: max(1rem, 16px);
+	padding-inline: 0.75rem;
 }
 
-.outpost-mode-day .outpost-input:not(.outpost-input--plain):focus,
-.outpost-mode-night .outpost-input:not(.outpost-input--plain):focus,
-.outpost-mode-system .outpost-input:not(.outpost-input--plain):focus,
-.outpost-mode-day .outpost-textarea:not(.outpost-textarea--plain):focus,
-.outpost-mode-night .outpost-textarea:not(.outpost-textarea--plain):focus,
-.outpost-mode-system .outpost-textarea:not(.outpost-textarea--plain):focus {
-	outline: 0;
-	border-block-end-width: 3px;
-	border-block-end-color: var(--outpost-focus-ring-color);
+.outpost-mode-day .outpost-input:not(.outpost-input--plain):focus-visible,
+.outpost-mode-night .outpost-input:not(.outpost-input--plain):focus-visible,
+.outpost-mode-system .outpost-input:not(.outpost-input--plain):focus-visible,
+.outpost-mode-day .outpost-textarea:not(.outpost-textarea--plain):focus-visible,
+.outpost-mode-night .outpost-textarea:not(.outpost-textarea--plain):focus-visible,
+.outpost-mode-system .outpost-textarea:not(.outpost-textarea--plain):focus-visible {
+	outline: 2px solid var(--outpost-focus-ring-color);
+	outline-offset: 2px;
+	border-color: var(--outpost-input-border-focus);
 }
 
-/* Radio groups — hand-drawn circle SVGs replace the UA bullet. The
- * input itself stays accessible (real radio with label); the SVG paints
- * as the visible affordance. */
+.outpost-input::placeholder,
+.outpost-textarea::placeholder {
+	color: var(--outpost-input-placeholder);
+	opacity: 1;
+}
+
+/* Radio groups — native radios tinted with the indicator color (the
+ * approved 2026-11-07 design; the hand-drawn SVG circles are retired
+ * because a background-image can't follow the scheme's ink and vanished
+ * on dark surfaces). `.outpost-radio--plain` keeps the browser default. */
 .outpost-mode-day .outpost-radio:not(.outpost-radio--plain) input[type="radio"],
 .outpost-mode-night .outpost-radio:not(.outpost-radio--plain) input[type="radio"],
 .outpost-mode-system .outpost-radio:not(.outpost-radio--plain) input[type="radio"] {
-	appearance: none;
-	-webkit-appearance: none;
-	width: 1.25rem;
-	height: 1.25rem;
-	background-image: url("../../../assets/svg/radio-idle.svg");
-	background-repeat: no-repeat;
-	background-position: center;
-	background-size: contain;
-	border: 0;
-	margin-inline-end: 0.5rem;
-	vertical-align: middle;
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+	accent-color: var(--outpost-tab-indicator);
 }
 
-.outpost-mode-day .outpost-radio:not(.outpost-radio--plain) input[type="radio"]:checked,
-.outpost-mode-night .outpost-radio:not(.outpost-radio--plain) input[type="radio"]:checked,
-.outpost-mode-system .outpost-radio:not(.outpost-radio--plain) input[type="radio"]:checked {
-	background-image: url("../../../assets/svg/radio-selected.svg");
-}
-
-/* Primary button — rubber-stamp treatment. Slightly rotated, ink-heavy
- * border, transformed letter-spacing so it reads "stamped on" rather
- * than "rendered by browser." Opt-out via `.outpost-button--plain`. */
+/* Primary button — flat action fill with a display-serif label (the
+ * approved 2026-11-07 design; the rotated uppercase stamp is retired).
+ * Opt-out via `.outpost-button--plain`. */
 .outpost-mode-day .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain),
 .outpost-mode-night .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain),
 .outpost-mode-system .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain) {
-	transform: rotate(-1deg);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	font-size: 0.9375rem;
-	border-width: 2px;
-	border-style: solid;
-}
-
-.outpost-mode-day .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active,
-.outpost-mode-night .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active,
-.outpost-mode-system .outpost-button:not(.outpost-button--secondary):not(.outpost-button--plain):active {
-	transform: rotate(-1deg) translateY(1px);
+	font-family: var(--outpost-font-family-display);
+	font-size: 1.125rem;
+	font-weight: 700;
+	min-height: 3rem;
+	padding-inline: 1.5rem;
+	border-radius: var(--outpost-radius-md);
 }
 
 /* Voice mic — clipart-stamp treatment. The mic icon swaps from emoji
@@ -1707,4 +1773,404 @@
 	max-height: 0;
 	overflow: hidden;
 	border-block-end-width: 0;
+}
+
+/* ----------------------------------------------------------------------
+ * PWA UI 2026-11-07: identity header, appearance settings, scenery,
+ * About facts. Paint through tokens only (B6). Decision:
+ * docs/decisions/session-pwa-ui-appearance.md.
+ * ---------------------------------------------------------------------- */
+
+.outpost-composer {
+	display: flex;
+	flex-direction: column;
+	flex: 1 0 auto;
+}
+
+/* Header: identity on the left, mode shortcut and settings on the right.
+ * Wraps onto two rows at narrow widths and large text sizes instead of
+ * overflowing. */
+.outpost-app-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 0.75rem;
+	padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.5rem max(1rem, env(safe-area-inset-left));
+}
+
+.outpost-app-header__identity {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	min-width: 0;
+}
+
+.outpost-signpost {
+	flex: 0 0 auto;
+	color: var(--outpost-logo);
+}
+
+.outpost-app-header__titles {
+	min-width: 0;
+}
+
+.outpost-wordmark {
+	margin: 0;
+	font-family: var(--outpost-font-family-display);
+	font-size: 1.375rem;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--outpost-surface-fg);
+}
+
+.outpost-app-header__site {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--outpost-text-muted);
+	overflow-wrap: anywhere;
+}
+
+.outpost-app-header__controls {
+	display: flex;
+	align-items: center;
+	gap: 0.375rem;
+}
+
+/* Light / Dark / System shortcut: a native radio group drawn as a
+ * segmented control. Each option is 44x44. */
+.outpost-mode-switch {
+	display: flex;
+	margin: 0;
+	padding: 0.125rem;
+	border: 1px solid var(--outpost-border);
+	border-radius: var(--outpost-radius-pill);
+	background: var(--outpost-input-bg);
+}
+
+.outpost-mode-switch__option {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: 2.75rem;
+	block-size: 2.75rem;
+	border-radius: var(--outpost-radius-pill);
+	color: var(--outpost-surface-fg);
+	cursor: pointer;
+}
+
+.outpost-mode-switch__option input {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.outpost-mode-switch__option:has(input:checked) {
+	background: var(--outpost-tab-bg-active);
+	color: var(--outpost-tab-fg-active);
+	box-shadow: inset 0 0 0 2px var(--outpost-tab-indicator);
+}
+
+.outpost-mode-switch__option:has(input:focus-visible) {
+	outline: 2px solid var(--outpost-focus-ring-color);
+	outline-offset: 2px;
+}
+
+.outpost-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: 2.75rem;
+	block-size: 2.75rem;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: var(--outpost-radius-pill);
+	background: var(--outpost-button-ghost-bg);
+	color: var(--outpost-button-ghost-fg);
+	cursor: pointer;
+}
+
+.outpost-icon-button:hover {
+	background: var(--outpost-button-ghost-bg-hover);
+}
+
+.outpost-icon-button:focus-visible {
+	outline: 2px solid var(--outpost-focus-ring-color);
+	outline-offset: 2px;
+}
+
+/* Settings sheet choices: native radios with the whole option as the
+ * hit target; selection shown by a 2px edge and weight, not color alone. */
+.outpost-settings {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.outpost-choice-group {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.outpost-choice-group__legend {
+	padding: 0;
+	font-family: var(--outpost-font-family-display);
+	font-size: 1.25rem;
+	font-weight: 700;
+}
+
+.outpost-choice-group__options {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.outpost-choice-group__options--row {
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr));
+}
+
+.outpost-choice {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.625rem;
+	min-height: 2.75rem;
+	padding: 0.625rem 0.75rem;
+	border: 1px solid var(--outpost-border);
+	border-radius: var(--outpost-radius-md);
+	background: var(--outpost-input-bg);
+	color: var(--outpost-input-fg);
+	cursor: pointer;
+}
+
+.outpost-choice--tile {
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	gap: 0.25rem;
+}
+
+.outpost-choice input[type="radio"] {
+	flex: 0 0 auto;
+	margin: 0.125rem 0 0;
+	inline-size: 1.125rem;
+	block-size: 1.125rem;
+	accent-color: var(--outpost-tab-indicator);
+}
+
+.outpost-choice:has(input:checked) {
+	border-color: var(--outpost-tab-indicator);
+	box-shadow: inset 0 0 0 1px var(--outpost-tab-indicator);
+}
+
+.outpost-choice:has(input:checked) .outpost-choice__label {
+	font-weight: 700;
+}
+
+.outpost-choice:has(input:focus-visible) {
+	outline: 2px solid var(--outpost-focus-ring-color);
+	outline-offset: 2px;
+}
+
+.outpost-choice__body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	min-width: 0;
+}
+
+.outpost-choice__label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	font-weight: 600;
+}
+
+.outpost-choice__description {
+	font-size: 0.9375rem;
+	color: var(--outpost-text-muted);
+}
+
+.outpost-settings__status {
+	min-height: 1.5em;
+	margin: 0;
+	font-size: 0.9375rem;
+	color: var(--outpost-surface-fg);
+}
+
+/* Decorative scenery: below everything, never under a field. */
+.outpost-scenery {
+	margin-block-start: auto;
+	padding-block-start: 1.5rem;
+	line-height: 0;
+	pointer-events: none;
+}
+
+.outpost-scenery svg {
+	display: block;
+	inline-size: 100%;
+	block-size: 3rem;
+}
+
+.outpost-scenery__far {
+	fill: var(--outpost-scenery-far);
+	opacity: 0.35;
+}
+
+.outpost-scenery__near {
+	fill: var(--outpost-scenery-near);
+	opacity: 0.55;
+}
+
+@media (forced-colors: active) {
+	.outpost-scenery {
+		display: none;
+	}
+
+	.outpost-signpost {
+		color: CanvasText;
+	}
+
+	.outpost-tab[aria-selected="true"],
+	.outpost-radio:has(input:checked),
+	.outpost-choice:has(input:checked),
+	.outpost-mode-switch__option:has(input:checked) {
+		outline: 2px solid Highlight;
+		outline-offset: -2px;
+	}
+}
+
+/* About: connection facts, help links, disclosures. */
+.outpost-facts {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--outpost-card-border);
+	border-radius: var(--outpost-radius-md);
+	background: var(--outpost-card-bg);
+}
+
+.outpost-facts__row {
+	display: grid;
+	grid-template-columns: minmax(7rem, 30%) 1fr;
+	gap: 0.25rem 0.75rem;
+	padding: 0.625rem 0.75rem;
+	border-block-start: 1px solid var(--outpost-card-border);
+}
+
+.outpost-facts__row:first-child {
+	border-block-start: 0;
+}
+
+.outpost-facts dt {
+	font-weight: 600;
+}
+
+.outpost-facts dd {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	overflow-wrap: anywhere;
+}
+
+.outpost-facts__detail {
+	font-size: 0.875rem;
+	color: var(--outpost-text-muted);
+}
+
+.outpost-state {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	font-weight: 700;
+}
+
+.outpost-state__glyph {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: 1.25rem;
+	block-size: 1.25rem;
+	border: 1.5px solid currentColor;
+	border-radius: var(--outpost-radius-pill);
+	font-size: 0.75rem;
+	line-height: 1;
+}
+
+.outpost-link-list,
+.outpost-about .outpost-link-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--outpost-card-border);
+	border-radius: var(--outpost-radius-md);
+	background: var(--outpost-card-bg);
+}
+
+.outpost-link-list li {
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	padding: 0.625rem 0.75rem;
+	border-block-start: 1px solid var(--outpost-card-border);
+}
+
+.outpost-link-list li:first-child {
+	border-block-start: 0;
+}
+
+.outpost-link-list a {
+	color: var(--outpost-link);
+	font-weight: 600;
+}
+
+.outpost-link-list__detail {
+	font-size: 0.875rem;
+	color: var(--outpost-text-muted);
+}
+
+.outpost-disclosure {
+	border: 1px solid var(--outpost-card-border);
+	border-radius: var(--outpost-radius-md);
+	padding: 0.25rem 0.75rem;
+}
+
+/* Keeps the native disclosure marker (display stays list-item). */
+.outpost-disclosure > summary {
+	padding-block: 0.625rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.outpost-disclosure > summary:focus-visible {
+	outline: 2px solid var(--outpost-focus-ring-color);
+	outline-offset: 2px;
+}
+
+.outpost-disclosure[open] {
+	padding-block-end: 0.75rem;
+}
+
+.outpost-diagnostics {
+	margin: 0 0 0.5rem;
+	padding: 0.5rem;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-family: var(--outpost-font-family-mono);
+	font-size: 0.8125rem;
+	background: var(--outpost-input-bg);
+	border-radius: var(--outpost-radius-sm);
+}
+
+.outpost-about a {
+	color: var(--outpost-link);
 }

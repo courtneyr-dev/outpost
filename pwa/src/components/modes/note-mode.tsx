@@ -15,6 +15,9 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
+import { clear_cache as clear_appearance_cache } from '../../lib/appearance';
+import { clear_drafts, draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -144,6 +147,10 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 
 const VARIANT_ORDER: Variant[] = ['article', 'note', 'status', 'aside', 'quote'];
 
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
 /**
  * Read share-target intake if it's tagged for the Post tab. Drains
  * the stash only on tab match — peek-then-consume so the parallel
@@ -171,17 +178,22 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	// destination, consume the stashed payload as the initial state.
 	// One-shot — sessionStorage clears on read.
 	const initial_share = consume_share_target_for_note();
+	// A share is a new post the person just asked for, so it wins over an
+	// unsent draft; the draft is replaced on the next save.
+	const [draft] = useState(() => (initial_share ? null : read_draft('note', token.me)));
+	const draft_variant = draft?.meta.variant;
 
 	// Variant precedence: share-target intake (when posting from a share)
-	// > site-admin default (Outpost_Settings → defaultPostVariant)
-	// > hard-coded 'article'.
+	// > restored draft > site-admin default (Outpost_Settings →
+	// defaultPostVariant) > hard-coded 'article'.
 	const initial_variant: Variant =
 		initial_share?.variant ??
+		(is_variant(draft_variant) ? draft_variant : undefined) ??
 		(composerConfig?.siteSettings?.defaultPostVariant as Variant | undefined) ??
 		'article';
 	const [variant, setVariant] = useState<Variant>(initial_variant);
-	const [title, setTitle] = useState(initial_share?.title ?? '');
-	const [content, setContent] = useState(initial_share?.content ?? '');
+	const [title, setTitle] = useState(initial_share?.title ?? draft_text(draft?.fields.title));
+	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
@@ -193,7 +205,14 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	// Either can be set independently. User can attach just a venue name
 	// ("the gym"), just coordinates, or both.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'note',
+		me: token.me,
+		fields: { title, content, venue: venue_name },
+		meta: { variant },
+		restored: draft !== null,
+	});
 
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const config = VARIANTS[variant];
@@ -202,6 +221,10 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const handle_signout = async (event: Event): Promise<void> => {
 		event.preventDefault();
 		await clear_token(tokenStore);
+		// The appearance copy and unsent drafts belong to this account; the
+		// next person on a shared device starts from the defaults.
+		clear_appearance_cache();
+		clear_drafts();
 		window.location.reload();
 	};
 
@@ -243,6 +266,9 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				micropubEnv,
 			);
 			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			// The post is published or held in the offline queue; either way
+			// the draft must not come back after a reload.
+			saved_draft.discard();
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 				setContent('');
@@ -290,7 +316,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				{config.heading}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code> · scope <code>{token.scope || '—'}</code>
+				Write an article, note, status, aside, or quote.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -427,6 +453,8 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer

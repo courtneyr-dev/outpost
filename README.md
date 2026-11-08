@@ -89,12 +89,14 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 
 ## The hard contract
 
-**Plugin owns layout. Theme owns paint.**
+**Outpost owns layout and its default design. The style source you pick supplies paint.**
 
-- Plugin always owns: PWA shell, routes, service worker, manifest, composer interaction, structural CSS (layout, iOS safe-area, touch targets, focus).
-- Theme always owns: every color, every font, spacing, radius, shadow, button fills, link colors.
-- Plugin CSS only references colors and fonts through `var(--outpost-*, neutral-fallback)`. No part of Outpost ever forces a color the theme didn't ask for.
+- Outpost always owns: PWA shell, routes, service worker, manifest, composer interaction, structural CSS (layout, iOS safe-area, touch targets, focus), and the Outpost Default design tokens.
+- Each person picks a style source in the composer's settings: **Outpost Default** (the shipped paper, violet, and orange design) or **Use Site Theme** (the active theme's palette and fonts, contrast-checked). Light, Dark, and System work with either.
+- Component CSS only references colors and fonts through `var(--outpost-*)` tokens and never hardcodes paint. A theme can still set any token.
 - One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the iOS bottom toolbar.
+
+Decision record: [docs/decisions/session-pwa-ui-appearance.md](docs/decisions/session-pwa-ui-appearance.md).
 
 ## Prior art
 

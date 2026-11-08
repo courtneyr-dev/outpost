@@ -76,14 +76,17 @@ final class Outpost_PWA_Shell {
 		<?php if ( null !== $entry_url ) : ?>
 	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
 		<?php endif; ?>
-	<meta name="theme-color" content="#2a4a39">
+	<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf5">
+	<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e1838">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<?php wp_styles()->do_items( $style_handles ); ?>
+		<?php self::print_theme_font_faces(); ?>
 </head>
-<body class="outpost-composer-shell <?php echo esc_attr( self::mode_class() ); ?>">
-	<main id="outpost-root" data-outpost-route="composer"></main>
+<body class="outpost-composer-shell <?php echo esc_attr( self::mode_class() . ' ' . self::source_class() ); ?>">
+		<?php wp_scripts()->do_items( array( 'outpost-appearance-boot' ) ); ?>
+	<main id="outpost-root" data-outpost-route="composer" data-outpost-version="<?php echo esc_attr( OUTPOST_VERSION ); ?>"></main>
 		<?php
 		wp_scripts()->do_items( $script_handles );
 		?>
@@ -119,6 +122,19 @@ final class Outpost_PWA_Shell {
 		wp_register_style( 'outpost-shell-critical', false, array(), OUTPOST_VERSION );
 		wp_add_inline_style( 'outpost-shell-critical', self::critical_css() );
 
+		// Applies the last-known appearance (mode, style source, cached
+		// token CSS) from this device before the composer paints. A
+		// classic script, printed right after <body> opens, because the
+		// CSP allows no inline script and a module script runs too late
+		// to prevent a flash of the wrong scheme.
+		wp_register_script(
+			'outpost-appearance-boot',
+			OUTPOST_PLUGIN_URL . 'assets/js/appearance-boot.js',
+			array(),
+			OUTPOST_VERSION,
+			false
+		);
+
 		// Server-rendered with a stable filename, so it needs the version query
 		// as a cache-bust. The bundle assets below don't — Vite content-hashes
 		// their filenames, so `null` keeps ?ver= off URLs that are already
@@ -129,6 +145,13 @@ final class Outpost_PWA_Shell {
 			array(),
 			OUTPOST_VERSION
 		);
+
+		$user_css = self::user_appearance_css();
+		if ( '' !== $user_css ) {
+			wp_register_style( 'outpost-appearance-user', false, array( 'outpost-tokens' ), OUTPOST_VERSION );
+			wp_add_inline_style( 'outpost-appearance-user', $user_css );
+			$style_handles[] = 'outpost-appearance-user';
+		}
 
 		foreach ( array_values( $css_urls ) as $index => $css_url ) {
 			$handle          = 'outpost-app-' . (string) $index;
@@ -196,6 +219,61 @@ final class Outpost_PWA_Shell {
 		$class = (string) apply_filters( 'outpost_shell_mode_class', $class );
 
 		return in_array( $class, array( 'outpost-mode-day', 'outpost-mode-night', 'outpost-mode-system' ), true ) ? $class : 'outpost-mode-system';
+	}
+
+	/**
+	 * Style-source class for the shell body: `outpost-source-outpost` or
+	 * `outpost-source-site`. For a request WordPress can't tie to a user
+	 * (the installed PWA authenticates with a bearer token, which a page
+	 * load doesn't carry), this is the new-user default, and the boot
+	 * script swaps in the device's last-known choice.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function source_class(): string {
+		$user_id = (int) get_current_user_id();
+		$source  = $user_id > 0 ? Outpost_Style_Source::get_source( $user_id ) : Outpost_Style_Source::SOURCE_OUTPOST;
+		return 'outpost-source-' . $source;
+	}
+
+	/**
+	 * Resolved token CSS for a cookie-identified user whose paint differs
+	 * from the token file: Site Theme, or Outpost Default with overrides.
+	 * The shell is sent no-store, and this holds colors and font names
+	 * only, never a credential.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function user_appearance_css(): string {
+		$user_id = (int) get_current_user_id();
+		if ( $user_id <= 0 ) {
+			return '';
+		}
+		$source    = Outpost_Style_Source::get_source( $user_id );
+		$overrides = get_user_meta( $user_id, Outpost_Token_Resolver::OVERRIDE_META_KEY, true );
+		if ( Outpost_Style_Source::SOURCE_SITE !== $source && empty( $overrides ) ) {
+			return '';
+		}
+		return Outpost_Token_Resolver::to_scoped_css(
+			$source,
+			Outpost_Token_Resolver::resolve( $user_id, 'day', $source ),
+			Outpost_Token_Resolver::resolve( $user_id, 'night', $source )
+		);
+	}
+
+	/**
+	 * The active theme's `@font-face` rules (theme.json fontFace entries),
+	 * so Use Site Theme can render the theme's own fonts. Same-origin font
+	 * files satisfy `font-src 'self'`, and a browser downloads a face only
+	 * when a rule uses its family, so Outpost Default pays nothing. This
+	 * prints font faces only, not the theme's stylesheet queue.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function print_theme_font_faces(): void {
+		if ( function_exists( 'wp_print_font_faces' ) ) {
+			wp_print_font_faces();
+		}
 	}
 
 	/**

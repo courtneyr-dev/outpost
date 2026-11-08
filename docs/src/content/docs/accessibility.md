@@ -34,7 +34,7 @@ The checklist's items above are the relevant evidence: interactive controls are 
 
 Open items straight from the repo's checklist and test inventory:
 
-- **Color contrast** — deferred in the checklist until the default design tokens ship; since colors come from your theme's tokens, contrast on your site also depends on your theme.
+- **Color contrast** — the Outpost Default tokens are measured against WCAG 2.2 AA (4.5:1 for text, 3:1 for borders, focus, and the logo) by an automated test. Under Use Site Theme, Outpost checks and adjusts your theme's colors at the same thresholds; token overrides you mark "override anyway" skip that check.
 - **Focus management when switching composer modes** — listed as open.
 - **Real-device screen reader testing** (VoiceOver, TalkBack) — listed as open.
 - **No automated accessibility test suite** — the repo's tests don't include axe, pa11y, or similar tooling.

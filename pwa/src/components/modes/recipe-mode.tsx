@@ -18,6 +18,8 @@ import { useMoreOpen } from '../../lib/composer-prefs';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -83,18 +85,33 @@ export function minutes_to_iso8601_duration(minutes: number): string {
 }
 
 export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModeProps) {
-	const [name, setName] = useState('');
-	const [ingredients_text, setIngredientsText] = useState('');
-	const [instructions_text, setInstructionsText] = useState('');
-	const [recipe_yield, setRecipeYield] = useState('');
-	const [duration_minutes, setDurationMinutes] = useState('');
-	const [content, setContent] = useState('');
+	const [draft] = useState(() => read_draft('recipe', token.me));
+	const [name, setName] = useState(draft_text(draft?.fields.name));
+	const [ingredients_text, setIngredientsText] = useState(draft_text(draft?.fields.ingredients));
+	const [instructions_text, setInstructionsText] = useState(draft_text(draft?.fields.instructions));
+	const [recipe_yield, setRecipeYield] = useState(draft_text(draft?.fields.yield));
+	const [duration_minutes, setDurationMinutes] = useState(draft_text(draft?.fields.duration));
+	const [content, setContent] = useState(draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'recipe',
+		me: token.me,
+		fields: {
+			name,
+			ingredients: ingredients_text,
+			instructions: instructions_text,
+			yield: recipe_yield,
+			duration: duration_minutes,
+			content,
+			venue: venue_name,
+		},
+		restored: draft !== null,
+	});
 	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 
@@ -210,6 +227,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			);
 			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
 			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			// Published or held in the offline queue: the draft is done.
+			saved_draft.discard();
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 				return;
@@ -272,7 +291,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				Recipe
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a recipe with ingredients, steps, and times.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -428,6 +447,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer

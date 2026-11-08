@@ -31,6 +31,8 @@ import type { DoingVariant } from '../../lib/share-target';
 import { fetch_source_preview, PreviewError } from '../../lib/preview';
 import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -409,6 +411,14 @@ const VARIANT_ORDER: Variant[] = [
 	'audio',
 ];
 
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
+function is_read_status(value: unknown): value is '' | 'to-read' | 'reading' | 'finished' {
+	return value === '' || value === 'to-read' || value === 'reading' || value === 'finished';
+}
+
 type Status =
 	| { kind: 'idle' }
 	| { kind: 'discovering-endpoint' }
@@ -513,9 +523,20 @@ function is_embeddable_media_url(url: string): boolean {
 
 export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv }: ListenModeProps) {
 	const initial_share = consume_share_target_for_doing();
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		initial_share.variant || initial_share.url || initial_share.content
+			? null
+			: read_draft('listen', token.me),
+	);
+	const d = draft?.fields;
+	const draft_variant = draft?.meta.variant;
+	const draft_read_status = draft?.meta.readStatus;
 
-	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'listen');
-	const [target_url, setTargetUrl] = useState(initial_share.url ?? '');
+	const [variant, setVariant] = useState<Variant>(
+		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'listen'),
+	);
+	const [target_url, setTargetUrl] = useState(initial_share.url ?? draft_text(d?.target));
 	// Source-id from share-target dispatch — drives the auto-preview
 	// fetch on mount and gets passed through to the submission so
 	// downstream filters (e.g., post-format inference) can see it.
@@ -523,22 +544,24 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	// Cover URL + publication populated by the auto-preview fetch.
 	// User-invisible state — they round-trip into the h-entry submission
 	// as `u-photo` and `p-publication` respectively.
-	const [cover_url, setCoverUrl] = useState('');
-	const [publication, setPublication] = useState('');
+	const [cover_url, setCoverUrl] = useState(draft_text(draft?.meta.cover));
+	const [publication, setPublication] = useState(draft_text(draft?.meta.publication));
 	// Unified per-variant primary input. The `personLabel` config decides
 	// what the user sees ("Artist" / "Director" / "Author" / "Place name" /
 	// "What did you eat?"). The submit handler below routes the value to
 	// the appropriate h-entry property based on `personProperty`.
-	const [person_name, setPersonName] = useState('');
-	const [watch_title, setWatchTitle] = useState('');
-	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>('');
+	const [person_name, setPersonName] = useState(draft_text(d?.person));
+	const [watch_title, setWatchTitle] = useState(draft_text(d?.watchTitle));
+	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>(
+		is_read_status(draft_read_status) ? draft_read_status : '',
+	);
 	// Event start/end — datetime-local values, submitted as h-event
 	// `start`/`end`. Only read by the event branch (gated on hasStart /
 	// hasEnd), so stale values never leak into other variants.
-	const [event_start, setEventStart] = useState('');
-	const [event_end, setEventEnd] = useState('');
-	const [rating, setRating] = useState('');
-	const [content, setContent] = useState(initial_share.content ?? '');
+	const [event_start, setEventStart] = useState(draft_text(d?.eventStart));
+	const [event_end, setEventEnd] = useState(draft_text(d?.eventEnd));
+	const [rating, setRating] = useState(draft_text(d?.rating));
+	const [content, setContent] = useState(initial_share.content ?? draft_text(d?.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
@@ -557,7 +580,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	// "everywhere else" pattern matches the picker used in Note / Reply /
 	// Photo / Life / Recipe — venue name + optional OSM coordinates.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(d?.venue));
 
 	// User-attached media for the snapshot-shaped variants (Checkin / Eat /
 	// Drink / Exercise — every variant whose config has hasGeocode: true).
@@ -567,7 +590,24 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	// client-side upload — the URL gets posted verbatim as the `video`
 	// h-entry property and downstream consumers handle embedding).
 	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
-	const [video_url, setVideoUrl] = useState('');
+	const [video_url, setVideoUrl] = useState(draft_text(d?.video));
+	const saved_draft = useDraft({
+		mode: 'listen',
+		me: token.me,
+		fields: {
+			target: target_url,
+			person: person_name,
+			watchTitle: watch_title,
+			eventStart: event_start,
+			eventEnd: event_end,
+			rating,
+			content,
+			video: video_url,
+			venue: venue_name,
+		},
+		meta: { variant, readStatus: read_status, cover: cover_url, publication },
+		restored: draft !== null,
+	});
 	// Media endpoint is discovered once per session and cached, matching
 	// PhotoMode's pattern. Discovery only fires when the submit handler
 	// actually needs to upload images.
@@ -952,6 +992,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			);
 			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
 			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			saved_draft.discard();
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 			} else {
@@ -1027,7 +1068,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				Doing
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share what you're listening to, watching, reading, playing, eating, and more.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -1427,6 +1468,8 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer

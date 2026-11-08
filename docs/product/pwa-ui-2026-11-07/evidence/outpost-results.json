@@ -1,0 +1,40 @@
+{
+ "outpost-light-390-note": [],
+ "outpost-light-390-reply": [],
+ "outpost-light-390-photo": [],
+ "outpost-light-390-listen": [],
+ "outpost-light-390-life": [],
+ "outpost-light-390-recipe": [],
+ "outpost-light-390-about": [],
+ "outpost-light-390-settings": [],
+ "outpost-dark-390-note": [],
+ "outpost-dark-390-reply": [],
+ "outpost-dark-390-photo": [],
+ "outpost-dark-390-listen": [],
+ "outpost-dark-390-life": [],
+ "outpost-dark-390-recipe": [],
+ "outpost-dark-390-about": [],
+ "outpost-dark-390-settings": [],
+ "outpost-light-320-docScroll": [
+  320,
+  320
+ ],
+ "focus-after-3-tabs": "<button type=\"button\" class=\"outpost-icon-button\" aria-haspopup=\"dialog\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" strok",
+ "tab-end-key-selects": "outpost-tab-about",
+ "selected-tab-fully-visible": true,
+ "offline-status": "Applied on this device; not saved to your site because you're offline. Outpost tries again when it can.",
+ "offline-body-class": "outpost-composer-shell outpost-mode-night outpost-source-outpost",
+ "inert-while-open": true,
+ "focus-returned-to": "dialog",
+ "after-reconnect-status": "Saved to your site.",
+ "system-os-change": {
+  "before": [
+   "light",
+   "rgb(251, 250, 245)"
+  ],
+  "after": [
+   "dark",
+   "rgb(30, 24, 56)"
+  ]
+ }
+}

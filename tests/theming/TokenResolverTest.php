@@ -204,9 +204,9 @@ final class TokenResolverTest extends \WP_Mock\Tools\TestCase {
 		$night = Outpost_Token_Resolver::resolve( 42, 'night' );
 
 		$this->assertSame( '#fbfaf5', $day['colors']['bg'] );
-		$this->assertSame( '#251f1c', $night['colors']['bg'] );
+		$this->assertSame( '#1e1838', $night['colors']['bg'] );
 		$this->assertSame( '#241c4a', $day['colors']['text'] );
-		$this->assertSame( '#fbfaf5', $night['colors']['text'] );
+		$this->assertSame( '#f7f4ff', $night['colors']['text'] );
 	}
 
 	public function test_invalid_mode_falls_back_to_day(): void {
@@ -393,5 +393,197 @@ final class TokenResolverTest extends \WP_Mock\Tools\TestCase {
 		$css = Outpost_Token_Resolver::to_css( $resolved );
 		$this->assertStringContainsString( '--outpost-text-secondary: #888888;', $css );
 		$this->assertStringContainsString( '--outpost-accent-2: #444444;', $css );
+	}
+
+	// --- style source (PWA UI appearance decision) ------------------------
+
+	private function tt5_like_source(): array {
+		return array(
+			'settings' => array(
+				'color' => array(
+					'palette' => array(
+						'theme' => array(
+							array(
+								'slug'  => 'base',
+								'color' => '#ffffff',
+							),
+							array(
+								'slug'  => 'contrast',
+								'color' => '#111111',
+							),
+							array(
+								'slug'  => 'accent-1',
+								'color' => '#ffee58',
+							),
+							array(
+								'slug'  => 'accent-3',
+								'color' => '#503aa8',
+							),
+						),
+					),
+				),
+			),
+			'styles'   => array(
+				'color'    => array(
+					'background' => 'var:preset|color|base',
+					'text'       => 'var:preset|color|contrast',
+				),
+				'elements' => array(
+					'link' => array( 'color' => array( 'text' => 'var(--wp--preset--color--accent-3)' ) ),
+				),
+			),
+		);
+	}
+
+	public function test_outpost_source_ignores_the_theme_palette(): void {
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'outpost' );
+		$this->assertSame( '#fbfaf5', $out['colors']['bg'] );
+		$this->assertSame( '#241c4a', $out['colors']['text'] );
+		$this->assertSame( 'default', $out['sources']['colors.bg'] );
+		$this->assertSame( 'outpost', $out['source'] );
+	}
+
+	public function test_outpost_source_still_applies_user_overrides(): void {
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$this->user_meta[42][ Outpost_Token_Resolver::OVERRIDE_META_KEY ] = array(
+			'day' => array( 'colors' => array( 'accent' => '#0055aa' ) ),
+		);
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'outpost' );
+		$this->assertSame( '#0055aa', $out['colors']['accent'] );
+		$this->assertSame( 'override', $out['sources']['colors.accent'] );
+	}
+
+	public function test_site_source_reads_semantic_global_styles(): void {
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$this->assertSame( '#ffffff', $out['colors']['bg'] );
+		$this->assertSame( '#111111', $out['colors']['text'] );
+		$this->assertSame( '#503aa8', $out['components']['link'], 'The theme link color passes 4.5:1 on white and is used.' );
+	}
+
+	public function test_site_source_button_label_meets_contrast_on_a_pale_accent(): void {
+		// accent-1 #ffee58 (pale yellow) cannot take a white label; the
+		// derivation picks the theme's own dark ink instead.
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$c   = $out['components'];
+		// The FY rule (accent at 3:1 on surface) darkens the yellow first
+		// and records it; the button fill is that adjusted accent.
+		$this->assertSame( '#ffee58', $out['adjusted']['accent']['original'] );
+		$this->assertSame( $out['colors']['accent'], $c['button-primary-bg'] );
+		$this->assertGreaterThanOrEqual( 4.5, Outpost_Contrast::ratio( $c['button-primary-fg'], $c['button-primary-bg'] ) );
+		$this->assertGreaterThanOrEqual( 3.0, Outpost_Contrast::ratio( $c['focus-ring-color'], $c['surface-bg'] ) );
+		$this->assertGreaterThanOrEqual( 3.0, Outpost_Contrast::ratio( $c['focus-ring-color'], $c['input-bg'] ) );
+	}
+
+	public function test_dark_without_a_dark_variation_keeps_dark_surfaces(): void {
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'night', 'site' );
+		$this->assertSame( '#1e1838', $out['components']['surface-bg'], 'A light-only theme must not paint dark mode with its light page color.' );
+		$this->assertGreaterThanOrEqual( 4.5, Outpost_Contrast::ratio( $out['components']['surface-fg'], $out['components']['surface-bg'] ) );
+	}
+
+	public function test_dark_variation_supplies_dark_values(): void {
+		$source               = $this->tt5_like_source();
+		$source['variations'] = array(
+			array(
+				'slug'     => 'evening',
+				'settings' => array(
+					'color' => array(
+						'palette' => array(
+							'theme' => array(
+								array(
+									'slug'  => 'base',
+									'color' => '#1b1b1b',
+								),
+								array(
+									'slug'  => 'contrast',
+									'color' => '#f0f0f0',
+								),
+							),
+						),
+					),
+				),
+			),
+		);
+		$this->inject_theme_source( $source );
+		$out = Outpost_Token_Resolver::resolve( 42, 'night', 'site' );
+		$this->assertSame( '#1b1b1b', $out['components']['surface-bg'] );
+		$this->assertSame( '#f0f0f0', $out['components']['surface-fg'] );
+	}
+
+	public function test_sources_cache_separately(): void {
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$site    = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$outpost = Outpost_Token_Resolver::resolve( 42, 'day', 'outpost' );
+		$this->assertNotSame( $site['colors']['bg'], $outpost['colors']['bg'] );
+		$this->assertArrayHasKey( Outpost_Token_Resolver::TRANSIENT_PREFIX . '42_day', $this->transients );
+		$this->assertArrayHasKey( Outpost_Token_Resolver::TRANSIENT_PREFIX . '42_day_outpost', $this->transients );
+	}
+
+	public function test_site_editor_palette_edit_invalidates_cache_without_theme_version_change(): void {
+		$source = $this->tt5_like_source();
+		$this->inject_theme_source( $source );
+		Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+
+		$source['settings']['color']['palette']['theme'][0]['color'] = '#fff8e7';
+		$this->inject_theme_source( $source );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$this->assertSame( '#fff8e7', $out['colors']['bg'], 'A Global Styles edit must reach the composer even when the theme version is unchanged.' );
+	}
+
+	public function test_scoped_css_rejects_values_that_could_escape_the_declaration(): void {
+		$css = Outpost_Token_Resolver::to_scoped_css(
+			'site',
+			array(
+				'components' => array(
+					'font-family-body' => 'x; } body { background: red',
+					'surface-bg'       => '#ffffff',
+				),
+			),
+			array(
+				'components' => array(
+					'font-family-body' => 'a</style><script>',
+					'logo'             => 'url(https://example.test/x)',
+				),
+			)
+		);
+		$this->assertStringNotContainsString( 'background: red', $css );
+		$this->assertStringNotContainsString( '<', $css );
+		$this->assertStringNotContainsString( 'url(', $css );
+		$this->assertStringContainsString( '--outpost-surface-bg: #ffffff;', $css );
+	}
+
+	public function test_scoped_css_follows_mode_class_structure(): void {
+		Outpost_Theme_Json_Reader::set_reader_for_tests( static fn () => null );
+		$css = Outpost_Token_Resolver::to_scoped_css(
+			'site',
+			Outpost_Token_Resolver::resolve( 42, 'day', 'site' ),
+			Outpost_Token_Resolver::resolve( 42, 'night', 'site' )
+		);
+		$this->assertStringContainsString( '.outpost-source-site.outpost-mode-day, .outpost-source-site.outpost-mode-system {', $css );
+		$this->assertStringContainsString( '.outpost-source-site.outpost-mode-night {', $css );
+		$this->assertMatchesRegularExpression( '/@media \(prefers-color-scheme: dark\) \{\s*\.outpost-source-site\.outpost-mode-system \{\s*color-scheme: dark;/', $css );
+		$this->assertSame( 0, preg_match( '/#[0-9a-f]{3,8}\s*[^;]*\{/i', $css ), 'Selectors carry no color values.' );
+	}
+
+	public function test_site_source_derives_missing_tones_from_the_theme(): void {
+		// TT5 names no border or muted-text color. Those tones must come
+		// from the theme's own text and page colors, not Outpost's violet.
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$c   = $out['components'];
+		$this->assertNotSame( Outpost_Token_Resolver::DEFAULTS['day']['colors']['border'], $c['border'] );
+		$this->assertNotSame( Outpost_Token_Resolver::DEFAULTS['day']['colors']['text_secondary'], $c['text-muted'] );
+		$this->assertSame( Outpost_Token_Resolver::mix_hex( '#ffffff', '#111111', 0.55 ), $c['border'] );
+		$this->assertGreaterThanOrEqual( 3.0, Outpost_Contrast::ratio( $c['border'], $c['surface-bg'] ) );
+		$this->assertGreaterThanOrEqual( 4.5, Outpost_Contrast::ratio( $c['text-muted'], $c['surface-bg'] ) );
+	}
+
+	public function test_mix_hex_endpoints_and_midpoint(): void {
+		$this->assertSame( '#ffffff', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 0.0 ) );
+		$this->assertSame( '#000000', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 1.0 ) );
+		$this->assertSame( '#808080', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 0.5 ) );
 	}
 }

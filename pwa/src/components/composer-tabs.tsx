@@ -18,6 +18,12 @@ import { QueueBadge } from './queue-badge';
 import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
 import { peek_share_target } from '../lib/share-target';
+import { useAppearance } from '../lib/use-appearance';
+import type { AppearanceEnvironment } from '../lib/appearance';
+import { AppHeader } from './app-header';
+import { SettingsSheet } from './settings-sheet';
+import { Scenery } from './scenery';
+import { drafts_available, type DraftStorage } from '../lib/drafts';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -69,6 +75,57 @@ export interface ComposerTabsProps {
 	micropubEnv?: MicropubEnvironment;
 	composerConfigEnv?: ComposerConfigEnvironment;
 	queueEnv?: OfflineQueueEnvironment;
+	appearanceEnv?: AppearanceEnvironment;
+	/** Device storage the modes keep drafts in; defaults to localStorage. */
+	draftStorage?: DraftStorage | null;
+}
+
+/**
+ * Tracks whether the tab strip has more tabs off either edge, for the
+ * visible overflow cue on narrow screens, and keeps the selected tab in
+ * view.
+ */
+function useTabOverflow(active: string): {
+	ref: { current: HTMLDivElement | null };
+	start: boolean;
+	end: boolean;
+} {
+	const ref = useRef<HTMLDivElement | null>(null);
+	const [edges, setEdges] = useState({ start: false, end: false });
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const measure = (): void => {
+			const start = el.scrollLeft > 1;
+			const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+			setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+		};
+		measure();
+		el.addEventListener('scroll', measure, { passive: true });
+		window.addEventListener('resize', measure);
+		return (): void => {
+			el.removeEventListener('scroll', measure);
+			window.removeEventListener('resize', measure);
+		};
+	}, []);
+	// Scroll only the strip, and only after the first render: calling
+	// scrollIntoView() on load moved the browser's sequential-focus
+	// starting point past the header, so Tab skipped it.
+	const first_render = useRef(true);
+	useEffect(() => {
+		if (first_render.current) {
+			first_render.current = false;
+			return;
+		}
+		const strip = ref.current;
+		const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+		if (!strip || !selected) return;
+		const left = selected.offsetLeft - strip.offsetLeft;
+		if (left < strip.scrollLeft || left + selected.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+			strip.scrollTo?.({ left: Math.max(0, left - 24) });
+		}
+	}, [active]);
+	return { ref, ...edges };
 }
 
 export function ComposerTabs({
@@ -77,14 +134,33 @@ export function ComposerTabs({
 	micropubEnv,
 	composerConfigEnv,
 	queueEnv,
+	appearanceEnv,
+	draftStorage,
 }: ComposerTabsProps) {
+	const appearance = useAppearance({
+		accessToken: token.accessToken,
+		me: token.me,
+		...(appearanceEnv ? { env: appearanceEnv } : {}),
+	});
+	const [settings_open, setSettingsOpen] = useState(false);
+	// Making the composer inert blurs the settings button before the
+	// drawer can record it, so focus goes back explicitly on close.
+	const settings_button = useRef<HTMLButtonElement | null>(null);
+	const close_settings = (): void => {
+		setSettingsOpen(false);
+		requestAnimationFrame(() => settings_button.current?.focus());
+	};
 	// Initial tab respects an in-flight share-target intake when present.
 	// peek_share_target() doesn't clear sessionStorage — the targeted mode
 	// drains it via consume_share_target() during its own mount.
 	const initial_share = peek_share_target();
 	const [active, setActive] = useState<ModeId>(initial_share?.tab ?? 'note');
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
-	const [config_error, setConfigError] = useState<'unauthorized' | 'fetch_failed' | null>(null);
+	const [config_error, setConfigError] = useState<'unauthorized' | 'forbidden' | 'fetch_failed' | null>(null);
+	// Whether unsent text survives the reload that "Sign in again" triggers.
+	const [can_keep_drafts] = useState(() =>
+		draftStorage === undefined ? drafts_available() : drafts_available(draftStorage),
+	);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
 	// Bumped to fetch the composer config again.
 	const [config_attempt, setConfigAttempt] = useState(0);
@@ -117,9 +193,9 @@ export function ComposerTabs({
 			})
 			.catch((err: { code?: string }) => {
 				if (cancelled) return;
-				if (err && err.code === 'unauthorized') {
+				if (err && (err.code === 'unauthorized' || err.code === 'forbidden')) {
 					config_needed.current = false;
-					setConfigError('unauthorized');
+					setConfigError(err.code);
 				} else {
 					config_needed.current = true;
 					setConfigError('fetch_failed');
@@ -231,7 +307,30 @@ export function ComposerTabs({
 		{
 			id: 'about',
 			label: 'About',
-			render: () => <AboutTab />,
+			render: () => (
+				<AboutTab
+					siteUrl={typeof window !== 'undefined' ? window.location.origin : ''}
+					me={token.me}
+					scope={token.scope}
+					connection={
+						composer_config
+							? 'connected'
+							: config_error === 'unauthorized'
+								? 'signed-out'
+								: config_error === 'forbidden'
+									? 'forbidden'
+									: config_error === 'fetch_failed'
+										? 'unreachable'
+										: 'checking'
+					}
+					companions={composer_config?.companions ?? null}
+					onRetry={retry_config_now}
+					onReauth={async (): Promise<void> => {
+						await clear_token(tokenStore);
+						window.location.reload();
+					}}
+				/>
+			),
 		},
 	];
 
@@ -262,84 +361,130 @@ export function ComposerTabs({
 		tab_refs.current[next_mode.id]?.focus();
 	};
 
+	const overflow = useTabOverflow(active);
+
+	const config_message =
+		config_error === 'unauthorized'
+			? {
+					title: 'Your sign-in expired.',
+					body: can_keep_drafts
+						? 'Posting needs a fresh sign-in. Signing in again reloads Outpost; your unsent text stays on this device and comes back afterward. Nothing posts until you tap a Post button.'
+						: "Posting needs a fresh sign-in. Signing in again reloads Outpost, and this device can't keep drafts, so copy anything you have written first.",
+				}
+			: config_error === 'forbidden'
+				? {
+						title: "Your site didn't allow loading companion options.",
+						body: 'This sign-in may lack a permission your site requires. The composer still posts; categories, tags, and other More options may be missing. About › Diagnostics shows what this sign-in can do.',
+					}
+				: {
+						title: "Couldn't reach your site.",
+						body: 'Outpost tries again on its own and as soon as your connection is back. Posting still works; More options appear once your site answers.',
+					};
+
 	return (
-		<div class="outpost-composer">
-			<InstallPrompt />
-			{config_error && (
-				<aside class="outpost-config-error" role="status">
-					<div class="outpost-config-error__body">
-						<strong>
-							{config_error === 'unauthorized'
-								? "Couldn't load companion options."
-								: "Couldn't reach your site."}
-						</strong>
-						<p>
-							{config_error === 'unauthorized'
-								? 'Your sign-in may have expired. Sign out and back in to refresh — your Yoast keyphrase, categories, tags, and XFN options will appear once your token is renewed.'
-								: 'The composer-config endpoint is unreachable. Outpost tries again on its own and as soon as your connection is back. The composer still works for posting; only the More options surface needs the config.'}
-						</p>
-					</div>
-					{config_error === 'unauthorized' ? (
-						<button
-							class="outpost-button outpost-button--secondary"
-							type="button"
-							onClick={async (): Promise<void> => {
-								await clear_token(tokenStore);
-								window.location.reload();
-							}}
-						>
-							Sign out + back in
-						</button>
-					) : (
-						<button
-							class="outpost-button outpost-button--secondary"
-							type="button"
-							onClick={retry_config_now}
-						>
-							Try again
-						</button>
-					)}
-				</aside>
-			)}
-			<div class="outpost-composer__header">
-				<QueueBadge
-					{...(micropubEnv ? { micropubEnv } : {})}
-					{...(queueEnv ? { queueEnv } : {})}
+		<>
+			<div class="outpost-composer" inert={settings_open}>
+				<AppHeader
+					siteHost={typeof window !== 'undefined' ? window.location.host : ''}
+					mode={appearance.state.mode}
+					onMode={appearance.setMode}
+					onOpenSettings={(): void => setSettingsOpen(true)}
+					settingsOpen={settings_open}
+					settingsButtonRef={settings_button}
 				/>
-			</div>
-			<h1 class="outpost-visually-hidden">Outpost composer</h1>
-			<div role="tablist" aria-label="Composer modes" class="outpost-tablist">
-				{modes.map((mode, index) => (
-					<button
-						key={mode.id}
-						ref={(el): void => {
-							tab_refs.current[mode.id] = el;
-						}}
-						id={`outpost-tab-${mode.id}`}
-						role="tab"
-						type="button"
-						class="outpost-tab"
-						aria-selected={active === mode.id}
-						aria-controls={`outpost-panel-${mode.id}`}
-						tabIndex={active === mode.id ? 0 : -1}
-						onClick={(): void => setActive(mode.id)}
-						onKeyDown={(event: KeyboardEvent): void => handle_keydown(event, index)}
-					>
-						{mode.label}
-					</button>
-				))}
-			</div>
-			{modes.map((mode) => (
-				<div
-					key={mode.id}
-					id={`outpost-panel-${mode.id}`}
-					role="tabpanel"
-					aria-labelledby={`outpost-tab-${mode.id}`}
-					hidden={active !== mode.id}
-				>
-					{mode.render()}
+				<InstallPrompt />
+				{config_error && (
+					<aside class="outpost-config-error" role="status">
+						<div class="outpost-config-error__body">
+							<strong>{config_message.title}</strong>
+							<p>{config_message.body}</p>
+						</div>
+						{config_error === 'unauthorized' ? (
+							<button
+								class="outpost-button outpost-button--secondary"
+								type="button"
+								onClick={async (): Promise<void> => {
+									await clear_token(tokenStore);
+									window.location.reload();
+								}}
+							>
+								Sign in again
+							</button>
+						) : config_error === 'fetch_failed' ? (
+							<button
+								class="outpost-button outpost-button--secondary"
+								type="button"
+								onClick={retry_config_now}
+							>
+								Try again
+							</button>
+						) : null}
+					</aside>
+				)}
+				<div class="outpost-composer__header">
+					<QueueBadge
+						{...(micropubEnv ? { micropubEnv } : {})}
+						{...(queueEnv ? { queueEnv } : {})}
+					/>
 				</div>
-			))}
-		</div>
+				<h1 class="outpost-visually-hidden">Outpost composer</h1>
+				<div
+					class="outpost-tablist-wrap"
+					data-overflow-start={overflow.start ? 'true' : 'false'}
+					data-overflow-end={overflow.end ? 'true' : 'false'}
+				>
+					<div
+						ref={overflow.ref}
+						role="tablist"
+						aria-label="Composer modes"
+						class="outpost-tablist"
+					>
+						{modes.map((mode, index) => (
+							<button
+								key={mode.id}
+								ref={(el): void => {
+									tab_refs.current[mode.id] = el;
+								}}
+								id={`outpost-tab-${mode.id}`}
+								role="tab"
+								type="button"
+								class="outpost-tab"
+								aria-selected={active === mode.id}
+								aria-controls={`outpost-panel-${mode.id}`}
+								tabIndex={active === mode.id ? 0 : -1}
+								onClick={(): void => setActive(mode.id)}
+								onKeyDown={(event: KeyboardEvent): void => handle_keydown(event, index)}
+							>
+								{mode.label}
+							</button>
+						))}
+					</div>
+					<span class="outpost-tablist-cue outpost-tablist-cue--start" aria-hidden="true">‹</span>
+					<span class="outpost-tablist-cue outpost-tablist-cue--end" aria-hidden="true">›</span>
+				</div>
+				{modes.map((mode) => (
+					<div
+						key={mode.id}
+						id={`outpost-panel-${mode.id}`}
+						role="tabpanel"
+						aria-labelledby={`outpost-tab-${mode.id}`}
+						hidden={active !== mode.id}
+					>
+						{mode.render()}
+					</div>
+				))}
+				<Scenery />
+			</div>
+			<SettingsSheet
+				open={settings_open}
+				onClose={close_settings}
+				mode={appearance.state.mode}
+				source={appearance.state.source}
+				status={appearance.status}
+				onMode={appearance.setMode}
+				onSource={appearance.setSource}
+				onRetry={appearance.retry}
+			/>
+		</>
 	);
 }

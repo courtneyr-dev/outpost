@@ -37,9 +37,11 @@
  *
  * CACHE
  *
- * Result cached in transient keyed on (user_id, mode, theme_version).
- * Invalidates on theme switch (theme_version moves) or settings
- * write (controller deletes the transient explicitly).
+ * Result cached in a transient keyed on (user_id, mode, source) and
+ * validated against the theme identity plus a signature of the theme
+ * layer, the user's overrides, and the source. Invalidates on theme
+ * switch, Site Editor palette edits, override writes, or a source
+ * change; the controller also deletes the transients explicitly.
  *
  * @package Outpost
  */
@@ -58,42 +60,49 @@ final class Outpost_Token_Resolver {
 
 	public const TRANSIENT_PREFIX = 'outpost_resolved_tokens_';
 
-	/** Built-in defaults: warm-paper neutrals for the Field Notes aesthetic. */
+	/**
+	 * Outpost Default semantic palette: warm paper, violet ink, orange
+	 * actions (light) and a violet night scheme (dark). The component
+	 * tokens for this palette live in `styles/outpost-tokens.css`;
+	 * {@see component_tokens()} derives the same component set from any
+	 * semantic palette (a site theme's, or one with user overrides).
+	 * Decision: docs/decisions/session-pwa-ui-appearance.md.
+	 */
 	public const DEFAULTS = array(
 		'day'   => array(
 			'colors' => array(
 				'bg'             => '#fbfaf5',
 				'surface'        => '#ffffff',
 				'text'           => '#241c4a',
-				'text_secondary' => '#6b6358',
+				'text_secondary' => '#5f5873',
 				'accent'         => '#fb8500',
-				'accent_2'       => '#241c4a',
-				'border'         => '#2a2622',
+				'accent_2'       => '#5b4a9e',
+				'border'         => '#7a70b0',
 				'tape'           => 'rgba(251,133,0,0.85)',
 				'halftone'       => 'rgba(36,28,74,0.04)',
 			),
 			'fonts'  => array(
-				'body'      => "'Inter', system-ui, sans-serif",
-				'display'   => "'Newsreader', 'Source Serif Pro', Georgia, serif",
-				'monospace' => "'JetBrains Mono', ui-monospace, monospace",
+				'body'      => '"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+				'display'   => '"Newsreader", "Source Serif Pro", Georgia, serif',
+				'monospace' => '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
 			),
 		),
 		'night' => array(
 			'colors' => array(
-				'bg'             => '#251f1c',
-				'surface'        => '#1a1614',
-				'text'           => '#fbfaf5',
-				'text_secondary' => '#a9a097',
-				'accent'         => '#fb8500',
-				'accent_2'       => '#8ecae6',
-				'border'         => '#3a322c',
-				'tape'           => 'rgba(251,133,0,0.75)',
+				'bg'             => '#1e1838',
+				'surface'        => '#2a2350',
+				'text'           => '#f7f4ff',
+				'text_secondary' => '#c9c1ef',
+				'accent'         => '#ff9a2e',
+				'accent_2'       => '#a59bd6',
+				'border'         => '#9a90cf',
+				'tape'           => 'rgba(255,154,46,0.35)',
 				'halftone'       => 'rgba(255,255,255,0.03)',
 			),
 			'fonts'  => array(
-				'body'      => "'Inter', system-ui, sans-serif",
-				'display'   => "'Newsreader', 'Source Serif Pro', Georgia, serif",
-				'monospace' => "'JetBrains Mono', ui-monospace, monospace",
+				'body'      => '"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+				'display'   => '"Newsreader", "Source Serif Pro", Georgia, serif',
+				'monospace' => '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
 			),
 		),
 	);
@@ -136,27 +145,37 @@ final class Outpost_Token_Resolver {
 	 * @param int    $user_id User; 0 = current.
 	 * @param string $mode    'day' or 'night'. 'system' should be resolved
 	 *                        client-side to one of these before calling.
-	 * @return array{mode: string, colors: array<string,string>, fonts: array<string,string>, sizes: array<string,string>, adjusted: array<string,array{original:string,applied:string,ratio_before:float,ratio_after:float}>, sources: array<string,string>}
+	 * @param string $source  'site' reads the theme layer (the behavior
+	 *                        before style sources existed); 'outpost'
+	 *                        skips it, so only overrides and Outpost
+	 *                        defaults apply.
+	 * @return array{mode: string, source: string, colors: array<string,string>, fonts: array<string,string>, sizes: array<string,string>, adjusted: array<string,array{original:string,applied:string,ratio_before:float,ratio_after:float}>, sources: array<string,string>, components: array<string,string>}
 	 */
-	public static function resolve( int $user_id, string $mode ): array {
-		$mode = self::normalize_mode( $mode );
+	public static function resolve( int $user_id, string $mode, string $source = 'site' ): array {
+		$mode   = self::normalize_mode( $mode );
+		$source = 'outpost' === $source ? 'outpost' : 'site';
 		if ( 0 === $user_id ) {
 			$user_id = (int) get_current_user_id();
 		}
 
-		$cached = self::read_cache( $user_id, $mode );
+		$override    = self::read_override_for_user( $user_id );
+		$theme_layer = 'site' === $source
+			? self::theme_layer_for_mode( $mode )
+			: array(
+				'colors' => array(),
+				'fonts'  => array(),
+			);
+		$signature   = md5( serialize( array( $source, $theme_layer, $override, self::CACHE_SCHEMA ) ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- hashing only, never unserialized.
+
+		$cached = self::read_cache( $user_id, $mode, $source, $signature );
 		if ( null !== $cached ) {
 			return $cached;
 		}
 
-		$theme    = Outpost_Theme_Json_Reader::read();
-		$override = self::read_override_for_user( $user_id );
-
-		$defaults    = self::DEFAULTS[ $mode ];
-		$theme_layer = $theme[ $mode ] ?? array(
-			'colors' => array(),
-			'fonts'  => array(),
-		);
+		$defaults = self::DEFAULTS[ $mode ];
+		if ( 'site' === $source ) {
+			$theme_layer['colors'] = self::fill_theme_tones( $theme_layer['colors'], $mode );
+		}
 
 		$resolved_colors = array();
 		$sources         = array();
@@ -176,18 +195,303 @@ final class Outpost_Token_Resolver {
 		$adjusted = array();
 		self::enforce_contrast( $resolved_colors, $override, $adjusted );
 
+		$components = self::component_tokens( $resolved_colors, $resolved_fonts, $adjusted );
+
 		$out = array(
-			'mode'     => $mode,
-			'colors'   => $resolved_colors,
-			'fonts'    => $resolved_fonts,
-			'sizes'    => self::SIZE_DEFAULTS,
-			'adjusted' => $adjusted,
-			'sources'  => $sources,
+			'mode'       => $mode,
+			'source'     => $source,
+			'colors'     => $resolved_colors,
+			'fonts'      => $resolved_fonts,
+			'sizes'      => self::SIZE_DEFAULTS,
+			'adjusted'   => $adjusted,
+			'sources'    => $sources,
+			'components' => $components,
 		);
 
-		self::write_cache( $user_id, $mode, $out );
+		self::write_cache( $user_id, $mode, $source, $signature, $out );
 		return $out;
 	}
+
+	/**
+	 * The theme layer for one scheme.
+	 *
+	 * Light reads the theme's main palette and semantic styles. Dark reads
+	 * the theme's dark style variation when it has one. Without one, the
+	 * light palette is not reused for dark surfaces (light paper behind
+	 * "dark mode" text reads as broken): dark keeps Outpost's dark
+	 * surfaces and text and carries over only the theme's accent and
+	 * fonts. Contrast enforcement then adjusts that accent against the
+	 * dark surfaces.
+	 *
+	 * @return array{colors: array<string,string>, fonts: array<string,string>}
+	 */
+	private static function theme_layer_for_mode( string $mode ): array {
+		$theme = Outpost_Theme_Json_Reader::read();
+		$layer = $theme[ $mode ] ?? array(
+			'colors' => array(),
+			'fonts'  => array(),
+		);
+		if ( self::MODE_NIGHT === $mode && ! Outpost_Theme_Json_Reader::has_dark_variation() ) {
+			$day_accent = $theme['day']['colors']['accent'] ?? '';
+			$layer      = array(
+				'colors' => '' !== $day_accent ? array( 'accent' => $day_accent ) : array(),
+				'fonts'  => $theme['day']['fonts'] ?? array(),
+			);
+		}
+		return $layer;
+	}
+
+	/**
+	 * Under Use Site Theme, a theme that names only its text and page
+	 * colors would otherwise get Outpost's violet muted text and borders.
+	 * Derive those tones from the theme's own pair instead (muted text at
+	 * 70% of the way from page to text, borders at 55%); contrast checks
+	 * run on them afterward like any other value.
+	 *
+	 * @param array<string,string> $colors Theme layer colors.
+	 * @return array<string,string>
+	 */
+	private static function fill_theme_tones( array $colors, string $mode ): array {
+		$text = $colors['text'] ?? '';
+		$page = $colors['bg'] ?? ( self::DEFAULTS[ $mode ]['colors']['bg'] );
+		if ( ! self::is_hex_like( $text ) || ! self::is_hex_like( $page ) ) {
+			return $colors;
+		}
+		if ( ! isset( $colors['text_secondary'] ) ) {
+			$colors['text_secondary'] = self::mix_hex( $page, $text, 0.70 );
+		}
+		if ( ! isset( $colors['border'] ) ) {
+			$colors['border'] = self::mix_hex( $page, $text, 0.55 );
+		}
+		if ( ! isset( $colors['accent_2'] ) && isset( $colors['accent'] ) ) {
+			$colors['accent_2'] = $colors['accent'];
+		}
+		return $colors;
+	}
+
+	/**
+	 * Linear mix of two hex colors in sRGB: $t = 0 gives $from, 1 gives $to.
+	 */
+	public static function mix_hex( string $from, string $to, float $t ): string {
+		$a   = self::hex_channels( $from );
+		$b   = self::hex_channels( $to );
+		$out = '#';
+		for ( $i = 0; $i < 3; $i++ ) {
+			$out .= str_pad( dechex( (int) round( $a[ $i ] + ( $b[ $i ] - $a[ $i ] ) * $t ) ), 2, '0', STR_PAD_LEFT );
+		}
+		return $out;
+	}
+
+	/**
+	 * @return array{0:int,1:int,2:int}
+	 */
+	private static function hex_channels( string $hex ): array {
+		$hex = ltrim( trim( $hex ), '#' );
+		if ( 3 === strlen( $hex ) || 4 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		return array( (int) hexdec( substr( $hex, 0, 2 ) ), (int) hexdec( substr( $hex, 2, 2 ) ), (int) hexdec( substr( $hex, 4, 2 ) ) );
+	}
+
+	/**
+	 * Map a resolved semantic palette onto the component tokens
+	 * `structure.css` reads, checking every final foreground/background
+	 * pair the composer paints (WCAG 2.2 AA):
+	 *
+	 *   text and muted text on page and field/card surfaces   4.5:1
+	 *   primary button label on its fill                       4.5:1
+	 *   link text on page and card surfaces                    4.5:1
+	 *   field, card, and chip borders on both surfaces         3:1
+	 *   focus ring on page and field surfaces                  3:1
+	 *   logo outline on the page surface                       3:1
+	 *
+	 * An adjusted value is recorded as `adjusted['component.<token>']`.
+	 *
+	 * @param array<string,string> $colors   Resolved semantic colors.
+	 * @param array<string,string> $fonts    Resolved semantic fonts.
+	 * @param array<string,array{original:string,applied:string,ratio_before:float,ratio_after:float}> $adjusted Adjustment log, appended to.
+	 * @return array<string,string> Component token name without the `--outpost-` prefix => value.
+	 */
+	public static function component_tokens( array $colors, array $fonts, array &$adjusted ): array {
+		$page    = self::hex_or( $colors['bg'] ?? '', '#ffffff' );
+		$field   = self::hex_or( $colors['surface'] ?? '', $page );
+		$text    = self::hex_or( $colors['text'] ?? '', '#000000' );
+		$muted   = self::hex_or( $colors['text_secondary'] ?? '', $text );
+		$accent  = self::hex_or( $colors['accent'] ?? '', $text );
+		$accent2 = self::hex_or( $colors['accent_2'] ?? '', $accent );
+		$border  = self::hex_or( $colors['border'] ?? '', $muted );
+		$body    = Outpost_Contrast::TARGET_AA_BODY;
+		$ui      = Outpost_Contrast::TARGET_AA_LARGE;
+
+		$text   = self::ensure_on_both( 'text', $text, $page, $field, $body, $adjusted );
+		$muted  = self::ensure_on_both( 'text-muted', $muted, $page, $field, $body, $adjusted );
+		$border = self::ensure_on_both( 'border', $border, $page, $field, $ui, $adjusted );
+
+		// Primary action: accent fill. The label takes whichever of the
+		// palette's own ink or paper reads best on it; when none reaches
+		// 4.5:1 the fill moves, not the label.
+		$label = $text;
+		foreach ( array( $page, $field ) as $candidate ) {
+			if ( Outpost_Contrast::ratio( $candidate, $accent ) > Outpost_Contrast::ratio( $label, $accent ) ) {
+				$label = $candidate;
+			}
+		}
+		$fill = $accent;
+		if ( Outpost_Contrast::ratio( $label, $fill ) < $body ) {
+			$fill = self::record_adjust( 'button-primary-bg', $fill, Outpost_Contrast::adjust_for_minimum( $fill, $label, $body ), $label, $adjusted );
+		}
+
+		$focus = ( Outpost_Contrast::ratio( $accent, $page ) >= $ui && Outpost_Contrast::ratio( $accent, $field ) >= $ui ) ? $accent : $text;
+		$link  = $text;
+		foreach ( array( $accent2, $accent ) as $candidate ) {
+			if ( Outpost_Contrast::ratio( $candidate, $page ) >= $body && Outpost_Contrast::ratio( $candidate, $field ) >= $body ) {
+				$link = $candidate;
+				break;
+			}
+		}
+
+		$tokens      = array(
+			'surface-bg'                 => $page,
+			'surface-fg'                 => $text,
+			'card-bg'                    => $field,
+			'card-fg'                    => $text,
+			'card-border'                => $border,
+			'input-bg'                   => $field,
+			'input-fg'                   => $text,
+			'input-border'               => $border,
+			'input-border-focus'         => $focus,
+			'input-placeholder'          => $muted,
+			'button-primary-bg'          => $fill,
+			'button-primary-fg'          => $label,
+			'button-primary-border'      => $fill,
+			'button-primary-bg-disabled' => $field,
+			'button-primary-fg-disabled' => $muted,
+			'button-secondary-fg'        => $text,
+			'button-secondary-border'    => $border,
+			'button-ghost-fg'            => $text,
+			'tab-fg'                     => $muted,
+			'tab-fg-active'              => $label,
+			'tab-bg-active'              => $fill,
+			'tab-indicator'              => $text,
+			'chip-fg'                    => $text,
+			'chip-border'                => $border,
+			'chip-bg-pressed'            => $fill,
+			'chip-fg-pressed'            => $label,
+			'focus-ring-color'           => $focus,
+			'text-muted'                 => $muted,
+			'border'                     => $border,
+			'link'                       => $link,
+			'logo'                       => $text,
+			'scenery-far'                => $accent2,
+			'scenery-near'               => $text,
+		);
+		$font_tokens = array(
+			'body'      => 'font-family-body',
+			'display'   => 'font-family-display',
+			'monospace' => 'font-family-mono',
+		);
+		foreach ( $font_tokens as $slug => $token ) {
+			if ( isset( $fonts[ $slug ] ) && '' !== $fonts[ $slug ] ) {
+				$tokens[ $token ] = $fonts[ $slug ];
+			}
+		}
+		return $tokens;
+	}
+
+	/**
+	 * Emit component tokens for both schemes, scoped to a style-source
+	 * class, in the mode-class structure `outpost-tokens.css` uses: day and
+	 * system share the light block; night, and system under a dark OS
+	 * preference, share the dark block. The two-class selectors outrank
+	 * the one-class defaults in the token files.
+	 *
+	 * @param array<string,mixed> $day   {@see resolve()} output for day.
+	 * @param array<string,mixed> $night {@see resolve()} output for night.
+	 */
+	public static function to_scoped_css( string $source, array $day, array $night ): string {
+		$scope = '.outpost-source-' . ( 'outpost' === $source ? 'outpost' : 'site' );
+		$light = self::declarations( is_array( $day['components'] ?? null ) ? $day['components'] : array() );
+		$dark  = self::declarations( is_array( $night['components'] ?? null ) ? $night['components'] : array() );
+		if ( '' === $light && '' === $dark ) {
+			return '';
+		}
+		return $scope . '.outpost-mode-day, ' . $scope . ".outpost-mode-system {\n\tcolor-scheme: light;\n" . $light . "}\n"
+			. $scope . ".outpost-mode-night {\n\tcolor-scheme: dark;\n" . $dark . "}\n"
+			. "@media (prefers-color-scheme: dark) {\n" . $scope . ".outpost-mode-system {\n\tcolor-scheme: dark;\n" . $dark . "}\n}\n";
+	}
+
+	/**
+	 * @param array<string,string> $tokens
+	 */
+	private static function declarations( array $tokens ): string {
+		$out = '';
+		foreach ( $tokens as $name => $value ) {
+			if ( 1 !== preg_match( '/^[a-z0-9-]+$/', (string) $name ) ) {
+				continue;
+			}
+			$clean = self::safe_css_value( (string) $value );
+			if ( '' === $clean ) {
+				continue;
+			}
+			$out .= "\t--outpost-" . $name . ': ' . $clean . ";\n";
+		}
+		return $out;
+	}
+
+	/**
+	 * Theme and override values are untrusted. A value that could end the
+	 * declaration or the rule, open a comment or tag, or load a resource
+	 * is dropped rather than escaped.
+	 */
+	public static function safe_css_value( string $value ): string {
+		$value = trim( $value );
+		if ( '' === $value || strlen( $value ) > 256 ) {
+			return '';
+		}
+		if ( 1 === preg_match( '/[\x00-\x1F\x7F;{}<>\\\\]|\/\*|\*\/|url\s*\(|expression\s*\(|@import/i', $value ) ) {
+			return '';
+		}
+		return $value;
+	}
+
+	/**
+	 * Raise $fg to $target against whichever background it reads worse
+	 * on, then re-check the other.
+	 *
+	 * @param array<string,array{original:string,applied:string,ratio_before:float,ratio_after:float}> $adjusted
+	 */
+	private static function ensure_on_both( string $name, string $fg, string $bg_a, string $bg_b, float $target, array &$adjusted ): string {
+		$worst = Outpost_Contrast::ratio( $fg, $bg_a ) <= Outpost_Contrast::ratio( $fg, $bg_b ) ? $bg_a : $bg_b;
+		if ( Outpost_Contrast::ratio( $fg, $worst ) >= $target ) {
+			return $fg;
+		}
+		$fixed = Outpost_Contrast::adjust_for_minimum( $fg, $worst, $target );
+		$other = $worst === $bg_a ? $bg_b : $bg_a;
+		if ( Outpost_Contrast::ratio( $fixed, $other ) < $target ) {
+			$fixed = Outpost_Contrast::adjust_for_minimum( $fixed, $other, $target );
+		}
+		return self::record_adjust( $name, $fg, $fixed, $worst, $adjusted );
+	}
+
+	/**
+	 * @param array<string,array{original:string,applied:string,ratio_before:float,ratio_after:float}> $adjusted
+	 */
+	private static function record_adjust( string $name, string $from, string $to, string $against, array &$adjusted ): string {
+		if ( $from !== $to ) {
+			$adjusted[ 'component.' . $name ] = array(
+				'original'     => $from,
+				'applied'      => $to,
+				'ratio_before' => Outpost_Contrast::ratio( $from, $against ),
+				'ratio_after'  => Outpost_Contrast::ratio( $to, $against ),
+			);
+		}
+		return $to;
+	}
+
+	private static function hex_or( string $value, string $fallback ): string {
+		return self::is_hex_like( $value ) ? trim( $value ) : $fallback;
+	}
+
 
 	/**
 	 * Render the resolved tokens as a CSS string suitable for inline
@@ -222,8 +526,12 @@ final class Outpost_Token_Resolver {
 	public static function invalidate_cache_for_user( int $user_id ): void {
 		foreach ( array( self::MODE_DAY, self::MODE_NIGHT ) as $mode ) {
 			delete_transient( self::transient_key( $user_id, $mode ) );
+			delete_transient( self::transient_key( $user_id, $mode, 'outpost' ) );
 		}
 	}
+
+	/** Bumped when the cached payload's shape changes. */
+	private const CACHE_SCHEMA = 2;
 
 	private const MODE_DAY   = 'day';
 	private const MODE_NIGHT = 'night';
@@ -368,41 +676,45 @@ final class Outpost_Token_Resolver {
 	/**
 	 * @return array<string,mixed>|null
 	 */
-	private static function read_cache( int $user_id, string $mode ): ?array {
+	private static function read_cache( int $user_id, string $mode, string $source, string $signature ): ?array {
 		if ( $user_id <= 0 ) {
 			return null;
 		}
-		$cached = get_transient( self::transient_key( $user_id, $mode ) );
+		$key    = self::transient_key( $user_id, $mode, $source );
+		$cached = get_transient( $key );
 		if ( ! is_array( $cached ) ) {
 			return null;
 		}
-		// Theme version mismatch invalidates the cache entry.
-		$expected = self::theme_version();
-		if ( ( $cached['_theme_version'] ?? '' ) !== $expected ) {
-			delete_transient( self::transient_key( $user_id, $mode ) );
+		// A different theme identity, Global Styles content, override set,
+		// or style source invalidates the entry. Theme version alone misses
+		// a palette edited in the Site Editor; the signature covers it.
+		if ( ( $cached['_theme_version'] ?? '' ) !== self::theme_version() || ( $cached['_signature'] ?? '' ) !== $signature ) {
+			delete_transient( $key );
 			return null;
 		}
-		unset( $cached['_theme_version'] );
+		unset( $cached['_theme_version'], $cached['_signature'] );
 		return $cached;
 	}
 
 	/**
 	 * @param array<string,mixed> $payload
 	 */
-	private static function write_cache( int $user_id, string $mode, array $payload ): void {
+	private static function write_cache( int $user_id, string $mode, string $source, string $signature, array $payload ): void {
 		if ( $user_id <= 0 ) {
 			return;
 		}
 		$payload['_theme_version'] = self::theme_version();
+		$payload['_signature']     = $signature;
 		set_transient(
-			self::transient_key( $user_id, $mode ),
+			self::transient_key( $user_id, $mode, $source ),
 			$payload,
 			defined( 'HOUR_IN_SECONDS' ) ? HOUR_IN_SECONDS : 3600
 		);
 	}
 
-	private static function transient_key( int $user_id, string $mode ): string {
-		return self::TRANSIENT_PREFIX . $user_id . '_' . $mode;
+	private static function transient_key( int $user_id, string $mode, string $source = 'site' ): string {
+		// The site-source key keeps its pre-amendment name.
+		return self::TRANSIENT_PREFIX . $user_id . '_' . $mode . ( 'outpost' === $source ? '_outpost' : '' );
 	}
 
 	private static function theme_version(): string {

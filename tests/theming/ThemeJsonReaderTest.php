@@ -96,8 +96,9 @@ final class ThemeJsonReaderTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( $out['day']['colors'], $out['night']['colors'] );
 	}
 
-	public function test_slug_priority_falls_through_when_primary_absent(): void {
-		// `primary` slug stands in for `foreground` on text token.
+	public function test_primary_slug_is_not_treated_as_body_text(): void {
+		// A theme's `primary` is usually a brand color, not body text
+		// (PWA UI appearance decision). It feeds the accent instead.
 		$this->inject_source(
 			array(
 				'settings' => array(
@@ -114,7 +115,8 @@ final class ThemeJsonReaderTest extends \WP_Mock\Tools\TestCase {
 		);
 
 		$out = Outpost_Theme_Json_Reader::read();
-		$this->assertSame( '#001122', $out['day']['colors']['text'] );
+		$this->assertArrayNotHasKey( 'text', $out['day']['colors'] );
+		$this->assertSame( '#001122', $out['day']['colors']['accent'] );
 	}
 
 	public function test_v3_origin_keyed_palette(): void {

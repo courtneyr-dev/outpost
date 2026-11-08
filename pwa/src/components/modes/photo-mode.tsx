@@ -22,6 +22,8 @@ import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft, type DraftFields } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -89,19 +91,61 @@ type Status =
 let next_id = 1;
 const make_id = (): string => `photo-${String(next_id++)}`;
 
+/**
+ * What a draft keeps of each photo. The File itself isn't saved, so after a
+ * reload the person adds the photos again and these fill in, in order.
+ */
+interface SavedPhoto {
+	alt: string;
+	caption: string;
+	decorative: boolean;
+}
+
+function saved_photos(value: unknown): SavedPhoto[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((item: unknown) => {
+		if (!item || typeof item !== 'object') return [];
+		const r = item as Record<string, unknown>;
+		return [{ alt: draft_text(r.alt), caption: draft_text(r.caption), decorative: r.decorative === true }];
+	});
+}
+
+function describe_photo(photo: SavedPhoto): DraftFields {
+	return { alt: photo.alt, caption: photo.caption, decorative: photo.decorative };
+}
+
 export function PhotoMode({
 	token,
 	micropubEnv,
 	composerConfig,
 	shareInboxEnv,
 }: PhotoModeProps) {
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		peek_share_target()?.tab === 'photo' ? null : read_draft('photo', token.me),
+	);
 	const [entries, setEntries] = useState<PhotoEntry[]>([]);
-	const [name, setName] = useState('');
-	const [content, setContent] = useState('');
+	// Descriptions from the draft still waiting for their photo.
+	const [pending_photos, setPendingPhotos] = useState<SavedPhoto[]>(() =>
+		saved_photos(draft?.fields.photos),
+	);
+	const [name, setName] = useState(draft_text(draft?.fields.name));
+	const [content, setContent] = useState(draft_text(draft?.fields.content));
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(
 		null
 	);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'photo',
+		me: token.me,
+		fields: {
+			name,
+			content,
+			venue: venue_name,
+			photos: [...entries, ...pending_photos].map(describe_photo),
+		},
+		restored: draft !== null,
+	});
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(
 		null
@@ -131,14 +175,18 @@ export function PhotoMode({
 
 	const add_files = (files: File[]): void => {
 		if (files.length === 0) return;
-		const new_entries: PhotoEntry[] = files.map((file) => ({
-			id: make_id(),
-			file,
-			preview_url: URL.createObjectURL(file),
-			alt: '',
-			caption: '',
-			decorative: false,
-		}));
+		const new_entries: PhotoEntry[] = files.map((file, i) => {
+			const saved = pending_photos[i];
+			return {
+				id: make_id(),
+				file,
+				preview_url: URL.createObjectURL(file),
+				alt: saved?.alt ?? '',
+				caption: saved?.caption ?? '',
+				decorative: saved?.decorative ?? false,
+			};
+		});
+		setPendingPhotos((prev) => prev.slice(files.length));
 		setEntries((prev) => [...prev, ...new_entries]);
 	};
 
@@ -300,6 +348,8 @@ export function PhotoMode({
 			);
 			if (result.micropubEndpoint) setMicropubEndpoint(result.micropubEndpoint);
 			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			saved_draft.discard();
+			setPendingPhotos([]);
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 			} else {
@@ -366,7 +416,7 @@ export function PhotoMode({
 				{entries.length > 1 ? 'Gallery' : 'Photo'}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a photo or a gallery, with alt text for each image.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -382,6 +432,13 @@ export function PhotoMode({
 					onChange={handle_file_change}
 					disabled={submitting}
 				/>
+				{pending_photos.length > 0 && (
+					<p class="outpost-help outpost-draft-photos">
+						{pending_photos.length === 1
+							? 'Your draft had 1 photo. Add it again and Outpost fills in its alt text and caption.'
+							: `Your draft had ${String(pending_photos.length)} photos. Add them again in the same order and Outpost fills in their alt text and captions.`}
+					</p>
+				)}
 
 				{entries.length > 0 && (
 					<ul class="outpost-photo-list">
@@ -596,6 +653,8 @@ export function PhotoMode({
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
