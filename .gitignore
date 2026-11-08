@@ -3,10 +3,10 @@ node_modules/
 vendor/
 
 # Build artifacts (generated)
-# `build/pwa/` IS tracked: the gd-wordpress-deployer rsync reflects the
-# working tree, so the production-shaped staging tests need the bundle on
-# disk. Mirrors the courtneyr-child theme pattern of committing built CSS.
-# `npm run build` is part of the deploy ritual — see docs/STAGING-DEPLOY.md.
+# `build/pwa/` (the composer bundle) and the block-editor files in `build/`
+# ARE tracked, so a clone or a ZIP of the repo runs without Node or a build
+# step. Rebuild with `npm run build:all` and commit the output whenever
+# pwa/src/ or src/ changes (see docs/RELEASING.md).
 #
 # Pattern: ignore the contents of build/ (build/*) rather than the
 # directory itself (build/), so the !build/pwa/ exception can re-include
@@ -15,7 +15,7 @@ vendor/
 build/*
 !build/pwa/
 # G3.5c — @wordpress/scripts emits the Gutenberg sidebar bundle here.
-# Committed for the same staging-deploy reasons as build/pwa/.
+# Committed for the same reason as build/pwa/.
 !build/index.js
 !build/index.asset.php
 !build/index.css
@@ -107,7 +107,7 @@ wp-includes/
 .gstack/
 
 # Phase G overnight run working files (per docs/dev/prompts/G-overnight-runbook.md §5).
-# Both files are ephemeral status logs for Courtney's morning review; never committed.
+# Both files are ephemeral status logs for a maintainer's review; never committed.
 .overnight-progress.md
 .overnight-questions.md
 

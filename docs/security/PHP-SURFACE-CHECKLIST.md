@@ -1,4 +1,6 @@
-# PHP Surface Security Checklist
+# PHP surface security checklist
+
+> **Status note (2026-11-08):** the "Status at v0.1.4" section below records the PHP surface as of v0.1.4. The file has had point edits since (the 1.0.22 bearer-scope rule, the text domain, the inline-script note), but no full pass. Outpost 1.0.24 registers REST routes in 12 classes under `includes/`, so the status section no longer describes the current plugin. It needs a full re-audit; until then, treat the per-surface checklists as the contract and the status section as history.
 
 Per-surface wordpress-pro pattern checklist for upcoming Outpost work. Each surface lists the WordPress security primitives it must use, the failure modes it must defend, and the test coverage it owes.
 
@@ -11,7 +13,7 @@ PHP surface is tight: admin notices + activation hooks + PWA shell render. No us
 - ✅ `wp_nonce_url()` for activate/install action buttons in admin notices
 - ✅ `current_user_can( 'install_plugins' )` gates admin notice rendering
 - ✅ `esc_html()`, `esc_url()`, `esc_attr()` on every dynamic output
-- ✅ `__()`/`esc_html__()` for all strings, locked to `'outpost'` text domain by PHPCS
+- ✅ `__()`/`esc_html__()` for all strings, locked to the `'outpost-mobile-publishing'` text domain by PHPCS (`phpcs.xml.dist`)
 - ✅ `template_redirect` priority 1 + `Outpost_PWA_Shell::halt()` keeps WP from concatenating theme template onto our output
 - ✅ Encrypted IndexedDB token storage (client-side; not a PHP surface but worth noting)
 
@@ -91,7 +93,7 @@ Phase G is where the real CSP and pen-test work lands. By that point, B2, Phase 
 - [ ] Frame-Options: DENY (or via CSP `frame-ancestors 'none'`)
 - [ ] Service worker fetch handler review — confirm scope stays `/post/*`, no fetches to `/wp-admin/*`
 - [ ] Token rotation strategy when scope changes
-- [ ] Pen test against the live staging site by an external reviewer
+- [ ] Pen test against a non-production test site by an external reviewer
 
 ---
 
@@ -123,7 +125,7 @@ These apply everywhere PHP runs:
 
 **Capability checks before sensitive operations:**
 - `current_user_can( 'capability' )` at the start of every admin handler
-- `wp_die( esc_html__( 'You do not have permission.', 'outpost' ) )` on failure
+- `wp_die( esc_html__( 'You do not have permission.', 'outpost-mobile-publishing' ) )` on failure
 
 **Rate limiting (when relevant):**
 - Transient-backed counter keyed on `get_current_user_id()` for authenticated; IP for anonymous
@@ -149,7 +151,7 @@ These apply everywhere PHP runs:
 **Inline JS and `data-*` attribute contexts:**
 - Inline `<script>` blocks that interpolate PHP variables: `esc_js()` for string content; `wp_json_encode()` for objects (and `esc_attr( wp_json_encode( $config ) )` if embedding the JSON in a `data-*` attribute rather than a script tag).
 - `data-*` attributes: `esc_attr()` is sufficient for the HTML-attribute context. Use `wp_json_encode()` first if the value is structured.
-- Outpost's only inline `<script>` (SW registration in `Outpost_PWA_Shell::render_shell()`) is static — no PHP interpolation, no escaping required. `data-outpost-blocker` uses `esc_attr()`.
+- The composer shell has no inline `<script>`. Its Content-Security-Policy is `script-src 'self'` (`Outpost_PWA_Shell::content_security_policy()`), service worker registration lives in the bundled JS (`pwa/src/index.tsx`), and the pre-paint appearance script is an external file (`assets/js/appearance-boot.js`) printed through `wp_scripts()->do_items()`. A new inline script would be blocked by that CSP, so ship JS as a file. `data-outpost-blocker` uses `esc_attr()`.
 - Prefer `wp_localize_script()` over inline `<script>` when interpolating user data; it handles JSON encoding + escaping in one step.
 
 ---

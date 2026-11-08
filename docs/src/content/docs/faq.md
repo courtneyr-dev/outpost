@@ -7,7 +7,7 @@ Quick answers to the questions Outpost users ask most.
 
 ## Is Outpost on WordPress.org?
 
-Not yet — Outpost (version 1.0.22) is in review for the WordPress.org plugin directory, not listed there yet. Install it from GitHub per the [installation guide](/outpost/installation/). Its two required dependencies (IndieAuth and Micropub) are on WordPress.org.
+Not yet. Outpost (version 1.0.24) isn't listed in the WordPress.org plugin directory. Install it from GitHub with the [installation guide](/outpost/installation/), and update it with [Update Outpost](/outpost/update/): WordPress won't show update notices for it. Its two required plugins, IndieAuth and Micropub, are on WordPress.org.
 
 ## Does Outpost require Jetpack?
 
@@ -23,11 +23,15 @@ No. That's much of the point: Outpost uses Micropub for publishing and IndieAuth
 
 ## Does Outpost work offline?
 
-Yes, for composing. Drafts written offline queue on your device and submit automatically when the connection returns, with retry and dismiss controls in the composer. The plugin's readme describes the queue storage as encrypted; we haven't verified that in the current code, so treat it as the maintainer's statement.
+Yes, for composing. A post you make offline waits in a queue on your device and sends when the connection returns, with retry and dismiss controls in the composer. The queue is stored in your browser's IndexedDB without encryption; your sign-in token is stored separately and is encrypted. [Privacy and data](/outpost/privacy-and-data/#data-stored-on-your-device-browser) lists what stays on the device.
+
+## Do I lose what I typed if I reload?
+
+No. Each tab saves its unsent text to your device as you type, and it comes back after a reload or a fresh sign-in as the same site. Photos themselves aren't kept, but their alt text and captions are. See [Get your draft back after a reload](/outpost/common-tasks/#get-your-draft-back-after-a-reload).
 
 ## Does it work on iPhone?
 
-Yes. The composer installs to the iOS home screen via Safari's "Add to Home Screen." iOS Safari doesn't support the share-sheet Web Share Target API, so sharing pages into Outpost from other apps goes through an Apple Shortcut instead — set it up at Settings → Outpost iOS Shortcut in wp-admin.
+Yes. The composer installs to the iOS home screen via Safari's "Add to Home Screen." iOS Safari doesn't support the share-sheet Web Share Target API, so sharing pages into Outpost from other apps goes through an Apple Shortcut you build in the Shortcuts app. [Share to Outpost from your phone](/outpost/common-tasks/#iphone-and-ipad) has the six steps. The ready-made Shortcut on wp-admin's Settings → Outpost iOS Shortcut page isn't published yet in 1.0.24.
 
 ## Does it work on Android?
 
@@ -39,15 +43,15 @@ The modes themselves are built in and always visible — the composer covers eve
 
 ## Can I write long posts in Outpost?
 
-Not in the composer itself. The Article variant hands off to the block editor at `/wp-admin/post-new.php` — Outpost is for fast, phone-sized posts.
+Yes, with limits. The **Article** style on the Post tab takes a title and body text and publishes a titled post. For long pieces with images, headings, and layout, use the block editor; posts from Outpost open there for editing.
 
 ## Can I change the /post URL?
 
-Not currently. The readme mentions a configurable route slug, but the current code serves the composer at the fixed `/post` path with no setting for it.
+No. The composer is always at `/post` on your site, and no setting changes it.
 
 ## Which platforms can I syndicate to?
 
-Destinations depend on what you configure: Bridgy-backed silos (Mastodon, Bluesky, Flickr, GitHub, Reddit — Bridgy no longer supports Twitter/X, Facebook, or Instagram), ActivityPub via its plugin, newsletter services and other platforms via adapters with API keys, and manual-share platforms where Outpost reminds you to paste the copy's URL after you post it yourself.
+Destinations depend on what you configure: Bridgy-backed networks (Mastodon, Bluesky, Flickr, GitHub, Reddit; Bridgy no longer supports X, Facebook, or Instagram), the fediverse through the ActivityPub plugin, Telegraph, and manual-share handoffs to apps such as Facebook, X, Threads, and Instagram, where you finish the post yourself. Outpost also has Beehiiv, Buttondown, Kit, and write.as destinations, but 1.0.24 has no on-screen way to choose them for a post. [Supported services](/outpost/supported-services/) has the full list and setup.
 
 ## What happens to my posts if I deactivate Outpost?
 

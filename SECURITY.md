@@ -1,23 +1,32 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
+
+Security fixes ship in the latest 1.0.x release. Update to the newest version before you report, and check whether the issue still reproduces there.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | Yes (pre-release) |
+| Latest 1.0.x | Yes |
+| Earlier 1.0.x releases | No: update to the latest 1.0.x |
+| < 1.0 | No |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
 If you discover a security vulnerability in Outpost, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-### How to Report
+### How to report
 
-1. Email security concerns to the plugin author via [WordPress.org profile](https://profiles.wordpress.org/courane01/).
-2. Use the [WordPress Plugin Security reporting process](https://developer.wordpress.org/plugins/wordpress-org/plugin-security/) for issues affecting WordPress.org users.
+Report privately through GitHub's private vulnerability reporting:
 
-### What to Include
+1. Open the repository's [Security tab](https://github.com/courtneyr-dev/outpost/security).
+2. Select **Report a vulnerability**.
+3. Fill in the form. Only you and the maintainer can see the report and the discussion that follows.
+
+If you can't use GitHub, follow the [WordPress plugin security reporting process](https://developer.wordpress.org/plugins/wordpress-org/plugin-security/).
+
+### What to include
 
 - Description of the vulnerability.
 - Steps to reproduce.
@@ -45,7 +54,7 @@ The following classes of issue are in scope for security reports:
 - Privilege escalation in settings management.
 - Any bypass of WordPress capability checks (`current_user_can()`).
 - CSP bypasses on the `/post/` route.
-- Rate-limit bypasses on the preview, draft, or bridgy-suggest endpoints.
+- Rate-limit bypasses on the rate-limited REST endpoints under `/wp-json/outpost/v1/`: `preview` (30 requests a minute per user), `lookup` (30 a minute), `geocode` (20 a minute signed in, 5 signed out), `composer-config` (600 a minute), and `manual-share/snooze-all` (once every 5 minutes per user).
 
 ### Out of scope
 
@@ -54,12 +63,12 @@ The following classes of issue are in scope for security reports:
 - Self-XSS (issues that require the victim to paste attacker-controlled JavaScript into their own browser console).
 - Reports against the WordPress.org-hosted demo install (when one exists).
 
-## Response Timeline
+## Response timeline
 
 - **Acknowledgement:** within 48 hours.
 - **Initial assessment:** within 1 week.
 - **Fix release:** as soon as practical; typically within 2 weeks for critical issues.
 
-## Coordinated Disclosure
+## Coordinated disclosure
 
 We follow coordinated disclosure. We ask reporters to give us a reasonable window to ship a fix before public disclosure (typically 90 days for medium-severity issues, sooner for actively exploited issues).

@@ -1,4 +1,4 @@
-# Integration Testing
+# Integration testing
 
 Integration tests exercise Outpost against a real WordPress install instead of WP_Mock stubs. This catches issues unit tests can't reach: rewrite-rule registration through `WP_Rewrite`, REST endpoint behavior through `WP_REST_Server`, capability cascades, hook ordering against WordPress's built-in handlers.
 
@@ -15,7 +15,7 @@ The first `wp-env start` pulls a few hundred MB of Docker images (PHP, MySQL, Wo
 
 `.wp-env.json` at the repo root configures:
 
-- **WordPress core:** `6.7` (matches `Tested up to:` in the plugin header)
+- **WordPress core:** `6.7`, pinned in `.wp-env.json`. This is the version the integration suite runs against, not the newest version Outpost supports: `readme.txt` declares `Tested up to: 7.1`.
 - **Plugins installed:**
   - `.` — Outpost itself, mapped from the working tree
   - IndieAuth (from WordPress.org) — required dependency per the IndieAuth-first chain
@@ -51,9 +51,9 @@ Which runs `composer test:integration` inside the wp-env tests-cli container, wi
 
 ## Status
 
-- `tests/integration/RouteHandlerIntegrationTest.php` is currently `markTestSkipped()` — the bootstrap is wired but the actual assertions haven't been written. The skipped test's top-of-file comment names the assertions the wp-env-backed test will make: Content-Type per route (`/post/`, `/post/manifest.json`, `/post/sw`, `/post/auth/callback/*`, `/post/share-target/*`), query-var dispatch through `template_redirect`, `register_activation_hook` side effects on `flush_rewrite_rules`.
-- The next session focused on integration testing fills these in. Sequence: un-skip the test, write assertions one route at a time, run `npm run test:integration` to verify, commit.
-- A future CI job will run `npm run test:integration` on every PR. Deferred until the assertions land — running an empty wp-env in CI just adds 2-5 minutes of Docker boot for no signal.
+The `test-integration` job in `.github/workflows/ci.yml` runs `npm run test:integration` on every push and pull request against `main`; see [CI integration](#ci-integration) below. Not every test in `tests/integration/` runs its assertions yet: see [What's still skipped](#whats-still-skipped).
+
+Integration tests extend `PHPUnit\Framework\TestCase`, not `WP_UnitTestCase`. The bootstrap loads real WordPress, so WordPress functions, the database, and `WP_REST_Server` are available inside a plain PHPUnit test case.
 
 ## Two PHPUnit bootstraps
 
@@ -64,7 +64,7 @@ PHPUnit 9.6 doesn't support per-testsuite bootstraps in `phpunit.xml.dist`. Outp
 | `unit` | `tests/bootstrap.php` (default from `phpunit.xml.dist`) | WP_Mock stubs + Outpost classes |
 | `integration` | `tests/integration/bootstrap.php` (overridden in `composer.json`'s `test:integration` script) | Real WP via the WP core test suite |
 
-`composer test` runs the unit suite (default). `composer test:unit` is the explicit equivalent. `composer test:integration` overrides the bootstrap for the integration suite. The `--bootstrap=` flag on the PHPUnit command line takes precedence over `phpunit.xml.dist`'s `bootstrap` attribute.
+`phpunit.xml.dist` sets no default suite, so `composer test` runs both the `unit` and `integration` suites under the unit bootstrap; integration tests that need real WordPress skip there. `composer test:unit` runs only the unit suite, which is what CI's PHPUnit job runs. `composer test:integration` overrides the bootstrap for the integration suite. The `--bootstrap=` flag on the PHPUnit command line takes precedence over `phpunit.xml.dist`'s `bootstrap` attribute.
 
 ## Why @wordpress/env over `bin/install-wp-tests.sh`
 
@@ -88,36 +88,27 @@ The legacy approach (still common in older plugins): a shell script that downloa
 
 **Container state is weird after a code change**: most code changes (PHP, JS) reflect immediately because the working tree is mounted. Schema-level changes (`.wp-env.json` updates, plugin install/remove) require `npm run wp-env:stop && npm run wp-env:start`.
 
-## Local development workflow (vs. integration testing)
+## Local development site
 
-`wp-env:start` also brings up a development site at `localhost:8888` you can browse. This isn't strictly necessary for Outpost (we have staging at `qkf.b0d.myftpupload.com`), but it's available if you want to test something locally without affecting staging.
+`npm run wp-env:start` also brings up a development site at `localhost:8888` with Outpost, IndieAuth, and Micropub active. Open `http://localhost:8888/post/` to use the composer against your working tree. After you change `pwa/src/`, run `npm run build` (or `npm run dev` for the Vite dev server) so the site serves your change.
 
-For routine development, the staging deploy ritual is faster:
-1. Edit code locally
-2. `npm run build` (rebuilds the PWA bundle)
-3. `git commit && git push` (lands on `outpost` main)
-4. Bump submodule pointer in `staging-courtneyr-dev`, push (triggers gd-wordpress-deployer)
-5. Smoke test via `https://qkf.b0d.myftpupload.com/post/?_cb=<timestamp>`
-
-Local wp-env is useful when you need to run integration tests, or when staging is down, or when you want to test against a different WP version than staging is running.
-
-## CI integration (G99 wp-env CI)
+## CI integration
 
 The `test-integration` job in `.github/workflows/ci.yml` runs the integration suite on every push + PR against `main`. The job:
 
-1. Sets up Node 20 + PHP 8.2 with composer + npm caches.
+1. Sets up Node 24 and PHP 8.2 with Composer and npm caches.
 2. Brings up the WireMock sidecar from `tests/mock-server/docker-compose.yml` on the runner host (port 8080 — *not* 8888, since wp-env already binds 8888 for its dev install and 8889 for tests).
 3. Polls WireMock's `/__admin/health` endpoint with a 120s timeout before proceeding.
 4. Starts wp-env (`npm run wp-env:start`).
-5. Runs `npx wp-env run tests-cli ... composer test:integration` with `OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8080` passed through `--env`.
+5. Runs `npm run test:integration` with no extra environment variables. `tests/integration/bootstrap.php` defines `OUTPOST_TEST_MOCK_SERVER_URL` itself: it uses an `OUTPOST_TEST_MOCK_SERVER_URL` environment variable when one is set inside the container, otherwise `http://host.docker.internal:8080` when that name resolves (Docker Desktop on macOS and Windows), otherwise `http://172.17.0.1:8080` (Linux Docker, which is what the CI runner uses).
 6. On failure: dumps wp-env + WireMock logs to the job output for diagnosis.
 7. Always: stops wp-env + WireMock to release the runner cleanly.
 
 ### Why `172.17.0.1` for the mock-server URL on Linux runners
 
-GitHub Actions Ubuntu runners use Linux Docker. The default bridge network gateway IP from inside any container is `172.17.0.1` — that's the address wp-env's `tests-cli` container sees the runner host on. WireMock binds to `0.0.0.0:8080` on the runner via `docker compose up`; from inside the container, `http://172.17.0.1:8080` reaches it.
+GitHub Actions Ubuntu runners use Linux Docker. The default bridge network gateway IP from inside any container is `172.17.0.1`, which is the address wp-env's `tests-cli` container sees the runner host on. WireMock binds to `0.0.0.0:8080` on the runner via `docker compose up`, so `http://172.17.0.1:8080` reaches it from inside the container.
 
-Local dev on macOS / Windows (Docker Desktop) can use `host.docker.internal:8080` instead — both work; `172.17.0.1` is the Linux-specific value the CI uses.
+Docker Desktop on macOS and Windows doesn't route `172.17.0.1`; it provides `host.docker.internal` instead. The bootstrap's detection picks the right one, so you don't set anything locally. To point at a different mock server, make an `OUTPOST_TEST_MOCK_SERVER_URL` environment variable visible inside the tests-cli container.
 
 ### What gates green
 
@@ -129,8 +120,8 @@ The smoke test in `tests/integration/IntegrationInfrastructureSmokeTest.php` cov
 - WireMock `/__admin/health` reachable from inside the wp-env container.
 - `Outpost_Mock_Server_Filter::maybe_rewrite` hooked on `pre_http_request`.
 
-If those five pass, every per-cluster stub migration follow-up (per `docs/dev/g99-stub-migration-inventory.md`) can ride this same job without re-debugging the platform — they just add their fixture JSON + the migrated test methods.
+If those five pass, the platform works, and a failing test elsewhere in the suite points at that test or the code it covers. Migrating a skipped test means adding its fixture JSON and removing the skip (see `docs/dev/g99-stub-migration-inventory.md`).
 
 ### What's still skipped
 
-The 97 `markTestSkipped` calls inventoried in `docs/dev/g99-stub-migration-inventory.md` remain skipped after this PR — the CI job runs them (they're discovered) but they short-circuit at the `markTestSkipped` line. Migration is per-cluster follow-up PRs.
+On 2026-11-08, `grep -rn markTestSkipped tests/integration` finds 72 calls across 28 files. Some are environment guards that skip only outside wp-env (for example, `integration_environment_ready()` checks); others skip unconditionally until their cluster is migrated. CI discovers and runs every test, but a skipped test stops at the `markTestSkipped` line, so read a test's docblock before you assume its assertions run. `docs/dev/g99-stub-migration-inventory.md` tracks the migration by cluster.

@@ -2,15 +2,32 @@
 
 Outpost's Kit (formerly ConvertKit) destination publishes a fan-out copy of each WordPress post as a Kit broadcast on publish. The WordPress post stays canonical; the Kit broadcast carries a "originally appeared on" link back to the source.
 
-Shipped in G5b (Phase G). The v3 API secret path lands here; OAuth v4 ("Connect Kit") is a separate follow-up PR.
+Shipped in G5b (Phase G). The adapter uses Kit's v3 API secret; OAuth v4 isn't available.
 
 ## Setup
 
-1. **Get your API secret.** In Kit, go to Settings → Advanced → API. Copy the **API Secret** (NOT the API Key). Broadcast creation requires the secret.
-2. **Configure Outpost.** WP admin → Outpost → Settings → API Keys. Fill in:
+1. **Set the encryption key.** Outpost encrypts the API secret at rest, and the API Keys tab hides its form, showing "Outpost encryption key is not configured", until a key exists. Add the constant to `wp-config.php`; it must be 32 raw bytes, so wrap the base64 value in `base64_decode()`:
+
+    ```php
+    // Generate the value once with: php -r "echo base64_encode(random_bytes(32));"
+    define( 'OUTPOST_ENCRYPTION_KEY', base64_decode( 'paste-the-output-here' ) );
+    ```
+
+    See [Encryption key](../concepts/encryption-key.md) for the database fallback.
+2. **Get your API secret.** In Kit, go to Settings → Advanced → API. Copy the **API Secret** (NOT the API Key). Broadcast creation requires the secret.
+3. **Configure Outpost.** WP admin → Outpost → Settings → API Keys. Fill in:
     - `Syndicate to Kit` (checkbox)
     - `Kit API secret (v3)` — stored encrypted at rest
-3. **Mark posts to syndicate.** In the Gutenberg post sidebar, toggle Kit on for posts that should fan out. The first scheduled dispatch fires 30 seconds after publish (G3.5b dispatcher).
+4. **Mark posts to syndicate.** The block editor has no destination selector yet. Set the `_outpost_posse_targets` post meta to a list of destination ids that includes `kit`, before the post is published. The REST route is `POST /wp-json/wp/v2/posts/<id>`, and the request needs a user with `edit_post` on that post. Set `WP_USER` to your username and `WP_APP_PASSWORD` to an application password (Users → Profile → Application Passwords) first:
+
+    ```bash
+    curl -X POST https://example.com/wp-json/wp/v2/posts/123 \
+      -u "$WP_USER:$WP_APP_PASSWORD" \
+      -H 'Content-Type: application/json' \
+      -d '{"meta":{"_outpost_posse_targets":["kit"]}}'
+    ```
+
+    WP-CLI works too: `wp post meta update 123 _outpost_posse_targets '["kit"]' --format=json`. The meta is registered for the `post` post type only, and the post's author needs `publish_posts`. When the post moves into `publish`, the dispatcher schedules the first attempt 30 seconds later. Edits to a post that's already published don't dispatch again.
 
 ## What gets syndicated
 
@@ -29,17 +46,17 @@ Kit's v3 API carries authentication as an `api_secret` field in the JSON request
 
 ## Syndication URL fallback
 
-Kit's create-broadcast response returns a `public_url` only when the broadcast is scheduled or sent — not when it's created as a draft. When `public_url` is empty, the adapter falls back to a stable `https://app.kit.com/broadcasts/{id}` URL so the dispatcher can still record the syndicated copy. After you push send in Kit, the public archive URL becomes available; updating the recorded URL is a future enhancement.
+Kit's create-broadcast response returns a `public_url` only when the broadcast is scheduled or sent — not when it's created as a draft. When `public_url` is empty, the adapter falls back to a stable `https://app.kit.com/broadcasts/{id}` URL so the dispatcher can still record the syndicated copy. After you send the broadcast in Kit, the public archive URL exists, but Outpost doesn't update the recorded URL; it keeps the `app.kit.com` link.
 
 ## Failure handling
 
-- **401 / 403:** auth failure (most likely cause: you pasted the API Key instead of the API Secret). Outpost marks the dispatch failed and surfaces an admin notice. **No retry** — fix the credentials first.
+- **401 / 403:** auth failure (most likely cause: you pasted the API Key instead of the API Secret). Outpost records the failure in the post's `_outpost_posse_failures` meta; no admin notice shows it yet. **No retry** — fix the credentials first.
 - **429, 502, 503, 504, network timeout:** transient. The G3.5b dispatcher retries up to two more times.
 - **2xx with no `broadcast.id`:** treated as failure with `retryable=false`.
 
-## OAuth v4 follow-up
+## OAuth v4
 
-Kit's v4 API supports OAuth 2.0. The G5-kit-oauth follow-up PR will add a "Connect Kit" button that registers a Kit OAuth provider against the G3.5a `Outpost_Credentials_Store` and runs the standard authorization-code flow. The v3 API secret path will stay supported alongside — sites already configured don't need to migrate. The settings UI for v4 will live on the OAuth Connections page, not the API Keys tab.
+Kit's v4 API supports OAuth 2.0, but Outpost has no Kit OAuth provider: `includes/oauth/providers/` contains Notion, Oura, Polar, Ravelry, Ride with GPS, and WHOOP only. A "Connect Kit" button isn't available yet. The v3 API secret on the API Keys tab is the only way to connect Kit today.
 
 ## What this is NOT
 

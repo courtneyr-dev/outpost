@@ -41,7 +41,7 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Start here',
-					items: ['installation', 'getting-started'],
+					items: ['installation', 'getting-started', 'update'],
 				},
 				{
 					label: 'Using Outpost',
@@ -49,7 +49,11 @@ export default defineConfig({
 				},
 				{
 					label: 'Reference',
-					items: ['how-outpost-shapes-a-post', 'supported-services', 'screenshots', 'playground'],
+					items: ['supported-services', 'screenshots', 'playground'],
+				},
+				{
+					label: 'Understand',
+					items: ['how-outpost-shapes-a-post'],
 				},
 				{
 					label: 'Help',

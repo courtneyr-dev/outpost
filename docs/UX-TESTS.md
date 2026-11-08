@@ -1,18 +1,18 @@
 # UX tests
 
-Manual and agent-runnable UX test suite for the Outpost composer. Written against v0.1.104. Complements [SMOKE-TESTS.md](SMOKE-TESTS.md) (device-level PWA plumbing) — this suite covers the user-facing composer experience.
+Manual and agent-runnable UX test suite for the Outpost composer. First written against v0.1.104; the About tab case and section M cover 1.0.24. Unit and integration tests cover the code paths; this suite covers what a person sees in the composer.
 
 ## How to run
 
-- **Target staging first:** `https://qkf.b0d.myftpupload.com/post/`. Only run against live (`https://courtneyr.dev/post/`) after a full staging pass.
-- **Cache-buster:** append `?_cb=<timestamp>` on first load so GoDaddy's edge cache doesn't serve a stale response.
+- **Target a test site you control.** The wp-env development site works: run `npm run wp-env:start` and open `http://localhost:8888/post/`. Any other WordPress site with Outpost, IndieAuth, and Micropub active works too. Don't run the suite against a site with real readers: every test that posts publishes a real post.
+- **Cache-buster:** if your host or CDN caches pages, append `?_cb=<timestamp>` on first load so a cached response doesn't stand in for the current build.
 - **Test content prefix:** every post created by a test starts its content with `UX-TEST` so cleanup is a single search.
 - **Cleanup:** after the run, trash every post whose content starts with `UX-TEST` (wp-admin → Posts → search "UX-TEST" → bulk trash).
 
 Each test carries a runner tag:
 
 - `[auto]` — runnable by an agent in desktop Chrome (Claude in Chrome, see [UX-TESTS-CHROME-RUNNER.md](UX-TESTS-CHROME-RUNNER.md)).
-- `[manual]` — needs a real phone, a device permission (mic, camera, location), or a network-state change desktop Chrome can't fake. Run these yourself per the SMOKE-TESTS.md device matrix.
+- `[manual]` — needs a real phone, a device permission (mic, camera, location), or a network-state change desktop Chrome can't fake. Run these yourself on iPhone Safari and Android Chrome.
 
 Record results as: **PASS**, **FAIL** (with what you saw), or **BLOCKED** (couldn't attempt, with why).
 
@@ -95,7 +95,7 @@ Select Reply. Fill only the URL.
 Expected: submit stays blocked until content is present too.
 
 **D3. Like requires URL only** `[auto]`
-Select Like, paste `https://qkf.b0d.myftpupload.com/` (or any post URL on the target site), leave content empty.
+Select Like, paste your test site's home URL (or any post URL on that site), leave content empty.
 Expected: submit enabled. Submitting creates the like post; success message shows the new URL. Prefix any content field you do fill with `UX-TEST`.
 
 **D4. Preview step** `[auto]`
@@ -172,8 +172,11 @@ Expected: success with URL; published post renders the recipe structure.
 
 ## I. About tab
 
-**I1. Bookmarklets render** `[auto]`
-Expected: the About tab lists the bookmarklet(s) with drag-to-bookmarks-bar affordance and the iOS setup guide. Links resolve; no broken images; the source link points at the GitHub repo.
+**I1. Connection facts come first** `[auto]`
+Expected: the About tab opens with a Connection list showing Site (a link to your site), Status (for example "Connected", with a glyph and a sentence of detail), Micropub, IndieAuth sign-in, and Version ("Outpost 1.0.24" on a 1.0.24 build). A "Check connection again" button follows (or "Sign in again" when the sign-in expired).
+
+**I2. Guides sit behind disclosures** `[auto]`
+Expected: below the Help links (Documentation, Getting started, Troubleshooting, Privacy and data, Source code, Report an issue), three collapsed disclosures: "Diagnostics", "Post from anywhere: share sheet and bookmarklets", and "How Outpost works with the IndieWeb". Opening the share-sheet disclosure shows the bookmarklet list with its drag-to-bookmarks-bar affordance and the iOS setup guide. "Copy diagnostics" copies text that contains no access token. Links resolve; no broken images.
 
 ---
 
@@ -227,6 +230,34 @@ After a full pass across all tabs, the browser console shows no uncaught errors 
 
 ---
 
+## M. Settings and drafts (1.0.24)
+
+**M1. Settings sheet opens from the header** `[auto]`
+Activate the header's settings button (accessible name "Settings").
+Expected: a sheet titled "Settings" opens with two groups: "Appearance" (Light, Dark, System) and "Style source" (Outpost Default, Use Site Theme). Focus moves into the sheet; Tab and Shift+Tab stay inside it; Escape or the close button returns focus to the settings button.
+
+**M2. Style source switches paint** `[auto]`
+In the sheet, select Use Site Theme, then Outpost Default.
+Expected: the composer's colors and fonts change each time with no reload. Under Outpost Default the composer shows the built-in paper, violet, and orange design. Under Use Site Theme it takes the active WordPress theme's colors and fonts. A status line reads "Saved to your site." after each choice.
+
+**M3. Light, Dark, and System** `[auto]`
+Select Dark, then Light, then System, from the sheet or from the header's Light / Dark / System shortcut.
+Expected: Dark and Light apply right away and stay put across a reload. System follows the operating system's setting (switch it, or emulate `prefers-color-scheme` in Chrome DevTools, to check). Text stays readable in every combination of style source and mode.
+
+**M4. A choice made offline stays on the device** `[manual]` (network toggle)
+Go offline, then change the style source.
+Expected: the choice applies, and the status reads "Applied on this device; not saved to your site because you're offline. Outpost tries again when it can." Back online, the next successful contact saves it.
+
+**M5. A draft survives a reload** `[auto]`
+On the Post tab, type `UX-TEST draft survives reload` and wait one second.
+Expected: "Draft saved" appears. Reload `/post/`: the text is back in the field and nothing has posted. Repeat on the Reply tab (target URL and content) and on the Photo tab (alt text and caption fill back in; you add the photo again).
+
+**M6. A draft clears after publishing and on sign-out** `[auto]`
+Publish the M5 note, then reload.
+Expected: the field is empty. Type a new draft, sign out, and sign back in: the draft is gone.
+
+---
+
 ## Coverage summary
 
 | Area | auto | manual |
@@ -239,11 +270,12 @@ After a full pass across all tabs, the browser console shows no uncaught errors 
 | Doing | 4 | 1 |
 | Life | 1 | 0 |
 | Recipe | 1 | 0 |
-| About | 1 | 0 |
+| About | 2 | 0 |
 | Entry paths | 1 | 2 |
 | Offline | 0 | 3 |
 | Visual/PWA | 4 | 1 |
-| **Total** | **33** | **9** |
+| Settings/drafts | 5 | 1 |
+| **Total** | **39** | **10** |
 
 ---
 
@@ -253,24 +285,24 @@ Tier 1 above is a breadth smoke test: every area once. Tier 2 drives **every pos
 
 **Rules (in addition to the Tier 1 "How to run" rules):**
 
-- Staging only. Every post's text content starts with `UX-TEST`.
+- Test site only. Every post's text content starts with `UX-TEST`.
 - **All syndication chips OFF on every post.** If a chip renders pre-selected, click it off before submitting. Tier 2 must never publish to an external network.
 - Verify every "posted" claim in wp-admin (`edit.php`, newest first): a NEW post ID with a fresh timestamp. Do not trust the banner alone — that lesson is why F4b exists.
 - After each section, trash that section's posts before moving on (keeps the newest-first check unambiguous).
-- Post-run, the deeper property check (`mf2_*` post meta) is done from Claude Code with wp-cli: `wp @staging post meta list <ID> | grep -E "mf2_"` on a sample of trashed posts. The browser agent only needs to report post IDs.
+- Post-run, check the `mf2_*` post meta with WP-CLI on a sample of trashed posts. On the wp-env site: `npm run wp-env -- run cli wp post meta list <ID>`, then look for `mf2_` keys. On another test site, run `wp post meta list <ID>` there. The browser agent only needs to report post IDs.
 
-Target URLs: use `https://qkf.b0d.myftpupload.com/` for on-site targets and `https://www.youtube.com/watch?v=dQw4w9WgXcQ` / `https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT` for media targets.
+Target URLs: use your test site's home URL for on-site targets and `https://www.youtube.com/watch?v=dQw4w9WgXcQ` / `https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT` for media targets.
 
 ## T2.A — Reply tab: all nine variants post
 
 For each: select the variant, fill the target URL (plus content where required, prefixed `UX-TEST`), toggle any syndication chips OFF, submit, expect a success banner, verify the new post in wp-admin, note the ID.
 
-**T2.1 Reply** — "In reply to" = staging URL, content `UX-TEST t2 reply` (both required). Also click "Show preview" first and confirm a citation renders.
+**T2.1 Reply** — "In reply to" = your test site's URL, content `UX-TEST t2 reply` (both required). Also click "Show preview" first and confirm a citation renders.
 **T2.2 Like** — URL only.
 **T2.3 Repost** — URL only.
 **T2.4 Bookmark** — URL + note `UX-TEST t2 bookmark`.
-**T2.5 RSVP** — "Event URL" = staging URL. Confirm the yes/no/maybe/interested picker shows with "yes" preselected; choose **maybe**; submit.
-**T2.6 Follow** — "Person or feed URL" = staging URL.
+**T2.5 RSVP** — "Event URL" = your test site's URL. Confirm the yes/no/maybe/interested picker shows with "yes" preselected; choose **maybe**; submit.
+**T2.6 Follow** — "Person or feed URL" = your test site's URL.
 **T2.7 Wishlist** — target URL + note `UX-TEST t2 wishlist`.
 **T2.8 Tag** — target URL + note `UX-TEST t2 tag`.
 **T2.9 Issue** — target URL + note `UX-TEST t2 issue`.
@@ -281,7 +313,7 @@ Expected mf2 properties (for the wp-cli follow-up): in-reply-to, like-of, repost
 
 **T2.10 Listen + rating + artist + title** — Spotify track URL, Title `UX-TEST t2 listen`, Artist `Test Artist`, Rating `4`, comment `UX-TEST t2 listen`. Verify posted (Audio format expected).
 **T2.11 Watch** — YouTube URL, Title `UX-TEST t2 watch`, Director field filled, Rating `5`.
-**T2.12 Read + read-status** — any book URL (e.g. `https://qkf.b0d.myftpupload.com/`), Title `UX-TEST t2 read`, Author filled, set the read-status dropdown to **reading**, Rating `3`.
+**T2.12 Read + read-status** — any book URL (or your test site's URL), Title `UX-TEST t2 read`, Author filled, set the read-status dropdown to **reading**, Rating `3`.
 **T2.13 Play** — any URL, Title `UX-TEST t2 play`.
 **T2.14 Game** — any URL, Title `UX-TEST t2 game` (same property as Play; distinct label).
 **T2.15 Jam** — Spotify URL, Artist filled, comment `UX-TEST t2 jam`.
@@ -320,4 +352,4 @@ Expected mf2 properties: listen-of ×2 (Listen, Jam), watch-of, read-of (+read-s
 
 ## Tier 2 cleanup and accounting
 
-~21 posts created (T2.1–T2.23). Trash via the per-section sweeps + a final `UX-TEST` search; report created vs trashed counts (photo/media posts may not text-match — check the Media Library and newest-first list). Claude Code then runs the wp-cli property audit on the trashed IDs and permanently empties nothing — Trash emptying stays manual.
+~21 posts created (T2.1–T2.23). Trash via the per-section sweeps + a final `UX-TEST` search; report created vs trashed counts (photo/media posts may not text-match — check the Media Library and newest-first list). Then run the WP-CLI property audit on the trashed IDs. Don't empty the Trash as part of the run; do that by hand once you've reviewed the results.

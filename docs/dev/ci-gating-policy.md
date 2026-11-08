@@ -9,12 +9,12 @@ Every PR targeting `main` must show all of the following CI checks green before 
 
 | Check | What it covers |
 |---|---|
-| `Section 5 Audit` | Case-study leakage, embedded credentials, hardcoded silos, untranslated strings, PII fixture handles |
+| `Section 5 Audit` | `bin/lint/section-5-audit.sh` checks B1–B6: case-study leakage, embedded credentials, hardcoded silo instance URLs, untranslated `capabilities()` strings, personal data in fixture handles, and (B6) hex color literals in `pwa/src/styles/structure.css` |
 | `PHPCS + PHPStan` | WordPress-Extra coding standards + level-6 static analysis |
 | `PHPUnit (PHP 8.2)` | Unit suite on PHP 8.2 (minimum supported) |
 | `PHPUnit (PHP 8.3)` | Unit suite on PHP 8.3 |
 | `PHPUnit (PHP 8.4)` | Unit suite on PHP 8.4 |
-| `TypeScript + Vitest + build smoke` | TS strict typecheck, Vitest unit suite, Vite production build |
+| `TypeScript + Vitest + build smoke` | TS strict typecheck, Vitest unit suite, ESLint (`npm run lint` and `npm run lint:wp`), `npm run check:dist`, a `build:wp` run that must leave `build/pwa/` untouched, Vite production build |
 | **`Integration suite (wp-env + WireMock)`** | **NEW required gate** — full integration tests against real WP via wp-env + WireMock sidecar |
 
 `required_status_checks.strict = true` — branches must be up-to-date with `main` before merge.
@@ -23,7 +23,7 @@ Every PR targeting `main` must show all of the following CI checks green before 
 
 **Discovered 2026-05-09:** The Integration suite has been failing on every PR since PR #70 (cluster #4 Spotify migration) merged on 2026-05-04. We merged 11 PRs across the G99 stub-migration arc on the strength of unit suite + lint passing, treating Integration as informational. **Result:** the wp_redirect filter capture pattern shipped across PRs #70/#71/#72/#75/#80 was architecturally broken (skipped under `OUTPOST_TESTING_PWA_SHELL`), and none of those tests' assertions actually ran. We had review theater on assertions whose execution path never fired.
 
-The pattern is documented in `integration-test-gotchas.md` and the corresponding Claude memory entry.
+`integration-test-gotchas.md` documents the pattern.
 
 **This policy is the meta-fix.** Without it, the same class of failure rediscovers itself in three weeks. Required-status enforcement is the floor that protects every other code-quality investment.
 
@@ -57,5 +57,4 @@ Disabling for "this PR is urgent" is the failure mode that produced the original
 ## See also
 
 - `docs/dev/integration-test-gotchas.md` — gotchas including the wp_redirect filter capture issue surfaced 2026-05-09
-- Memory: `integration_suite_was_always_red_lesson.md` — the lesson from this discovery
 - PR description for this policy PR — the full investigation trail

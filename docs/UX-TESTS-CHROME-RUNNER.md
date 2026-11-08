@@ -5,14 +5,17 @@ How to run the `[auto]` tests from [UX-TESTS.md](UX-TESTS.md) using the Claude i
 ## One-time setup
 
 1. Install the Claude extension in Chrome and sign in to Claude.
-2. In the same Chrome profile, sign in to the **staging** site's wp-admin (`https://qkf.b0d.myftpupload.com/wp-admin/`). The IndieAuth authorize step reuses this session.
-3. Open a new tab and open the Claude sidebar.
+2. Pick a test site you control, with Outpost, IndieAuth, and Micropub active. The wp-env development site works: `npm run wp-env:start`, then `http://localhost:8888/` (sign in with the wp-env defaults, `admin` / `password`). Don't use a site with real readers; the run publishes posts.
+3. In the same Chrome profile, sign in to that site's wp-admin. The IndieAuth authorize step reuses this session.
+4. Open a new tab and open the Claude sidebar.
+
+In the prompts below, replace every `<TEST_SITE>` with your test site's base URL, for example `http://localhost:8888`.
 
 ## Run it
 
 Paste the operator prompt below into the Claude sidebar. It tells Claude to fetch the test suite straight from the repo, run the `[auto]` tests in order, and report a results table.
 
-Run in two halves if the session gets long — the prompt supports `Run sections A through F` / `Run sections G through L`.
+Run in two halves if the session gets long — the prompt supports `Run sections A through F` / `Run sections G through M`.
 
 ---
 
@@ -24,19 +27,19 @@ You are running a UX test pass on the Outpost composer PWA.
 TEST SUITE
 Fetch and read the suite first:
 https://raw.githubusercontent.com/courtneyr-dev/outpost/main/docs/UX-TESTS.md
-Run ONLY tests tagged [auto], in order (A1 → L5). Skip every [manual] test
+Run ONLY tests tagged [auto], in order (A1 → M6). Skip every [manual] test
 and mark it SKIPPED (manual) in the report. Run A5 (Sign out) LAST.
 
 TARGET
-Staging only: https://qkf.b0d.myftpupload.com/post/
-On the first navigation, append ?_cb=<current unix timestamp> to bypass the
-edge cache. Never navigate to courtneyr.dev during this run.
+Test site only: <TEST_SITE>/post/
+On the first navigation, append ?_cb=<current unix timestamp> to bypass any
+page cache. Never navigate to any other WordPress site during this run.
 
 GROUND RULES
 1. Every post you create must have content starting with "UX-TEST" so it
    can be found and deleted later. Never post anything else.
 2. If a test needs a public URL to reply to / like / bookmark, use
-   https://qkf.b0d.myftpupload.com/ or any post on that staging site.
+   <TEST_SITE>/ or any post on that test site.
 3. For file-upload tests (E1, E2, F3), use any small image you can supply;
    if you cannot attach a file, mark the test BLOCKED (no file available)
    and move on.
@@ -57,7 +60,7 @@ GROUND RULES
    tab for horizontal scroll, then restore the window size.
 
 CLEANUP (after A5)
-Go to https://qkf.b0d.myftpupload.com/wp-admin/edit.php, search "UX-TEST",
+Go to <TEST_SITE>/wp-admin/edit.php, search "UX-TEST",
 and move every matching post to Trash. Report how many you trashed and
 how many posts the run created (the numbers should match).
 
@@ -77,9 +80,8 @@ saw, console errors if any. After the table, list:
 
 ## After the run
 
-1. Paste the results table back into your Claude Code session — failures become the next work items.
-2. Run the `[manual]` tests on your phone per the SMOKE-TESTS.md device matrix (iPhone Safari for K1/K2/L4; Android for J2/K3).
-3. Only after staging passes: repeat the run against `https://courtneyr.dev/post/` if a live pass is needed — same prompt with the URL swapped, and be aware test posts publish to the public site until cleanup.
+1. File each FAIL as a GitHub issue (or fix it in your branch), quoting the row from the results table.
+2. Run the `[manual]` tests on a phone: iPhone Safari for K1, K2, and L4; Android Chrome for J2 and K3.
 
 ---
 
@@ -94,9 +96,9 @@ You are running Tier 2 (exhaustive variant pass), Batch 1, on the Outpost
 composer. Fetch and read the "Tier 2" section of
 https://raw.githubusercontent.com/courtneyr-dev/outpost/main/docs/UX-TESTS.md
 then run tests T2.1 through T2.9 in order against
-https://qkf.b0d.myftpupload.com/post/?_cb=<current unix timestamp>.
+<TEST_SITE>/post/?_cb=<current unix timestamp>.
 
-Hard rules: staging only; every post's text starts with "UX-TEST"; toggle
+Hard rules: test site only; every post's text starts with "UX-TEST"; toggle
 every syndication chip OFF before each submit; verify each post in
 wp-admin (edit.php, newest first) and record its ID; after T2.9, trash all
 nine posts via the UX-TEST search and per-row Trash links.
@@ -113,11 +115,11 @@ You are running Tier 2 (exhaustive variant pass), Batch 2, on the Outpost
 composer. Fetch and read the "Tier 2" section of
 https://raw.githubusercontent.com/courtneyr-dev/outpost/main/docs/UX-TESTS.md
 then run tests T2.10 through T2.30 in order against
-https://qkf.b0d.myftpupload.com/post/?_cb=<current unix timestamp>.
+<TEST_SITE>/post/?_cb=<current unix timestamp>.
 
-Hard rules: staging only; every post's text starts with "UX-TEST"; toggle
+Hard rules: test site only; every post's text starts with "UX-TEST"; toggle
 every syndication chip OFF before each submit; verify each post in
-wp-admin and record its ID; T2.23 additionally requires confirming the
+wp-admin and record its ID; T2.23 also requires confirming the
 category, tag, slug, and Aside format all landed on the post; for file
 uploads (T2.17, T2.22) use any small image, or mark BLOCKED if you cannot
 attach one; trash each section's posts before starting the next section.
@@ -131,4 +133,4 @@ page is blank.
 
 ## After Tier 2
 
-Paste both batch reports into Claude Code. It then runs the wp-cli property audit on the reported post IDs (`wp @staging post meta list <ID> | grep mf2_`) to confirm each variant wrote the right Micropub property — the browser can't see post meta, so this closes the maker/checker loop.
+Run the WP-CLI property audit on the reported post IDs to confirm each variant wrote the right Micropub property. The browser can't see post meta, so this is the only check that does. On the wp-env site, run `npm run wp-env -- run cli wp post meta list <ID>` and look for `mf2_` keys; on another test site, run `wp post meta list <ID>` there.

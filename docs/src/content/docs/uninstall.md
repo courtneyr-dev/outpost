@@ -10,7 +10,7 @@ How to remove Outpost from your site, what the uninstaller cleans up, and what i
 1. In wp-admin, go to **Plugins → Installed Plugins**.
 2. Find **Outpost** and select **Deactivate**.
 
-Deactivation is reversible and deletes no data. It clears Outpost's caches and transients and removes the `/post` rewrite rule, so the composer URL stops responding. Reactivating restores everything.
+Deactivation is reversible and deletes no data. It flushes WordPress's rewrite rules, so `/post` stops serving the composer. Reactivating restores it.
 
 ## Delete the plugin
 
@@ -21,14 +21,21 @@ WordPress removes the plugin files and runs Outpost's uninstall script.
 
 ## What the uninstaller removes — and what it doesn't
 
-Since version 1.0.4, deleting the plugin removes everything Outpost created on your site — on a single site and on every site of a multisite network:
+Deleting the plugin runs Outpost's uninstaller on a single site and on every site of a multisite network. In version 1.0.24 it removes:
 
-- **All Outpost options** — settings, destination API keys, the generated encryption key, Bridgy silo choices, Telegraph author settings, and the `/post` rewrite bookkeeping.
-- **Per-user data** — encrypted service credentials, iOS Shortcut tokens, appearance preferences, and dismissed-notice markers.
-- **Outpost's own post meta** — syndication targets and recorded syndication links, POSSE retry state, manual-share and Bridgy logs, Telegraph page links, XFN relationship choices, and check-in place names.
+- **Outpost options:** settings, destination API keys, the generated encryption key, Bridgy silo choices, Telegraph settings, and the `/post` rewrite bookkeeping.
+- **Per-person data:** encrypted service credentials, iOS Shortcut tokens, Light, Dark, or System choices, token overrides, and dismissed-notice markers.
+- **Outpost's own post meta:** syndication targets and recorded syndication links, POSSE retry state, manual-share and Bridgy logs, Telegraph page links, XFN relationship choices, and check-in place names.
 - **Cached data** (transients) and any scheduled syndication retries.
 
-It never removes your posts or media, image alt text, featured images, categories, or another plugin's data — for example a Yoast focus keyphrase Outpost saved on your behalf stays with the post. [Privacy and data](/outpost/privacy-and-data/) lists every option and meta key with its purpose.
+Two small records added in 1.0.24 stay behind: each person's style source choice (`outpost_appearance_source` user meta) and the site's `outpost_appearance_schema` option. Neither holds content or credentials. To remove them with WP-CLI:
+
+```bash
+wp option delete outpost_appearance_schema
+wp user list --field=ID | xargs -I % wp user meta delete % outpost_appearance_source
+```
+
+It never removes your posts or media, image alt text, featured images, categories, activity details attached to posts, or another plugin's data. For example, a Yoast focus keyphrase Outpost saved on your behalf stays with the post. [Privacy and data](/outpost/privacy-and-data/#what-uninstalling-removes) lists every option and meta key with its purpose.
 
 ## Remove the app from your phone
 

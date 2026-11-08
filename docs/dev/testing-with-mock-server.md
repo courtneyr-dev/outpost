@@ -5,24 +5,25 @@ Outpost's integration suite runs against a containerized HTTP mock server (WireM
 ## Local-dev workflow
 
 ```bash
-# Start wp-env's containers (WP, MySQL, etc.).
-npx wp-env start
+# Start the mock server (detached). Port 8080, because wp-env claims
+# 8888 and 8889, and wp_http_validate_url() only allows ports 80, 443,
+# and 8080.
+(cd tests/mock-server && docker compose up -d)
 
-# Start the mock server in a separate terminal (or detached).
-cd tests/mock-server
-docker compose up -d
+# Start wp-env's containers (WordPress, MySQL, tests-cli).
+npm run wp-env:start
 
-# Run the integration suite. The integration bootstrap promotes
-# OUTPOST_TEST_MOCK_SERVER_URL from the env var; export it first
-# (port 8080, not 8888 — wp-env claims 8888 for its dev install).
-export OUTPOST_TEST_MOCK_SERVER_URL=http://172.17.0.1:8080
-composer test:integration
+# Run the integration suite inside the tests-cli container.
+npm run test:integration
 
 # Tear down when done.
-docker compose down
+npm run wp-env:stop
+(cd tests/mock-server && docker compose down)
 ```
 
-The mock server listens on host port 8080 (container port 8080). Stubs and journaled requests are wiped between tests via `Outpost_Mock_Server::reset()`.
+You don't need to export anything. `tests/integration/bootstrap.php` defines `OUTPOST_TEST_MOCK_SERVER_URL` from, in order: an `OUTPOST_TEST_MOCK_SERVER_URL` environment variable, if one is set inside the tests-cli container; `http://host.docker.internal:8080` when that name resolves (Docker Desktop on macOS and Windows); `http://172.17.0.1:8080` otherwise (Linux Docker, including CI). Run the suite through `npm run test:integration`, not `composer test:integration` on your host: the bootstrap needs the WordPress test suite that only exists inside the tests-cli container. See [INTEGRATION-TESTING.md](../INTEGRATION-TESTING.md).
+
+The mock server listens on host port 8080 (container port 8080). `Outpost_Mock_Server::reset()` wipes stubs and journaled requests between tests.
 
 ## How rewriting works
 
@@ -32,8 +33,12 @@ When the constant is NOT defined, the filter is a no-op and outbound HTTP behave
 
 ## Writing an integration test
 
+Integration tests extend `PHPUnit\Framework\TestCase`. The integration bootstrap has already loaded WordPress, so WordPress functions work inside the test.
+
 ```php
-class MyIntegrationTest extends WP_UnitTestCase {
+use PHPUnit\Framework\TestCase;
+
+final class MyIntegrationTest extends TestCase {
 
     public function setUp(): void {
         parent::setUp();
@@ -99,4 +104,4 @@ When `OUTPOST_TEST_MOCK_SERVER_URL` is defined and a request matches a rewritabl
 
 ## Migration of existing skipped stubs
 
-Several integration tests in `tests/integration/` are marked `markTestSkipped( 'wp-env-pending' )`. Once the mock server scaffolding lands and concrete fixtures are written for each upstream, these tests get migrated to use `Outpost_Mock_Server::stub_from_fixture(...)` and the skip markers come off. Migration is incremental — each test can come off the skip list independently as its fixture is written. Tracked as a follow-up to G99.
+Some integration tests in `tests/integration/` still call `markTestSkipped()` until a fixture exists for their upstream. To migrate one, write the fixture, switch the test to `Outpost_Mock_Server::stub_from_fixture(...)`, and remove the skip. Each test comes off the skip list on its own. `docs/dev/g99-stub-migration-inventory.md` tracks the remaining clusters.

@@ -39,4 +39,4 @@ Snipd's public share pages emit standard Open Graph meta tags. The adapter uses 
 The original G15 prompt specified six enhancements per `posse-expansion-may-2026.md` §8. G15a ships items 1 (URL kind detection) only.
 
 - Item 2 (OG fallback when Snipd API fails) is moot for this adapter — Snipd has no public API; OG IS the primary path. Documented here for future readers wondering why item 2 is absent.
-- Items 3-6 (composite enrichment, Apple Podcasts cross-lookup, multi-clip stitching, structured-blocks artwork replacement) ship as G15b after the G4 composite primitive (PR #35) merges.
+- Items 3-6 (composite enrichment, Apple Podcasts cross-lookup, multi-clip stitching, structured-blocks artwork replacement) aren't available yet. The G4 composite primitive exists (`Outpost_Composite_Inbound`), but the Snipd source doesn't use it.

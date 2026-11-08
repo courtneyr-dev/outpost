@@ -1,44 +1,40 @@
 ---
 title: Accessibility
-description: "Where Outpost's accessibility work stands: what the repository's audit records as done and what still needs testing. Evidence, not a conformance claim."
+description: "Where Outpost's accessibility work stands in version 1.0.24: what the code and changelog record as fixed, and what still needs testing. Evidence, not a conformance claim."
 ---
 
-Where Outpost's accessibility work stands: what the repo's own audit records as done, and what still needs testing. This page describes evidence, not compliance — Outpost does not claim WCAG conformance, and neither do these docs.
+Where Outpost's accessibility work stands in version 1.0.24: what the code and the changelog record as done, and what still needs testing. This page describes evidence, not compliance. Outpost doesn't claim WCAG conformance, and neither do these docs.
 
 ## The surfaces that matter
 
-- **The composer PWA at `/post`** — the main user-facing UI: mode tabs, text fields, media upload, syndication chips, status messages.
-- **wp-admin pages** — the Outpost pages (bookmarklets, settings tabs, Appearance, OAuth Connections, iOS Shortcut) use standard WordPress admin markup: form tables, nav tabs, notices.
-- **Block editor sidebar** — the Outpost "fetch recent" picker panel.
-- **Frontend output** — appended `u-syndication` links inside post content; plain anchor elements.
+- **The composer app at `/post`:** the main interface, with its header, tabs, form fields, photo upload, syndication chips, Settings sheet, and status messages.
+- **wp-admin pages:** the Outpost pages (bookmarklets and composer defaults, Settings tabs, Appearance, OAuth Connections, iOS Shortcut) use standard WordPress admin markup: form tables, nav tabs, and notices.
+- **The block editor sidebar:** the Outpost panel and its **Add from connected platforms** picker.
+- **Frontend output:** the `u-syndication` links Outpost adds sit inside a `hidden` element, so they add nothing to the visible page or the accessibility tree.
 
-## What the repo's checklist records
+## What's in place
 
-The repo keeps a WCAG 2.1/2.2 Level AA checklist at [docs/accessibility/A11Y-CHECKLIST.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/accessibility/A11Y-CHECKLIST.md). As of its v0.1.8 audit it records these as met in the composer:
+The target is WCAG 2.2 Level AA. These come from the code and from the accessibility entries in the [changelog](https://github.com/courtneyr-dev/outpost/blob/main/CHANGELOG.md), including the 1.0.22 WCAG 2.2 AA source review:
 
-- Semantic landmarks and a single `h1` per surface.
-- Real interactive elements — buttons and links, no click-handling `div`s.
-- A visible focus ring (themeable via the `--outpost-focus` token).
-- Minimum 44px touch target size.
-- Status messages announced via `aria-live` and `role="alert"`.
-- Labels on all inputs.
-- The page language set from your site's locale.
+- **Structure:** a single `h1` ("Outpost composer"), a tab list built to the WAI-ARIA tabs pattern with arrow-key navigation, and a page title that names the active tab, such as "Reply – Outpost".
+- **Native controls:** buttons, links, and radio buttons, not click-handling `div` elements. Choices in the Settings sheet are native radio groups.
+- **Focus:** a visible focus ring with at least 3:1 contrast in every scheme. Drawers keep focus inside while open, and a closed drawer is inert (1.0.24).
+- **Touch targets:** at least 44px. Style choices are 44px tiles (1.0.24).
+- **Status messages:** each tab's status and error regions stay mounted and only their text changes, so VoiceOver on iOS announces them. Urgent errors use `role="alert"`; routine notices use `role="status"`.
+- **Labels:** every input has a label, link text matches the visible text, and links that open a new tab say so to screen readers.
+- **Language:** the page language comes from your site's locale.
+- **Contrast:** the Outpost Default colors are tested against WCAG 2.2 AA (4.5:1 for text; 3:1 for borders, focus, and the logo). Under Use Site Theme, Outpost checks your theme's text, button, link, border, and focus colors at the same thresholds and adjusts the ones that fall short. Token overrides you mark "override anyway" skip that check.
+- **Disabled buttons** keep their contrast: they use dedicated colors instead of lowered opacity (1.0.24).
 
-Two behaviors also help content accessibility: alt text is required on photo uploads (the post won't submit without it), and Outpost integrates with the Accessibility Checker plugin when that companion is active.
-
-## Keyboard and screen reader notes
-
-The checklist's items above are the relevant evidence: interactive controls are native elements (so they're keyboard-reachable), focus is visible, and posting status is announced. The composer is touch-first, though — if you rely on a keyboard or screen reader and hit a snag, that's worth reporting (see below).
+Two behaviors also help the content you publish: photo posts require alt text (the post won't submit without it, and a separate control marks an image as decorative), and Outpost links to the Accessibility Checker report after each post when that plugin is active.
 
 ## What still needs testing
 
-Open items straight from the repo's checklist and test inventory:
-
-- **Color contrast** — the Outpost Default tokens are measured against WCAG 2.2 AA (4.5:1 for text, 3:1 for borders, focus, and the logo) by an automated test. Under Use Site Theme, Outpost checks and adjusts your theme's colors at the same thresholds; token overrides you mark "override anyway" skip that check.
-- **Focus management when switching composer modes** — listed as open.
-- **Real-device screen reader testing** (VoiceOver, TalkBack) — listed as open.
-- **No automated accessibility test suite** — the repo's tests don't include axe, pa11y, or similar tooling.
+- **Real-device screen reader testing** with VoiceOver on iOS and TalkBack on Android hasn't been recorded for 1.0.24.
+- **Focus when switching composer tabs** is still listed as open.
+- **No automated accessibility tests** run against the composer. The repository's tests don't include axe, pa11y, or similar tools; the documentation site you're reading runs axe in its own build.
+- **The repository checklist** at [docs/accessibility/A11Y-CHECKLIST.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/accessibility/A11Y-CHECKLIST.md) records a full audit at version 0.1.8 and needs a re-audit against 1.0.24.
 
 ## Reporting accessibility issues
 
-Accessibility reports are bug reports: open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues) with the assistive tech, browser, and composer mode involved.
+Accessibility reports are bug reports. Open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues) with the assistive technology, browser, device, and composer tab involved.

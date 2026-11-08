@@ -27,7 +27,7 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 * **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
 * **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
-The composer is a real PWA: it installs to your iOS or Android home screen, queues drafts written offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note, a shared photo the Photo tab.
+The composer is a real PWA: it installs to your iOS or Android home screen, keeps unsent text on your device through a reload or a fresh sign-in, queues posts made offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note, a shared photo the Photo tab.
 
 POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.
 
@@ -71,7 +71,7 @@ Active-only enhancements. Nothing here changes what Outpost can publish; each ad
 
 1. Install and activate the IndieAuth plugin from the WordPress.org plugin directory.
 2. Install and activate the Micropub plugin from the WordPress.org plugin directory.
-3. Install and activate Outpost. While Outpost is not yet listed on WordPress.org, download the ZIP from [GitHub releases](https://github.com/courtneyr-dev/outpost/releases) and install it via Plugins → Add New Plugin → Upload Plugin.
+3. Install and activate Outpost. While Outpost is not yet listed on WordPress.org, install it from the `main` branch of [its GitHub repository](https://github.com/courtneyr-dev/outpost): clone it into `wp-content/plugins/`, or choose Code → Download ZIP and upload it via Plugins → Add New Plugin → Upload Plugin. The [installation guide](https://courtneyr-dev.github.io/outpost/installation/) has both paths.
 4. In wp-admin, open the **Outpost** menu: it links to the composer, generates bookmarklets, and walks through installing the app on your phone.
 5. Open `/post` on your phone, sign in with your site address (IndieAuth), and tap "Add to Home Screen" to install the PWA.
 
@@ -89,7 +89,7 @@ Not yet — until it's listed, install from GitHub per the Installation section.
 
 = Where do the settings live? =
 
-In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost → Settings** holds destination API keys; **Outpost → Appearance** controls day/night mode and color tokens; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
+In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost → Settings** holds destination API keys; **Outpost → Appearance** sets your style source (Outpost Default or Use Site Theme), Light, Dark, or System, and token overrides; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
 
 = Does it work on managed hosts? =
 
@@ -97,7 +97,7 @@ Mostly, with one known pitfall: some managed hosts strip the Authorization heade
 
 = Does Outpost work offline? =
 
-Yes, for composing. Drafts written offline queue in your browser's IndexedDB and submit when the connection returns. Sign-in tokens are encrypted (AES-GCM) in the browser. A queued draft keeps no copy of your token: it sends with your current sign-in, only to the site it was queued for, and signing out leaves it in the queue.
+Yes, for composing. Posts written offline queue in your browser's IndexedDB, unencrypted, and submit when the connection returns. Sign-in tokens are encrypted (AES-GCM) in the browser. A queued post keeps no copy of your token: it sends with your current sign-in, only to the site it was queued for, and signing out leaves it in the queue. Unsent drafts are kept in the browser's localStorage, also unencrypted, and clear when you post or sign out.
 
 = What sends data where? =
 
@@ -113,13 +113,13 @@ Not currently. The composer is served at the fixed `/post` path.
 
 = How do the bookmarklets work? =
 
-The Outpost admin page generates one bookmarklet per post kind, embedded with your site's URL. Drag one to your bookmark bar (or long-press on mobile); click it while viewing any page to open the composer with that page's URL pre-filled. Pattern adapted from IndieWeb Press This (Pfefferle, Shanske, Barrett).
+The Outpost admin page generates four bookmarklets (Reply, Like, Repost, and Bookmark), each embedded with your site's URL. Drag one to your bookmark bar (or long-press on mobile); click it while viewing any page to open the composer with that page's URL pre-filled. Pattern adapted from IndieWeb Press This (Pfefferle, Shanske, Barrett).
 
 = How do I post from my phone's share sheet? =
 
 On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, a title plus text an Article, and a shared photo opens the Photo tab with the picture attached.
 
-iOS Safari doesn't support share targets, so on iPhone or iPad add a Shortcut. The guided one from Settings → Outpost iOS Shortcut posts through a scoped token without opening the composer. To build one that opens the composer so you can review first:
+iOS Safari doesn't support share targets, so on iPhone or iPad build a Shortcut in the Shortcuts app. It opens the composer so you can review first and needs no token. (The ready-made Shortcut on Settings → Outpost iOS Shortcut isn't published yet in 1.0.24.) The steps:
 
 1. Open the Shortcuts app and tap + for a new Shortcut.
 2. In the first action, tap Nowhere and choose Share Sheet; set the types to URLs and Text.
@@ -218,7 +218,7 @@ To rebuild the compiled assets from source: `npm install`, then `npm run build` 
 1. The composer sign-in screen at /post on a phone — enter your site address to authorize the device via IndieAuth.
 2. The Outpost admin page with per-variant bookmarklets, the composer link, and phone install steps.
 3. OAuth Connections — connect life-tracking providers such as Notion, Polar Flow, Oura, Ride With GPS, Ravelry, and WHOOP.
-4. Appearance settings — day/night mode and per-token color overrides, with automatic contrast adjustment.
+4. Appearance settings — Light, Dark, or System and per-token color overrides, with automatic contrast adjustment.
 5. The Outpost iOS Shortcut Bridge — site URL, per-user token, and connection status for share-sheet posting from iPhone.
 6. Note mode on a phone, signed in — write a note and pick syndication targets before posting.
 7. The composer offline — posts made without a connection wait in the queue until you reconnect.

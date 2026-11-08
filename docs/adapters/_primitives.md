@@ -187,7 +187,7 @@ The fallback chain gives the adapter graceful degradation: official API down, fa
 
 ## Reference
 
-Spec at `docs/dev/prompts/G4-adapter-primitives.md` — locked design decisions Og_Inbound 1–9 and Composite_Inbound 1–8.
+The G4 spec (`docs/dev/prompts/G4-adapter-primitives.md`) isn't in this repository; the locked design decisions it numbered (Og_Inbound 1–9, Composite_Inbound 1–8) survive only as references in code comments.
 
 ## G4b — concrete extractors
 
@@ -247,19 +247,12 @@ When multiple extractors claim the same `@type`, the higher `priority()` wins.
 
 Third-party extractors can `use` the trait to inherit these helpers.
 
-## Apple Music + iTunes Lookup composite demo (G4b)
+## Production callers
 
-`Outpost_Apple_Music_Adapter::fetch( $url )` wraps `Composite_Inbound::fetch()` with two sources:
+No shipped adapter calls `Outpost_Og_Inbound::fetch()` or `Outpost_Composite_Inbound::fetch()` today. `outpost.php` registers the five G4b extractors with `Outpost_Og_Inbound::register_extractor()`, but the inbound sources in `includes/sources/` use the F16 `og_tags` extractor through the preview endpoint instead. Apple Music is one of those: `Outpost_Source_AppleMusic` (`includes/sources/class-source-applemusic.php`) declares `'extractor' => 'og_tags'` and makes no iTunes Lookup call. Earlier versions of this page described an `Outpost_Apple_Music_Adapter` composite demo; that class doesn't exist.
 
-1. **Primary** (`apple_music_og`) — calls `Outpost_Og_Inbound::fetch( $url )` to extract OG tags from Apple's canonical share page.
-2. **Enricher** (`itunes_lookup`) — parses album/song id from the URL, hits `https://itunes.apple.com/lookup?id={id}&country={country}` (anonymous public API, no auth), normalises the result to an `itunes_*` keyed shape including 1000×1000 artwork (rewritten from iTunes' default 100×100).
-
-Album URLs with `?i={track-id}` upgrade to song lookup automatically.
-
-The primary's response provides title / image / description from Apple's HTML; the enricher fills in `itunes_artist_name`, `itunes_collection_name`, `itunes_track_name`, `itunes_genre`, `itunes_release_date`, `itunes_artwork_high_res`. Failed enrichment is swallowed — the adapter still returns the OG-only response when iTunes Lookup is unreachable.
-
-This is the canonical pattern for any future Phase G adapter that wants OG scraping plus an authenticated/anonymous JSON enrichment: declare a primary callback for the cheap path, declare an enricher callback for the rich path, let the composite primitive handle parallelism + timeout + merge.
+The primitives are public static APIs that third-party code can call. Use the pattern in "Pattern: building a Phase G adapter on these primitives" above: a primary callback for the cheap path, an enricher or fallback callback for the rich path, and `Composite_Inbound` for ordering, timeout, and merge.
 
 ## Reference
 
-Spec at `docs/dev/prompts/G4-adapter-primitives.md` — locked design decisions Og_Inbound 1–9 and Composite_Inbound 1–8.
+The G4 spec (`docs/dev/prompts/G4-adapter-primitives.md`) isn't in this repository; the locked design decisions it numbered (Og_Inbound 1–9, Composite_Inbound 1–8) survive only as references in code comments.
