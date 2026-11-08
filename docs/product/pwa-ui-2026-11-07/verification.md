@@ -123,7 +123,7 @@ All captures are synthetic: `localhost:8888`, the wp-env `admin` account, no dra
 - **Device review:** no iOS Safari, installed PWA, or Android test; no VoiceOver or TalkBack pass. Unverified.
 - **Zoom and text size:** 200% text and 400% zoom/reflow were not tested; the header wraps by design but wasn't measured at large text sizes.
 - **Keyboard-visible layout:** the sticky-toolbar and virtual-keyboard checks weren't run (no device); the composer has no sticky toolbar, and the body field caps at 50dvh.
-- **Draft retention across re-sign-in:** drafts live only in component state, so "Sign in again" reloads and loses unsent text. The notice says so. Persistence isn't built.
+- **Draft retention across re-sign-in:** built on `feature/pwa-composer-drafts` (stacked on this branch): `pwa/src/lib/drafts.ts` keeps each mode's unsent text in localStorage per `me`, restores it after "Sign in again" without posting, and clears it on publish, queue, and sign-out. Covered by vitest only; not yet checked on a device.
 - **Per-mode redesign:** Photo, Recipe, and Life keep their existing field layouts under the new tokens; the mockup's compact "Add media" / "Categories & tags" rows weren't built, and More options still opens the existing drawer.
 - **Web fonts:** none ship; IBM Plex and Newsreader render only when installed on the device.
 - **Bridge:** no site appearance bridge exists in this plugin (`outpost_shell_mode_class` and `outpost_shell_style_handles` are the hooks); nothing here reads one.
