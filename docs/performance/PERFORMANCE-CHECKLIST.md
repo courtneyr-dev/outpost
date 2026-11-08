@@ -1,6 +1,12 @@
-# Performance Checklist
+# Performance checklist
 
-Per-surface wordpress-performance pattern checklist for upcoming Outpost work. Pairs with `PHP-SURFACE-CHECKLIST.md` (security) and `STAGING-DEPLOY.md` (deploy ritual).
+> **Status note (2026-11-08):** the status sections below reflect v0.1.6. The bundle has grown since, and the numbers in "Status at v0.1.6" no longer describe 1.0.24. A re-audit is pending; see "Open items" for the one measurement taken on 2026-11-08.
+
+Per-surface wordpress-performance pattern checklist for upcoming Outpost work. Pairs with `docs/security/PHP-SURFACE-CHECKLIST.md` (security) and `docs/RELEASING.md` (release steps).
+
+## Open items
+
+- [ ] **Entry bundle is over the 40 KB gzipped ceiling.** On 2026-11-08 the committed entry bundle, `build/pwa/assets/index-MhDwrWQl.js` (1.0.24), measured 180,056 bytes raw and 52,392 bytes gzipped (`gzip -c build/pwa/assets/index-*.js | wc -c`), about 52 KB against the 40 KB ceiling under "Bundle budget". The ceiling stands. Bring the bundle back under it with code splitting, or record a measurement-backed reason for the overage in a decision file.
 
 ## Status at v0.1.6
 
@@ -16,7 +22,7 @@ The `/post/` shell load path is tight. Total transfer for a cold cached load:
 - ✅ **`<link rel="modulepreload">`** for the entry JS — browser starts fetching the module while parsing HTML and downloading CSS in parallel, instead of waiting for the `<script type="module">` tag at the bottom of body.
 - ✅ **Inline critical layout CSS** in `<style>` — reserves `min-height: 100dvh` on `body` and `#outpost-root` immediately, before the bundled CSS arrives. Eliminates CLS when JS mounts and adds the `.outpost-app` class.
 - ✅ **`<script type="module">`** is inherently deferred — modules execute after HTML parsing.
-- ✅ **Cache-busted asset filenames** via Vite content hashes — long-cache + cache-bust pattern works automatically. No manual cache-buster needed for asset URLs (only for the staging-verify HTML cache; see hosting gotcha #5).
+- ✅ **Cache-busted asset filenames** via Vite content hashes — long-cache + cache-bust pattern works automatically. No manual cache-buster needed for asset URLs; a `?_cb=<timestamp>` query only matters for page-cached HTML (see `docs/CACHE-LAYERS.md`).
 - ✅ **HTTP/2** is on by default on managed-WP hosts — small-bundle + parallel-fetch combo benefits from HTTP/2's multiplexing.
 - ✅ **Per-request manifest cache** in `Outpost_PWA_Assets::manifest()` — disk read at most once per render path, not per asset URL lookup.
 
@@ -149,13 +155,13 @@ The composer adds Preact components per mode (Note, Reply, Photo, Listen group, 
 Performance is hard to validate from CI without real-browser measurements, but bundle size is checkable:
 
 ```bash
-cd ~/projects/outpost
+# from the repository root
 npm run build
 ls -lh build/pwa/assets/index-*.js
-# Watch for the gzipped size in vite's output
+gzip -c build/pwa/assets/index-*.js | wc -c   # gzipped bytes; compare with the 40 KB ceiling
 ```
 
-When B2 / Phase C ship, plan a one-time browser session with Chrome DevTools' Performance panel against staging:
+When B2 / Phase C ship, plan a one-time browser session with Chrome DevTools' Performance panel against a test site (the wp-env site at `http://localhost:8888/post/` works):
 
 - Record a load of `/post/?_cb=<timestamp>` on Slow 3G + 4× CPU throttle
 - Note LCP, FCP, CLS, TTI

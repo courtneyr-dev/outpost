@@ -61,8 +61,6 @@ Each gotcha is numbered, dated, and linked to the PR where it surfaced. Anti-pat
 
 **Where surfaced:** PR #68 (cluster #3 NotionShareTargetPreview, closed).
 
-**Memory:** `outpost_rewritable_hosts_scope.md`.
-
 ---
 
 ## Gotcha #5 — `wp-env logs` hangs CI cleanup
@@ -105,8 +103,6 @@ Each gotcha is numbered, dated, and linked to the PR where it surfaced. Anti-pat
 
 **Where surfaced:** PR #66 → #67 cascade. Recovery PR #67 cherry-picked the lost commit onto a fresh main-based branch.
 
-**Memory:** `stacked_pr_merge_sequencing.md`.
-
 ---
 
 ## Gotcha #8 — Speculative-future-behavior in test docblocks
@@ -123,8 +119,6 @@ Each gotcha is numbered, dated, and linked to the PR where it surfaced. Anti-pat
 4. If any divergence, reclassify as blocked-on-product and file an issue for the user UX decision
 
 **Where surfaced:** PR #68 (cluster #3) closed because 3 of 6 stubs had this issue.
-
-**Memory:** `g99_pre_migration_readiness_check.md`.
 
 ---
 
@@ -207,8 +201,6 @@ Zero production callers. Same posture as `OUTPOST_TESTING_PWA_SHELL`.
 
 **Where surfaced:** ShortcutDispatchTest cluster #7 attempt → seam shipped as PR #74 → cluster #7 migration as PR #75 (stacked on #74).
 
-**Memory:** `outpost_php_input_no_test_seam.md`.
-
 ---
 
 ## Gotcha #11 — Outpost loaded as muplugin in integration tests, not as activated plugin
@@ -274,8 +266,6 @@ platform_chips count: 10
 chips_for_mode(photo) count: 0      ← smoking gun
 ```
 
-**Memory:** `outpost_companion_active_plugins_test_env.md`.
-
 ---
 
 ## Gotcha #12 — `Outpost_Source_Registry::$bootstrapped` state drift between manual `do_action` and implicit `ensure_bootstrapped()`
@@ -323,9 +313,7 @@ Production-callers proof: `grep -rn "mark_bootstrapped_for_tests" includes/ outp
 
 Gotcha #12 is a **production-API contract gap** — the static-state coordination between `reset_for_tests()` and the post-action `$bootstrapped` flag was missing a complementary seam.
 
-**Where surfaced:** PR-Aux-5-diagnosis (#92, cluster A). Production fix PR-A3a (#98). Cascade-anticipation pattern that prevented later regressions: `feedback_anticipate_cascade.md` memory file (4 instances of the same shape across the recovery week — see `pr-aux-6-diagnosis.md` § "Diagnostic incompleteness — fourth instance recap").
-
-**Memory:** `outpost_source_registry_bootstrap_drift.md`.
+**Where surfaced:** PR-Aux-5-diagnosis (#92, cluster A). Production fix PR-A3a (#98). The same cascade shape showed up 4 times across the recovery week; `pr-aux-6-diagnosis.md` § "Diagnostic incompleteness — fourth instance recap" lists them.
 
 ---
 
@@ -404,10 +392,10 @@ The reset+replay restores the production source set; without cleanup, the fake s
 
 **When writing a new integration test:**
 
-1. Run the readiness check (a/b/c/d) per `g99_pre_migration_readiness_check.md`
+1. Run the readiness check (a/b/c/d) defined at the top of `docs/dev/g99-readiness-audit.md`
 2. Scan this doc for any pattern your SUT triggers (HTTP fetches → #1–#4, php://input → #10, halts → #9, etc.)
 3. Apply the relevant fixes preemptively
-4. If you discover a gotcha not listed here, file an 11th entry below with the same shape
+4. If you discover a gotcha not listed here, add it as gotcha #13 with the same shape
 
 **When reviewing an integration-test PR:**
 
