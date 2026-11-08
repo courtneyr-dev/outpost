@@ -17,7 +17,7 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 
 ## Reply to (or like, repost, bookmark) a page
 
-1. In the composer, switch to the Reply group and pick the response type: Reply, Like, Repost, or Bookmark.
+1. In the composer, switch to the **Reply** tab and pick the response type: Reply, Like, Favorite, Repost, Bookmark, RSVP, Follow, Wishlist, Tag, Acquisition, or Issue.
 2. Paste the URL you're responding to. The composer shows the target's context.
 3. Add your commentary (Reply and Bookmark), then post. The published post links back to the source with the right microformats (in-reply-to, like-of, repost-of).
 
@@ -48,26 +48,26 @@ What each kind of share becomes:
 
 ### iPhone and iPad
 
-iOS Safari doesn't support the Web Share Target API, so a web app can't join the share sheet by itself. Add a small Shortcut instead, one of two ways.
+iOS Safari doesn't support the Web Share Target API, so a web app can't join the share sheet by itself. Build a small Shortcut instead. It needs no token and opens the composer so you can review before posting.
 
-- **Guided:** in wp-admin, open **Settings → Outpost iOS Shortcut**. It provides a ready-made Shortcut and the token it needs. That Shortcut posts straight to your site through the token without opening the composer — use it when you don't want to review first. If the one-tap Shortcut link isn't published in your version yet, use the manual steps.
-- **Manual** (no token; opens the composer so you can review before posting):
-  1. Open the **Shortcuts** app and tap **+** to make a new Shortcut.
-  2. The first action reads *Receive … from Nowhere*. Tap **Nowhere** and choose **Share Sheet** — that's what makes the shortcut appear when you share. Then tap the types (it starts as *Images and 18 more*), clear them, and pick **URLs** and **Text**. (On older iOS this is the **Show in Share Sheet** toggle under the ⓘ details instead.)
-  3. Search for the action named **Open URLs** — not *Share*, which only reopens the share sheet — and add it. In its URL field type `https://your-site.example/post/share-target?url=` and, with the cursor at the very end, tap **Shortcut Input** in the variable bar above the keyboard, so the field reads `…share-target?url=[Shortcut Input]`. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
-  4. Tap the shortcut's name at the top, choose **Rename**, and call it **Post to Outpost**.
-  5. Test it: open any page in Safari, tap **Share**, and pick **Post to Outpost**. The composer opens on Reply with that link as the target.
-  6. Move it up the list: scroll to the bottom of the share sheet, tap **Edit Actions…**, tap the green **+** next to **Post to Outpost** to add it to Favorites, then drag it to the top with the **≡** handle and tap **Done**. It now sits near the top every time you share.
+The **Settings → Outpost iOS Shortcut** page in wp-admin is meant to offer a ready-made Shortcut that posts without opening the composer. In 1.0.24 its link isn't published yet, so use these steps.
 
-  "Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
+1. Open the **Shortcuts** app and tap **+** to make a new Shortcut.
+2. The first action reads *Receive … from Nowhere*. Tap **Nowhere** and choose **Share Sheet** — that's what makes the shortcut appear when you share. Then tap the types (it starts as *Images and 18 more*), clear them, and pick **URLs** and **Text**. (On older iOS this is the **Show in Share Sheet** toggle under the ⓘ details instead.)
+3. Search for the action named **Open URLs** — not *Share*, which only reopens the share sheet — and add it. In its URL field type `https://your-site.example/post/share-target?url=` and, with the cursor at the end, tap **Shortcut Input** in the variable bar above the keyboard, so the field reads `…share-target?url=[Shortcut Input]`. Sharing plain text rather than a link? Use `?text=` in place of `?url=`.
+4. Tap the shortcut's name at the top, choose **Rename**, and call it **Post to Outpost**.
+5. Test it: open any page in Safari, tap **Share**, and pick **Post to Outpost**. The composer opens on Reply with that link as the target.
+6. Move it up the list: scroll to the bottom of the share sheet, tap **Edit Actions…**, tap the green **+** next to **Post to Outpost** to add it to Favorites, then drag it to the top with the **≡** handle and tap **Done**. It now sits near the top every time you share.
 
-  **Photos, too.** The share sheet only offers a Shortcut that accepts the kind of thing you're sharing, so pictures get a second one. Make it exactly like the first, but keep **Images** as the accepted type and set its **Open URLs** action to `https://your-site.example/post/?mode=photo` with nothing after it (no Shortcut Input). Name it **Photo to Outpost**. Sharing a photo from your library then opens the composer on the Photo tab; pick the picture there and add alt text.
+"Post to Outpost" now appears in your share sheet. Choosing it opens the composer prefilled, using the sign-in you already have in the app.
 
-The composer's About tab carries the same directions with your site's address already filled in.
+**Photos, too.** The share sheet only offers a Shortcut that accepts the kind of thing you're sharing, so pictures get a second one. Make it exactly like the first, but keep **Images** as the accepted type and set its **Open URLs** action to `https://your-site.example/post/?mode=photo` with nothing after it (no Shortcut Input). Name it **Photo to Outpost**. Sharing a photo from your library then opens the composer on the Photo tab; pick the picture there and add alt text.
+
+The composer's **About** tab has the same directions, with your site's address already filled in, under **Post from anywhere: share sheet and bookmarklets**.
 
 ## Add the bookmarklets to your browser
 
-Outpost generates one bookmarklet per response type — Reply, Like, Repost, Bookmark — each pre-built with your site's URL. They're in two places: wp-admin → **Outpost** (the first Outpost menu), and the composer's **About** tab, which lists the same four with a copy button.
+Outpost generates one bookmarklet per response type — Reply, Like, Repost, Bookmark — each pre-built with your site's URL. They're in two places: wp-admin → **Outpost** (the first Outpost menu), and the composer's **About** tab under **Post from anywhere: share sheet and bookmarklets**, which lists the same four with a copy button.
 
 Install them the way your device handles bookmarks:
 
@@ -107,21 +107,33 @@ If lookup says a source is "not configured," add the relevant API key under Post
 3. Attach a photo if you have one — it becomes the post's featured image.
 4. Post. The recipe publishes as an h-recipe, and with the Post Kinds companion active it's classified as the recipe kind.
 
-## Write a long-form article
+## Write an article
 
-Choose the Article variant in the composer. Outpost hands off to the block editor (`/wp-admin/post-new.php`) — the composer is for fast posts; long-form stays in the editor.
+1. On the **Post** tab, choose **Article**.
+2. Enter a title and the body text.
+3. Tap **Post article**.
+
+The article publishes through Micropub like every other post, with a title and the Standard post format. For long pieces with images, headings, and layout, write in the block editor instead; anything you post from Outpost opens there for editing later.
+
+## Get your draft back after a reload
+
+You don't need to do anything. Each tab saves its unsent text to your device about half a second after you stop typing, and "Draft saved" appears under the form. When you reload, reopen the app, or sign in again as the same site, the text comes back with "Draft restored from this device. Nothing posts until you post it."
+
+What's kept: titles and body text, reply targets, the Doing, Life, and Recipe fields, and each photo's alt text and caption. Photos themselves aren't kept: add them again, and their descriptions fill back in, in order.
+
+A draft clears when you post it, when the post goes into the offline queue, or when you sign out. If your browser blocks storage or it's full, the composer says "This device can't keep drafts right now. Copy anything you want to keep." and keeps working without drafts.
 
 ## Change which variant the composer opens to
 
 1. Go to wp-admin → Outpost (first menu) and scroll to the Settings section.
-2. Set "Default Post variant" (Article, Note, Status, Aside, or Quote) and save. See [Settings](/outpost/settings/).
+2. Set **Default Post variant** (Article, Note, Status, Aside, or Quote) and save. See [Settings](/outpost/settings/#composer-defaults).
 
 ![Composer defaults form with Default Post variant, Bridgy auto-suggest, and Auto Post-Format inference fields](../../assets/screenshots/admin-settings-composer-defaults.png)
 
 ## Confirm a post syndicated
 
-- On the post itself, syndicated copies appear as links appended to the content ("Also on …" style `u-syndication` links).
-- In wp-admin → Posts, Outpost adds a syndication status column to the post list.
+- In wp-admin → **Posts**, Outpost adds a syndication status column to the post list. It's the quickest check.
+- In the post's HTML, Outpost adds a `u-syndication` link for each copy inside `<div class="outpost-syndication-links" hidden>`. Readers don't see it; Bridgy and other IndieWeb tools read it. To show the links, style `.outpost-syndication-links` in your theme. To stop Outpost adding them, return `false` from the `outpost_render_syndication_links` filter.
 
 ![Posts list showing the Outpost syndication status column](../../assets/screenshots/admin-syndication-column.png)
 
@@ -135,7 +147,10 @@ Just post — if the network is down, the draft queues on your device and Outpos
 
 1. Go to wp-admin → Outpost (first menu) → OAuth Connections.
 2. Click Connect next to the provider (Oura, WHOOP, Polar, Notion, Ride With GPS, Ravelry — as available) and approve access on the provider's site.
-3. Back in WordPress, the provider shows as connected. In the block editor, the Outpost sidebar offers a "fetch recent" picker to pull recent items from connected providers into a post.
+3. Back in WordPress, the provider shows as connected.
+4. In the block editor, open the **Outpost** sidebar and choose **Add from connected platforms** to pull a recent workout, sleep session, or recovery into the post. Oura, WHOOP, and Polar Flow feed this picker; Ravelry and Ride With GPS connect but aren't used by any feature yet. The phone composer doesn't have the picker.
+
+If the picker stops listing items from a service, disconnect and reconnect it: tokens aren't refreshed automatically in 1.0.24.
 
 ## Troubleshoot a post that didn't appear
 

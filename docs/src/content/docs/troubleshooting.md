@@ -11,19 +11,19 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Cause:** Outpost's full feature surface only turns on when both IndieAuth and Micropub are installed and active. IndieAuth comes first in the chain — Micropub itself requires it.
 
-**Fix:** follow the notice's install/activate link, or go to Plugins → Add New and install IndieAuth, then Micropub, from WordPress.org. Reload `/post` afterward.
+**Fix:** follow the notice's install/activate link, or go to **Plugins** → **Add New Plugin** and install IndieAuth, then Micropub, from WordPress.org. Reload `/post` afterward.
 
 **Check next:** if the notice says your WordPress or PHP version is too old, upgrade to WordPress 6.5+ / PHP 8.2+ — the version check runs before the dependency check.
 
-## Sign-in or lookups fail on managed hosting (GoDaddy and similar)
+## Sign-in or lookups fail on managed hosting
 
 **Symptom:** you can sign in, but posting returns "forbidden"/"unauthorized"; or the media lookup says "The lookup was rejected. Sign out and back in to refresh your token", or the More panel says "Couldn't load companion options — your sign-in may have expired", even after doing exactly that.
 
-**Cause:** some managed WordPress hosts (GoDaddy is the documented case) strip the `Authorization` HTTP header before it reaches PHP, so IndieAuth never sees your token. Hosts can also rewrite response status codes at their gateway, which used to make successful posts look like failures.
+**Cause:** some managed WordPress hosts strip the `Authorization` HTTP header before it reaches PHP, so IndieAuth never sees your token. GoDaddy's managed WordPress hosting is one confirmed case. Hosts can also rewrite response status codes at their gateway, which used to make successful posts look like failures.
 
 **Fix:** update Outpost. The plugin has shipped a series of workarounds (versions 0.1.105, 0.1.112, 0.1.113, and 1.0.5 in the changelog): tokens now also travel in the request body where hosts can't strip them — since 1.0.5 that includes the companion-options request behind the More panel (Yoast keyphrase, categories, tags, XFN) — and any 2xx response counts as success. If you still see the companion-options message on 1.0.5 or later, sign out and back in once so the app reloads. Signing out keeps posts waiting in the offline queue; once you're signed back in to the same site, Retry all now in the queue sends them.
 
-**Check next:** if you're on a managed host other than GoDaddy and still see auth failures on a current version, that host may need its own workaround — open an issue (below) with the host's name.
+**Check next:** if you still see auth failures on a current version, your host may need its own workaround. Open an issue (below) with the host's name.
 
 ## The composer said it posted, but there's no post
 
@@ -73,10 +73,34 @@ Symptoms, likely causes, and fixes for the problems Outpost users actually hit, 
 
 **Symptom:** after updating the plugin, the composer looks or behaves like the old version.
 
-**Cause:** aggressive page/CDN caching on the composer HTML. The plugin's own test docs note real-world caching pain on managed hosts with CDN layers.
+**Cause:** a page cache or CDN in front of your site is still serving the old composer HTML or scripts.
 
-**Fix:** clear your host/CDN cache and hard-reload the composer. As a PWA it also updates its service worker on reload.
+**Fix:** clear your host's page cache and your CDN cache, then reload the composer. As a PWA it also updates its service worker on reload. [Update Outpost](/outpost/update/#after-the-update) lists the post-update checks.
+
+## The API Keys tab shows an encryption-key error and no form
+
+**Symptom:** wp-admin → Outpost → Settings → API Keys shows "Outpost encryption key is not configured. Sensitive settings cannot be saved until the key is set." and nothing to fill in.
+
+**Cause:** the tab only shows its form once Outpost has a key for encrypting credentials, and a new site doesn't have one yet.
+
+**Fix:** define `OUTPOST_ENCRYPTION_KEY` in `wp-config.php` with the steps in [Settings → API Keys tab](/outpost/settings/#api-keys-tab), then reload the tab.
+
+## A connected service stopped showing recent activity
+
+**Symptom:** the block editor's **Add from connected platforms** picker used to list your Oura, WHOOP, or Polar Flow items and now lists none.
+
+**Cause:** the service's access token expired. Outpost 1.0.24 doesn't refresh tokens automatically.
+
+**Fix:** go to wp-admin → Outpost → **OAuth Connections**, select **Disconnect** next to the service, then **Connect** and approve access again.
+
+## The iOS Shortcut page says the link isn't published
+
+**Symptom:** wp-admin → Settings → Outpost iOS Shortcut reads "iCloud Shortcut link is not yet published. Check back after the next plugin release."
+
+**Cause:** the ready-made Shortcut isn't available in 1.0.24.
+
+**Fix:** build the Shortcut yourself in about two minutes with [Share to Outpost from your phone](/outpost/common-tasks/#iphone-and-ipad). It opens the composer and needs no token.
 
 ## When to open an issue
 
-If none of the above fits — or a documented fix doesn't work on a current version — open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues). Include your WordPress and PHP versions, your host, the composer mode you used, and the exact message you saw. For security problems, follow [SECURITY.md](https://github.com/courtneyr-dev/outpost/blob/main/docs/../SECURITY.md) instead of filing a public issue.
+If none of the above fits — or a documented fix doesn't work on a current version — open an issue at [github.com/courtneyr-dev/outpost/issues](https://github.com/courtneyr-dev/outpost/issues). Include your WordPress and PHP versions, your host, the composer mode you used, and the exact message you saw. For security problems, follow [SECURITY.md](https://github.com/courtneyr-dev/outpost/blob/main/SECURITY.md) instead of filing a public issue.

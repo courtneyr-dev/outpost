@@ -5,7 +5,7 @@ description: "Gallery of Outpost's documented screens, plus capture specificatio
 
 The screens Outpost adds to WordPress, captured from a fresh install. Every screenshot has a text equivalent in the page that documents the task, so you never need the image to follow the instructions.
 
-Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. The pending-syndication capture also came from a local wp-env site, against a post seeded with two pending share entries. One capture is still outstanding; its specification and the reason are at the end of this page.
+Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. The pending-syndication capture also came from a local wp-env site, against a post seeded with two pending share entries. Two captures are still outstanding; they are listed at the end of this page.
 
 ## Admin screens
 
@@ -19,11 +19,11 @@ The main **Outpost** admin page: per-variant bookmarklets and the phone install 
 
 ![Outpost Appearance page with the day/night mode choice and token override fields](../../assets/screenshots/admin-appearance-settings.png)
 
-**Outpost → Appearance**: choose the composer's day/night mode and override its design tokens. See [Settings](/outpost/settings/).
+**Outpost → Appearance**: choose Light, Dark, or System and override individual design tokens. This capture predates 1.0.24, so it doesn't show the **Style source** choice (Outpost Default or Use Site Theme) that now sits above them. See [Settings → Appearance](/outpost/settings/#appearance).
 
 ![OAuth Connections page listing providers with Connect actions](../../assets/screenshots/admin-oauth-connections.png)
 
-**Outpost → OAuth Connections**: connect Oura, WHOOP, Polar Flow, Ravelry, or Ride With GPS. Select **Connect** next to a provider to start its authorization flow. See [Supported services](/outpost/supported-services/).
+**Outpost → OAuth Connections**: connect Notion, Oura, WHOOP, Polar Flow, Ravelry, or Ride With GPS. Select **Connect** next to a provider to start its authorization flow. See [Supported services](/outpost/supported-services/).
 
 ![Outpost iOS Shortcut settings page with the per-user token controls](../../assets/screenshots/admin-ios-shortcut.png)
 
@@ -81,7 +81,10 @@ Install the composer like an app. After your first post, Outpost offers the Add 
 
 ## Screenshots still needed
 
-One capture remains, and it is blocked on code rather than on tooling: the composer-side paste-URL form. `SyndicationCaptureForm`, inside `SyndicationDetailView`, is built and tested, but nothing mounts it — it doesn't render anywhere in the running app. The pending-syndication reminder above links to the composer, but the form it links to isn't there yet. The row below is its specification for when it is (a phone-sized viewport, as with the other composer captures).
+Two captures are outstanding.
+
+- **Appearance with Style source.** Recapture `admin-appearance-settings.png` on 1.0.24 so it shows the Style source choice.
+- **The composer's paste-URL form.** This one is blocked on code, not tooling. `SyndicationCaptureForm` is built and tested and is used inside `SyndicationDetailView` and `PendingSyndicationsPanel`, but the composer mounts neither, so the form doesn't render in the running app. The pending-syndication reminder above links to the composer, but the form isn't there yet. The row below is its specification for when it is (a phone-sized viewport, as with the other composer captures).
 
 | Filename | Screen and state | What to highlight | Alt text | Caption |
 | --- | --- | --- | --- | --- |

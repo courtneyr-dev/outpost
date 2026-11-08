@@ -1,14 +1,13 @@
 # Outpost
 
 [![CI](https://github.com/courtneyr-dev/outpost/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/courtneyr-dev/outpost/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/courtneyr-dev/outpost)](https://github.com/courtneyr-dev/outpost/releases/latest)
 [![License](https://img.shields.io/badge/license-GPLv2%2B-blue.svg)](LICENSE)
 
 > *Post from your outpost. Reach your people everywhere.*
 
 Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Requires WordPress 6.5+ and PHP 8.2+; tested up to WordPress 7.1.
 
-**Status:** version 1.0.22. In review for the WordPress.org plugin directory; install from GitHub in the meantime.
+**Status:** version 1.0.24. Not yet in the WordPress.org plugin directory: install from this repository's `main` branch with the [installation guide](https://courtneyr-dev.github.io/outpost/installation/), and update with [Update Outpost](https://courtneyr-dev.github.io/outpost/update/).
 
 ## User documentation
 
@@ -17,6 +16,7 @@ Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Requires
 Key pages:
 
 - [Installation](https://courtneyr-dev.github.io/outpost/installation/) — GitHub install plus the required IndieAuth and Micropub plugins.
+- [Update Outpost](https://courtneyr-dev.github.io/outpost/update/) — move to a new version with git or a ZIP.
 - [Getting started](https://courtneyr-dev.github.io/outpost/getting-started/) — sign in, post a note from your phone, install to your home screen.
 - [Settings](https://courtneyr-dev.github.io/outpost/settings/) — composer defaults, API keys, appearance, OAuth connections.
 - [Troubleshooting](https://courtneyr-dev.github.io/outpost/troubleshooting/) — managed-host auth issues, offline queue, dependency notices.
@@ -26,7 +26,7 @@ The docs site builds from [`docs/`](docs/) with Astro Starlight — see [docs/MA
 
 ## What this is
 
-Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` (configurable). It's optimised for the post shapes IndieWeb people actually publish — quick notes, replies, likes, photos, and life-tracking entries — with one-tap syndication chips that default to **on** for every configured destination.
+Outpost is a WordPress plugin that ships a mobile-first PWA composer at `/post` on your own site. It's optimised for the post shapes IndieWeb people actually publish — quick notes, replies, likes, photos, and life-tracking entries — with one-tap syndication chips that default to **on** for every configured destination.
 
 Every kind that [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-kinds-for-indieweb) registers is postable from the composer, grouped into six tabs:
 
@@ -45,11 +45,11 @@ When the Post Kinds companion is active, the composer also names the kind explic
 
 **What Outpost writes:** posts — the standard `post` type. Not pages, not custom post types (the Micropub plugin's filters decide any routing), not comments; a Reply is an h-entry on your own site that links to the page you're replying to. How each post gets its format, which IndieWeb specs it's built on, and what XFN adds are explained in [How Outpost shapes a post](https://courtneyr-dev.github.io/outpost/how-outpost-shapes-a-post/).
 
-**Share sheet:** installed as an app on Android (or desktop Chrome/Edge), Outpost registers as a Web Share Target — a shared link opens a Reply, shared text a Note, a title plus text an Article, and a shared photo the Photo tab with the picture attached. iOS Safari has no share-target API, so iPhone and iPad use a Shortcut: the guided one from wp-admin **Settings → Outpost iOS Shortcut** posts through a scoped token without opening the composer; a manual one opens the composer so you can review first. Six steps for the manual one: (1) Shortcuts app → **+**; (2) in the first action tap **Nowhere** → **Share Sheet**, and set the types to **URLs** and **Text**; (3) add the **Open URLs** action — not *Share* — with the URL `https://your-site/post/share-target?url=` and **Shortcut Input** inserted at the end; (4) rename it **Post to Outpost**; (5) share any page from Safari and pick it — the composer opens on Reply with that link; (6) to keep it near the top of the share sheet, scroll to the sheet's bottom, tap **Edit Actions…**, tap the green **+** by **Post to Outpost** to add it to Favorites, drag it up, and tap **Done**. Photos get a second Shortcut: the same steps, but keep **Images** as the type and set **Open URLs** to `https://your-site/post/?mode=photo` with nothing after it, named **Photo to Outpost**. The composer's About tab has the same steps with your site's address filled in; the full walkthrough is in [Common tasks](https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone).
+**Share sheet:** installed as an app on Android (or desktop Chrome/Edge), Outpost registers as a Web Share Target — a shared link opens a Reply, shared text a Note, a title plus text an Article, and a shared photo the Photo tab with the picture attached. iOS Safari has no share-target API, so iPhone and iPad use a Shortcut you build in the Shortcuts app. It opens the composer so you can review first and needs no token. (wp-admin's **Settings → Outpost iOS Shortcut** page is meant to offer a ready-made one, but its link isn't published in 1.0.24.) The six steps: (1) Shortcuts app → **+**; (2) in the first action tap **Nowhere** → **Share Sheet**, and set the types to **URLs** and **Text**; (3) add the **Open URLs** action — not *Share* — with the URL `https://your-site/post/share-target?url=` and **Shortcut Input** inserted at the end; (4) rename it **Post to Outpost**; (5) share any page from Safari and pick it — the composer opens on Reply with that link; (6) to keep it near the top of the share sheet, scroll to the sheet's bottom, tap **Edit Actions…**, tap the green **+** by **Post to Outpost** to add it to Favorites, drag it up, and tap **Done**. Photos get a second Shortcut: the same steps, but keep **Images** as the type and set **Open URLs** to `https://your-site/post/?mode=photo` with nothing after it, named **Photo to Outpost**. The composer's About tab has the same steps with your site's address filled in; the full walkthrough is in [Common tasks](https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone).
 
 **standard.site:** with the Post Kinds companion, Outpost's posts adhere to the standard.site spec on the AT Protocol. Cited pages' `site.standard.document` records are read into citation cards with no setup, and with ATmosphere connected your own posts publish as documents under Post Kinds' kind rules — public content and logs by default, privacy-sensitive kinds opt-in. Details: [How Outpost shapes a post](https://courtneyr-dev.github.io/outpost/how-outpost-shapes-a-post/).
 
-It works standalone with the [Micropub plugin](https://wordpress.org/plugins/micropub/) (required) and lights up additional capabilities when companion plugins are also active. No Jetpack, no app store, no third-party auth.
+It needs two plugins, [IndieAuth](https://wordpress.org/plugins/indieauth/) and [Micropub](https://wordpress.org/plugins/micropub/), and adds features when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
 | ![Outpost composer on a phone showing Note mode with a text field and syndication chips](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode showing the pasted target URL context](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a queued draft badge](docs/src/assets/screenshots/frontend-offline-queue.png) |
 |---|---|---|
@@ -68,7 +68,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 | Companion | When active |
 |-----------|-------------|
 | [Micropub](https://wordpress.org/plugins/micropub/) (David Shanske) | **Required.** Server endpoint. |
-| [IndieAuth](https://wordpress.org/plugins/indieauth/) | Auth provider. Falls back to application passwords. |
+| [IndieAuth](https://wordpress.org/plugins/indieauth/) | **Required.** Signs you in to the composer with your site's address. Install it before Micropub, which also needs it. |
 | [Post Kinds for IndieWeb in Block Themes](https://github.com/courtneyr-dev/post-kinds-for-indieweb) | Kind classification for every composer entry (explicit `pkiw-kind` hint), media "Look it up" search, and card rendering. Reads standard.site records behind cited pages; with ATmosphere, decides which kinds publish as standard.site documents. |
 | [Post Formats for Block Themes](https://github.com/courtneyr-dev/post-formats-for-block-themes) | Format selector + auto-detection. |
 | [Link Extension for XFN](https://github.com/courtneyr-dev/link-extension-for-xfn) | Relationship picker on reply targets. |
@@ -85,7 +85,6 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 **rss.chat.** [rss.chat](https://rss.chat) is a chat network built on RSS: your site publishes a post to it, people reply there, and the replies come back to your post as comments. Matthias Pfefferle's [RSS Chat plugin](https://github.com/pfefferle/wordpress-rss-chat) does the sending; on its own it sends only posts carrying the core *chat* post format. [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) chooses which posts go instead — by default post format, default Post Kind, or per post — and brings replies home as verified Webmentions. With it active, the composer's More panel adds the same per-post choice, **Send to rss.chat** (Site default, Include in RSS Chat, or Exclude from RSS Chat), sent as `mp-rss-chat-routing`, so you can opt a post in or out from the app without opening the editor.
 
 **ATmosphere.** [ATmosphere](https://wordpress.org/plugins/atmosphere/) (Automattic) makes your site a first-class citizen of the AT Protocol, the open network behind Bluesky. When a post is published it shares it on Bluesky — a short post, or a thread that links back to a long article — and stores the full article on your own AT Protocol account as a standard.site document (the community `site.standard.*` lexicons for blogs and articles), so any app that understands that schema can read it. Bluesky replies, likes, and reposts come back as WordPress comments, and your own domain can become your Bluesky handle. Outpost doesn't detect ATmosphere or add a chip for it: everything you post from the composer is an ordinary published post, so ATmosphere cross-posts it exactly as it would a post from the editor. Two things to know: opting a single post out is done from the block editor sidebar, not from the composer; and if ATmosphere is connected, leave the **Bluesky via Bridgy** chip off, or the same post can reach Bluesky twice. With Post Kinds active, Post Kinds decides which kinds publish by default and derives readable titles for untitled ones, so posts from Outpost follow the standard.site rules.
-| ActivityPub / Bridgy | Surface as syndication chips automatically. |
 
 ## The hard contract
 
@@ -120,26 +119,17 @@ composer test           # PHPUnit
 composer lint           # PHPCS (WordPress-Extra)
 composer lint:section5  # §5 audit (case-study leak / credential / instance / i18n)
 composer analyze        # PHPStan
+npm test                # Vitest (PWA)
 npm run lint            # ESLint
-npm run test:e2e        # Playwright
+npm run wp-env:start    # Local WordPress at localhost:8888 (needs Docker)
+npm run test:integration # Integration suite inside wp-env
 ```
 
-See `CLAUDE.md` for the development conventions and session-based build plan, and `CONTRIBUTING.md` for the §5 audit lint that runs in CI on every PR.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup, tests, CI, and coding standards; [`docs/RELEASING.md`](docs/RELEASING.md) covers cutting a release.
 
-## Status & roadmap
+## Status
 
-Outpost is being built across ~40 small, atomic sessions, each scoped to a specific deliverable. Phases:
-
-- **A — Foundation** (slug, scaffold, companion detector, routes)
-- **B — Auth and Micropub** (IndieAuth, Micropub client, server-side mf2 preview)
-- **C — Composer modes** (Note → Reply → Photo → Listen group → Article → More pull-out)
-- **D — PWA polish** (manifest, service worker, offline queue, voice, iOS safe-area)
-- **E — Share-sheet and bookmarklets** (Web Share Target, iOS Shortcut, multi-action bookmarklet generator, Bridgy auto-suggest)
-- **F — Companions** (adapters)
-- **G — Security** (token hardening, CSP, file-upload, rate-limit, URL validation, pen test)
-- **H — Settings and onboarding**
-- **I — Distribution** (WordPress.org submission)
-- **J — Documentation and launch**
+Outpost is at version 1.0.24. [`CHANGELOG.md`](CHANGELOG.md) lists every release, and [open issues](https://github.com/courtneyr-dev/outpost/issues) track known problems and planned work.
 
 ## Support
 
