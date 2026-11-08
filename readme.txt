@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.23
+Stable tag:        1.0.24
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -236,6 +236,17 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
 
+= 1.0.24 =
+* New: the Outpost Default design, in light and dark. Each person picks Outpost Default or Use Site Theme in the composer's Settings sheet or on Outpost → Appearance, separately from Light, Dark, or System.
+* New: a header with the Outpost signpost, the connected site, a Light / Dark / System shortcut, and a settings button.
+* New: About starts with your site, connection state, Micropub and IndieAuth status, and the plugin version.
+* New: unsent text survives a reload and a fresh sign-in. Drafts reopen only for the same signed-in site, never post on their own, and clear after you publish or sign out.
+* Changed: people who used Outpost before 1.0.24 keep Use Site Theme until they choose otherwise. New installs start on Outpost Default and System.
+* Changed: Use Site Theme now reaches the installed app, and its colors are checked against WCAG 2.2 AA contrast.
+* Fixed: composer text no longer falls back to the browser's serif font.
+* Fixed: saving the appearance mode you already had no longer returns an error.
+* Fixed: closing a drawer no longer leaves keyboard focus inside it.
+
 = 1.0.23 =
 * Fixed: several color combinations that were hard to read — the over-limit character counter and the offline-queue error message in dark ("night") mode, the focus outline on light backgrounds, white text on an orange background on result buttons (location and media lookups), field borders in dark mode, and tab text on the washi-tape strip in dark mode.
 * Fixed: status and error messages under each composer form (Note, Reply, Photo, Doing, Life, Recipe) now announce reliably to screen readers, including iOS VoiceOver, instead of sometimes going unannounced.
@@ -358,6 +369,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
+
+= 1.0.24 =
+New Outpost Default design and drafts that survive a reload. If you used Outpost before this update, you keep your site's theme colors until you choose otherwise.
 
 = 1.0.22 =
 Security release. Apps that post through Outpost's endpoints with an IndieAuth token need the create or update permission. Posts queued offline before this update send with your current sign-in.
