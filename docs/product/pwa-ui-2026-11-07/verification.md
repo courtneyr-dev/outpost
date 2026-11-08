@@ -26,7 +26,7 @@ Evidence for [the implementation brief](implementation-brief.md). States are kep
 | `npm run build` | pass — JS 50.1 kB gzip (was 44.4), CSS 7.6 kB gzip (was 6.5) |
 | `npm run test:integration` | not run as written: the script's `--env-cwd=wp-content/plugins/outpost` doesn't match this worktree's mount name. Run with `--env-cwd=wp-content/plugins/outpost-pwa-ui`: 185 tests, 129 passed, 32 skipped, 56 errors/failures, all in mock-backed classes that can't reach the WireMock sidecar (`host.docker.internal:8080`). WireMock wasn't started locally (disk full). CI runs it with the sidecar. |
 | `npm run test:e2e` | fail — "No tests found": `tests/e2e/` holds only `.gitkeep`, so Playwright collects vitest files. Pre-existing; CI doesn't run e2e. |
-| docs site build | skipped — needs a separate `docs/` install; the volume had under 500 MB free. The six About help URLs each returned HTTP 200. |
+| docs site build | skipped locally — needs a separate `docs/` install; the volume had under 500 MB free. CI's "Docs" workflow passed at `a94eb54` ([run 42435035738](https://github.com/courtneyr-dev/outpost/actions/runs/42435035738)). The six About help URLs each returned HTTP 200. |
 
 ## CI
 

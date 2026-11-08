@@ -13,7 +13,7 @@ No external review has been received yet. The entries below are findings from Cl
 | S5 | The 5-unit outline stroke rendered at 0.47 CSS px at 24 px. | [signpost-light.png](evidence/signpost-light.png) before the fix. | Fixed in `eedb13c`: stroke held at ≥ 1.5 CSS px, coordinates unchanged; signpost test. |
 | S6 | Radios drawn as background SVGs were near-invisible on dark tiles. | Dark capture before the fix. | Fixed in `6b611e1`: native radios with `accent-color`, `--plain` selector kept. |
 | S7 | A file input overflowed its row in Doing. | Light Doing capture before the fix. | Fixed in `6923c90`. |
-| S9 | Tab from page load skipped the header controls and the tab strip and landed on the first Post field. `scrollIntoView()` on the selected tab at mount moved the browser's sequential-focus starting point. | Playwright: Tab 1 → `outpost-note-variant`; Shift+Tab showed the header was reachable backward. | Fixed: no scroll on first render, strip-only `scrollTo` afterward. Tab 1 now reaches the header mode group. |
+| S9 | Tab from page load skipped the header controls and the tab strip and landed on the first Post field. `scrollIntoView()` on the selected tab at mount moved the browser's sequential-focus starting point. | Playwright: Tab 1 → `outpost-note-variant`; Shift+Tab showed the header was reachable backward. | Fixed in `b20acbb`: no scroll on first render, strip-only `scrollTo` afterward. Tab 1 now reaches the header mode group. |
 | S8 | With overrides under Outpost Default, the FY rule darkens the orange accent to `#e27700`. | REST response `colors.accent`. | Unresolved — listed as a risk in [review-request.md](review-request.md); changing the FY rule is a separate decision. |
 
 ## Reviewer findings
