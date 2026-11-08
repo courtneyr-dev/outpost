@@ -15,6 +15,8 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { useMoodSuggestions, type MoodsEnvironment } from '../../lib/pkiw-moods';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -130,6 +132,10 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 
 const VARIANT_ORDER: Variant[] = ['mood', 'weather', 'sleep', 'trip', 'itinerary', 'question'];
 
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
 type Status =
 	| { kind: 'idle' }
 	| { kind: 'discovering-endpoint' }
@@ -156,16 +162,30 @@ function consume_share_target_for_life(): { variant?: Variant; content?: string 
 
 export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeModeProps) {
 	const initial_share = consume_share_target_for_life();
-	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'mood');
-	const [title, setTitle] = useState('');
-	const [primary_value, setPrimaryValue] = useState('');
-	const [content, setContent] = useState(initial_share.content ?? '');
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		initial_share.variant || initial_share.content ? null : read_draft('life', token.me),
+	);
+	const draft_variant = draft?.meta.variant;
+	const [variant, setVariant] = useState<Variant>(
+		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'mood'),
+	);
+	const [title, setTitle] = useState(draft_text(draft?.fields.title));
+	const [primary_value, setPrimaryValue] = useState(draft_text(draft?.fields.primary));
+	const [content, setContent] = useState(initial_share.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'life',
+		me: token.me,
+		fields: { title, primary: primary_value, content, venue: venue_name },
+		meta: { variant },
+		restored: draft !== null,
+	});
 
 	const config = VARIANTS[variant];
 	const mood_suggestions = useMoodSuggestions(
@@ -218,6 +238,7 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 				micropubEnv,
 			);
 			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			saved_draft.discard();
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 				setPrimaryValue('');
@@ -402,6 +423,8 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
