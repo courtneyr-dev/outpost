@@ -85,6 +85,11 @@ final class Outpost_Mode_Controller {
 		if ( ! in_array( $normalized, self::VALID_MODES, true ) ) {
 			return false;
 		}
+		// update_user_meta() returns false when the value is unchanged;
+		// saving the mode a person already has is a success, not a 400.
+		if ( get_user_meta( $user_id, self::META_KEY, true ) === $normalized ) {
+			return true;
+		}
 		$result = update_user_meta( $user_id, self::META_KEY, $normalized );
 		return false !== $result;
 	}

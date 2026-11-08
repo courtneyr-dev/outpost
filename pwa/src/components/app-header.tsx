@@ -13,6 +13,7 @@ export interface AppHeaderProps {
 	onMode: (mode: AppearanceMode) => void;
 	onOpenSettings: () => void;
 	settingsOpen: boolean;
+	settingsButtonRef?: { current: HTMLButtonElement | null };
 }
 
 export const MODE_OPTIONS: ReadonlyArray<{ id: AppearanceMode; label: string }> = [
@@ -57,7 +58,14 @@ export function ModeIcon({ mode }: { mode: AppearanceMode }): preact.JSX.Element
 	);
 }
 
-export function AppHeader({ siteHost, mode, onMode, onOpenSettings, settingsOpen }: AppHeaderProps): preact.JSX.Element {
+export function AppHeader({
+	siteHost,
+	mode,
+	onMode,
+	onOpenSettings,
+	settingsOpen,
+	settingsButtonRef,
+}: AppHeaderProps): preact.JSX.Element {
 	return (
 		<header class="outpost-app-header">
 			<div class="outpost-app-header__identity">
@@ -88,6 +96,7 @@ export function AppHeader({ siteHost, mode, onMode, onOpenSettings, settingsOpen
 					))}
 				</fieldset>
 				<button
+					{...(settingsButtonRef ? { ref: settingsButtonRef } : {})}
 					type="button"
 					class="outpost-icon-button"
 					aria-haspopup="dialog"

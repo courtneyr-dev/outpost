@@ -31,10 +31,12 @@ final class ModeControllerTest extends \WP_Mock\Tools\TestCase {
 				return $single ? $value : array( $value );
 			}
 		);
+		// Like WordPress: false when the stored value is unchanged.
 		WP_Mock::userFunction( 'update_user_meta' )->andReturnUsing(
 			function ( int $user_id, string $key, $value ): bool {
+				$changed                             = ( $this->user_meta[ $user_id ][ $key ] ?? null ) !== $value;
 				$this->user_meta[ $user_id ][ $key ] = $value;
-				return true;
+				return $changed;
 			}
 		);
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturnUsing(
@@ -87,6 +89,14 @@ final class ModeControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_set_mode_persists_valid_value(): void {
 		$this->assertTrue( Outpost_Mode_Controller::set_mode( 42, 'night' ) );
 		$this->assertSame( 'night', $this->user_meta[42][ Outpost_Mode_Controller::META_KEY ] );
+	}
+
+	public function test_set_mode_saving_the_current_value_succeeds(): void {
+		// update_user_meta() returns false for an unchanged value; that used
+		// to surface as a 400 "Invalid mode_preference" on a repeat save.
+		$this->assertTrue( Outpost_Mode_Controller::set_mode( 42, 'night' ) );
+		$this->assertTrue( Outpost_Mode_Controller::set_mode( 42, 'night' ) );
+		$this->assertSame( 'night', Outpost_Mode_Controller::get_mode( 42 ) );
 	}
 
 	public function test_set_mode_normalizes_input(): void {

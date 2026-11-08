@@ -126,6 +126,13 @@ export function ComposerTabs({
 		...(appearanceEnv ? { env: appearanceEnv } : {}),
 	});
 	const [settings_open, setSettingsOpen] = useState(false);
+	// Making the composer inert blurs the settings button before the
+	// drawer can record it, so focus goes back explicitly on close.
+	const settings_button = useRef<HTMLButtonElement | null>(null);
+	const close_settings = (): void => {
+		setSettingsOpen(false);
+		requestAnimationFrame(() => settings_button.current?.focus());
+	};
 	// Initial tab respects an in-flight share-target intake when present.
 	// peek_share_target() doesn't clear sessionStorage — the targeted mode
 	// drains it via consume_share_target() during its own mount.
@@ -360,6 +367,7 @@ export function ComposerTabs({
 					onMode={appearance.setMode}
 					onOpenSettings={(): void => setSettingsOpen(true)}
 					settingsOpen={settings_open}
+					settingsButtonRef={settings_button}
 				/>
 				<InstallPrompt />
 				{config_error && (
@@ -446,7 +454,7 @@ export function ComposerTabs({
 			</div>
 			<SettingsSheet
 				open={settings_open}
-				onClose={(): void => setSettingsOpen(false)}
+				onClose={close_settings}
 				mode={appearance.state.mode}
 				source={appearance.state.source}
 				status={appearance.status}

@@ -73,6 +73,9 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 	const state_ref = useRef(state);
 	state_ref.current = state;
 	const [attempt, setAttempt] = useState(0);
+	// True while a request is out; a reconnect then waits for it instead
+	// of sending a duplicate.
+	const in_flight = useRef(false);
 
 	const scheme = effective_scheme(state.mode, dark);
 
@@ -115,7 +118,11 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 		const local = state_ref.current;
 		const pending = local.pending;
 		if (pending) setStatus({ kind: 'saving' });
+		in_flight.current = true;
 		sync_appearance(accessToken, pending ?? {}, env)
+			.finally(() => {
+				in_flight.current = false;
+			})
 			.then((server) => {
 				if (cancelled) return;
 				// A choice made while this request was in flight wins.
@@ -143,7 +150,7 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 	// Reconnecting retries a pending save.
 	useEffect(() => {
 		const on_online = (): void => {
-			if (state_ref.current.pending) setAttempt((n) => n + 1);
+			if (state_ref.current.pending && !in_flight.current) setAttempt((n) => n + 1);
 		};
 		window.addEventListener('online', on_online);
 		return (): void => window.removeEventListener('online', on_online);

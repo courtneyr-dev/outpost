@@ -146,6 +146,7 @@ export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps
 				aria-modal="true"
 				aria-labelledby={title_id}
 				tabIndex={-1}
+				inert={!open}
 			>
 				<header class="outpost-drawer__header">
 					<h2 id={title_id} class="outpost-drawer__title">
