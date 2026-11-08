@@ -446,6 +446,29 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 		$this->assertContains( 'accent', $saved['bypass_contrast'] );
 	}
 
+	public function test_handle_save_persists_style_source_without_touching_mode(): void {
+		$_POST = array(
+			Outpost_Appearance_Settings_Page::NONCE_NAME => 'nonce-stub',
+			'style_source'                               => 'site',
+		);
+
+		Outpost_Appearance_Settings_Page::handle_save();
+
+		$this->assertSame( 'site', $this->user_meta[ $this->current_user_id ]['outpost_appearance_source'] );
+		$this->assertArrayNotHasKey( 'outpost_appearance_mode', $this->user_meta[ $this->current_user_id ] );
+	}
+
+	public function test_handle_save_rejects_unknown_style_source(): void {
+		$_POST = array(
+			Outpost_Appearance_Settings_Page::NONCE_NAME => 'nonce-stub',
+			'style_source'                               => 'forest',
+		);
+
+		Outpost_Appearance_Settings_Page::handle_save();
+
+		$this->assertArrayNotHasKey( 'outpost_appearance_source', $this->user_meta[ $this->current_user_id ] ?? array() );
+	}
+
 	public function test_handle_save_with_invalid_color_returns_error_notice(): void {
 		$_POST = array(
 			Outpost_Appearance_Settings_Page::NONCE_NAME => 'nonce-stub',

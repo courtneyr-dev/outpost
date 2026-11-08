@@ -63,8 +63,9 @@ final class Outpost_Appearance_Settings_Page {
 		}
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = Outpost_Mode_Controller::get_mode( $user_id );
-		$day       = Outpost_Token_Resolver::resolve( $user_id, 'day' );
-		$night     = Outpost_Token_Resolver::resolve( $user_id, 'night' );
+		$source    = Outpost_Style_Source::get_source( $user_id );
+		$day       = Outpost_Token_Resolver::resolve( $user_id, 'day', $source );
+		$night     = Outpost_Token_Resolver::resolve( $user_id, 'night', $source );
 
 		?>
 		<div class="wrap outpost-appearance-wrap">
@@ -72,15 +73,31 @@ final class Outpost_Appearance_Settings_Page {
 
 			<?php self::render_admin_notice(); ?>
 
-			<p><?php esc_html_e( 'Customize how the Outpost composer paints itself. Color and font defaults inherit from your active theme; you can override any individual token below. Day/night mode is a per-user preference — two contributors on the same site can have different settings.', 'outpost-mobile-publishing' ); ?></p>
+			<p><?php esc_html_e( 'Choose how the Outpost composer looks for you. Style source picks where colors and fonts come from: the built-in Outpost Default design, or your active theme. Appearance picks Light, Dark, or System. Both are per-user, and the composer\'s own Settings sheet changes the same values. You can also override individual tokens below.', 'outpost-mobile-publishing' ); ?></p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="outpost-appearance-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ACTION ); ?>">
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 
-				<h2><?php esc_html_e( 'Mode', 'outpost-mobile-publishing' ); ?></h2>
+				<h2><?php esc_html_e( 'Style source', 'outpost-mobile-publishing' ); ?></h2>
+				<fieldset class="outpost-appearance-source">
+					<legend class="screen-reader-text"><?php esc_html_e( 'Style source', 'outpost-mobile-publishing' ); ?></legend>
+					<?php foreach ( self::source_options() as $value => $label ) : ?>
+						<label class="outpost-appearance-mode__option">
+							<input
+								type="radio"
+								name="style_source"
+								value="<?php echo esc_attr( $value ); ?>"
+								<?php checked( $source, $value ); ?>
+							>
+							<?php echo esc_html( $label ); ?>
+						</label>
+					<?php endforeach; ?>
+				</fieldset>
+
+				<h2><?php esc_html_e( 'Appearance', 'outpost-mobile-publishing' ); ?></h2>
 				<fieldset class="outpost-appearance-mode">
-					<legend class="screen-reader-text"><?php esc_html_e( 'Day / night mode preference', 'outpost-mobile-publishing' ); ?></legend>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Light, Dark, or System', 'outpost-mobile-publishing' ); ?></legend>
 					<?php foreach ( self::mode_options() as $value => $label ) : ?>
 						<label class="outpost-appearance-mode__option">
 							<input
@@ -147,6 +164,7 @@ final class Outpost_Appearance_Settings_Page {
 
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( (string) $_POST['mode_preference'] ) ) : '';
+		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( (string) $_POST['style_source'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
 			? array_keys( array_filter( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) ) )
@@ -156,6 +174,7 @@ final class Outpost_Appearance_Settings_Page {
 
 		$payload = array(
 			'mode_preference' => $mode_pref,
+			'style_source'    => $source_in,
 			'bypass_contrast' => $bypass_in,
 		);
 		foreach ( array( 'day', 'night' ) as $mode ) {
@@ -462,9 +481,17 @@ final class Outpost_Appearance_Settings_Page {
 	/** @return array<string,string> */
 	private static function mode_options(): array {
 		return array(
-			Outpost_Mode_Controller::MODE_SYSTEM => __( 'Match system', 'outpost-mobile-publishing' ),
-			Outpost_Mode_Controller::MODE_DAY    => __( 'Always day', 'outpost-mobile-publishing' ),
-			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Always night', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_DAY    => __( 'Light', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Dark', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_SYSTEM => __( 'System', 'outpost-mobile-publishing' ),
+		);
+	}
+
+	/** @return array<string,string> */
+	private static function source_options(): array {
+		return array(
+			Outpost_Style_Source::SOURCE_OUTPOST => __( 'Outpost Default', 'outpost-mobile-publishing' ),
+			Outpost_Style_Source::SOURCE_SITE    => __( 'Use Site Theme', 'outpost-mobile-publishing' ),
 		);
 	}
 

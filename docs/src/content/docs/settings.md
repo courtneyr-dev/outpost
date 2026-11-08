@@ -39,12 +39,21 @@ If a tab shows "No settings registered for this tab yet," no destination has add
 
 ## Appearance
 
-**Location:** wp-admin → Outpost (first menu) → Appearance. Available to anyone who can edit posts.
+You can change appearance in two places, and both change the same per-user settings:
 
-The "Outpost Appearance" page controls how the composer paints itself:
+- In the composer: tap the gear button at the top right to open **Settings**, or use the Light / Dark / System buttons next to it.
+- In wp-admin: Outpost (first menu) → **Appearance**. Available to anyone who can edit posts.
 
-- **Mode** — a day/night preference. This is per-user: two contributors on the same site can pick different modes.
-- **Token overrides** — colors and fonts inherit from your active theme; you can override individual design tokens here.
+Two independent choices:
+
+- **Style source** — **Outpost Default** is the built-in design: warm paper, violet ink, and orange actions, with a violet dark scheme. **Use Site Theme** uses your active theme's colors and fonts instead. Outpost checks the theme's text, button, link, border, and focus colors against WCAG AA contrast and adjusts any that fall short. If your theme has no dark style variation, Dark keeps Outpost's dark surfaces and uses your theme's accent and fonts.
+- **Appearance** — **Light** and **Dark** always show that scheme. **System** follows your phone or computer setting and switches while Outpost is open.
+
+New people start on Outpost Default and System. If you used Outpost before version 1.0.24, you stay on Use Site Theme, which is what you saw before, until you pick another style source.
+
+A choice you make while offline applies on that device right away, and Outpost saves it to your site the next time it connects. The Settings sheet says when a choice is saved only on the device.
+
+The wp-admin page also has **Token overrides**: set an individual color or font for Light or Dark. Overrides apply under either style source.
 
 ## OAuth Connections
 

@@ -69,6 +69,13 @@
 	font-size: 0.9rem;
 }
 
+/* Fields never exceed their row, file inputs included. */
+.outpost-input,
+.outpost-textarea {
+	box-sizing: border-box;
+	max-width: 100%;
+}
+
 .outpost-input {
 	min-height: 2.75rem;
 	padding: 0.5rem 0.75rem;
