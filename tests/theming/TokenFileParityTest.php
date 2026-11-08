@@ -80,6 +80,7 @@ final class TokenFileParityTest extends \WP_Mock\Tools\TestCase {
 			array( 'tab-fg', 'surface-bg', 4.5 ),
 			array( 'link', 'surface-bg', 4.5 ),
 			array( 'link', 'card-bg', 4.5 ),
+			array( 'button-primary-fg-disabled', 'button-primary-bg-disabled', 4.5 ),
 			array( 'error-fg', 'error-bg', 4.5 ),
 			array( 'success-fg', 'success-bg', 4.5 ),
 			array( 'warning-fg', 'warning-bg', 4.5 ),

@@ -240,6 +240,7 @@ describe('ComposerTabs: composer-config notice', () => {
 				tokenStore={mock_token_store()}
 				composerConfigEnv={env}
 				queueEnv={{ indexedDB: new IDBFactory() }}
+				appearanceEnv={{ fetch: () => Promise.reject(new TypeError('offline')) }}
 			/>,
 			root,
 		);
@@ -318,11 +319,26 @@ describe('ComposerTabs: composer-config notice', () => {
 		const { env, calls } = config_site([rejected, loaded]);
 		mount_with(env);
 		await vi.waitFor(() => expect(notice()).not.toBeNull());
-		expect(notice_buttons()).toEqual(['Sign out + back in']);
+		expect(notice_buttons()).toEqual(['Sign in again']);
+		expect(notice()?.textContent).toContain('sign-in expired');
 
 		window.dispatchEvent(new Event('online'));
 		await new Promise((resolve) => setTimeout(resolve, 30));
 		expect(calls()).toBe(1);
 		expect(notice()).not.toBeNull();
+	});
+
+	it('treats a 403 as a permission limit, not an expired sign-in, and does not retry it', async () => {
+		const forbidden = (): Promise<Response> => Promise.resolve(new Response('{}', { status: 403 }));
+		const { env, calls } = config_site([forbidden, loaded]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		expect(notice()?.textContent).not.toContain('expired');
+		expect(notice()?.textContent).toContain("didn't allow");
+		expect(notice_buttons()).toEqual([]);
+
+		window.dispatchEvent(new Event('online'));
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		expect(calls()).toBe(1);
 	});
 });

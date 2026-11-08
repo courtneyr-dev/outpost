@@ -262,7 +262,7 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 				Life
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Log your mood, weather, sleep, a trip, an itinerary, or a question.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>

@@ -82,10 +82,13 @@ describe('fetch_composer_config', () => {
 		});
 	});
 
-	it('throws unauthorized on 403', async () => {
+	it('throws forbidden on 403, distinct from an expired sign-in', async () => {
+		// A 403 is a scope, capability, or nonce refusal; re-signing in
+		// doesn't fix it, so the composer must not tell the person their
+		// sign-in expired.
 		const env = mock_env({ ok: false, status: 403 });
 		await expect(fetch_composer_config('test-token', env)).rejects.toMatchObject({
-			code: 'unauthorized',
+			code: 'forbidden',
 		});
 	});
 

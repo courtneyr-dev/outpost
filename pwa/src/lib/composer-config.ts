@@ -62,7 +62,7 @@ const default_env: ComposerConfigEnvironment = {
 export class ComposerConfigError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'unauthorized' | 'fetch_failed' | 'invalid_response',
+		public readonly code: 'unauthorized' | 'forbidden' | 'fetch_failed' | 'invalid_response',
 	) {
 		super(message);
 		this.name = 'ComposerConfigError';
@@ -116,11 +116,14 @@ export async function fetch_composer_config(
 		);
 	}
 
-	if (response.status === 401 || response.status === 403) {
-		throw new ComposerConfigError(
-			'fetch_composer_config: unauthorized (' + String(response.status) + ')',
-			'unauthorized',
-		);
+	// 401: the site no longer accepts the token (expired or revoked).
+	// 403: the token is valid but lacks a scope or capability, or a
+	// cookie session sent no nonce. Signing in again only fixes the first.
+	if (response.status === 401) {
+		throw new ComposerConfigError('fetch_composer_config: unauthorized (401)', 'unauthorized');
+	}
+	if (response.status === 403) {
+		throw new ComposerConfigError('fetch_composer_config: forbidden (403)', 'forbidden');
 	}
 
 	if (!response.ok) {

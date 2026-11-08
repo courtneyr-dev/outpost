@@ -567,4 +567,23 @@ final class TokenResolverTest extends \WP_Mock\Tools\TestCase {
 		$this->assertMatchesRegularExpression( '/@media \(prefers-color-scheme: dark\) \{\s*\.outpost-source-site\.outpost-mode-system \{\s*color-scheme: dark;/', $css );
 		$this->assertSame( 0, preg_match( '/#[0-9a-f]{3,8}\s*[^;]*\{/i', $css ), 'Selectors carry no color values.' );
 	}
+
+	public function test_site_source_derives_missing_tones_from_the_theme(): void {
+		// TT5 names no border or muted-text color. Those tones must come
+		// from the theme's own text and page colors, not Outpost's violet.
+		$this->inject_theme_source( $this->tt5_like_source() );
+		$out = Outpost_Token_Resolver::resolve( 42, 'day', 'site' );
+		$c   = $out['components'];
+		$this->assertNotSame( Outpost_Token_Resolver::DEFAULTS['day']['colors']['border'], $c['border'] );
+		$this->assertNotSame( Outpost_Token_Resolver::DEFAULTS['day']['colors']['text_secondary'], $c['text-muted'] );
+		$this->assertSame( Outpost_Token_Resolver::mix_hex( '#ffffff', '#111111', 0.55 ), $c['border'] );
+		$this->assertGreaterThanOrEqual( 3.0, Outpost_Contrast::ratio( $c['border'], $c['surface-bg'] ) );
+		$this->assertGreaterThanOrEqual( 4.5, Outpost_Contrast::ratio( $c['text-muted'], $c['surface-bg'] ) );
+	}
+
+	public function test_mix_hex_endpoints_and_midpoint(): void {
+		$this->assertSame( '#ffffff', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 0.0 ) );
+		$this->assertSame( '#000000', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 1.0 ) );
+		$this->assertSame( '#808080', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 0.5 ) );
+	}
 }

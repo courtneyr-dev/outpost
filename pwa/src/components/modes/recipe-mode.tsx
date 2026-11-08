@@ -272,7 +272,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				Recipe
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a recipe with ingredients, steps, and times.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>

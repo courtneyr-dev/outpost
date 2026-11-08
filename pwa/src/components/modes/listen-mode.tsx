@@ -1027,7 +1027,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				Doing
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share what you're listening to, watching, reading, playing, eating, and more.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>

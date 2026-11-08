@@ -86,7 +86,7 @@ final class Outpost_PWA_Shell {
 </head>
 <body class="outpost-composer-shell <?php echo esc_attr( self::mode_class() . ' ' . self::source_class() ); ?>">
 		<?php wp_scripts()->do_items( array( 'outpost-appearance-boot' ) ); ?>
-	<main id="outpost-root" data-outpost-route="composer"></main>
+	<main id="outpost-root" data-outpost-route="composer" data-outpost-version="<?php echo esc_attr( OUTPOST_VERSION ); ?>"></main>
 		<?php
 		wp_scripts()->do_items( $script_handles );
 		?>

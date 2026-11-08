@@ -37,7 +37,7 @@
 	--outpost-button-primary-border: #fb8500;
 	--outpost-button-primary-bg-hover: #e67a00;
 	--outpost-button-primary-bg-active: #d16f00;
-	--outpost-button-primary-bg-disabled: #ece8f5;
+	--outpost-button-primary-bg-disabled: #ffffff;
 	--outpost-button-primary-fg-disabled: #5f5873;
 	--outpost-button-primary-radius: var(--outpost-radius-md);
 
@@ -189,6 +189,8 @@
 	--outpost-button-primary-bg: #fb8500;
 	--outpost-button-primary-fg: #241c4a;
 	--outpost-button-primary-border: #fb8500;
+	--outpost-button-primary-bg-disabled: #ffffff;
+	--outpost-button-primary-fg-disabled: #5f5873;
 	--outpost-button-secondary-fg: #241c4a;
 	--outpost-button-secondary-border: #7a70b0;
 	--outpost-button-ghost-fg: #241c4a;
@@ -240,6 +242,8 @@
 	--outpost-button-primary-bg: #ff9a2e;
 	--outpost-button-primary-fg: #1e1838;
 	--outpost-button-primary-border: #ff9a2e;
+	--outpost-button-primary-bg-disabled: #2a2350;
+	--outpost-button-primary-fg-disabled: #c9c1ef;
 	--outpost-button-secondary-fg: #f7f4ff;
 	--outpost-button-secondary-border: #9a90cf;
 	--outpost-button-ghost-fg: #f7f4ff;
@@ -292,6 +296,8 @@
 		--outpost-button-primary-bg: #ff9a2e;
 		--outpost-button-primary-fg: #1e1838;
 		--outpost-button-primary-border: #ff9a2e;
+		--outpost-button-primary-bg-disabled: #2a2350;
+		--outpost-button-primary-fg-disabled: #c9c1ef;
 		--outpost-button-secondary-fg: #f7f4ff;
 		--outpost-button-secondary-border: #9a90cf;
 		--outpost-button-ghost-fg: #f7f4ff;

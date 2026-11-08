@@ -15,6 +15,7 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
+import { clear_cache as clear_appearance_cache } from '../../lib/appearance';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -202,6 +203,9 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const handle_signout = async (event: Event): Promise<void> => {
 		event.preventDefault();
 		await clear_token(tokenStore);
+		// The appearance copy belongs to this account; the next person on a
+		// shared device starts from the defaults.
+		clear_appearance_cache();
 		window.location.reload();
 	};
 
@@ -290,7 +294,7 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 				{config.heading}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code> · scope <code>{token.scope || '—'}</code>
+				Write an article, note, status, aside, or quote.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>

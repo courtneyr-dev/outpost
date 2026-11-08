@@ -406,7 +406,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				{config.label}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Reply, like, repost, bookmark, RSVP, follow, and more.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>

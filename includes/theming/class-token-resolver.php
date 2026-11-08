@@ -173,6 +173,9 @@ final class Outpost_Token_Resolver {
 		}
 
 		$defaults = self::DEFAULTS[ $mode ];
+		if ( 'site' === $source ) {
+			$theme_layer['colors'] = self::fill_theme_tones( $theme_layer['colors'], $mode );
+		}
 
 		$resolved_colors = array();
 		$sources         = array();
@@ -239,6 +242,58 @@ final class Outpost_Token_Resolver {
 	}
 
 	/**
+	 * Under Use Site Theme, a theme that names only its text and page
+	 * colors would otherwise get Outpost's violet muted text and borders.
+	 * Derive those tones from the theme's own pair instead (muted text at
+	 * 70% of the way from page to text, borders at 55%); contrast checks
+	 * run on them afterward like any other value.
+	 *
+	 * @param array<string,string> $colors Theme layer colors.
+	 * @return array<string,string>
+	 */
+	private static function fill_theme_tones( array $colors, string $mode ): array {
+		$text = $colors['text'] ?? '';
+		$page = $colors['bg'] ?? ( self::DEFAULTS[ $mode ]['colors']['bg'] );
+		if ( ! self::is_hex_like( $text ) || ! self::is_hex_like( $page ) ) {
+			return $colors;
+		}
+		if ( ! isset( $colors['text_secondary'] ) ) {
+			$colors['text_secondary'] = self::mix_hex( $page, $text, 0.70 );
+		}
+		if ( ! isset( $colors['border'] ) ) {
+			$colors['border'] = self::mix_hex( $page, $text, 0.55 );
+		}
+		if ( ! isset( $colors['accent_2'] ) && isset( $colors['accent'] ) ) {
+			$colors['accent_2'] = $colors['accent'];
+		}
+		return $colors;
+	}
+
+	/**
+	 * Linear mix of two hex colors in sRGB: $t = 0 gives $from, 1 gives $to.
+	 */
+	public static function mix_hex( string $from, string $to, float $t ): string {
+		$a   = self::hex_channels( $from );
+		$b   = self::hex_channels( $to );
+		$out = '#';
+		for ( $i = 0; $i < 3; $i++ ) {
+			$out .= str_pad( dechex( (int) round( $a[ $i ] + ( $b[ $i ] - $a[ $i ] ) * $t ) ), 2, '0', STR_PAD_LEFT );
+		}
+		return $out;
+	}
+
+	/**
+	 * @return array{0:int,1:int,2:int}
+	 */
+	private static function hex_channels( string $hex ): array {
+		$hex = ltrim( trim( $hex ), '#' );
+		if ( 3 === strlen( $hex ) || 4 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		return array( (int) hexdec( substr( $hex, 0, 2 ) ), (int) hexdec( substr( $hex, 2, 2 ) ), (int) hexdec( substr( $hex, 4, 2 ) ) );
+	}
+
+	/**
 	 * Map a resolved semantic palette onto the component tokens
 	 * `structure.css` reads, checking every final foreground/background
 	 * pair the composer paints (WCAG 2.2 AA):
@@ -296,37 +351,39 @@ final class Outpost_Token_Resolver {
 		}
 
 		$tokens      = array(
-			'surface-bg'              => $page,
-			'surface-fg'              => $text,
-			'card-bg'                 => $field,
-			'card-fg'                 => $text,
-			'card-border'             => $border,
-			'input-bg'                => $field,
-			'input-fg'                => $text,
-			'input-border'            => $border,
-			'input-border-focus'      => $focus,
-			'input-placeholder'       => $muted,
-			'button-primary-bg'       => $fill,
-			'button-primary-fg'       => $label,
-			'button-primary-border'   => $fill,
-			'button-secondary-fg'     => $text,
-			'button-secondary-border' => $border,
-			'button-ghost-fg'         => $text,
-			'tab-fg'                  => $muted,
-			'tab-fg-active'           => $label,
-			'tab-bg-active'           => $fill,
-			'tab-indicator'           => $text,
-			'chip-fg'                 => $text,
-			'chip-border'             => $border,
-			'chip-bg-pressed'         => $fill,
-			'chip-fg-pressed'         => $label,
-			'focus-ring-color'        => $focus,
-			'text-muted'              => $muted,
-			'border'                  => $border,
-			'link'                    => $link,
-			'logo'                    => $text,
-			'scenery-far'             => $accent2,
-			'scenery-near'            => $text,
+			'surface-bg'                 => $page,
+			'surface-fg'                 => $text,
+			'card-bg'                    => $field,
+			'card-fg'                    => $text,
+			'card-border'                => $border,
+			'input-bg'                   => $field,
+			'input-fg'                   => $text,
+			'input-border'               => $border,
+			'input-border-focus'         => $focus,
+			'input-placeholder'          => $muted,
+			'button-primary-bg'          => $fill,
+			'button-primary-fg'          => $label,
+			'button-primary-border'      => $fill,
+			'button-primary-bg-disabled' => $field,
+			'button-primary-fg-disabled' => $muted,
+			'button-secondary-fg'        => $text,
+			'button-secondary-border'    => $border,
+			'button-ghost-fg'            => $text,
+			'tab-fg'                     => $muted,
+			'tab-fg-active'              => $label,
+			'tab-bg-active'              => $fill,
+			'tab-indicator'              => $text,
+			'chip-fg'                    => $text,
+			'chip-border'                => $border,
+			'chip-bg-pressed'            => $fill,
+			'chip-fg-pressed'            => $label,
+			'focus-ring-color'           => $focus,
+			'text-muted'                 => $muted,
+			'border'                     => $border,
+			'link'                       => $link,
+			'logo'                       => $text,
+			'scenery-far'                => $accent2,
+			'scenery-near'               => $text,
 		);
 		$font_tokens = array(
 			'body'      => 'font-family-body',

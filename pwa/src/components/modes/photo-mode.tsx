@@ -366,7 +366,7 @@ export function PhotoMode({
 				{entries.length > 1 ? 'Gallery' : 'Photo'}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a photo or a gallery, with alt text for each image.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
