@@ -17,6 +17,8 @@ import { CharCounter } from '../char-counter';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
 	MorePanel,
@@ -239,6 +241,14 @@ const VARIANT_ORDER: Variant[] = [
 ];
 
 type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
+
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
+function is_rsvp(value: unknown): value is RsvpValue {
+	return value === 'yes' || value === 'no' || value === 'maybe' || value === 'interested';
+}
 const RSVP_VALUES: RsvpValue[] = ['yes', 'no', 'maybe', 'interested'];
 
 type Status =
@@ -274,18 +284,31 @@ function consume_share_target_for_reply(): {
 
 export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
 	const initial_share = consume_share_target_for_reply();
-	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'reply');
-	const [target_url, setTargetUrl] = useState(initial_share?.url ?? '');
-	const [title, setTitle] = useState(initial_share?.title ?? '');
-	const [content, setContent] = useState(initial_share?.content ?? '');
-	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() => (initial_share ? null : read_draft('reply', token.me)));
+	const draft_variant = draft?.meta.variant;
+	const draft_rsvp = draft?.meta.rsvp;
+	const [variant, setVariant] = useState<Variant>(
+		initial_share?.variant ?? (is_variant(draft_variant) ? draft_variant : 'reply'),
+	);
+	const [target_url, setTargetUrl] = useState(initial_share?.url ?? draft_text(draft?.fields.target));
+	const [title, setTitle] = useState(initial_share?.title ?? draft_text(draft?.fields.title));
+	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
+	const [rsvp_value, setRsvpValue] = useState<RsvpValue>(is_rsvp(draft_rsvp) ? draft_rsvp : 'yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'reply',
+		me: token.me,
+		fields: { target: target_url, title, content, venue: venue_name },
+		meta: { variant, rsvp: rsvp_value },
+		restored: draft !== null,
+	});
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -358,6 +381,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				micropubEnv,
 			);
 			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			saved_draft.discard();
 			if (result.kind === 'queued') {
 				setStatus({ kind: 'queued' });
 				setContent('');
@@ -576,6 +600,8 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						''
 					)}
 				</p>
+
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer

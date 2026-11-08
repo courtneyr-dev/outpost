@@ -328,6 +328,62 @@ describe('ComposerTabs: composer-config notice', () => {
 		expect(notice()).not.toBeNull();
 	});
 
+	it('tells people their unsent text stays and nothing posts on its own after signing in again', async () => {
+		const { env } = config_site([rejected]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		expect(notice()?.textContent).toContain('stays on this device');
+		expect(notice()?.textContent).toContain('Nothing posts until you tap');
+		expect(notice()?.textContent).not.toContain('copy anything');
+	});
+
+	it('still says to copy text first when this device cannot keep drafts', async () => {
+		const full = {
+			getItem: (): string | null => null,
+			setItem: (): void => {
+				throw new DOMException('full', 'QuotaExceededError');
+			},
+			removeItem: (): void => {},
+		};
+		const { env } = config_site([rejected]);
+		render(
+			<ComposerTabs
+				token={mock_token}
+				tokenStore={mock_token_store()}
+				composerConfigEnv={env}
+				queueEnv={{ indexedDB: new IDBFactory() }}
+				appearanceEnv={{ fetch: () => Promise.reject(new TypeError('offline')) }}
+				draftStorage={full}
+			/>,
+			root,
+		);
+		await vi.waitFor(() => expect(notice()).not.toBeNull());
+		expect(notice()?.textContent).toContain('copy anything');
+		expect(notice()?.textContent).not.toContain('stays on this device');
+	});
+
+	it('does not clear drafts when signing in again', async () => {
+		const reload_spy = vi.fn();
+		vi.spyOn(window, 'location', 'get').mockReturnValue({
+			...window.location,
+			reload: reload_spy,
+		} as Location);
+		localStorage.setItem(
+			'outpost:drafts',
+			JSON.stringify({ v: 1, me: 'https://example.test/', modes: { note: { savedAt: 1, fields: { content: 'kept' }, meta: {} } } }),
+		);
+		const { env } = config_site([rejected]);
+		mount_with(env);
+		await vi.waitFor(() => expect(notice_buttons()).toEqual(['Sign in again']));
+		const button = Array.from(notice()?.querySelectorAll('button') ?? []).find(
+			(b) => b.textContent === 'Sign in again',
+		) as HTMLButtonElement;
+		button.click();
+		await vi.waitFor(() => expect(reload_spy).toHaveBeenCalled());
+		expect(localStorage.getItem('outpost:drafts')).toContain('kept');
+		vi.restoreAllMocks();
+	});
+
 	it('treats a 403 as a permission limit, not an expired sign-in, and does not retry it', async () => {
 		const forbidden = (): Promise<Response> => Promise.resolve(new Response('{}', { status: 403 }));
 		const { env, calls } = config_site([forbidden, loaded]);

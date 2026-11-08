@@ -15,6 +15,7 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Header with the outline signpost (canonical icon geometry), wordmark, connected site, a Light / Dark / System shortcut, and a settings button.
 - About now starts with the site, connection state, Micropub and IndieAuth status, and version from runtime data, then help links, redacted diagnostics, and the existing guides behind disclosures.
 - A choice made offline applies on the device and is sent on the next successful contact; the sheet says when a choice is saved only on the device.
+- **Drafts survive a reload and a fresh sign-in.** Each mode saves its unsent text to the device 600 ms after typing stops: title and body, reply target and content, the Doing, Life, and Recipe fields, and each photo's alt text and caption (photos themselves are added again; their descriptions fill back in, in order). Drafts reopen only for the same signed-in `me`, never post on their own, clear after a publish or when the post is queued offline, and clear on sign-out. "Draft saved" appears only after the device accepts the write; when storage is blocked or full, the composer says it can't keep drafts and keeps working. The expired-sign-in notice now says unsent text stays.
 
 ### Changed
 

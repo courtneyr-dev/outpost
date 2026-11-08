@@ -23,6 +23,7 @@ import type { AppearanceEnvironment } from '../lib/appearance';
 import { AppHeader } from './app-header';
 import { SettingsSheet } from './settings-sheet';
 import { Scenery } from './scenery';
+import { drafts_available, type DraftStorage } from '../lib/drafts';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -75,6 +76,8 @@ export interface ComposerTabsProps {
 	composerConfigEnv?: ComposerConfigEnvironment;
 	queueEnv?: OfflineQueueEnvironment;
 	appearanceEnv?: AppearanceEnvironment;
+	/** Device storage the modes keep drafts in; defaults to localStorage. */
+	draftStorage?: DraftStorage | null;
 }
 
 /**
@@ -132,6 +135,7 @@ export function ComposerTabs({
 	composerConfigEnv,
 	queueEnv,
 	appearanceEnv,
+	draftStorage,
 }: ComposerTabsProps) {
 	const appearance = useAppearance({
 		accessToken: token.accessToken,
@@ -153,6 +157,10 @@ export function ComposerTabs({
 	const [active, setActive] = useState<ModeId>(initial_share?.tab ?? 'note');
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const [config_error, setConfigError] = useState<'unauthorized' | 'forbidden' | 'fetch_failed' | null>(null);
+	// Whether unsent text survives the reload that "Sign in again" triggers.
+	const [can_keep_drafts] = useState(() =>
+		draftStorage === undefined ? drafts_available() : drafts_available(draftStorage),
+	);
 	const tab_refs = useRef<Partial<Record<ModeId, HTMLButtonElement | null>>>({});
 	// Bumped to fetch the composer config again.
 	const [config_attempt, setConfigAttempt] = useState(0);
@@ -359,7 +367,9 @@ export function ComposerTabs({
 		config_error === 'unauthorized'
 			? {
 					title: 'Your sign-in expired.',
-					body: 'Posting needs a fresh sign-in. Signing in again reloads Outpost, so copy anything you have written first.',
+					body: can_keep_drafts
+						? 'Posting needs a fresh sign-in. Signing in again reloads Outpost; your unsent text stays on this device and comes back afterward. Nothing posts until you tap a Post button.'
+						: "Posting needs a fresh sign-in. Signing in again reloads Outpost, and this device can't keep drafts, so copy anything you have written first.",
 				}
 			: config_error === 'forbidden'
 				? {
