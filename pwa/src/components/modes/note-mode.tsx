@@ -18,6 +18,7 @@ import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -87,6 +88,8 @@ interface VariantConfig {
 	kind: PostKindSlug;
 	requiresTitle: boolean;
 	contentLabel: string;
+	/** Short name the publish hint uses for the content field. */
+	contentName: string;
 	contentRows: number;
 }
 
@@ -99,6 +102,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'note',
 		requiresTitle: false,
 		contentLabel: "What's on your mind?",
+		contentName: 'Text',
 		contentRows: 5,
 	},
 	status: {
@@ -109,6 +113,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'note',
 		requiresTitle: false,
 		contentLabel: "What's happening?",
+		contentName: 'Text',
 		contentRows: 4,
 	},
 	aside: {
@@ -119,6 +124,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'note',
 		requiresTitle: false,
 		contentLabel: 'Quick aside',
+		contentName: 'Text',
 		contentRows: 4,
 	},
 	article: {
@@ -129,6 +135,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'article',
 		requiresTitle: true,
 		contentLabel: 'Body',
+		contentName: 'Body',
 		contentRows: 12,
 	},
 	quote: {
@@ -139,11 +146,41 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		kind: 'quote',
 		requiresTitle: false,
 		contentLabel: 'Quote text',
+		contentName: 'Quote text',
 		contentRows: 5,
 	},
 };
 
 const VARIANT_ORDER: Variant[] = ['article', 'note', 'status', 'aside', 'quote'];
+
+/** Stroke paths for each style tile's icon (24 × 24, drawn in currentColor). */
+const STYLE_ICON_PATHS: Record<Variant, string> = {
+	article: 'M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4',
+	note: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
+	status: 'M4 5h16v11H10l-6 4z',
+	aside: 'M4 6h10M4 10h10M4 14h10M4 18h6M19 5v14',
+	quote: 'M10 7H5v6h4c0 2-1 3-3 4M19 7h-5v6h4c0 2-1 3-3 4',
+};
+
+function StyleIcon({ variant }: { variant: Variant }): preact.JSX.Element {
+	return (
+		<svg
+			class="outpost-radio__icon"
+			viewBox="0 0 24 24"
+			width="22"
+			height="22"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+			focusable="false"
+		>
+			<path d={STYLE_ICON_PATHS[variant]} />
+		</svg>
+	);
+}
 
 /** Variant labels in picker order; Home lists them as the tab's inventory. */
 export const POST_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
@@ -291,6 +328,9 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 	const submitting = status.kind === 'discovering' || status.kind === 'posting';
 	const can_submit =
 		!!content.trim() && (!config.requiresTitle || !!title.trim()) && !submitting;
+	const missing: string[] = [];
+	if (config.requiresTitle && !title.trim()) missing.push('Title');
+	if (!content.trim()) missing.push(config.contentName);
 	const button_label =
 		status.kind === 'discovering'
 			? 'Finding endpoint…'
@@ -311,10 +351,10 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
-				<fieldset class="outpost-variant-picker">
+				<fieldset class="outpost-variant-picker outpost-variant-picker--tiles">
 					<legend class="outpost-label">Style</legend>
 					{VARIANT_ORDER.map((id) => (
-						<label key={id} class="outpost-radio">
+						<label key={id} class="outpost-radio outpost-radio--tile">
 							<input
 								type="radio"
 								name="outpost-note-variant"
@@ -323,6 +363,7 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 								onChange={(): void => setVariant(id)}
 								disabled={submitting}
 							/>
+							<StyleIcon variant={id} />
 							<span>{VARIANTS[id].label}</span>
 						</label>
 					))}
@@ -467,15 +508,8 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={!can_submit}
-					>
-						{button_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -484,8 +518,16 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 						>
 							More options
 						</button>
-					)}
-				</div>
+					</div>
+				)}
+
+				<PublishButton
+					idPrefix="outpost-note"
+					label={button_label}
+					disabled={!can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

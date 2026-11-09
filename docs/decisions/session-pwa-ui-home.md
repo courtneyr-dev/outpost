@@ -73,3 +73,14 @@ Sign out sat in the Post form beside the publish button, on the most-used screen
 ### Tests
 
 PHP: `tests/theming/StartScreenTest.php`, start-screen cases in `tests/theming/AppearanceRestControllerTest.php`, and uninstall assertions in `tests/integration/UninstallTest.php`. PWA: `pwa/src/lib/start-screen.test.ts`, start-screen cases in `appearance.test.ts` and `use-appearance.test.tsx`, `sign-out.test.ts`, the Home and start-screen block in `composer-tabs.test.tsx`, and the Preferences and About cases in `settings-and-about.test.tsx`.
+
+## Addendum — compact composer (mockup review P1–P6)
+
+Recorded 2026-11-08 on branch `pwa/compact-composer`. Full measurements and evidence: [P1 to P6 as built](../product/pwa-ui-2026-11-07/mockup-review-2026-11-08.md#p1-to-p6-as-built).
+
+- Long type lists (Doing, Reply) use `.outpost-variant-picker--compact`: content-sized `border-box` tiles that wrap. Rejected: three fixed columns (labels break mid-word at 360 px) and a "More types" disclosure (hides radios that arrow keys still reach).
+- Post uses `.outpost-variant-picker--tiles` with `.outpost-radio--tile`: the native radio is transparent and covers the tile.
+- `PublishButton` ends every composing form. Each mode passes the short names of its empty required fields; the hint is the button's description, not a live region.
+- New component tokens `segment-bg-selected` and `segment-fg-selected`, derived in `component_tokens()` and pinned in both token files. `chip-active` stays an alias of the pressed chip fill.
+- The header no longer adds its own 1rem side padding inside `.outpost-composer`; it adds only the safe-area inset.
+

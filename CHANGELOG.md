@@ -19,6 +19,9 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Sign out** moved from the Post form, where it sat beside the publish button, to About › Connection as "Sign out of this device", with a note on what it removes.
 - The header's settings button and its sheet are named **Preferences**, matching About › Preferences.
 - `/appearance/tokens` validates every preference in a request before writing any, so one bad value no longer stores the valid ones beside it.
+- **Compact type pickers.** Doing's 15 types and Reply's 11 wrap as content-sized tiles, so every type stays visible in about half the height (Doing at 390 px: 576 → 268 px). Post's five styles are one row of icon-and-label tiles from 360 px.
+- **Publish at the end of every form.** Each composing tab ends with a full-width publish button with the variant's own label ("Post article") and a line above it naming the required fields that are still empty ("Still needed: Title and Body."). A disabled button no longer has a dashed outline.
+- The header stays on one row from 375 px (119 → 70 px tall at 390 px). The selected Light / Dark / System option is a tint with an ink ring instead of the orange fill, so Publish is the one orange control on screen. Two new tokens carry it, `--outpost-segment-bg-selected` and `--outpost-segment-fg-selected`; Use Site Theme derives them with a 4.5:1 check.
 
 ### Fixed
 

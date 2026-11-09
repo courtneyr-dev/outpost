@@ -303,6 +303,7 @@ final class Outpost_Token_Resolver {
 	 *   link text on page and card surfaces                    4.5:1
 	 *   field, card, and chip borders on both surfaces         3:1
 	 *   focus ring on page and field surfaces                  3:1
+ *   ink on the selected appearance segment                 4.5:1
 	 *   logo outline on the page surface                       3:1
 	 *
 	 * An adjusted value is recorded as `adjusted['component.<token>']`.
@@ -350,6 +351,20 @@ final class Outpost_Token_Resolver {
 			}
 		}
 
+		// Selected segment of the Light / Dark / System switch: a tint of
+		// the field toward the secondary accent, never the action fill, so
+		// the publish button stays the one orange control (mockup review
+		// P6). The tint backs off toward the field until the ink reaches
+		// 4.5:1 on it; the ink already passes on the field, so this ends.
+		$segment = $field;
+		for ( $t = 0.14; $t > 0.0; $t -= 0.02 ) {
+			$candidate = self::mix_hex( $field, $accent2, $t );
+			if ( Outpost_Contrast::ratio( $text, $candidate ) >= $body ) {
+				$segment = $candidate;
+				break;
+			}
+		}
+
 		$tokens      = array(
 			'surface-bg'                 => $page,
 			'surface-fg'                 => $text,
@@ -377,6 +392,8 @@ final class Outpost_Token_Resolver {
 			'chip-border'                => $border,
 			'chip-bg-pressed'            => $fill,
 			'chip-fg-pressed'            => $label,
+			'segment-bg-selected'        => $segment,
+			'segment-fg-selected'        => $text,
 			'focus-ring-color'           => $focus,
 			'text-muted'                 => $muted,
 			'border'                     => $border,

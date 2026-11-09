@@ -21,6 +21,7 @@ import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -284,6 +285,13 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 		ingredients_text.trim().length > 0 &&
 		instructions_text.trim().length > 0 &&
 		(media_entries.length === 0 || all_entries_have_alt(media_entries));
+	const missing: string[] = [];
+	if (!name.trim()) missing.push('Recipe title');
+	if (ingredients_text.trim().length === 0) missing.push('Ingredients');
+	if (instructions_text.trim().length === 0) missing.push('Instructions');
+	if (media_entries.length > 0 && !all_entries_have_alt(media_entries)) {
+		missing.push('Alt text for the photo');
+	}
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-recipe-mode-title">
@@ -471,15 +479,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -488,8 +489,16 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						>
 							More options
 						</button>
-					)}
-				</div>
+					</div>
+				)}
+
+				<PublishButton
+					idPrefix="outpost-recipe"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

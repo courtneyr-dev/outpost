@@ -94,6 +94,8 @@ final class TokenFileParityTest extends \WP_Mock\Tools\TestCase {
 			array( 'tab-indicator', 'surface-bg', 3.0 ),
 			array( 'logo', 'surface-bg', 3.0 ),
 			array( 'error-border', 'surface-bg', 3.0 ),
+			array( 'segment-fg-selected', 'segment-bg-selected', 4.5 ),
+			array( 'tab-indicator', 'segment-bg-selected', 3.0 ),
 		);
 		foreach ( $pairs as list( $fg, $bg, $target ) ) {
 			$this->assertArrayHasKey( $fg, $t, "$mode: --outpost-$fg missing" );

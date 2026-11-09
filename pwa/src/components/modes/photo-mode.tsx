@@ -25,6 +25,7 @@ import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft, type DraftFields } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -406,6 +407,8 @@ export function PhotoMode({
 		(entry) => entry.decorative || entry.alt.trim().length > 0
 	);
 	const can_submit = entries.length > 0 && all_have_alt && !submitting;
+	const missing: string[] =
+		entries.length === 0 ? ['A photo'] : all_have_alt ? [] : ['Alt text for each photo'];
 
 	return (
 		<section
@@ -676,15 +679,8 @@ export function PhotoMode({
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={!can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -693,8 +689,16 @@ export function PhotoMode({
 						>
 							More options
 						</button>
-					)}
-				</div>
+					</div>
+				)}
+
+				<PublishButton
+					idPrefix="outpost-photo"
+					label={submit_label}
+					disabled={!can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);
