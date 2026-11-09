@@ -20,6 +20,7 @@ import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -240,6 +241,9 @@ const VARIANT_ORDER: Variant[] = [
 	'issue',
 ];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const REPLY_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
 
 function is_variant(value: unknown): value is Variant {
@@ -417,6 +421,11 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const fetching_preview = status.kind === 'fetching-preview';
 	const can_submit =
 		!!target_url.trim() && (!config.contentRequired || !!content.trim());
+	// The hint names a target by its label when that label is a noun
+	// ("Event URL"); "In reply to" and "Like of" read as "URL".
+	const missing: string[] = [];
+	if (!target_url.trim()) missing.push(/URL$/.test(config.targetLabel) ? config.targetLabel : 'URL');
+	if (config.contentRequired && !content.trim()) missing.push(config.contentLabel);
 	const submit_label =
 		status.kind === 'discovering-endpoint'
 			? 'Finding endpoint…'
@@ -434,7 +443,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
-				<fieldset class="outpost-variant-picker">
+				<fieldset class="outpost-variant-picker outpost-variant-picker--compact">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
 						<label key={id} class="outpost-radio">
@@ -626,13 +635,6 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 
 				<div class="outpost-form-actions">
 					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || fetching_preview || !can_submit}
-					>
-						{submit_label}
-					</button>
-					<button
 						class="outpost-button outpost-button--secondary"
 						type="button"
 						onClick={handle_preview}
@@ -651,6 +653,14 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						</button>
 					)}
 				</div>
+
+				<PublishButton
+					idPrefix="outpost-reply"
+					label={submit_label}
+					disabled={submitting || fetching_preview || !can_submit}
+					missing={missing}
+					busy={submitting || fetching_preview}
+				/>
 			</form>
 		</section>
 	);

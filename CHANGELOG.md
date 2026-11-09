@@ -7,6 +7,27 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Home launcher.** Outpost opens to a Home screen with six cards (Post, Reply, Photo, Doing, Life, Recipe), a compact connection line, and an About row. Each card opens its existing composer tab. A card says "Unsent draft" when that tab holds saved text. Under the cards, "Everything each tab can post" lists every variant from the composer's own tables. Decision: `docs/decisions/session-pwa-ui-home.md`.
+- **← Home** link at the foot of every tab, About included. It sits in the page flow, so it never covers Publish or a focused field. Going Home keeps everything typed or attached in every tab.
+- **Default start screen** in About › Preferences and the Preferences sheet: Home (the default), Post, Reply, Photo, Doing, Life, Recipe, or About. Stored per person in the `outpost_start_screen` user meta through `/wp-json/outpost/v1/appearance/tokens` (`start_screen`), so it follows the person to every device. A share-sheet, bookmarklet, or iOS Shortcut launch still opens the tab its content belongs in, and changing the preference never moves someone off the screen they're on.
+- About is organized as Connection, Preferences, Help and documentation, and Project. Preferences holds the start screen, Light / Dark / System, Outpost Default / Use Site Theme, and **Reset preferences**. Help adds a "Sharing and shortcuts" link; Project adds version and credits.
+
+### Changed
+
+- **Sign out** moved from the Post form, where it sat beside the publish button, to About › Connection as "Sign out of this device", with a note on what it removes.
+- The header's settings button and its sheet are named **Preferences**, matching About › Preferences.
+- `/appearance/tokens` validates every preference in a request before writing any, so one bad value no longer stores the valid ones beside it.
+- **Compact type pickers.** Doing's 15 types and Reply's 11 wrap as content-sized tiles, so every type stays visible in about half the height (Doing at 390 px: 576 → 268 px). Post's five styles are one row of icon-and-label tiles from 360 px.
+- **Publish at the end of every form.** Each composing tab ends with a full-width publish button with the variant's own label ("Post article") and a line above it naming the required fields that are still empty ("Still needed: Title and Body."). A disabled button no longer has a dashed outline.
+- The header stays on one row from 375 px (119 → 70 px tall at 390 px). The selected Light / Dark / System option is a tint with an ink ring instead of the orange fill, so Publish is the one orange control on screen. Two new tokens carry it, `--outpost-segment-bg-selected` and `--outpost-segment-fg-selected`; Use Site Theme derives them with a 4.5:1 check.
+
+### Fixed
+
+- Uninstall now removes the `outpost_appearance_source` user meta and the `outpost_appearance_schema` option that 1.0.24 added, along with the new `outpost_start_screen`.
+- Two preference changes made before the composer re-rendered (for example, start screen and then appearance) kept only the second.
+
 ## [1.0.24] - 2026-11-08
 
 ### Added

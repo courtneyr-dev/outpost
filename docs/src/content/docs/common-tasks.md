@@ -13,7 +13,7 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 4. Review the syndication chips: configured destinations are on by default; tap to turn any off.
 5. Tap post and follow the link in the success message to your new post.
 
-![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+![Outpost on a phone with the Note style selected and More options open on the Send to list of syndication destinations](../../assets/screenshots/frontend-composer-note-mode.png)
 
 ## Reply to (or like, repost, bookmark) a page
 
@@ -21,7 +21,7 @@ Step-by-step recipes for the things you'll do most often with Outpost. All of th
 2. Paste the URL you're responding to. The composer shows the target's context.
 3. Add your commentary (Reply and Bookmark), then post. The published post links back to the source with the right microformats (in-reply-to, like-of, repost-of).
 
-![Reply mode showing the pasted target URL context and syndication chips](../../assets/screenshots/frontend-composer-reply-mode.png)
+![Reply mode on a phone with its eleven types as wrapping tiles, a target URL in In reply to, and a reply being written](../../assets/screenshots/frontend-composer-reply-mode.png)
 
 Faster paths so you don't paste URLs by hand:
 
@@ -74,7 +74,7 @@ Install them the way your device handles bookmarks:
 - **Desktop browsers:** drag the bookmarklet link to the bookmarks bar.
 - **iPhone Safari:** long-press the link and choose **Add Bookmark**.
 - **Android Chrome:** long-press the link, choose **Copy link**, then save it as a new bookmark.
-- **Anywhere else:** use the **Copy source** button in the About tab and paste the `javascript:` link wherever your device manages bookmarks.
+- **Anywhere else:** use the **Copy source** button in **About › Help and documentation › Post from anywhere** and paste the `javascript:` link wherever your device manages bookmarks.
 
 On any web page, open a bookmarklet to launch the composer with that page's URL, title, and your selected text pre-filled.
 
@@ -121,7 +121,16 @@ You don't need to do anything. Each tab saves its unsent text to your device abo
 
 What's kept: titles and body text, reply targets, the Doing, Life, and Recipe fields, and each photo's alt text and caption. Photos themselves aren't kept: add them again, and their descriptions fill back in, in order.
 
-A draft clears when you post it, when the post goes into the offline queue, or when you sign out. If your browser blocks storage or it's full, the composer says "This device can't keep drafts right now. Copy anything you want to keep." and keeps working without drafts.
+Going to Home and back keeps everything too: Home marks a tab that holds a draft with "Unsent draft".
+
+A draft clears when you post it, when the post goes into the offline queue, or when you sign out (**About › Connection › Sign out of this device**). If your browser blocks storage or it's full, the composer says "This device can't keep drafts right now. Copy anything you want to keep." and keeps working without drafts.
+
+## Choose which screen Outpost opens to
+
+1. Tap **Preferences** (the gear at the top right), or open **About › Preferences**.
+2. Under **Default start screen**, pick Home, Post, Reply, Photo, Doing, Life, Recipe, or About.
+
+The choice saves to your site and applies the next time you launch Outpost, on any device. It doesn't move you off the screen you're on. Sharing to Outpost still opens the tab that content belongs in. From any tab, **← Home** at the bottom of the screen goes back to Home.
 
 ## Change which variant the composer opens to
 
@@ -141,7 +150,7 @@ A draft clears when you post it, when the post goes into the offline queue, or w
 
 Just post — if the network is down, the draft queues on your device and Outpost submits it automatically when the connection returns. The queue shows pending entries with retry and dismiss controls. Signing out doesn't clear the queue: once you sign back in to the same site, Retry all now in the queue sends the waiting posts. A post queued for a different site, or one an older version queued with no site recorded, stays in the queue with an error you can dismiss.
 
-![Composer showing the offline connection banner and a queued draft badge](../../assets/screenshots/frontend-offline-queue.png)
+![Composer showing the offline connection banner and a 1 queued badge above the Post tab](../../assets/screenshots/frontend-offline-queue.png)
 
 ## Connect a life-tracking service
 

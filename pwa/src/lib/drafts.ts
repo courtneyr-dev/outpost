@@ -251,3 +251,14 @@ export function useDraft({
 
 	return { state, discard };
 }
+
+/** The modes holding a saved draft for this account, for Home's "Unsent draft" labels. */
+export function draft_modes(me: string, storage: DraftStorage | null = default_storage()): DraftMode[] {
+	if (!storage) return [];
+	const stored = load(storage);
+	if (!stored || stored.me !== me) return [];
+	return (Object.keys(stored.modes) as DraftMode[]).filter((mode) => {
+		const entry = stored.modes[mode];
+		return !!entry && is_record(entry.fields) && !is_blank(entry.fields as DraftFields);
+	});
+}

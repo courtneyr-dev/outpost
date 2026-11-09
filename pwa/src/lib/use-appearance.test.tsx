@@ -45,8 +45,8 @@ function harness(options: Parameters<typeof useAppearance>[0]): { get: () => Use
 	return { get: () => latest as unknown as UseAppearance, root };
 }
 
-const server = (mode = 'system', source = 'outpost', css = ''): Response =>
-	new Response(JSON.stringify({ mode_preference: mode, style_source: source, css }), { status: 200 });
+const server = (mode = 'system', source = 'outpost', css = '', start = 'home'): Response =>
+	new Response(JSON.stringify({ mode_preference: mode, style_source: source, css, start_screen: start }), { status: 200 });
 
 async function settle(): Promise<void> {
 	for (let i = 0; i < 6; i++) {
@@ -146,5 +146,89 @@ describe('useAppearance', () => {
 		await settle();
 		expect(document.body.classList.contains('outpost-mode-night')).toBe(true);
 		expect(h.get().status).toMatchObject({ kind: 'device-only', stored: false });
+	});
+
+	describe('start screen', () => {
+		it('is ready at once when this device already knows it', () => {
+			const storage = memory_storage();
+			write_cache({ mode: 'system', source: 'outpost', css: '', start: 'reply', me: 'https://a.test/' }, storage);
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: () => new Promise(() => {}) } });
+			expect(h.get().ready).toBe(true);
+			expect(h.get().state.start).toBe('reply');
+		});
+
+		it('waits for the site on a device without a copy, then uses its answer', async () => {
+			const storage = memory_storage();
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: () => Promise.resolve(server('system', 'outpost', '', 'life')) } });
+			expect(h.get().ready).toBe(false);
+			await settle();
+			expect(h.get().ready).toBe(true);
+			expect(h.get().state.start).toBe('life');
+			expect(read_cache(storage)?.start).toBe('life');
+		});
+
+		it('is ready, with no start screen, when the site cannot be reached', async () => {
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage: memory_storage(), env: { fetch: () => Promise.reject(new TypeError('offline')) } });
+			await settle();
+			expect(h.get().ready).toBe(true);
+			expect(h.get().state.start).toBeUndefined();
+		});
+
+		it('a 1.0.24 device copy without a start screen still asks the site', async () => {
+			const storage = memory_storage();
+			write_cache({ mode: 'night', source: 'site', css: '', me: 'https://a.test/' }, storage);
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: () => Promise.resolve(server('night', 'site', '', 'photo')) } });
+			expect(h.get().ready).toBe(false);
+			await settle();
+			expect(h.get().state.start).toBe('photo');
+		});
+
+		it('saves a start screen without touching appearance', async () => {
+			const storage = memory_storage();
+			write_cache({ mode: 'night', source: 'site', css: 'x', start: 'home', me: 'https://a.test/' }, storage);
+			const bodies: Array<Record<string, string>> = [];
+			const fetch = vi.fn((_: string, init: RequestInit) => {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+				return Promise.resolve(server('night', 'site', 'x', bodies.length > 1 ? 'recipe' : 'home'));
+			});
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: fetch as unknown as typeof globalThis.fetch } });
+			await settle();
+			act(() => h.get().setStart('recipe'));
+			await settle();
+			const save = bodies[bodies.length - 1];
+			expect(save?.['start_screen']).toBe('recipe');
+			expect(save).not.toHaveProperty('mode_preference');
+			expect(save).not.toHaveProperty('style_source');
+			expect(h.get().state.mode).toBe('night');
+			expect(h.get().status.kind).toBe('saved');
+		});
+
+		it('two changes before a re-render both stick', async () => {
+			const storage = memory_storage();
+			write_cache({ mode: 'system', source: 'outpost', css: '', start: 'home', me: 'https://a.test/' }, storage);
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: () => new Promise(() => {}) } });
+			act(() => {
+				h.get().setStart('recipe');
+				h.get().setMode('night');
+			});
+			expect(h.get().state).toMatchObject({ start: 'recipe', mode: 'night', pending: { start: 'recipe', mode: 'night' } });
+			expect(read_cache(storage)).toMatchObject({ start: 'recipe', mode: 'night' });
+		});
+
+		it('reset returns Home, System, and Outpost Default in one save', async () => {
+			const storage = memory_storage();
+			write_cache({ mode: 'night', source: 'site', css: 'x', start: 'about', me: 'https://a.test/' }, storage);
+			const bodies: Array<Record<string, string>> = [];
+			const fetch = vi.fn((_: string, init: RequestInit) => {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+				return Promise.resolve(bodies.length > 1 ? server('system', 'outpost', '', 'home') : server('night', 'site', 'x', 'about'));
+			});
+			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: fetch as unknown as typeof globalThis.fetch } });
+			await settle();
+			act(() => h.get().reset());
+			await settle();
+			expect(bodies[bodies.length - 1]).toMatchObject({ mode_preference: 'system', style_source: 'outpost', start_screen: 'home' });
+			expect(h.get().state).toMatchObject({ mode: 'system', source: 'outpost', start: 'home', css: '' });
+		});
 	});
 });

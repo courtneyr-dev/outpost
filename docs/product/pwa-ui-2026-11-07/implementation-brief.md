@@ -1,6 +1,8 @@
 # Outpost PWA implementation brief
 
-Implement the approved illustrated Outpost composer with Outpost Default styling, an optional Site Theme palette, independent Light/Dark/System controls, and an About tab for connection information and help.
+Implement the approved illustrated Outpost composer with Outpost Default styling, an optional Site Theme palette, independent Light/Dark/System controls, a Home launcher with a per-person default start screen, and an About tab for connection, preferences, and help.
+
+> **Revision 2026-11-08.** The Home launcher, footer Home link, Default start screen preference, and four-section About were merged into this brief (sections 3, 6, 7, 8, 10, and 12) rather than written as a separate feature. The approved appearance decisions are unchanged. The added design reference is [home-launcher-mockup.webp](home-launcher-mockup.webp); the decision record is [session-pwa-ui-home.md](../../decisions/session-pwa-ui-home.md); a review of the mockup against the shipped tabs is in [mockup-review-2026-11-08.md](mockup-review-2026-11-08.md).
 
 ## 1. Instructions, scope, and sources
 
@@ -28,6 +30,14 @@ Expose two independent choices in the PWA settings sheet. Provide named controls
 | --- | --- | --- |
 | Style source | Outpost Default, Use Site Theme | Selects the color and type source without changing brightness mode |
 | Appearance | Light, Dark, System | Maps to existing stored `day`, `night`, `system` values |
+
+A third, independent preference sets the screen a normal launch opens to:
+
+| Choice | Options | Behavior |
+| --- | --- | --- |
+| Default start screen | Home (default), Post, Reply, Photo, Doing, Life, Recipe, About | Opens on a normal launch only. Stored as user meta `outpost_start_screen` with the PWA tab ids (`home`, `note`, `reply`, `photo`, `listen`, `life`, `recipe`, `about`) and carried as `start_screen` on the same `/appearance/tokens` request, with the same device copy and offline reconciliation. Not the site-wide `default_post_variant`, which picks the style the Post tab starts on. |
+
+Startup precedence, highest first: (1) the sign-in callback and recovery flows; (2) a share-sheet, bookmarklet, or iOS Shortcut launch, which opens the tab its content belongs in (a shared photo opens Photo; a shared link keeps the dispatcher's tab and variant); (3) navigation the person already made, because the screen is decided once and a late or changed preference never moves anyone off a draft; (4) the saved start screen; (5) Home. A device holding a copy of the preference opens the right screen on first render. A first launch on a device shows "Opening Outpost…" in a live region while it asks the site, for at most 1.5 seconds, then opens Home. Changing the preference never navigates. Light/Dark/System and the style source stay independent of it.
 
 New users start with Outpost Default + System. Preserve existing saved `outpost_appearance_mode` and explicit token overrides. For upgrades with no style-source field, migrate existing users to Site Theme to preserve their prior behavior. Document and test the new-user/upgrade distinction; don't infer it from whether a user happens to have a mode value. A schema/migration marker can distinguish existing installations. A fresh author on a new install gets the new default.
 
@@ -70,7 +80,26 @@ Bind the logo color to a semantic `--outpost-*` token. Use violet in default lig
 
 Preserve `outpost-icon.svg`, PNG manifest icons, maskable icons, and Apple touch icons as the fixed install identity in this change. The in-app theme choice doesn't regenerate them. An adjacent Outpost wordmark can make the inline mark decorative with `aria-hidden`; a standalone mark needs an accessible name. Compare geometry to the pinned canonical source and inspect at 24, 32, 48, and 64 CSS pixels in both schemes and forced colors.
 
-## 6. All seven destinations and existing publishing behavior
+## 6. Home and all seven destinations
+
+### Home launcher
+
+Home is a launcher, not a form. It's a destination inside the composer, not a second router: the composer adds a `view` (Home or tabs) beside the existing selected tab, keeps the WAI-ARIA tab strip and all seven panels mounted, and hides them on Home. No URL changes.
+
+Home shows a compact connection line from runtime state (the same states as About, never a hard-coded "Connected"), the heading "What would you like to post?", six cards, an "Everything each tab can post" disclosure, and an About row. Each card is one native button with an icon, a title as its accessible name, and a short description as its accessible description. A card whose tab holds a saved draft adds the text "Unsent draft" to its name.
+
+| Card | Opens | Inventory (read from the mode files' variant tables) |
+| --- | --- | --- |
+| Post | `note` | Article, Note, Status, Aside, Quote |
+| Reply | `reply` | Reply, Like, Favorite, Repost, Bookmark, RSVP, Follow, Wishlist, Tag, Acquisition, Issue |
+| Photo | `photo` | Single photo and gallery |
+| Doing | `listen` | Listen, Watch, Read, Play, Game, Jam, Checkin, Eat, Drink, Exercise, Craft, Event, Review, Video, Audio |
+| Life | `life` | Mood, Weather, Sleep, Trip, Itinerary, Question |
+| Recipe | `recipe` | Structured recipe: title, ingredients, instructions, yield, total time, notes |
+
+Two columns on phones, three from 40rem, one only below 17.5rem (very large text). Choosing a card opens its tab and moves focus to the selected tab. Paint comes from the selected style source's tokens like every other surface; the scenery stays decoration.
+
+### Existing publishing behavior
 
 Preserve runtime capability gates, property mapping, validation, drafts, and submission semantics. Read `pwa/src/components/composer-tabs.tsx`, the mode components under `pwa/src/components/modes/`, `pwa/src/lib/composer-config.ts`, shared media/voice/drawer/More components, and their tests.
 
@@ -100,11 +129,18 @@ Replace colliding decorative radios with native radio semantics and a label layo
 
 Size textareas for the task and let them grow without consuming the whole viewport. Keep font sizes at least 16 CSS pixels for phone inputs. Aim for 44×44 CSS pixel targets; meet WCAG's 24×24 minimum and spacing exceptions where relevant. Avoid page-level horizontal scroll at 320 CSS pixels. Support 200% text and 400% zoom/reflow, long labels, safe areas, landscape, virtual keyboards, and larger desktop widths.
 
+Every composing tab and About ends with one footer link, "← Home", in a `<nav>` after the panels and scenery. It's in the page flow, never fixed or sticky, so it can't cover Publish, a focused field, or the keyboard; the composer's bottom padding already clears `env(safe-area-inset-bottom)`. It returns Home and moves focus to Home's heading. Home has none. It doesn't repeat the tab strip.
+
+Going Home never discards a draft or an attached photo, because the panels stay mounted. Home re-reads saved drafts when it opens and labels those cards; a photo attached without typed text has no draft entry but stays attached in Photo.
+
 Keep publish/save controls distinguishable and outside the keyboard's obstruction. A sticky toolbar must never cover the focused control or final field. Give icon-only settings, save, microphone, and close controls accessible names. Don't show "Draft saved" until storage succeeds. Keep useful composition and media state through navigation, appearance changes, retries, and reauthentication. Never auto-publish after sign-in or reconnect.
 
 Differentiate loading, empty, offline, network timeout, 401/expired sign-in, 403/capability/nonce failures, and server failures. Reproduce the companion-options error before attributing it to token expiration. A compact status message offers the right retry or sign-in action while retaining the draft. Use existing persistent live-region patterns for iOS VoiceOver. Keep diagnostics out of ordinary composer copy.
 
-## 8. About means connection and help
+## 8. About means connection, preferences, and help
+
+About has four sections, in this order: **Connection** (site, status, Micropub, IndieAuth, signed-in `me`, Check connection again or Sign in again, Sign out of this device with a note on what it removes, and redacted Diagnostics); **Preferences** (Default start screen, Light/Dark/System, Outpost Default/Use Site Theme, status line, Reset preferences — the same component the header's Preferences sheet shows, with instance-unique ids); **Help and documentation** (Getting started, Plugin documentation, Sharing and shortcuts, Troubleshooting, Privacy and data, plus the share-sheet and bookmarklet guides); **Project** (GitHub repository, Report an issue, version and credits from `readme.txt`, and the IndieWeb reference behind a disclosure). Sharing and shortcuts links to https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone.
+
 
 About has no author biography, avatar editing, profile fields, or publish button. Put the connected site's actual address, connection state, relevant Micropub/IndieAuth status, retry/reauthentication controls, and app/plugin version first. Use runtime data; never hardcode the mockup's courtneyr.dev address, green "connected" dot, "Enabled", "Authenticated", or `vX.X.X`. Show unknown/unavailable states when checks haven't run.
 
@@ -134,6 +170,8 @@ Preserve CSP, escaping/validation, capability and nonce checks, safe CSS seriali
 ## 10. Execution and verification
 
 First reproduce current layouts and appearance behavior on a local/test WordPress site with synthetic content. Measure computed control sizes and trace the token/persistence paths. The six earlier phone screenshots show symptoms; they don't prove root causes. Record observations separately from hypotheses. Don't start by replacing the entire stylesheet or adding a UI framework.
+
+Implementation sequence for the Home revision, as built: start-screen user meta and endpoint field with tests; client preference model and hook; startup precedence function; Home component and composer `view`; footer link; shared Preferences panel in the sheet and About; About sections and sign-out move; styles; docs; captures. The original sequence follows.
 
 Produce a short implementation plan and decision record, then implement in reviewable units: appearance contract/resolver/storage, in-app controls and signpost, shared layout/controls, all mode screens and About, then integration/accessibility verification. Proceed through routine implementation without waiting for another chat's reply.
 
@@ -174,6 +212,8 @@ Give Courtney a ready-to-paste review request containing the branch, immutable f
 Ask ChatGPT to review visual fidelity, canonical signpost geometry, all source/mode combinations, About information architecture, feature omissions, and accessibility evidence. Each actionable finding should name a file/line or screenshot, reproduction steps, impact, and a spec/acceptance reference. Treat its conclusions as advisory. Reproduce each finding independently; record accepted/fixed, rejected-with-evidence, or unresolved findings in `review-response.md`, with commit/test links. Re-review changed areas when new evidence warrants it. Record independent implementation progress while awaiting review.
 
 ## 12. Completion criteria and report
+
+The Home revision is ready for review when new people land on Home; each card opens its tab; all seven tabs keep their behavior; drafts survive trips Home; the footer link returns Home from every tab without obscuring composer actions; all eight start screens can be chosen, persist, and open on a normal launch; share and shortcut launches override them; sign-in still works; appearance stays independent; both style sources render Home, a composer, and About; and keyboard, screen-reader names, zoom, reduced motion, and touch targets have evidence.
 
 The implementation is ready for Courtney's review when all seven destinations retain their capabilities, the actual composer renders the approved default design, Site Theme is optional, both sources work with all appearance modes, the signpost matches canonical geometry, About shows runtime connection/help data, drafts survive recovery, and required checks have evidence.
 

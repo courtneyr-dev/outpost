@@ -586,4 +586,50 @@ final class TokenResolverTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( '#000000', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 1.0 ) );
 		$this->assertSame( '#808080', Outpost_Token_Resolver::mix_hex( '#ffffff', '#000000', 0.5 ) );
 	}
+
+	/**
+	 * Mockup review P6: the selected Light / Dark / System segment takes a
+	 * tint, not the orange action fill, and keeps its label and ring readable.
+	 *
+	 * @return array<string,array{0:array<string,string>}>
+	 */
+	public static function segment_palettes(): array {
+		return array(
+			'Outpost Default light' => array( Outpost_Token_Resolver::DEFAULTS['day']['colors'] ),
+			'Outpost Default dark'  => array( Outpost_Token_Resolver::DEFAULTS['night']['colors'] ),
+			'pale accent site'      => array(
+				array(
+					'bg'       => '#ffffff',
+					'surface'  => '#ffffff',
+					'text'     => '#111111',
+					'accent'   => '#ffee58',
+					'accent_2' => '#503aa8',
+				),
+			),
+			'low-contrast ink site' => array(
+				array(
+					'bg'       => '#f4f4f4',
+					'surface'  => '#ffffff',
+					'text'     => '#767676',
+					'accent'   => '#0a7d3b',
+					'accent_2' => '#333333',
+				),
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider segment_palettes
+	 * @param array<string,string> $colors
+	 */
+	public function test_selected_segment_is_a_readable_tint_not_the_action_fill( array $colors ): void {
+		$adjusted = array();
+		$c        = Outpost_Token_Resolver::component_tokens( $colors, array(), $adjusted );
+		$this->assertArrayHasKey( 'segment-bg-selected', $c );
+		$this->assertArrayHasKey( 'segment-fg-selected', $c );
+		$this->assertNotSame( $c['button-primary-bg'], $c['segment-bg-selected'], 'The selected segment must not reuse the publish fill.' );
+		$this->assertNotSame( $c['tab-bg-active'], $c['segment-bg-selected'], 'The selected segment must not reuse the selected-tab fill.' );
+		$this->assertGreaterThanOrEqual( 4.5, Outpost_Contrast::ratio( $c['segment-fg-selected'], $c['segment-bg-selected'] ) );
+		$this->assertGreaterThanOrEqual( 3.0, Outpost_Contrast::ratio( $c['tab-indicator'], $c['segment-bg-selected'] ), 'The inset ring is the non-color cue and needs 3:1.' );
+	}
 }

@@ -93,6 +93,9 @@ final class UninstallTest extends TestCase {
 
 		update_user_meta( $this->user_id, 'outpost_appearance_mode', 'night' );
 		update_user_meta( $this->user_id, 'outpost_appearance_overrides', array( 'a' => 'b' ) );
+		update_user_meta( $this->user_id, 'outpost_appearance_source', 'site' );
+		update_user_meta( $this->user_id, 'outpost_start_screen', 'reply' );
+		update_option( 'outpost_appearance_schema', array( 'version' => 1, 'legacy_cutoff' => 0 ) );
 		update_user_meta( $this->user_id, 'outpost_ios_shortcut_token', 'plain-token' );
 		update_user_meta( $this->user_id, 'outpost_ios_shortcut_first_seen', '2026-09-01' );
 		update_user_meta( $this->user_id, 'outpost_dismissed_encryption_key_notice_1.0.4', '1' );
@@ -134,6 +137,9 @@ final class UninstallTest extends TestCase {
 
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_appearance_mode', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_appearance_overrides', true ) );
+		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_appearance_source', true ) );
+		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_start_screen', true ) );
+		$this->assertFalse( get_option( 'outpost_appearance_schema', false ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_ios_shortcut_token', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_ios_shortcut_first_seen', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_dismissed_encryption_key_notice_1.0.4', true ) );

@@ -27,6 +27,8 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, buil
 * **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
 * **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
 
+The composer opens to a Home screen with a card for each mode, or to the start screen you pick in Preferences. Sharing to Outpost still opens the mode that fits what you shared.
+
 The composer is a real PWA: it installs to your iOS or Android home screen, keeps unsent text on your device through a reload or a fresh sign-in, queues posts made offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note, a shared photo the Photo tab.
 
 POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.

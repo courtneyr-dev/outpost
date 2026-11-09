@@ -33,6 +33,7 @@ import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -121,6 +122,9 @@ interface VariantConfig {
 	/** Show the per-kind primary input (artist for listen/jam, director for
 	 *  watch, author for read, food/drink for eat/drink, place for checkin). */
 	personLabel?: string;
+	/** Short name the publish hint uses when the person field is the
+	 *  required one and its label is a question. Defaults to personLabel. */
+	personName?: string;
 	/** Property the personLabel maps to in the Micropub payload. */
 	personProperty?: 'author' | 'name';
 	/** Show the read-status dropdown (Read kind only). */
@@ -282,6 +286,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you eat?',
+		personName: 'Food',
 		personProperty: 'name', // posted as eat-of via property mapping below
 		hasGeocode: true,
 	},
@@ -295,6 +300,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you drink?',
+		personName: 'Drink',
 		personProperty: 'name',
 		hasGeocode: true,
 	},
@@ -312,6 +318,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What activity?',
+		personName: 'Activity',
 		personProperty: 'name', // routed to `exercise` via the eat/drink-shaped branch below
 		hasGeocode: true,
 	},
@@ -329,6 +336,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you make?',
+		personName: 'Project',
 		personProperty: 'name', // routed to `craft-of` via the person-primary branch below
 		hasGeocode: true,
 	},
@@ -410,6 +418,9 @@ const VARIANT_ORDER: Variant[] = [
 	'video',
 	'audio',
 ];
+
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const DOING_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
 
 function is_variant(value: unknown): value is Variant {
 	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
@@ -1061,6 +1072,15 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		media_entries.length === 0 ||
 		all_entries_have_alt(media_entries);
 	const can_submit = base_can_submit && media_complete;
+	const missing: string[] = [];
+	if (!base_can_submit) {
+		missing.push(
+			config.targetRequired
+				? config.targetLabel
+				: (config.personName ?? config.personLabel ?? 'Details'),
+		);
+	}
+	if (!media_complete) missing.push('Alt text for each photo');
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-listen-mode-title">
@@ -1072,7 +1092,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
-				<fieldset class="outpost-variant-picker">
+				<fieldset class="outpost-variant-picker outpost-variant-picker--compact">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
 						<label key={id} class="outpost-radio">
@@ -1492,15 +1512,8 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -1509,8 +1522,16 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						>
 							More options
 						</button>
-					)}
-				</div>
+					</div>
+				)}
+
+				<PublishButton
+					idPrefix="outpost-listen"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

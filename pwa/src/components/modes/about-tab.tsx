@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { BookmarkletList } from '../bookmarklet-list';
 import { ExternalLink } from '../external-link';
 import { ShareSheetGuide } from '../share-sheet-guide';
+import { PreferencesPanel, type PreferencesPanelProps } from '../preferences-panel';
 import type { CompanionId, CompanionStatus } from '../../lib/composer-config';
 
 /**
@@ -39,9 +40,13 @@ export interface AboutTabProps {
 	companions: Record<CompanionId, CompanionStatus> | null;
 	onRetry: () => void;
 	onReauth: () => void;
+	/** Forget this sign-in, drafts, and preferences copy on this device. */
+	onSignOut: () => void;
+	/** The same preferences the header's Preferences sheet shows. */
+	preferences: Omit<PreferencesPanelProps, 'idPrefix'>;
 }
 
-const CONNECTION_TEXT: Record<ConnectionState, { label: string; detail: string }> = {
+export const CONNECTION_TEXT: Record<ConnectionState, { label: string; detail: string }> = {
 	checking: { label: 'Checking…', detail: 'Outpost is asking your site for its settings.' },
 	connected: { label: 'Connected', detail: 'Your site accepted this sign-in and answered.' },
 	unreachable: {
@@ -55,7 +60,7 @@ const CONNECTION_TEXT: Record<ConnectionState, { label: string; detail: string }
 	},
 };
 
-const CONNECTION_GLYPH: Record<ConnectionState, string> = {
+export const CONNECTION_GLYPH: Record<ConnectionState, string> = {
 	checking: '…',
 	connected: '✓',
 	unreachable: '!',
@@ -64,13 +69,38 @@ const CONNECTION_GLYPH: Record<ConnectionState, string> = {
 };
 
 const HELP_LINKS: ReadonlyArray<{ href: string; label: string; detail: string }> = [
-	{ href: 'https://courtneyr-dev.github.io/outpost/', label: 'Documentation', detail: 'Everything Outpost does, with setup and settings.' },
 	{ href: 'https://courtneyr-dev.github.io/outpost/getting-started/', label: 'Getting started', detail: 'Install, sign in, and post your first entry.' },
+	{ href: 'https://courtneyr-dev.github.io/outpost/', label: 'Plugin documentation', detail: 'Everything Outpost does, with setup and settings.' },
+	{ href: 'https://courtneyr-dev.github.io/outpost/common-tasks/#share-to-outpost-from-your-phone', label: 'Sharing and shortcuts', detail: 'Share to Outpost from your phone, the iOS Shortcut, and bookmarklets.' },
 	{ href: 'https://courtneyr-dev.github.io/outpost/troubleshooting/', label: 'Troubleshooting', detail: 'Fixes for sign-in, connection, and posting problems.' },
 	{ href: 'https://courtneyr-dev.github.io/outpost/privacy-and-data/', label: 'Privacy and data', detail: 'What Outpost stores, where, and for how long.' },
-	{ href: 'https://github.com/courtneyr-dev/outpost', label: 'Source code', detail: 'GPLv2-or-later, on GitHub.' },
+];
+
+const PROJECT_LINKS: ReadonlyArray<{ href: string; label: string; detail: string }> = [
+	{ href: 'https://github.com/courtneyr-dev/outpost', label: 'GitHub repository', detail: 'Source code, GPLv2-or-later.' },
 	{ href: 'https://github.com/courtneyr-dev/outpost/issues', label: 'Report an issue', detail: 'Tell us what went wrong, or ask for a feature.' },
 ];
+
+/** Prior IndieWeb work Outpost builds on, as credited in readme.txt. */
+const CREDITS: ReadonlyArray<string> = [
+	'IndieWeb Press This by Matthias Pfefferle, David Shanske, and Ryan Barrett: the bookmarklet pattern Outpost extends.',
+	'Micropub plugin by David Shanske: the server endpoint Outpost posts to.',
+	'IndieAuth plugin by Matthias Pfefferle and David Shanske: sign-in.',
+	'Bridgy by Ryan Barrett: round-trip syndication.',
+];
+
+function LinkList({ labelledBy, links }: { labelledBy: string; links: ReadonlyArray<{ href: string; label: string; detail: string }> }): preact.JSX.Element {
+	return (
+		<ul class="outpost-link-list" aria-labelledby={labelledBy}>
+			{links.map((link) => (
+				<li key={link.href}>
+					<ExternalLink href={link.href}>{link.label}</ExternalLink>
+					<span class="outpost-link-list__detail">{link.detail}</span>
+				</li>
+			))}
+		</ul>
+	);
+}
 
 function app_version(): string {
 	if (typeof document === 'undefined') return '';
@@ -108,7 +138,7 @@ export function diagnostics_text(props: Pick<AboutTabProps, 'siteUrl' | 'me' | '
  * readers), so a draft in another tab stays where it is.
  */
 export function AboutTab(props: AboutTabProps): preact.JSX.Element {
-	const { siteUrl, me, scope, connection, onRetry, onReauth } = props;
+	const { siteUrl, me, connection, onRetry, onReauth, onSignOut, preferences } = props;
 	const version = app_version();
 	const [copied, setCopied] = useState('');
 	const text = CONNECTION_TEXT[connection];
@@ -125,9 +155,9 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 	return (
 		<section class="outpost-card outpost-about" aria-labelledby="outpost-about-title">
 			<h2 id="outpost-about-title" class="outpost-card__title">
-				About
+				About Outpost
 			</h2>
-			<p class="outpost-card__lede">Connection, documentation, and help for Outpost.</p>
+			<p class="outpost-card__lede">Connection, preferences, documentation, and help.</p>
 
 			<h3 id="outpost-about-connection">Connection</h3>
 			<dl class="outpost-facts" aria-labelledby="outpost-about-connection">
@@ -168,8 +198,10 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 					</dd>
 				</div>
 				<div class="outpost-facts__row">
-					<dt>Version</dt>
-					<dd>{version ? `Outpost ${version}` : 'Unknown'}</dd>
+					<dt>Signed in as</dt>
+					<dd>
+						<code>{me || 'Unknown'}</code>
+					</dd>
 				</div>
 			</dl>
 			<div class="outpost-form-actions">
@@ -182,7 +214,18 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						Check connection again
 					</button>
 				)}
+				<button
+					type="button"
+					class="outpost-button outpost-button--secondary"
+					onClick={onSignOut}
+					aria-describedby="outpost-about-signout-help"
+				>
+					Sign out of this device
+				</button>
 			</div>
+			<p class="outpost-help" id="outpost-about-signout-help">
+				Signing out removes this sign-in, your unsent drafts, and the preferences copy from this device.
+			</p>
 
 			<details class="outpost-disclosure">
 				<summary>Diagnostics</summary>
@@ -195,15 +238,13 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 				</p>
 			</details>
 
-			<h3 id="outpost-about-help">Help</h3>
-			<ul class="outpost-link-list" aria-labelledby="outpost-about-help">
-				{HELP_LINKS.map((link) => (
-					<li key={link.href}>
-						<ExternalLink href={link.href}>{link.label}</ExternalLink>
-						<span class="outpost-link-list__detail">{link.detail}</span>
-					</li>
-				))}
-			</ul>
+			<h3 id="outpost-about-preferences">Preferences</h3>
+			<section aria-labelledby="outpost-about-preferences">
+				<PreferencesPanel idPrefix="outpost-about-prefs" {...preferences} />
+			</section>
+
+			<h3 id="outpost-about-help">Help and documentation</h3>
+			<LinkList labelledBy="outpost-about-help" links={HELP_LINKS} />
 
 			<details class="outpost-disclosure">
 				<summary>Post from anywhere: share sheet and bookmarklets</summary>
@@ -213,10 +254,21 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 				</div>
 			</details>
 
+			<h3 id="outpost-about-project">Project</h3>
+			<LinkList labelledBy="outpost-about-project" links={PROJECT_LINKS} />
+
+			<h4 id="outpost-about-credits">Version and credits</h4>
+			<p>{version ? `Outpost ${version}` : 'Outpost (version unknown)'}, GPLv2-or-later. It builds on:</p>
+			<ul aria-labelledby="outpost-about-credits">
+				{CREDITS.map((credit) => (
+					<li key={credit}>{credit}</li>
+				))}
+			</ul>
+
 			<details class="outpost-disclosure">
-				<summary>How Outpost works with the IndieWeb</summary>
+				<summary>IndieWeb reference: how Outpost posts</summary>
 				<div class="outpost-disclosure__body">
-					<h3>What Outpost posts</h3>
+					<h4>What Outpost posts</h4>
 					<p>
 						Outpost only writes <strong>posts</strong> — the standard WordPress{' '}
 						<code>post</code> post type. It does <strong>not</strong> write:
@@ -238,7 +290,7 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						server accepts.
 					</p>
 
-					<h3>POSSE — Publish (on your) Own Site, Syndicate Elsewhere</h3>
+					<h4>POSSE — Publish (on your) Own Site, Syndicate Elsewhere</h4>
 					<p>
 						The acronym was{' '}
 						<ExternalLink href="https://indieweb.org/POSSE">
@@ -297,7 +349,7 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						</li>
 					</ul>
 
-					<h3>IndieWeb specs Outpost speaks</h3>
+					<h4>IndieWeb specs Outpost speaks</h4>
 					<p>
 						Every post Outpost sends is built on these specs. Helpful primers if
 						you want to understand what a post actually looks like on the wire:
@@ -378,7 +430,7 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						</dd>
 					</dl>
 
-					<h3>XFN — XHTML Friends Network</h3>
+					<h4>XFN — XHTML Friends Network</h4>
 					<p>
 						The relationship picker on Reply / Doing target URLs is XFN. It lets
 						you mark how you know the person on the other end of a link:{' '}
@@ -410,7 +462,7 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						</dd>
 					</dl>
 
-					<h3>Post Formats</h3>
+					<h4>Post Formats</h4>
 					<p>
 						WordPress&apos;s native classification of posts as Status / Aside /
 						Image / Gallery / Video / Audio / Quote / Link / Standard. Outpost
@@ -452,7 +504,7 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						</dd>
 					</dl>
 
-					<h3>Companion plugins</h3>
+					<h4>Companion plugins</h4>
 					<p>
 						Outpost works on its own but adapts when these plugins are present:
 					</p>
@@ -524,16 +576,6 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 				</div>
 			</details>
 
-			<p class="outpost-help">
-				Signed in as <code>{me || 'unknown'}</code>
-				{scope ? (
-					<>
-						{' '}
-						with <code>{scope}</code>
-					</>
-				) : null}
-				.
-			</p>
 		</section>
 	);
 }

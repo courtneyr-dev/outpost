@@ -334,6 +334,10 @@ Theme inheritance + Field Notes treatments (three stacked PRs). Token priority c
 
 Outpost Default ships the paper/violet/orange design; Use Site Theme is a per-user option (`outpost_appearance_source`), independent of Light/Dark/System (`outpost_appearance_mode`). Upgrades keep Site Theme for users registered before the `outpost_appearance_schema` cutoff; fresh installs and later users get Outpost Default + System. The resolver derives the full component token set (`component_tokens()`, contrast-checked final pairs) and emits it scoped to `.outpost-source-*` (`to_scoped_css()`); the shell prints it for cookie users and `assets/js/appearance-boot.js` applies the device cache before first paint; `/appearance/tokens` accepts bearer tokens and answers `no-store`. Full decisions: [docs/decisions/session-pwa-ui-appearance.md](docs/decisions/session-pwa-ui-appearance.md).
 
+## PWA UI Home launcher — Locked Decisions (in progress, 2026-11-08)
+
+Home is a `view` inside `ComposerTabs`, not a router: the tab strip and all seven panels stay mounted and `hidden`, so a trip Home drops nothing. Per-user start screen in `outpost_start_screen` (`home` default for everyone; values are the tab ids, so Post is `note`, Doing is `listen`), carried as `start_screen` on `/appearance/tokens` with the appearance device copy and pending reconciliation. Precedence: auth callback → share/bookmarklet/Shortcut intake → navigation already made (decided once) → saved start screen → Home; a first launch on a device waits at most 1.5 s. The "← Home" footer link is in page flow, never fixed. Sign out lives in About › Connection. Compact composer (#289): Doing and Reply types are wrapping `border-box` 44 px tiles, never a disclosure; every composing tab ends with `PublishButton` plus a "Still needed: …" hint; the selected appearance segment paints from `segment-bg-selected` / `segment-fg-selected`, not `chip-active`. Full decisions: [docs/decisions/session-pwa-ui-home.md](docs/decisions/session-pwa-ui-home.md).
+
 ## Build Order (40 sessions)
 
 Phase A: Foundation (slug, scaffold, companion detector, routes).

@@ -107,7 +107,48 @@ final class AppearanceRestControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'outpost', $data['style_source'] );
 		$this->assertFalse( $data['style_source_stored'] );
 		$this->assertSame( 'system', $data['mode_preference'] );
+		$this->assertSame( 'home', $data['start_screen'], 'A user without a stored start screen opens on Home.' );
+		$this->assertFalse( $data['start_screen_stored'] );
 		$this->assertSame( '', $data['css'], 'Outpost Default without overrides needs no extra CSS.' );
+	}
+
+	public function test_start_screen_save_persists_and_is_returned(): void {
+		$response = Outpost_Appearance_REST_Controller::handle_post( $this->post( array( 'start_screen' => 'reply' ) ) );
+		$data     = $response->get_data();
+		$this->assertSame( 'reply', $this->user_meta[7]['outpost_start_screen'] );
+		$this->assertSame( 'reply', $data['start_screen'] );
+		$this->assertTrue( $data['start_screen_stored'] );
+	}
+
+	public function test_invalid_start_screen_is_rejected_without_writes(): void {
+		$result = Outpost_Appearance_REST_Controller::handle_post( $this->post( array( 'start_screen' => 'settings' ) ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'outpost_appearance_invalid_start_screen', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertSame( array(), $this->meta_writes );
+	}
+
+	public function test_an_invalid_start_screen_does_not_half_apply_other_changes(): void {
+		$result = Outpost_Appearance_REST_Controller::handle_post(
+			$this->post(
+				array(
+					'mode_preference' => 'night',
+					'style_source'    => 'site',
+					'start_screen'    => 'nowhere',
+				)
+			)
+		);
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( array(), $this->meta_writes, 'A rejected request must not store the valid fields beside it.' );
+	}
+
+	public function test_start_screen_is_independent_of_appearance(): void {
+		$this->user_meta[7]['outpost_appearance_mode']   = 'night';
+		$this->user_meta[7]['outpost_appearance_source'] = 'site';
+		Outpost_Appearance_REST_Controller::handle_post( $this->post( array( 'start_screen' => 'photo' ) ) );
+		$this->assertSame( 'night', $this->user_meta[7]['outpost_appearance_mode'] );
+		$this->assertSame( 'site', $this->user_meta[7]['outpost_appearance_source'] );
+		$this->assertSame( array( array( 7, 'outpost_start_screen' ) ), $this->meta_writes );
 	}
 
 	public function test_style_source_save_persists_and_returns_site_css(): void {

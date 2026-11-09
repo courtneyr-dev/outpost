@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render } from 'preact';
 import { NoteMode } from './note-mode';
-import type { StoredToken, TokenStoreEnvironment } from '../../lib/token-store';
+import type { StoredToken } from '../../lib/token-store';
 import type { MicropubEnvironment } from '../../lib/micropub';
 import { DRAFTS_KEY, DRAFT_SAVE_DELAY_MS } from '../../lib/drafts';
 
@@ -17,11 +17,6 @@ function token_for(me: string): StoredToken {
 		storedAt: 0,
 	};
 }
-
-const token_store: TokenStoreEnvironment = {
-	indexedDB: globalThis.indexedDB,
-	crypto: globalThis.crypto,
-} as TokenStoreEnvironment;
 
 let root: HTMLDivElement;
 let posts: URLSearchParams[];
@@ -63,7 +58,7 @@ afterEach(() => {
 });
 
 function mount(me = ME): void {
-	render(<NoteMode token={token_for(me)} tokenStore={token_store} micropubEnv={online_micropub()} />, root);
+	render(<NoteMode token={token_for(me)} micropubEnv={online_micropub()} />, root);
 }
 
 /** Unmount and mount again: what a page reload does to component state. */
@@ -174,26 +169,8 @@ describe('NoteMode drafts', () => {
 		expect(field('outpost-note-content').value).toBe('');
 	});
 
-	it('clears drafts on sign-out', async () => {
-		const reload_spy = vi.fn();
-		vi.spyOn(window, 'location', 'get').mockReturnValue({
-			...window.location,
-			reload: reload_spy,
-		} as Location);
-		mount();
-		type('outpost-note-content', 'Private words');
-		await wait_for_save();
-		expect(localStorage.getItem(DRAFTS_KEY)).not.toBeNull();
-		const sign_out = Array.from(root.querySelectorAll('button')).find(
-			(b) => b.textContent === 'Sign out',
-		) as HTMLButtonElement;
-		sign_out.click();
-		await vi.waitFor(() => expect(reload_spy).toHaveBeenCalled());
-		expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
-	});
-
 	it('keeps working without "Draft saved" when storage refuses writes', async () => {
-		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+		vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
 			throw new DOMException('denied', 'SecurityError');
 		});
 		mount();
@@ -210,7 +187,7 @@ describe('NoteMode drafts', () => {
 	});
 
 	it('mounts with an empty form when storage reads throw', async () => {
-		vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+		vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
 			throw new DOMException('denied', 'SecurityError');
 		});
 		mount();

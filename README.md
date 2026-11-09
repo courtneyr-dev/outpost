@@ -39,6 +39,8 @@ Every kind that [Post Kinds for IndieWeb](https://github.com/courtneyr-dev/post-
 | Life | mood, weather, sleep, trip, itinerary, question |
 | Recipe | recipe (h-recipe with ingredients and steps) |
 
+The composer opens to a Home screen with a card for each tab, or to the start screen each person picks in Preferences; a share-sheet or bookmarklet launch still opens the tab its content belongs in, and every tab links back to Home.
+
 Any Doing kind except Video, and Recipe, accept an optional photo. The first photo on a post becomes its featured image unless one is already set (site owners can turn that off with the `outpost_set_featured_image` filter).
 
 When the Post Kinds companion is active, the composer also names the kind explicitly on each Micropub post (a `pkiw-kind` vendor property), so property-ambiguous kinds — an issue is wire-identical to a reply — classify correctly. Other Micropub servers never receive the property.
@@ -51,7 +53,7 @@ When the Post Kinds companion is active, the composer also names the kind explic
 
 It needs two plugins, [IndieAuth](https://wordpress.org/plugins/indieauth/) and [Micropub](https://wordpress.org/plugins/micropub/), and adds features when companion plugins are also active. No Jetpack, no app store, no third-party auth.
 
-| ![Outpost composer on a phone showing Note mode with a text field and syndication chips](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode showing the pasted target URL context](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a queued draft badge](docs/src/assets/screenshots/frontend-offline-queue.png) |
+| ![Outpost on a phone with the Note style selected and More options open on the Send to list of syndication destinations](docs/src/assets/screenshots/frontend-composer-note-mode.png) | ![Reply mode on a phone with its eleven types as wrapping tiles, a target URL in In reply to, and a reply being written](docs/src/assets/screenshots/frontend-composer-reply-mode.png) | ![Composer showing the offline connection banner and a 1 queued badge above the Post tab](docs/src/assets/screenshots/frontend-offline-queue.png) |
 |---|---|---|
 | Note mode with syndication chips | Reply mode with the target's context | Offline, with a queued draft |
 
@@ -91,7 +93,7 @@ Outpost detects companions at runtime (not at install time) and updates the comp
 **Outpost owns layout and its default design. The style source you pick supplies paint.**
 
 - Outpost always owns: PWA shell, routes, service worker, manifest, composer interaction, structural CSS (layout, iOS safe-area, touch targets, focus), and the Outpost Default design tokens.
-- Each person picks a style source in the composer's settings: **Outpost Default** (the shipped paper, violet, and orange design) or **Use Site Theme** (the active theme's palette and fonts, contrast-checked). Light, Dark, and System work with either.
+- Each person picks a style source in the composer's Preferences: **Outpost Default** (the shipped paper, violet, and orange design) or **Use Site Theme** (the active theme's palette and fonts, contrast-checked). Light, Dark, and System work with either.
 - Component CSS only references colors and fonts through `var(--outpost-*)` tokens and never hardcodes paint. A theme can still set any token.
 - One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the iOS bottom toolbar.
 

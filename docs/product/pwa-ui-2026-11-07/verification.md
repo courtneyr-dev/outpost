@@ -130,3 +130,45 @@ All captures are synthetic: `localhost:8888`, the wp-env `admin` account, no dra
 - **Classic-theme fallback:** covered by unit tests (no theme.json → Outpost values with the theme layer empty) but not captured on a classic theme.
 - **Integration suite:** needs the WireMock sidecar; left to CI.
 - **Docs site:** build, link check, and screenshot refresh skipped (disk).
+
+## Home launcher revision (branch `pwa/home-launcher`, 2026-11-08)
+
+Same states as above: implemented, locally verified, CI-verified, device-reviewed. Nothing here is device-reviewed.
+
+Environment: macOS, Node 20.20.2 for Vitest (Node 26's `localStorage` breaks happy-dom here), PHP 8.4 locally, wp-env with WordPress, IndieAuth 5.0.0, Micropub 2.5.4, and Twenty Twenty-Five, Playwright Chromium. Sign-in used the same local-only `me` removal as above.
+
+| Command | Result |
+| --- | --- |
+| `composer test:unit` | 1,647 tests, 4,111 assertions, OK |
+| `composer lint` | exit 0 |
+| `composer analyze` | no errors |
+| `composer lint:section5` | passed, including B6 (no hex in component CSS) |
+| `vendor/bin/phpunit --bootstrap=tests/integration/bootstrap.php --testsuite integration --filter 'UninstallTest\|BearerScope'` in wp-env `tests-cli` | 8 tests, 46 assertions, OK |
+| `npx tsc --noEmit -p .` | no errors |
+| `npm run lint` | no errors |
+| Vitest, full suite | 55 files, 626 tests passed. One earlier full run had a 1,074 ms timeout in an unrelated QueueBadge test; it passed 3 of 3 alone and in the next full run. |
+| `npm run build` | JS 54.7 KB gzipped (+2.4 KB), CSS 8.0 KB gzipped (+0.5 KB) |
+| Docs: `npm run lint:md`, Vale on the four edited pages, `npm run build`, internal link check | 0 issues; 0 Vale alerts; 17 pages; 242 links, 0 broken |
+| `npm run format:check` | not run as a gate: Prettier flags 120 existing files and CI doesn't run it; new files follow the surrounding style |
+
+Not run locally: the full integration suite (needs the WireMock sidecar; CI runs it) and `npm run test:e2e` (no Playwright specs exist).
+
+### Acceptance checks
+
+| Check | How it's verified |
+| --- | --- |
+| New users without a preference land on Home | `composer-tabs.test.tsx` "a new user waits for the site, then lands on Home"; `StartScreenTest` default; [capture](evidence-home/home-light-390.png) |
+| Each Home card opens the right composer | test "each card opens its composer tab and moves focus to that tab" (all six) |
+| All seven tabs remain | existing tab-framework tests, run with a stored Post start screen |
+| Switching tabs and going Home keep drafts | test "going Home keeps typed text and labels the tab that holds it"; [capture](evidence-home/home-draft-light-390.png) |
+| Returning Home works from every tab | test "every tab, About included, has the Home link" |
+| Home link doesn't obscure composer actions | in page flow, no `position: fixed` or `sticky` in its CSS; [capture](evidence-home/post-light-390.png) |
+| Any of the eight start screens can be chosen and opens | tests "opens each of the eight saved start screens", the select test, `StartScreenTest` |
+| The preference persists across sessions and devices | `AppearanceRestControllerTest` start-screen cases; hook test "waits for the site … then uses its answer"; composer test "uses the site's saved start screen on a device that hasn't stored one" |
+| Share and shortcut launches override it | test "a share launch opens its tab even when another start screen is saved"; `start-screen.test.ts` |
+| Sign-in still works | real IndieAuth sign-in on wp-env during capture; the callback route is untouched |
+| Appearance stays independent of the start screen | hook test "saves a start screen without touching appearance"; REST test "start screen is independent of appearance"; composer test "changing the start screen or appearance never moves the person" |
+| Both style sources on Home, composer, and About | captures under Outpost Default and Use Site Theme |
+| Automated accessibility | axe-core, WCAG 2.0 to 2.2 A/AA tags: 13 views, 0 violations ([results](evidence-home/home-axe-results.json)) |
+| Keyboard | Cards and links are native buttons; focus moves to the selected tab after a card and to the Home heading after "← Home" (tests). Not checked by hand with a keyboard. |
+| VoiceOver, zoom, reduced motion, touch | **Unverified.** No device pass. Home adds no animation. Cards are at least 8.5rem tall and every other new control is at least 44 px tall. A single-column rule covers very large text; 200% and 400% weren't measured. |

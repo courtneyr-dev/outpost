@@ -1,6 +1,8 @@
 /**
- * Appearance preferences for the composer: Light / Dark / System (`mode`)
- * and Outpost Default / Use Site Theme (`source`).
+ * Composer preferences: Light / Dark / System (`mode`), Outpost Default /
+ * Use Site Theme (`source`), and the screen a normal launch opens to
+ * (`start`). The start screen rides along because it needs the same
+ * per-user storage, device copy, and offline reconciliation.
  *
  * The server stores both per user (`/wp-json/outpost/v1/appearance/tokens`).
  * This module keeps a device copy in localStorage so
@@ -21,6 +23,10 @@
 export type AppearanceMode = 'day' | 'night' | 'system';
 export type StyleSource = 'outpost' | 'site';
 export type EffectiveScheme = 'light' | 'dark';
+/** Home, the six composing tabs (Post is `note`, Doing is `listen`), then About. */
+export type StartScreen = 'home' | 'note' | 'reply' | 'photo' | 'listen' | 'life' | 'recipe' | 'about';
+
+export const START_SCREENS: readonly StartScreen[] = ['home', 'note', 'reply', 'photo', 'listen', 'life', 'recipe', 'about'];
 
 export const CACHE_KEY = 'outpost.appearance.v1';
 const STYLE_ELEMENT_ID = 'outpost-appearance-tokens';
@@ -31,10 +37,18 @@ export interface AppearanceState {
 	source: StyleSource;
 	/** Scoped token CSS for the source; '' when the token file covers it. */
 	css: string;
+	/** Screen a normal launch opens to; absent until the site or this device has said. */
+	start?: StartScreen;
 	/** Choices made on this device the server hasn't confirmed yet. */
-	pending?: { mode?: AppearanceMode; source?: StyleSource };
+	pending?: PreferenceChanges;
 	/** The signed-in `me` URL the cache belongs to. */
 	me?: string;
+}
+
+export interface PreferenceChanges {
+	mode?: AppearanceMode;
+	source?: StyleSource;
+	start?: StartScreen;
 }
 
 export const NEW_USER_DEFAULT: AppearanceState = { mode: 'system', source: 'outpost', css: '' };
@@ -45,6 +59,10 @@ export function is_mode(value: unknown): value is AppearanceMode {
 
 export function is_source(value: unknown): value is StyleSource {
 	return value === 'outpost' || value === 'site';
+}
+
+export function is_start_screen(value: unknown): value is StartScreen {
+	return typeof value === 'string' && (START_SCREENS as readonly string[]).includes(value);
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,12 +127,14 @@ export function parse_state(raw: unknown): AppearanceState | null {
 		css: typeof r.css === 'string' ? r.css : '',
 	};
 	if (typeof r.me === 'string') state.me = r.me;
+	if (is_start_screen(r.start)) state.start = r.start;
 	if (r.pending && typeof r.pending === 'object') {
 		const p = r.pending as Record<string, unknown>;
-		const pending: NonNullable<AppearanceState['pending']> = {};
+		const pending: PreferenceChanges = {};
 		if (is_mode(p.mode)) pending.mode = p.mode;
 		if (is_source(p.source)) pending.source = p.source;
-		if (pending.mode || pending.source) state.pending = pending;
+		if (is_start_screen(p.start)) pending.start = p.start;
+		if (pending.mode || pending.source || pending.start) state.pending = pending;
 	}
 	return state;
 }
@@ -189,6 +209,7 @@ export interface ServerAppearance {
 	mode: AppearanceMode;
 	source: StyleSource;
 	css: string;
+	start: StartScreen;
 }
 
 /**
@@ -200,12 +221,13 @@ export interface ServerAppearance {
  */
 export async function sync_appearance(
 	access_token: string,
-	changes: { mode?: AppearanceMode; source?: StyleSource } = {},
+	changes: PreferenceChanges = {},
 	env: AppearanceEnvironment = default_env(),
 ): Promise<ServerAppearance> {
 	const body: Record<string, string> = { access_token };
 	if (changes.mode) body['mode_preference'] = changes.mode;
 	if (changes.source) body['style_source'] = changes.source;
+	if (changes.start) body['start_screen'] = changes.start;
 
 	const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
 	const timer = controller ? setTimeout(() => controller.abort(), env.timeoutMs ?? 10_000) : null;
@@ -250,6 +272,8 @@ export async function sync_appearance(
 		mode: d['mode_preference'],
 		source: d['style_source'],
 		css: typeof d['css'] === 'string' ? d['css'] : '',
+		// A site still on 1.0.24 doesn't send it; Home is the default there too.
+		start: is_start_screen(d['start_screen']) ? d['start_screen'] : 'home',
 	};
 }
 
@@ -258,10 +282,11 @@ export async function sync_appearance(
  * survives a read that didn't include it (the caller sends it next).
  */
 export function reconcile(local: AppearanceState | null, server: ServerAppearance, sent_pending: boolean): AppearanceState {
-	const out: AppearanceState = { mode: server.mode, source: server.source, css: server.css };
+	const out: AppearanceState = { mode: server.mode, source: server.source, css: server.css, start: server.start };
 	if (local?.me) out.me = local.me;
 	if (local?.pending && !sent_pending) {
 		if (local.pending.mode) out.mode = local.pending.mode;
+		if (local.pending.start) out.start = local.pending.start;
 		if (local.pending.source) {
 			out.source = local.pending.source;
 			// The server's CSS is for its source; drop it until resent.

@@ -25,12 +25,15 @@ Expected result: the composer shows its posting modes and you're ready to write.
 
 ## 3. Post a note
 
-1. The composer opens on the **Post** tab. Its first choice is the post style, set to **Article** unless your site admin changed the default (see [Settings](/outpost/settings/)). Choose **Note**.
+1. Outpost opens on **Home**, with a card for each kind of post. Tap **Post**. (**← Home** at the bottom of any tab brings you back.) Its first choice is the post style, set to **Article** unless your site admin changed the default (see [Settings](/outpost/settings/)). Choose **Note**.
+
+   ![Outpost Home screen on a phone: the connection status, the question What would you like to post?, six cards for Post, Reply, Photo, Doing, Life, and Recipe, and an About Outpost row](../../assets/screenshots/frontend-composer-home.png)
+
 2. Type a short post. After you pause, "Draft saved" appears under the form: the text is kept on this device until you post it.
 3. If you use syndication destinations, chips for each configured destination appear enabled by default. Tap a chip to turn it off for this post.
-4. Tap **Post note**.
+4. Tap **Post note**, the full-width button at the end of the form. Until the post has everything it needs, the button is unavailable and the line above it names what's missing, for example "Still needed: Text."
 
-![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+![Outpost on a phone with the Note style selected and More options open on the Send to list of syndication destinations](../../assets/screenshots/frontend-composer-note-mode.png)
 
 Expected result: a success message with a link to the new post on your site. Open it to confirm the note published.
 
@@ -43,18 +46,19 @@ The composer is a PWA, so you can install it like an app:
 - **iOS (Safari):** tap the Share button, then "Add to Home Screen."
 - **Android (Chrome):** accept the install banner, or open the browser menu and choose "Add to Home screen" / "Install app."
 
-Expected result: an Outpost icon on your home screen that opens straight into the composer.
+Expected result: an Outpost icon on your home screen that opens straight to Outpost's Home screen, or to the start screen you pick in step 5.
 
 ![Phone browser showing the Add to Home Screen prompt for the Outpost composer](../../assets/screenshots/frontend-pwa-install-prompt.png)
 
 ## 5. Pick how the composer looks
 
-Tap **Settings** (the gear at the top right) to choose two things for yourself:
+Tap **Preferences** (the gear at the top right) to choose three things for yourself. The same choices are in **About › Preferences**.
 
+- **Default start screen:** what opens when you launch Outpost. **Home** is the default; pick **Post**, **Reply**, or another tab to skip it.
 - **Style source:** **Outpost Default** (Outpost's own design) or **Use Site Theme** (your theme's colors and fonts).
 - **Appearance:** **Light**, **Dark**, or **System**, which follows your device. The three buttons next to the gear switch this too.
 
-Each person who posts has their own choice. [Settings → Appearance](/outpost/settings/#appearance) has the details.
+Each person who posts has their own choices, and they follow you to every device you sign in on. [Settings → Appearance](/outpost/settings/#appearance) has the details.
 
 ## First-run notes
 

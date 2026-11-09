@@ -73,7 +73,7 @@ final class Outpost_Appearance_Settings_Page {
 
 			<?php self::render_admin_notice(); ?>
 
-			<p><?php esc_html_e( 'Choose how the Outpost composer looks for you. Style source picks where colors and fonts come from: the built-in Outpost Default design, or your active theme. Appearance picks Light, Dark, or System. Both are per-user, and the composer\'s own Settings sheet changes the same values. You can also override individual tokens below.', 'outpost-mobile-publishing' ); ?></p>
+			<p><?php esc_html_e( 'Choose how the Outpost composer looks for you. Style source picks where colors and fonts come from: the built-in Outpost Default design, or your active theme. Appearance picks Light, Dark, or System. Both are per-user, and the composer\'s Preferences (the gear button, or About › Preferences) change the same values. You can also override individual tokens below.', 'outpost-mobile-publishing' ); ?></p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="outpost-appearance-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ACTION ); ?>">

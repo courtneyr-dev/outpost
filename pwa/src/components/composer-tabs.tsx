@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { JSX } from 'preact';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../lib/token-store';
+import { sign_out } from '../lib/sign-out';
+import { START_SCREEN_WAIT_MS, initial_screen } from '../lib/start-screen';
+import type { StartScreen } from '../lib/appearance';
 import type { MicropubEnvironment } from '../lib/micropub';
 import {
 	fetch_composer_config,
@@ -13,7 +16,8 @@ import { PhotoMode } from './modes/photo-mode';
 import { ListenMode } from './modes/listen-mode';
 import { LifeMode } from './modes/life-mode';
 import { RecipeMode } from './modes/recipe-mode';
-import { AboutTab } from './modes/about-tab';
+import { AboutTab, type ConnectionState } from './modes/about-tab';
+import { HomeScreen } from './home-screen';
 import { QueueBadge } from './queue-badge';
 import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
@@ -23,7 +27,7 @@ import type { AppearanceEnvironment } from '../lib/appearance';
 import { AppHeader } from './app-header';
 import { SettingsSheet } from './settings-sheet';
 import { Scenery } from './scenery';
-import { drafts_available, type DraftStorage } from '../lib/drafts';
+import { DRAFT_SAVE_DELAY_MS, draft_modes, drafts_available, type DraftMode, type DraftStorage } from '../lib/drafts';
 
 /**
  * Composer tab framework — the WAI-ARIA tabs pattern for switching
@@ -85,7 +89,7 @@ export interface ComposerTabsProps {
  * visible overflow cue on narrow screens, and keeps the selected tab in
  * view.
  */
-function useTabOverflow(active: string): {
+function useTabOverflow(active: string, visible: boolean): {
 	ref: { current: HTMLDivElement | null };
 	start: boolean;
 	end: boolean;
@@ -107,7 +111,8 @@ function useTabOverflow(active: string): {
 			el.removeEventListener('scroll', measure);
 			window.removeEventListener('resize', measure);
 		};
-	}, []);
+		// A strip hidden behind Home measures zero wide; measure again when it shows.
+	}, [visible]);
 	// Scroll only the strip, and only after the first render: calling
 	// scrollIntoView() on load moved the browser's sequential-focus
 	// starting point past the header, so Tab skipped it.
@@ -124,7 +129,7 @@ function useTabOverflow(active: string): {
 		if (left < strip.scrollLeft || left + selected.offsetWidth > strip.scrollLeft + strip.clientWidth) {
 			strip.scrollTo?.({ left: Math.max(0, left - 24) });
 		}
-	}, [active]);
+	}, [active, visible]);
 	return { ref, ...edges };
 }
 
@@ -150,11 +155,72 @@ export function ComposerTabs({
 		setSettingsOpen(false);
 		requestAnimationFrame(() => settings_button.current?.focus());
 	};
-	// Initial tab respects an in-flight share-target intake when present.
-	// peek_share_target() doesn't clear sessionStorage — the targeted mode
-	// drains it via consume_share_target() during its own mount.
-	const initial_share = peek_share_target();
-	const [active, setActive] = useState<ModeId>(initial_share?.tab ?? 'note');
+	// Which screen opens: see lib/start-screen.ts for the precedence. A
+	// share-target intake wins; peek_share_target() doesn't clear
+	// sessionStorage, the targeted mode drains it during its own mount.
+	// `view` is null while the saved start screen is still unknown.
+	const [first_screen] = useState<StartScreen | null>(() =>
+		initial_screen({
+			share: peek_share_target(),
+			start: appearance.state.start,
+			ready: appearance.ready,
+			timedOut: false,
+		}),
+	);
+	const [view, setView] = useState<'home' | 'tabs' | null>(
+		first_screen === null ? null : first_screen === 'home' ? 'home' : 'tabs',
+	);
+	const [active, setActive] = useState<ModeId>(
+		first_screen !== null && first_screen !== 'home' ? first_screen : 'note',
+	);
+	const [start_wait_over, setStartWaitOver] = useState(false);
+	const home_heading = useRef<HTMLHeadingElement | null>(null);
+	const read_home_drafts = (): Set<DraftMode> =>
+		new Set(draftStorage === undefined ? draft_modes(token.me) : draft_modes(token.me, draftStorage));
+	const [home_drafts, setHomeDrafts] = useState<Set<DraftMode>>(read_home_drafts);
+
+	// First launch on a device: wait briefly for the site's answer, then
+	// settle once. Later preference changes never move the person.
+	useEffect(() => {
+		if (view !== null) return;
+		const next = initial_screen({
+			share: null,
+			start: appearance.state.start,
+			ready: appearance.ready,
+			timedOut: start_wait_over,
+		});
+		if (next === null) {
+			const timer = setTimeout(() => setStartWaitOver(true), START_SCREEN_WAIT_MS);
+			return (): void => clearTimeout(timer);
+		}
+		if (next === 'home') {
+			setView('home');
+		} else {
+			setActive(next);
+			setView('tabs');
+		}
+		return undefined;
+	}, [view, appearance.ready, appearance.state.start, start_wait_over]);
+
+	// Home's "Unsent draft" labels: read now, and again once a save that
+	// was still debouncing has landed.
+	useEffect(() => {
+		if (view !== 'home') return;
+		setHomeDrafts(read_home_drafts());
+		const timer = setTimeout(() => setHomeDrafts(read_home_drafts()), DRAFT_SAVE_DELAY_MS + 100);
+		return (): void => clearTimeout(timer);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- re-read only when Home shows.
+	}, [view]);
+
+	const open_tab = (id: ModeId): void => {
+		setActive(id);
+		setView('tabs');
+		requestAnimationFrame(() => tab_refs.current[id]?.focus());
+	};
+	const go_home = (): void => {
+		setView('home');
+		requestAnimationFrame(() => home_heading.current?.focus());
+	};
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const [config_error, setConfigError] = useState<'unauthorized' | 'forbidden' | 'fetch_failed' | null>(null);
 	// Whether unsent text survives the reload that "Sign in again" triggers.
@@ -227,12 +293,42 @@ export function ComposerTabs({
 	// and screen-reader users navigating by document title get a meaningful
 	// label instead of a static "Outpost" for the whole session.
 	useEffect(() => {
+		if (view === null) {
+			document.title = 'Outpost';
+			return;
+		}
+		if (view === 'home') {
+			document.title = 'Home – Outpost';
+			return;
+		}
 		const current_mode = modes.find((mode) => mode.id === active);
 		if (current_mode) {
 			document.title = `${current_mode.label} – Outpost`;
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- `modes` is a fresh array every render, but its id/label pairs are static; only `active` should retrigger this.
-	}, [active]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- `modes` is a fresh array every render, but its id/label pairs are static; only `active` and `view` should retrigger this.
+	}, [active, view]);
+
+	const connection: ConnectionState = composer_config
+		? 'connected'
+		: config_error === 'unauthorized'
+			? 'signed-out'
+			: config_error === 'forbidden'
+				? 'forbidden'
+				: config_error === 'fetch_failed'
+					? 'unreachable'
+					: 'checking';
+
+	const preferences = {
+		mode: appearance.state.mode,
+		source: appearance.state.source,
+		start: appearance.state.start ?? 'home',
+		status: appearance.status,
+		onMode: appearance.setMode,
+		onSource: appearance.setSource,
+		onStart: appearance.setStart,
+		onReset: appearance.reset,
+		onRetry: appearance.retry,
+	};
 
 	const modes: ModeDefinition[] = [
 		{
@@ -243,7 +339,6 @@ export function ComposerTabs({
 			render: () => (
 				<NoteMode
 					token={token}
-					tokenStore={tokenStore}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
@@ -312,23 +407,17 @@ export function ComposerTabs({
 					siteUrl={typeof window !== 'undefined' ? window.location.origin : ''}
 					me={token.me}
 					scope={token.scope}
-					connection={
-						composer_config
-							? 'connected'
-							: config_error === 'unauthorized'
-								? 'signed-out'
-								: config_error === 'forbidden'
-									? 'forbidden'
-									: config_error === 'fetch_failed'
-										? 'unreachable'
-										: 'checking'
-					}
+					connection={connection}
 					companions={composer_config?.companions ?? null}
 					onRetry={retry_config_now}
 					onReauth={async (): Promise<void> => {
 						await clear_token(tokenStore);
 						window.location.reload();
 					}}
+					onSignOut={(): void => {
+						void sign_out(tokenStore);
+					}}
+					preferences={preferences}
 				/>
 			),
 		},
@@ -361,7 +450,7 @@ export function ComposerTabs({
 		tab_refs.current[next_mode.id]?.focus();
 	};
 
-	const overflow = useTabOverflow(active);
+	const overflow = useTabOverflow(active, view === 'tabs');
 
 	const config_message =
 		config_error === 'unauthorized'
@@ -428,7 +517,21 @@ export function ComposerTabs({
 					/>
 				</div>
 				<h1 class="outpost-visually-hidden">Outpost composer</h1>
+				<div class="outpost-start-status" role="status" aria-live="polite">
+					{view === null ? <p class="outpost-status">Opening Outpost…</p> : null}
+				</div>
+				{view === 'home' && (
+					<HomeScreen
+						siteHost={typeof window !== 'undefined' ? window.location.host : ''}
+						connection={connection}
+						drafts={home_drafts}
+						onOpen={open_tab}
+						onAbout={(): void => open_tab('about')}
+						headingRef={home_heading}
+					/>
+				)}
 				<div
+					hidden={view !== 'tabs'}
 					class="outpost-tablist-wrap"
 					data-overflow-start={overflow.start ? 'true' : 'false'}
 					data-overflow-end={overflow.end ? 'true' : 'false'}
@@ -468,22 +571,24 @@ export function ComposerTabs({
 						id={`outpost-panel-${mode.id}`}
 						role="tabpanel"
 						aria-labelledby={`outpost-tab-${mode.id}`}
-						hidden={active !== mode.id}
+						hidden={view !== 'tabs' || active !== mode.id}
 					>
 						{mode.render()}
 					</div>
 				))}
 				<Scenery />
+				{view === 'tabs' && (
+					<nav class="outpost-footer-nav" aria-label="Outpost">
+						<button type="button" class="outpost-footer-nav__home" onClick={go_home}>
+							<span aria-hidden="true">←</span> Home
+						</button>
+					</nav>
+				)}
 			</div>
 			<SettingsSheet
 				open={settings_open}
 				onClose={close_settings}
-				mode={appearance.state.mode}
-				source={appearance.state.source}
-				status={appearance.status}
-				onMode={appearance.setMode}
-				onSource={appearance.setSource}
-				onRetry={appearance.retry}
+				{...preferences}
 			/>
 		</>
 	);
