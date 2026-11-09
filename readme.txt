@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.24
+Stable tag:        1.0.25
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -238,6 +238,16 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
 
+= 1.0.25 =
+* New: Outpost opens to a Home screen with a card for each kind of post, and every tab ends with a ← Home link. Going Home keeps everything you've typed or attached, and Home marks a tab that holds an unsent draft.
+* New: choose the screen Outpost opens to (Home, any tab, or About) under Preferences › Default start screen. It's saved to your site, so it follows you to every device. Sharing to Outpost still opens the tab your content belongs in.
+* New: About is organized into Connection, Preferences, Help and documentation, and Project, with Reset preferences, a Sharing and shortcuts guide link, and version and credits.
+* Changed: Doing and Reply show every type as compact tiles, Post's five styles fit in one row of icon tiles, and every form ends with a full-width publish button that names any required field still empty.
+* Changed: the header fits on one row on most phones, and the selected Light / Dark / System option no longer uses the publish button's orange.
+* Changed: Sign out moved from the Post form to About › Connection, and the composer's settings sheet is now called Preferences.
+* Fixed: uninstalling now removes the style choice and its schema marker that 1.0.24 added.
+* Fixed: two preference changes made in quick succession both save.
+
 = 1.0.24 =
 * New: the Outpost Default design, in light and dark. Each person picks Outpost Default or Use Site Theme in the composer's Settings sheet or on Outpost → Appearance, separately from Light, Dark, or System.
 * New: a header with the Outpost signpost, the connected site, a Light / Dark / System shortcut, and a settings button.
@@ -371,6 +381,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
+
+= 1.0.25 =
+Outpost now opens to a Home screen. To open straight to Post as before, choose Post under Preferences › Default start screen.
 
 = 1.0.24 =
 New Outpost Default design and drafts that survive a reload. If you used Outpost before this update, you keep your site's theme colors until you choose otherwise.

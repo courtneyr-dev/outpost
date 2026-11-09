@@ -7,6 +7,8 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.25] - 2026-11-08
+
 ### Added
 
 - **Home launcher.** Outpost opens to a Home screen with six cards (Post, Reply, Photo, Doing, Life, Recipe), a compact connection line, and an About row. Each card opens its existing composer tab. A card says "Unsent draft" when that tab holds saved text. Under the cards, "Everything each tab can post" lists every variant from the composer's own tables. Decision: `docs/decisions/session-pwa-ui-home.md`.
