@@ -54,7 +54,7 @@ Raw results: [home-axe-results.json](evidence-home/home-axe-results.json). An au
 
 ## Proposed next improvements
 
-Ranked by how much of the screen or the task they affect. Each keeps native controls, every variant, and the token contract. P1 to P6 are done on branch `pwa/compact-composer`, stacked on this one; [P1 to P6 as built](#p1-to-p6-as-built) records what changed from the proposal text and why.
+Ranked by how much of the screen or the task they affect. Each keeps native controls, every variant, and the token contract. P1 to P6 are done: built in [courtneyr-dev/outpost#289](https://github.com/courtneyr-dev/outpost/pull/289) and merged into this branch (`pwa/home-launcher`, #288); [P1 to P6 as built](#p1-to-p6-as-built) records what changed from the proposal text and why.
 
 | # | Tab | Observation | Proposal | Status |
 | --- | --- | --- | --- | --- |

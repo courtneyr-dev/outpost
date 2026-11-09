@@ -55,19 +55,23 @@ The Outpost sidebar in the block editor: **Add from connected platforms** opens 
 
 The composer at `/post` before sign-in: enter your site address to start the IndieAuth flow. See [Getting started](/outpost/getting-started/).
 
-![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+![Outpost Home screen on a phone: the connection status, the question What would you like to post?, six cards for Post, Reply, Photo, Doing, Life, and Recipe, and an About Outpost row](../../assets/screenshots/frontend-composer-home.png)
+
+Home, where Outpost opens after sign-in: one card per tab, the connection status, and About. Each person can choose a different start screen in Preferences. See [Common tasks](/outpost/common-tasks/#choose-which-screen-outpost-opens-to).
+
+![Outpost on a phone with the Note style selected and More options open on the Send to list of syndication destinations](../../assets/screenshots/frontend-composer-note-mode.png)
 
 Note mode, signed in: write a note and pick syndication targets before posting. See [Common tasks](/outpost/common-tasks/).
 
-![Reply mode showing the pasted target URL context and syndication chips](../../assets/screenshots/frontend-composer-reply-mode.png)
+![Reply mode on a phone with its eleven types as wrapping tiles, a target URL in In reply to, and a reply being written](../../assets/screenshots/frontend-composer-reply-mode.png)
 
-Reply mode: paste a URL and Outpost shows what you're replying to. See [Common tasks](/outpost/common-tasks/).
+Reply mode: pick a type, paste the URL you're replying to, and write your reply. **Show preview** fetches the page so you can check it. See [Common tasks](/outpost/common-tasks/).
 
 ![Photo mode with an uploaded image and the required alt text field](../../assets/screenshots/frontend-composer-photo-mode.png)
 
 Photo mode: every photo post asks for alt text before publishing. See [Common tasks](/outpost/common-tasks/).
 
-![Composer showing the offline connection banner and a queued draft badge](../../assets/screenshots/frontend-offline-queue.png)
+![Composer showing the offline connection banner and a 1 queued badge above the Post tab](../../assets/screenshots/frontend-offline-queue.png)
 
 The composer offline: posts made offline wait in the queue until you reconnect. See [Common tasks](/outpost/common-tasks/).
 

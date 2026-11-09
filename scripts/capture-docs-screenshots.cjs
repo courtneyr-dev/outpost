@@ -287,6 +287,14 @@ const panel = (id) => `#outpost-panel-${id}`;
 		await mpage.goto(BASE + '/post/', { waitUntil: 'networkidle' });
 		await indieAuthSignIn(mpage, mobile);
 
+		// 9b. Home, where a normal launch opens (1.0.25). Its cards open the
+		// tabs; the tab strip stays hidden until one is chosen.
+		await mpage.waitForSelector('.outpost-home', { timeout: 20000 });
+		await mpage.waitForTimeout(500);
+		await shoot(mpage, 'frontend-composer-home.png');
+		await mpage.locator('.outpost-home-card[data-mode="note"]').click();
+		await mpage.waitForSelector(panel('note') + ':not([hidden])', { timeout: 10000 });
+
 		// 10. Note mode. Endpoint discovery (which the syndication chips need)
 		// happens on the first successful post, so post once, then compose the
 		// pictured note and open More options at the Send to chip list.
@@ -306,13 +314,21 @@ const panel = (id) => `#outpost-panel-${id}`;
 		await mpage.locator('.outpost-drawer[data-open="true"] button[aria-label="Close"]').click();
 		await mpage.waitForTimeout(500);
 
-		// 11. Reply mode with a context preview of a post on this same site.
+		// 11. Reply mode with a context preview. The preview endpoint's SSRF
+		// guard refuses internal addresses, so a post on this Playground
+		// (127.0.0.1) can't be previewed; reply to a public IndieWeb page
+		// instead (REPLY_TARGET overrides it). If the preview doesn't come
+		// back, capture without it rather than abort the run.
 		await mpage.locator('#outpost-tab-reply').click();
-		await mpage.fill('#outpost-reply-target', await readingClubUrl(mpage));
+		await mpage.fill('#outpost-reply-target', process.env.REPLY_TARGET || 'https://indieweb.org/POSSE');
 		await mpage.locator(panel('reply') + ' button:has-text("Show preview")').click();
-		await mpage.waitForSelector(panel('reply') + ' .outpost-citation', { timeout: 20000 });
+		try {
+			await mpage.waitForSelector(panel('reply') + ' .outpost-citation', { timeout: 30000 });
+		} catch {
+			console.log('warning: no reply preview (network?) — frontend-composer-reply-mode.png has no citation');
+		}
 		await mpage.waitForTimeout(500);
-		await mpage.fill(panel('reply') + ' textarea', 'Count me in — starting the first book this weekend.');
+		await mpage.fill(panel('reply') + ' textarea', 'Doing this now: every note starts on my own site, then goes out.');
 		await mpage.evaluate(() => window.scrollTo(0, 0));
 		await mpage.waitForTimeout(300);
 		await shoot(mpage, 'frontend-composer-reply-mode.png');
@@ -325,7 +341,7 @@ const panel = (id) => `#outpost-panel-${id}`;
 		);
 		await mpage.waitForSelector(panel('photo') + ' textarea', { timeout: 10000 });
 		const altField = mpage.locator(panel('photo') + ' textarea').first();
-		await altField.fill('The Outpost logo: a white signal tower on a teal background.');
+		await altField.fill('The Outpost logo: a cream signpost with two arrows on a dark green square.');
 		await altField.focus();
 		await mpage.waitForTimeout(300);
 		await shoot(mpage, 'frontend-composer-photo-mode.png');
@@ -380,22 +396,14 @@ const panel = (id) => `#outpost-panel-${id}`;
 		}
 	}
 
-	async function readingClubUrl(p) {
-		// The blueprint seeds "Announcing the summer reading club"; resolve its
-		// permalink through the public REST index so the reply target (and the
-		// server-side preview it drives) points at a real post on this site.
-		return p.evaluate(async (fallback) => {
-			const res = await fetch('/wp-json/wp/v2/posts?search=summer%20reading%20club&per_page=1', {
-				credentials: 'omit',
-			});
-			const posts = await res.json();
-			return Array.isArray(posts) && posts[0] && posts[0].link ? posts[0].link : fallback + '/?p=1';
-		}, BASE);
-	}
-
 	async function captureMediaLookup(mpage) {
 		// The Doing tab surfaces the lookup search when Post Kinds is active.
-		await mpage.locator('#outpost-tab-listen').click();
+		// A reload opens Home again; its Doing card opens the tab.
+		if (await mpage.locator('.outpost-home').isVisible()) {
+			await mpage.locator('.outpost-home-card[data-mode="listen"]').click();
+		} else {
+			await mpage.locator('#outpost-tab-listen').click();
+		}
 		const query = mpage.locator(panel('listen') + ' .outpost-media-lookup__input');
 		if (!(await query.count())) {
 			console.log('skipping frontend-composer-media-lookup.png — no lookup affordance (is Post Kinds active?)');
