@@ -69,6 +69,8 @@
 	--outpost-chip-border: #7a70b0;
 	--outpost-chip-bg-pressed: #fb8500;
 	--outpost-chip-fg-pressed: #241c4a;
+	--outpost-segment-bg-selected: #e8e6f1;
+	--outpost-segment-fg-selected: #241c4a;
 	--outpost-chip-radius: var(--outpost-radius-pill);
 
 	/* Card (preview, install prompt, error banner, queue inspector) */
@@ -202,6 +204,8 @@
 	--outpost-chip-border: #7a70b0;
 	--outpost-chip-bg-pressed: #fb8500;
 	--outpost-chip-fg-pressed: #241c4a;
+	--outpost-segment-bg-selected: #e8e6f1;
+	--outpost-segment-fg-selected: #241c4a;
 	--outpost-focus-ring-color: #241c4a;
 	--outpost-text-muted: #5f5873;
 	--outpost-border: #7a70b0;
@@ -255,6 +259,8 @@
 	--outpost-chip-border: #9a90cf;
 	--outpost-chip-bg-pressed: #ff9a2e;
 	--outpost-chip-fg-pressed: #1e1838;
+	--outpost-segment-bg-selected: #3b3463;
+	--outpost-segment-fg-selected: #f7f4ff;
 	--outpost-focus-ring-color: #ff9a2e;
 	--outpost-text-muted: #c9c1ef;
 	--outpost-border: #9a90cf;
@@ -309,6 +315,8 @@
 		--outpost-chip-border: #9a90cf;
 		--outpost-chip-bg-pressed: #ff9a2e;
 		--outpost-chip-fg-pressed: #1e1838;
+		--outpost-segment-bg-selected: #3b3463;
+		--outpost-segment-fg-selected: #f7f4ff;
 		--outpost-focus-ring-color: #ff9a2e;
 		--outpost-text-muted: #c9c1ef;
 		--outpost-border: #9a90cf;

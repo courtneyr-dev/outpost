@@ -18,6 +18,7 @@ import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -65,6 +66,8 @@ interface VariantConfig {
 	label: string;
 	property: 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 	primaryLabel: string;
+	/** Short name the publish hint uses for the primary field. */
+	primaryName: string;
 	primaryPlaceholder: string;
 	contentLabel: string;
 	submitLabel: string;
@@ -75,6 +78,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Mood',
 		property: 'mood',
 		primaryLabel: 'How are you feeling?',
+		primaryName: 'Mood',
 		primaryPlaceholder: 'e.g., focused, tired, hopeful',
 		contentLabel: 'More context (optional)',
 		submitLabel: 'Post mood',
@@ -83,6 +87,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Weather',
 		property: 'weather',
 		primaryLabel: 'Conditions',
+		primaryName: 'Conditions',
 		primaryPlaceholder: 'e.g., 72°F and sunny, light breeze',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post weather',
@@ -93,6 +98,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Sleep',
 		property: 'sleep',
 		primaryLabel: 'How did you sleep?',
+		primaryName: 'Sleep',
 		primaryPlaceholder: 'e.g., 7h 40m, restless after 3am',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post sleep',
@@ -103,6 +109,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Trip',
 		property: 'trip',
 		primaryLabel: 'Where are you headed?',
+		primaryName: 'Destination',
 		primaryPlaceholder: 'e.g., Chicago to Detroit by train',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post trip',
@@ -113,6 +120,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Itinerary',
 		property: 'itinerary',
 		primaryLabel: 'Legs',
+		primaryName: 'Legs',
 		primaryPlaceholder: 'e.g., ORD → DTW 9:05am, DTW → YYZ 1:20pm',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post itinerary',
@@ -124,6 +132,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Question',
 		property: 'question',
 		primaryLabel: "What's your question?",
+		primaryName: 'Question',
 		primaryPlaceholder: 'e.g., Best static-site host in 2026?',
 		contentLabel: 'Details (optional)',
 		submitLabel: 'Post question',
@@ -279,6 +288,7 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 				? 'Posting…'
 				: config.submitLabel;
 	const can_submit = !!primary_value.trim();
+	const missing: string[] = can_submit ? [] : [config.primaryName];
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-life-mode-title">
@@ -450,15 +460,8 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -467,8 +470,16 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 						>
 							More options
 						</button>
-					)}
-				</div>
+					</div>
+				)}
+
+				<PublishButton
+					idPrefix="outpost-life"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);
