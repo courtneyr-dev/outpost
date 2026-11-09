@@ -4,7 +4,7 @@ import {
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
-import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../../lib/token-store';
+import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
 import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
@@ -15,8 +15,7 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
-import { clear_cache as clear_appearance_cache } from '../../lib/appearance';
-import { clear_drafts, draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import {
@@ -63,7 +62,6 @@ import {
 
 export interface NoteModeProps {
 	token: StoredToken;
-	tokenStore: TokenStoreEnvironment;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
 }
@@ -147,6 +145,9 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 
 const VARIANT_ORDER: Variant[] = ['article', 'note', 'status', 'aside', 'quote'];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const POST_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 function is_variant(value: unknown): value is Variant {
 	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
 }
@@ -173,7 +174,7 @@ function consume_share_target_for_note(): {
 	return out;
 }
 
-export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: NoteModeProps) {
+export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) {
 	// Web Share Target intake (Phase E0): when this tab is the share
 	// destination, consume the stashed payload as the initial state.
 	// One-shot — sessionStorage clears on read.
@@ -217,16 +218,6 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
-
-	const handle_signout = async (event: Event): Promise<void> => {
-		event.preventDefault();
-		await clear_token(tokenStore);
-		// The appearance copy and unsent drafts belong to this account; the
-		// next person on a shared device starts from the defaults.
-		clear_appearance_cache();
-		clear_drafts();
-		window.location.reload();
-	};
 
 	const handle_submit = async (event: Event): Promise<void> => {
 		event.preventDefault();
@@ -494,14 +485,6 @@ export function NoteMode({ token, tokenStore, micropubEnv, composerConfig }: Not
 							More options
 						</button>
 					)}
-					<button
-						class="outpost-button outpost-button--secondary"
-						type="button"
-						onClick={handle_signout}
-						disabled={submitting}
-					>
-						Sign out
-					</button>
 				</div>
 			</form>
 		</section>

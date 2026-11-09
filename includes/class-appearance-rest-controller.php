@@ -27,8 +27,10 @@
  * The PWA calls POST with only its bearer token in the body (hosts that
  * strip the Authorization header lose a GET's credentials) to read its
  * state without writing anything, and with `style_source` /
- * `mode_preference` to save. Both responses carry `style_source`, the
- * stored `mode_preference`, and `css`: the component tokens for the
+ * `mode_preference` / `start_screen` to save. Both responses carry
+ * `style_source`, the stored `mode_preference`, `start_screen` (the
+ * screen a normal launch opens to; see Outpost_Start_Screen), and
+ * `css`: the component tokens for the
  * user's source in both schemes, scoped to `.outpost-source-*`.
  * Responses are per-user and never cacheable.
  *
@@ -134,6 +136,8 @@ final class Outpost_Appearance_REST_Controller {
 			'mode_preference'     => Outpost_Mode_Controller::get_mode( $user_id ),
 			'style_source'        => $source,
 			'style_source_stored' => Outpost_Style_Source::has_stored_source( $user_id ),
+			'start_screen'        => Outpost_Start_Screen::get( $user_id ),
+			'start_screen_stored' => Outpost_Start_Screen::has_stored( $user_id ),
 			'css'                 => $css,
 			'colors'              => $resolved['colors'],
 			'fonts'               => $resolved['fonts'],
@@ -237,32 +241,26 @@ final class Outpost_Appearance_REST_Controller {
 			);
 		}
 
-		// Style source is independent of mode and overrides.
-		if ( isset( $body['style_source'] ) && is_string( $body['style_source'] ) && '' !== trim( $body['style_source'] ) ) {
-			if ( ! Outpost_Style_Source::set_source( $user_id, $body['style_source'] ) ) {
-				return new \WP_Error(
-					'outpost_appearance_invalid_source',
-					__( 'Invalid style_source value.', 'outpost-mobile-publishing' ),
-					array( 'status' => 400 )
-				);
+		// Validate every field before writing any, so a request with one bad
+		// value changes nothing. An empty string means "no change".
+		$preferences = array();
+		$checks      = array(
+			'style_source'    => array( Outpost_Style_Source::VALID_SOURCES, 'outpost_appearance_invalid_source', __( 'Invalid style_source value.', 'outpost-mobile-publishing' ) ),
+			'mode_preference' => array( Outpost_Mode_Controller::VALID_MODES, 'outpost_appearance_invalid_mode', __( 'Invalid mode_preference value.', 'outpost-mobile-publishing' ) ),
+			'start_screen'    => array( Outpost_Start_Screen::VALID_SCREENS, 'outpost_appearance_invalid_start_screen', __( 'Invalid start_screen value.', 'outpost-mobile-publishing' ) ),
+		);
+		foreach ( $checks as $field => $check ) {
+			if ( ! isset( $body[ $field ] ) || ! is_string( $body[ $field ] ) ) {
+				continue;
 			}
-		}
-
-		// Mode preference update is independent of override updates.
-		// An empty string means "no change requested" — only validate
-		// when the caller actually supplied a value.
-		if ( isset( $body['mode_preference'] ) && is_string( $body['mode_preference'] ) ) {
-			$mode_value = trim( $body['mode_preference'] );
-			if ( '' !== $mode_value ) {
-				$saved = Outpost_Mode_Controller::set_mode( $user_id, $mode_value );
-				if ( ! $saved ) {
-					return new \WP_Error(
-						'outpost_appearance_invalid_mode',
-						__( 'Invalid mode_preference value.', 'outpost-mobile-publishing' ),
-						array( 'status' => 400 )
-					);
-				}
+			$value = strtolower( trim( $body[ $field ] ) );
+			if ( '' === $value ) {
+				continue;
 			}
+			if ( ! in_array( $value, $check[0], true ) ) {
+				return new \WP_Error( $check[1], $check[2], array( 'status' => 400 ) );
+			}
+			$preferences[ $field ] = $value;
 		}
 
 		$existing = self::read_overrides( $user_id );
@@ -289,6 +287,17 @@ final class Outpost_Appearance_REST_Controller {
 				return $bypass_validated;
 			}
 			$updated['bypass_contrast'] = $bypass_validated;
+		}
+
+		// Each preference is stored independently of the others.
+		if ( isset( $preferences['style_source'] ) ) {
+			Outpost_Style_Source::set_source( $user_id, $preferences['style_source'] );
+		}
+		if ( isset( $preferences['mode_preference'] ) ) {
+			Outpost_Mode_Controller::set_mode( $user_id, $preferences['mode_preference'] );
+		}
+		if ( isset( $preferences['start_screen'] ) ) {
+			Outpost_Start_Screen::set( $user_id, $preferences['start_screen'] );
 		}
 
 		// A body with no override changes (the PWA's token-only read, or a

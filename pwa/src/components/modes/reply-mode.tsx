@@ -240,6 +240,9 @@ const VARIANT_ORDER: Variant[] = [
 	'issue',
 ];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const REPLY_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
 
 function is_variant(value: unknown): value is Variant {

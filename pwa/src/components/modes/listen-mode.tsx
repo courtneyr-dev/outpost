@@ -411,6 +411,9 @@ const VARIANT_ORDER: Variant[] = [
 	'audio',
 ];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const DOING_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 function is_variant(value: unknown): value is Variant {
 	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
 }

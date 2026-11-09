@@ -5,6 +5,7 @@ import {
 	apply_to_document,
 	clear_cache,
 	effective_scheme,
+	is_start_screen,
 	parse_state,
 	read_cache,
 	reconcile,
@@ -159,10 +160,21 @@ describe('appearance: sync_appearance transport', () => {
 });
 
 describe('appearance: reconcile', () => {
-	const server = { mode: 'day' as const, source: 'outpost' as const, css: '' };
+	const server = { mode: 'day' as const, source: 'outpost' as const, css: '', start: 'home' as const };
 
 	it('the server wins when nothing is pending', () => {
-		expect(reconcile({ mode: 'night', source: 'site', css: 'x' }, server, false)).toEqual({ mode: 'day', source: 'outpost', css: '' });
+		expect(reconcile({ mode: 'night', source: 'site', css: 'x', start: 'reply' }, server, false)).toEqual({
+			mode: 'day',
+			source: 'outpost',
+			css: '',
+			start: 'home',
+		});
+	});
+
+	it('a pending start screen survives a read that did not include it', () => {
+		const out = reconcile({ mode: 'day', source: 'outpost', css: '', start: 'photo', pending: { start: 'photo' } }, server, false);
+		expect(out.start).toBe('photo');
+		expect(out.pending).toEqual({ start: 'photo' });
 	});
 
 	it('a newer device choice is not overwritten by an older server value', () => {
@@ -175,5 +187,47 @@ describe('appearance: reconcile', () => {
 
 	it('drops pending once it was sent', () => {
 		expect(reconcile({ mode: 'night', source: 'site', css: '', pending: { mode: 'night' } }, server, true).pending).toBeUndefined();
+	});
+});
+
+describe('appearance: start screen', () => {
+	const answer = (body: unknown): typeof fetch => () => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+
+	it('accepts all eight destinations and nothing else', () => {
+		for (const screen of ['home', 'note', 'reply', 'photo', 'listen', 'life', 'recipe', 'about']) {
+			expect(is_start_screen(screen)).toBe(true);
+		}
+		for (const value of ['settings', 'post', 'doing', '', null, 3]) {
+			expect(is_start_screen(value)).toBe(false);
+		}
+	});
+
+	it('sends start_screen only when it changes', async () => {
+		let seen: Record<string, string> = {};
+		const fetch = ((_: string, init: RequestInit) => {
+			seen = JSON.parse(String(init.body)) as Record<string, string>;
+			return Promise.resolve(new Response(JSON.stringify({ mode_preference: 'system', style_source: 'outpost', start_screen: 'life' }), { status: 200 }));
+		}) as unknown as typeof globalThis.fetch;
+		const out = await sync_appearance('t', { start: 'life' }, { fetch });
+		expect(seen['start_screen']).toBe('life');
+		expect(seen).not.toHaveProperty('mode_preference');
+		expect(out.start).toBe('life');
+		await sync_appearance('t', {}, { fetch });
+		expect(seen).not.toHaveProperty('start_screen');
+	});
+
+	it('reads Home when the site does not send a start screen', async () => {
+		const out = await sync_appearance('t', {}, { fetch: answer({ mode_preference: 'day', style_source: 'site' }) });
+		expect(out.start).toBe('home');
+	});
+
+	it('keeps a cached start screen and drops an invalid one', () => {
+		expect(parse_state({ mode: 'day', source: 'outpost', css: '', start: 'recipe', pending: { start: 'recipe' } })).toMatchObject({
+			start: 'recipe',
+			pending: { start: 'recipe' },
+		});
+		const bad = parse_state({ mode: 'day', source: 'outpost', css: '', start: 'settings', pending: { start: 'nope' } });
+		expect(bad?.start).toBeUndefined();
+		expect(bad?.pending).toBeUndefined();
 	});
 });

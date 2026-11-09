@@ -15,6 +15,8 @@ import {
 	type AppearanceState,
 	type AppearanceStorage,
 	type EffectiveScheme,
+	type PreferenceChanges,
+	type StartScreen,
 	type StyleSource,
 } from './appearance';
 
@@ -37,8 +39,16 @@ export interface UseAppearance {
 	state: AppearanceState;
 	scheme: EffectiveScheme;
 	status: AppearanceStatus;
+	/**
+	 * True once the start screen is known: from this device's copy, or after
+	 * the first answer (or failure) from the site.
+	 */
+	ready: boolean;
 	setMode: (mode: AppearanceMode) => void;
 	setSource: (source: StyleSource) => void;
+	setStart: (start: StartScreen) => void;
+	/** Back to the new-user defaults: Home, System, Outpost Default. */
+	reset: () => void;
 	retry: () => void;
 }
 
@@ -68,6 +78,7 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 		return { ...NEW_USER_DEFAULT, me };
 	};
 	const [state, setState] = useState<AppearanceState>(initial);
+	const [ready, setReady] = useState<boolean>(() => state.start !== undefined);
 	const [dark, setDark] = useState<boolean>(prefers_dark);
 	const [status, setStatus] = useState<AppearanceStatus>({ kind: 'idle' });
 	const state_ref = useRef(state);
@@ -129,13 +140,18 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 				const latest = state_ref.current;
 				const sent_all =
 					!latest.pending ||
-					(latest.pending.mode === pending?.mode && latest.pending.source === pending?.source);
+					(latest.pending.mode === pending?.mode &&
+						latest.pending.source === pending?.source &&
+						latest.pending.start === pending?.start);
 				commit(reconcile(sent_all ? without_pending(latest) : latest, server, sent_all));
 				if (pending) setStatus({ kind: 'saved' });
+				setReady(true);
 				if (!sent_all) setAttempt((n) => n + 1);
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
+				// Without an answer, the caller falls back to Home.
+				setReady(true);
 				if (pending) {
 					const code = err instanceof AppearanceError ? err.code : 'server';
 					setStatus({ kind: 'device-only', reason: code, stored: read_cache(storage) !== null });
@@ -157,17 +173,20 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 	}, []);
 
 	const change = useCallback(
-		(patch: { mode?: AppearanceMode; source?: StyleSource }): void => {
+		(patch: PreferenceChanges): void => {
 			const current = state_ref.current;
 			const next: AppearanceState = {
 				...current,
 				...(patch.mode ? { mode: patch.mode } : {}),
 				...(patch.source ? { source: patch.source } : {}),
+				...(patch.start ? { start: patch.start } : {}),
 				pending: { ...current.pending, ...patch },
 			};
 			// Switching to Outpost Default can drop Site Theme CSS at once;
 			// switching to Site Theme waits for the site's CSS.
 			if (patch.source === 'outpost' && current.source !== 'outpost') next.css = '';
+			// A second change before the next render builds on this one.
+			state_ref.current = next;
 			commit(next);
 			setStatus({ kind: 'saving' });
 			setAttempt((n) => n + 1);
@@ -179,8 +198,11 @@ export function useAppearance({ accessToken, me, env, storage }: UseAppearanceOp
 		state,
 		scheme,
 		status,
+		ready,
 		setMode: (mode) => change({ mode }),
 		setSource: (source) => change({ source }),
+		setStart: (start) => change({ start }),
+		reset: () => change({ mode: 'system', source: 'outpost', start: 'home' }),
 		retry: () => setAttempt((n) => n + 1),
 	};
 }

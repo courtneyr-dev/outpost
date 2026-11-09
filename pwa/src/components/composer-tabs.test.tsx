@@ -4,6 +4,10 @@ import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
 import { ComposerTabs, CONFIG_RETRY_DELAYS_MS } from './composer-tabs';
 import type { StoredToken, TokenStoreEnvironment } from '../lib/token-store';
+import { CACHE_KEY, write_cache, type StartScreen } from '../lib/appearance';
+import { stash_share_target } from '../lib/share-target';
+import { DRAFT_SAVE_DELAY_MS } from '../lib/drafts';
+import { START_SCREEN_WAIT_MS } from '../lib/start-screen';
 
 const mock_token: StoredToken = {
 	accessToken: 'test-token',
@@ -22,14 +26,23 @@ function mock_token_store(): TokenStoreEnvironment {
 
 let root: HTMLDivElement;
 
+/** This device already knows the person's start screen. */
+function prefer_start(start: StartScreen): void {
+	write_cache({ mode: 'system', source: 'outpost', css: '', start, me: mock_token.me });
+}
+
 beforeEach(() => {
 	root = document.createElement('div');
 	document.body.appendChild(root);
+	// The tab-framework tests below start where 1.0.24 launched: on Post.
+	prefer_start('note');
 });
 
 afterEach(() => {
 	render(null, root);
 	root.remove();
+	localStorage.clear();
+	sessionStorage.clear();
 });
 
 function mock_composer_config_env(): { fetch: typeof fetch } {
@@ -396,5 +409,175 @@ describe('ComposerTabs: composer-config notice', () => {
 		window.dispatchEvent(new Event('online'));
 		await new Promise((resolve) => setTimeout(resolve, 30));
 		expect(calls()).toBe(1);
+	});
+});
+
+describe('ComposerTabs: Home and the start screen', () => {
+	const site = (body: Record<string, string>): { fetch: typeof fetch } => ({
+		fetch: ((): Promise<Response> => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }))) as typeof fetch,
+	});
+	const new_user_site = site({ mode_preference: 'system', style_source: 'outpost', start_screen: 'home' });
+
+	function mount_home(appearanceEnv: { fetch: typeof fetch } = new_user_site): void {
+		render(
+			<ComposerTabs
+				token={mock_token}
+				tokenStore={mock_token_store()}
+				composerConfigEnv={mock_composer_config_env()}
+				queueEnv={{ indexedDB: new IDBFactory() }}
+				appearanceEnv={appearanceEnv}
+			/>,
+			root,
+		);
+	}
+
+	const home = (): HTMLElement | null => root.querySelector('.outpost-home');
+	const tablist_wrap = (): HTMLElement => root.querySelector('.outpost-tablist-wrap') as HTMLElement;
+	const visible_panels = (): string[] => panels().filter((p) => !p.hidden).map((p) => p.id);
+	const footer_home = (): HTMLButtonElement | null => root.querySelector('.outpost-footer-nav__home');
+	const card = (mode: string): HTMLButtonElement => root.querySelector(`.outpost-home-card[data-mode="${mode}"]`) as HTMLButtonElement;
+
+	beforeEach(() => {
+		localStorage.removeItem(CACHE_KEY);
+	});
+
+	it('a new user waits for the site, then lands on Home with no composer showing', async () => {
+		mount_home();
+		expect(root.textContent).toContain('Opening Outpost');
+		expect(visible_panels()).toEqual([]);
+		await vi.waitFor(() => expect(home()).not.toBeNull());
+		expect(root.textContent).not.toContain('Opening Outpost');
+		expect(tablist_wrap().hidden).toBe(true);
+		expect(visible_panels()).toEqual([]);
+		expect(footer_home()).toBeNull();
+		expect(document.title).toBe('Home – Outpost');
+		expect(root.querySelector('#outpost-home-title')?.textContent).toBe('What would you like to post?');
+	});
+
+	it('offers six cards, each a named button with a description', async () => {
+		mount_home();
+		await vi.waitFor(() => expect(home()).not.toBeNull());
+		const cards = Array.from(root.querySelectorAll<HTMLButtonElement>('.outpost-home-card'));
+		expect(cards.map((c) => c.dataset['mode'])).toEqual(['note', 'reply', 'photo', 'listen', 'life', 'recipe']);
+		for (const c of cards) {
+			expect(c.tagName).toBe('BUTTON');
+			const name = document.getElementById(c.getAttribute('aria-labelledby') ?? '')?.textContent;
+			const description = document.getElementById(c.getAttribute('aria-describedby') ?? '')?.textContent;
+			expect(name).toBeTruthy();
+			expect(description).toBeTruthy();
+		}
+		expect(root.querySelector('.outpost-home')?.textContent).toContain('Acquisition');
+		expect(root.querySelector('.outpost-home')?.textContent).toContain('Exercise');
+	});
+
+	it('each card opens its composer tab and moves focus to that tab', async () => {
+		for (const mode of ['note', 'reply', 'photo', 'listen', 'life', 'recipe']) {
+			render(null, root);
+			mount_home();
+			await vi.waitFor(() => expect(home()).not.toBeNull());
+			card(mode).click();
+			await flush();
+			await new Promise((r) => requestAnimationFrame(() => r(null)));
+			expect(home()).toBeNull();
+			expect(tablist_wrap().hidden).toBe(false);
+			expect(visible_panels()).toEqual([`outpost-panel-${mode}`]);
+			const tab = root.querySelector(`#outpost-tab-${mode}`);
+			expect(tab?.getAttribute('aria-selected')).toBe('true');
+			expect(document.activeElement).toBe(tab);
+		}
+	});
+
+	it('every tab, About included, has the Home link; it returns Home and focuses the heading', async () => {
+		mount_home();
+		await vi.waitFor(() => expect(home()).not.toBeNull());
+		card('note').click();
+		await flush();
+		for (const tab of tabs()) {
+			tab.click();
+			await flush();
+			expect(footer_home()?.textContent?.trim()).toBe('← Home');
+			expect(footer_home()?.closest('nav')).not.toBeNull();
+		}
+		footer_home()?.click();
+		await flush();
+		await new Promise((r) => requestAnimationFrame(() => r(null)));
+		expect(home()).not.toBeNull();
+		expect(document.activeElement?.id).toBe('outpost-home-title');
+		expect(footer_home()).toBeNull();
+	});
+
+	it('going Home keeps typed text and labels the tab that holds it', async () => {
+		mount_home();
+		await vi.waitFor(() => expect(home()).not.toBeNull());
+		card('note').click();
+		await flush();
+		const body = root.querySelector<HTMLTextAreaElement>('#outpost-note-content') as HTMLTextAreaElement;
+		body.value = 'Half a thought';
+		body.dispatchEvent(new Event('input', { bubbles: true }));
+		await new Promise((r) => setTimeout(r, DRAFT_SAVE_DELAY_MS + 50));
+		footer_home()?.click();
+		await vi.waitFor(() => expect(card('note').textContent).toContain('Unsent draft'));
+		expect(card('reply').textContent).not.toContain('Unsent draft');
+		const name_ids = card('note').getAttribute('aria-labelledby')?.split(' ') ?? [];
+		expect(name_ids.map((id) => document.getElementById(id)?.textContent)).toEqual(['Post', 'Unsent draft']);
+		card('note').click();
+		await flush();
+		expect((root.querySelector('#outpost-note-content') as HTMLTextAreaElement).value).toBe('Half a thought');
+	});
+
+	it('opens a saved start screen directly, without waiting', () => {
+		prefer_start('reply');
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		expect(root.textContent).not.toContain('Opening Outpost');
+		expect(visible_panels()).toEqual(['outpost-panel-reply']);
+		expect(home()).toBeNull();
+	});
+
+	it('opens each of the eight saved start screens', async () => {
+		for (const start of ['home', 'note', 'reply', 'photo', 'listen', 'life', 'recipe', 'about'] as const) {
+			render(null, root);
+			prefer_start(start);
+			mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+			if (start === 'home') {
+				expect(home()).not.toBeNull();
+				expect(visible_panels()).toEqual([]);
+			} else {
+				expect(visible_panels()).toEqual([`outpost-panel-${start}`]);
+			}
+		}
+	});
+
+	it('a share launch opens its tab even when another start screen is saved', () => {
+		prefer_start('reply');
+		stash_share_target({ tab: 'photo' });
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		expect(visible_panels()).toEqual(['outpost-panel-photo']);
+	});
+
+	it("uses the site's saved start screen on a device that hasn't stored one", async () => {
+		mount_home(site({ mode_preference: 'night', style_source: 'outpost', start_screen: 'life' }));
+		await vi.waitFor(() => expect(visible_panels()).toEqual(['outpost-panel-life']));
+		expect(home()).toBeNull();
+	});
+
+	it('stops waiting and opens Home when the site does not answer', async () => {
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		expect(root.textContent).toContain('Opening Outpost');
+		await vi.waitFor(() => expect(home()).not.toBeNull(), { timeout: START_SCREEN_WAIT_MS + 1500 });
+	});
+
+	it('changing the start screen or appearance never moves the person', async () => {
+		prefer_start('about');
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		const select = root.querySelector<HTMLSelectElement>('#outpost-about-prefs-start') as HTMLSelectElement;
+		select.value = 'recipe';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		root.querySelector<HTMLInputElement>('input[name="outpost-about-prefs-mode"][value="night"]')?.click();
+		await flush();
+		await vi.waitFor(() => expect(document.body.classList.contains('outpost-mode-night')).toBe(true));
+		expect(visible_panels()).toEqual(['outpost-panel-about']);
+		expect(root.querySelector('#outpost-tab-about')?.getAttribute('aria-selected')).toBe('true');
+		expect(document.body.classList.contains('outpost-mode-night')).toBe(true);
+		expect(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}').start).toBe('recipe');
 	});
 });

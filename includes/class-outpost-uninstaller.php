@@ -43,12 +43,15 @@ final class Outpost_Uninstaller {
 		'outpost_telegraph_short_name',
 		'outpost_telegraph_author_name',
 		'outpost_telegraph_author_url',
+		'outpost_appearance_schema',
 	);
 
 	/** Exact user-meta keys Outpost owns (deleted for every user). */
 	private const USER_META_KEYS = array(
 		'outpost_appearance_overrides',
 		'outpost_appearance_mode',
+		'outpost_appearance_source',
+		'outpost_start_screen',
 		'outpost_ios_shortcut_token',
 		'outpost_ios_shortcut_first_seen',
 	);

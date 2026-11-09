@@ -132,6 +132,9 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 
 const VARIANT_ORDER: Variant[] = ['mood', 'weather', 'sleep', 'trip', 'itinerary', 'question'];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const LIFE_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 function is_variant(value: unknown): value is Variant {
 	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
 }

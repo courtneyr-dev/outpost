@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.24
+ * Version:           1.0.25
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Author:            Courtney Robertson
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.24' );
+define( 'OUTPOST_VERSION', '1.0.25' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -250,6 +250,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-contrast.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-theme-json-reader.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-mode-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-style-source.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-start-screen.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-appearance-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-appearance-settings-page.php';
