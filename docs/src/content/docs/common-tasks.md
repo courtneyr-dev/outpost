@@ -121,7 +121,16 @@ You don't need to do anything. Each tab saves its unsent text to your device abo
 
 What's kept: titles and body text, reply targets, the Doing, Life, and Recipe fields, and each photo's alt text and caption. Photos themselves aren't kept: add them again, and their descriptions fill back in, in order.
 
-A draft clears when you post it, when the post goes into the offline queue, or when you sign out. If your browser blocks storage or it's full, the composer says "This device can't keep drafts right now. Copy anything you want to keep." and keeps working without drafts.
+Going to Home and back keeps everything too: Home marks a tab that holds a draft with "Unsent draft".
+
+A draft clears when you post it, when the post goes into the offline queue, or when you sign out (**About › Connection › Sign out of this device**). If your browser blocks storage or it's full, the composer says "This device can't keep drafts right now. Copy anything you want to keep." and keeps working without drafts.
+
+## Choose which screen Outpost opens to
+
+1. Tap **Preferences** (the gear at the top right), or open **About › Preferences**.
+2. Under **Default start screen**, pick Home, Post, Reply, Photo, Doing, Life, Recipe, or About.
+
+The choice saves to your site and applies the next time you launch Outpost, on any device. It doesn't move you off the screen you're on. Sharing to Outpost still opens the tab that content belongs in. From any tab, **← Home** at the bottom of the screen goes back to Home.
 
 ## Change which variant the composer opens to
 

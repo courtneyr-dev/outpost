@@ -61,7 +61,7 @@ If a tab shows "No settings registered for this tab yet," no destination has add
 
 You can change appearance in two places, and both change the same per-user settings:
 
-- In the composer: tap the gear button at the top right to open **Settings**, or use the Light / Dark / System buttons next to it.
+- In the composer: tap the gear button at the top right to open **Preferences**, go to **About › Preferences**, or use the Light / Dark / System buttons next to the gear.
 - In wp-admin: Outpost (first menu) → **Appearance**. Available to anyone who can edit posts.
 
 Two independent choices:
@@ -71,7 +71,9 @@ Two independent choices:
 
 New people start on Outpost Default and System. If you used Outpost before version 1.0.24, you stay on Use Site Theme, which is what you saw before, until you pick another style source.
 
-A choice you make while offline applies on that device right away, and Outpost saves it to your site the next time it connects. The Settings sheet says when a choice is saved only on the device.
+A choice you make while offline applies on that device right away, and Outpost saves it to your site the next time it connects. Preferences says when a choice is saved only on the device. **Reset preferences** returns to Home, System, and Outpost Default.
+
+The composer's Preferences also hold the **Default start screen**: the screen a normal launch opens to. Choices: Home, Post, Reply, Photo, Doing, Life, Recipe, or About; Home is the default. It's per person and follows you to every device. Opening Outpost from the share sheet, a bookmarklet, or the iOS Shortcut still goes to the tab that content belongs in. It's separate from the site-wide **Default Post variant**, which picks the style the Post tab starts on.
 
 The wp-admin page also has **Token overrides**: set an individual color or font for Light or Dark. Overrides apply under either style source.
 

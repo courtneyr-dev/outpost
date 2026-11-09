@@ -25,7 +25,7 @@ Expected result: the composer shows its posting modes and you're ready to write.
 
 ## 3. Post a note
 
-1. The composer opens on the **Post** tab. Its first choice is the post style, set to **Article** unless your site admin changed the default (see [Settings](/outpost/settings/)). Choose **Note**.
+1. Outpost opens on **Home**, with a card for each kind of post. Tap **Post**. Its first choice is the post style, set to **Article** unless your site admin changed the default (see [Settings](/outpost/settings/)). Choose **Note**.
 2. Type a short post. After you pause, "Draft saved" appears under the form: the text is kept on this device until you post it.
 3. If you use syndication destinations, chips for each configured destination appear enabled by default. Tap a chip to turn it off for this post.
 4. Tap **Post note**.
@@ -49,12 +49,13 @@ Expected result: an Outpost icon on your home screen that opens straight into th
 
 ## 5. Pick how the composer looks
 
-Tap **Settings** (the gear at the top right) to choose two things for yourself:
+Tap **Preferences** (the gear at the top right) to choose three things for yourself. The same choices are in **About › Preferences**.
 
+- **Default start screen:** what opens when you launch Outpost. **Home** is the default; pick **Post**, **Reply**, or another tab to skip it.
 - **Style source:** **Outpost Default** (Outpost's own design) or **Use Site Theme** (your theme's colors and fonts).
 - **Appearance:** **Light**, **Dark**, or **System**, which follows your device. The three buttons next to the gear switch this too.
 
-Each person who posts has their own choice. [Settings → Appearance](/outpost/settings/#appearance) has the details.
+Each person who posts has their own choices, and they follow you to every device you sign in on. [Settings → Appearance](/outpost/settings/#appearance) has the details.
 
 ## First-run notes
 

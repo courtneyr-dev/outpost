@@ -28,6 +28,15 @@ The PNG is the downloaded final generated image titled "Theme Adaptive Outpost U
 
 The current repository says the theme owns every paint value. The implementation must document the authorized amendment for selectable sources while retaining semantic tokens, B6, parity, shell isolation, and public opt-outs. This artifact commit doesn't change those runtime rules or claim the new behavior exists.
 
+## Home launcher revision, 2026-11-08
+
+The Home launcher, footer Home link, Default start screen preference, and four-section About extend this design rather than replace it. The [implementation brief](implementation-brief.md) carries the merged requirements in sections 3, 6, 7, 8, 10, and 12.
+
+- Design reference: [home-launcher-mockup.webp](home-launcher-mockup.webp), a generated image like the first mockup.
+- Review of that mockup against every shipped tab, with twelve proposed improvements: [mockup-review-2026-11-08.md](mockup-review-2026-11-08.md).
+- Required views as captures of the running build: [evidence-home/](evidence-home/).
+- Decision record: [session-pwa-ui-home.md](../../decisions/session-pwa-ui-home.md). Verification: the Home section of [verification.md](verification.md).
+
 ## Canonical SVG reconciliation
 
 The source is [outpost-icon.svg at the inspected commit](https://github.com/courtneyr-dev/outpost/blob/d79277f67000199245bfcfe344684b7d0aa167cd/assets/icons/outpost-icon.svg), Git blob `3f3a5c598558b3c3fea02fc7c12cd3e48bd0d1ae`.
