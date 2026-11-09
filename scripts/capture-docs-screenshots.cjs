@@ -314,11 +314,13 @@ const panel = (id) => `#outpost-panel-${id}`;
 		await mpage.locator('.outpost-drawer[data-open="true"] button[aria-label="Close"]').click();
 		await mpage.waitForTimeout(500);
 
-		// 11. Reply mode with a context preview. The preview endpoint's SSRF
-		// guard refuses internal addresses, so a post on this Playground
-		// (127.0.0.1) can't be previewed; reply to a public IndieWeb page
-		// instead (REPLY_TARGET overrides it). If the preview doesn't come
-		// back, capture without it rather than abort the run.
+		// 11. Reply mode, with a context preview when one loads. On
+		// 2026-11-08 the preview failed in Playground for both a post on
+		// this site (127.0.0.1) and https://indieweb.org/POSSE. The cause
+		// is not confirmed (inferred: the SSRF guard for the internal
+		// address, Playground networking for both), so the capture goes
+		// ahead without the preview rather than abort the run.
+		// REPLY_TARGET overrides the target.
 		await mpage.locator('#outpost-tab-reply').click();
 		await mpage.fill('#outpost-reply-target', process.env.REPLY_TARGET || 'https://indieweb.org/POSSE');
 		await mpage.locator(panel('reply') + ' button:has-text("Show preview")').click();

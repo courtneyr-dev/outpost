@@ -65,7 +65,7 @@ Note mode, signed in: write a note and pick syndication targets before posting. 
 
 ![Reply mode on a phone with its eleven types as wrapping tiles, a target URL in In reply to, and a reply being written](../../assets/screenshots/frontend-composer-reply-mode.png)
 
-Reply mode: pick a type, paste the URL you're replying to, and write your reply. **Show preview** fetches the page so you can check it. See [Common tasks](/outpost/common-tasks/).
+Reply mode: pick a type, paste the URL you're replying to, and write your reply. See [Common tasks](/outpost/common-tasks/).
 
 ![Photo mode with an uploaded image and the required alt text field](../../assets/screenshots/frontend-composer-photo-mode.png)
 

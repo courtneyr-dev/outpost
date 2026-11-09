@@ -2010,7 +2010,7 @@
 	outline-offset: 2px;
 }
 
-/* Settings sheet choices: native radios with the whole option as the
+/* Preferences choices: native radios with the whole option as the
  * hit target; selection shown by a 2px edge and weight, not color alone. */
 .outpost-settings {
 	display: flex;
