@@ -191,25 +191,27 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * Regression: same bypass via the Micropub body-token fallback.
-	 *
-	 * `{"access_token":"x", ...}` in the body must also be validated, not
-	 * accepted on presence.
+	 * wp.org review 2026-09-14: the permission callback never resolves or
+	 * switches users. A JSON-body token WordPress didn't resolve leaves the
+	 * request anonymous, and the preview route refuses it with 401.
 	 */
-	public function test_check_permission_rejects_unvalidated_body_token(): void {
+	public function test_check_permission_refuses_a_body_token_wordpress_did_not_resolve(): void {
 		$request = new \WP_REST_Request( 'POST', '/' );
 		$request->set_body( '{"access_token":"x"}' ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-		$this->mock_filters( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		// Even a token IndieAuth would accept: the callback never asks.
+		$this->mock_filters( 42 );
 
 		$result = Outpost_Preview_Endpoint::check_permission( $request );
 
-		$this->assertSame( 'Bearer x', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'The body token was read and handed to the validating filter.' );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'The callback must not write a request header.' );
 	}
 
 	/**
@@ -218,9 +220,10 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 	 */
 	public function test_check_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
-		// determine_current_user validates the token to user 42, who can edit_posts.
+		// IndieAuth resolved the header token during WordPress's own user
+		// resolution, before the route ran.
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
@@ -239,7 +242,7 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 	public function test_check_permission_refuses_under_scoped_bearer_token(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );

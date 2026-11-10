@@ -214,7 +214,8 @@ export interface ServerAppearance {
 
 /**
  * Read (no `changes`) or save the state. Always a POST so the token can
- * ride in the body on hosts that strip the Authorization header; a POST
+ * ride in a form-encoded body, which IndieAuth reads on hosts that strip
+ * the Authorization header; a POST
  * without changes writes nothing on the server. `credentials: 'omit'`
  * keeps a wp-admin cookie from turning this into a nonce-less cookie
  * request (CLAUDE.md, cookie + bearer collision).
@@ -239,10 +240,10 @@ export async function sync_appearance(
 			cache: 'no-store',
 			headers: {
 				Authorization: 'Bearer ' + access_token,
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify(body),
+			body: new URLSearchParams(body).toString(),
 			...(controller ? { signal: controller.signal } : {}),
 		});
 	} catch (err) {

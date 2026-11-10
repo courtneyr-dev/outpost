@@ -432,4 +432,23 @@ final class ShareTargetDispatchTest extends TestCase {
 		$this->assertNull( $redirect_url, 'Array-valued fields are not share data.' );
 		$this->assertSame( array(), $this->captured_redirects );
 	}
+
+	/**
+	 * wp.org review 2026-09-14: against real core sanitizers, markup and
+	 * quotes appended to a shared url field never reach the composer, and
+	 * the encoded link survives.
+	 */
+	public function test_hostile_url_field_is_sanitized_before_dispatch(): void {
+		$location = $this->dispatch_share_target_post(
+			array( 'url' => 'https://example.com/a%20b"><script>alert(1)</script>' )
+		);
+
+		$this->assertNotNull( $location, 'A share with a link still redirects to the composer.' );
+		parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $query );
+		$carried = implode( ' ', array_filter( $query, 'is_string' ) );
+		$this->assertStringNotContainsString( '<', $carried );
+		$this->assertStringNotContainsString( '"', $carried );
+		$this->assertStringNotContainsString( 'script', $carried );
+		$this->assertStringContainsString( 'https://example.com/a%20b', $carried );
+	}
 }

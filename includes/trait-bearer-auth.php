@@ -13,51 +13,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait Outpost_Bearer_Auth {
 
-	/**
-	 * Resolve a bearer token to a real WP user before the capability check.
-	 *
-	 * Delegates validation to the `determine_current_user` filter (the same
-	 * hook IndieAuth's plugin uses to authenticate bearer tokens), so an
-	 * unvalidated token can never authorize the request. On managed-WP hosts
-	 * that strip the Authorization header (GoDaddy), the Micropub-spec body
-	 * `access_token` is restored to the header first so IndieAuth can read it.
-	 *
-	 * This is the plugin's one `wp_set_current_user()` call. WordPress
-	 * resolves the user once, before it dispatches the route, and two cases
-	 * leave a valid token unrecognized by then:
-	 *
-	 *   1. The host stripped the Authorization header and the PWA's token
-	 *      rides in a JSON body. IndieAuth's `determine_current_user`
-	 *      callback reads the header and form-encoded `$_POST` only.
-	 *   2. The request also carries a wp-admin cookie with no REST nonce, so
-	 *      core's `rest_cookie_check_errors()` already set the user to 0.
-	 *
-	 * Core has no hook that resolves the user again after that point, so
-	 * this re-runs the `determine_current_user` chain and applies its
-	 * answer. The user id only ever comes from that chain: this trait never
-	 * maps a token to a user. It lasts for the request; no cookie or session
-	 * is written.
-	 *
-	 * @param WP_REST_Request $request REST request.
+	/*
+	 * This trait never resolves or switches users. WordPress resolves the
+	 * current user once, through the `determine_current_user` filter chain,
+	 * before it dispatches a REST route: IndieAuth's callback (priority 15)
+	 * reads a bearer token from the Authorization header or from a
+	 * form-encoded `access_token` body field, the two places RFC 6750 and the
+	 * Micropub spec put it. Every Outpost permission callback checks the user
+	 * WordPress resolved and the scope of the token that authenticated it.
+	 * A token sent anywhere else (a JSON body, the query string) does not
+	 * authenticate the request.
 	 */
-	private static function authenticate_bearer_token( WP_REST_Request $request ): void {
-		if ( is_user_logged_in() ) {
-			return;
-		}
-		$token = self::bearer_token( $request );
-		if ( '' === $token ) {
-			return;
-		}
-		// Restore a stripped Authorization header so IndieAuth's
-		// determine_current_user callback can read and validate the token.
-		if ( '' === Outpost_Request_Headers::authorization() ) {
-			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
-		}
-		$user_id = Outpost_Request_Headers::resolve_token_user();
-		if ( $user_id > 0 ) {
-			wp_set_current_user( $user_id );
-		}
-	}
 
 	/**
 	 * Whether the token that authenticated this request carries any of the
@@ -102,9 +68,7 @@ trait Outpost_Bearer_Auth {
 	 * is present, and whether a scope check applies never depends on which
 	 * code resolved the current user. IndieAuth's callback runs during
 	 * WordPress's own early user resolution, before any permission callback,
-	 * so a header or form-encoded token is usually resolved already and
-	 * `authenticate_bearer_token()` returns early without resolving anything
-	 * itself.
+	 * so a header or form-encoded token is resolved before this runs.
 	 *
 	 *   1. {@see self::bearer_token()} finds a token in the Authorization
 	 *      header or in the `access_token` body parameter.
@@ -176,9 +140,13 @@ trait Outpost_Bearer_Auth {
 	}
 
 	/**
-	 * Extract the bearer token from the Authorization header, or the
-	 * Micropub-spec `access_token` request body on hosts that strip the
-	 * header. Returns '' when no token is present.
+	 * Find a bearer token in the Authorization header or an `access_token`
+	 * body field. Returns '' when no token is present.
+	 *
+	 * This only decides whether a scope check applies; it never
+	 * authenticates anything. A JSON-body token counts here so that a
+	 * request presenting one is held to the scope gate (fail closed), even
+	 * though IndieAuth only authenticates header and form-encoded tokens.
 	 *
 	 * The header pattern matches every header text IndieAuth's
 	 * `Authorize::get_token_from_bearer_header()` matches. IndieAuth's

@@ -112,22 +112,19 @@ final class Outpost_Preview_Endpoint {
 	/**
 	 * Permission callback for the preview endpoint.
 	 *
-	 * `current_user_can('edit_posts')` is the sole gate. A bearer token
-	 * (Authorization header, or the Micropub body fallback on hosts that
-	 * strip the header) is not an allow-leg on its own — it is only an input
-	 * to authentication: we hand it to IndieAuth's `determine_current_user`
-	 * validation and re-check the capability against the resolved user. Mere
-	 * presence of a `Bearer` header is NOT authentication (a bogus
-	 * `Authorization: Bearer x` from an anonymous caller resolves to no user
-	 * and is rejected).
+	 * `current_user_can('edit_posts')` on the user WordPress already
+	 * resolved is the gate, plus the token's scope. IndieAuth's
+	 * `determine_current_user` callback validates a bearer token from the
+	 * Authorization header or a form-encoded `access_token` field before any
+	 * route runs; this callback never resolves or switches users. Presence of
+	 * a `Bearer` header is NOT authentication: a bogus token resolves to no
+	 * user and is rejected with 401.
 	 *
 	 * Filterable via `outpost_preview_permission` for site admins.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// Read-only: fetches and sanitizes a target URL, writes nothing.
 		// A token scoped for `read` alone (as well as `create`/`update`)
 		// may use it.

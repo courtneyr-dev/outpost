@@ -85,12 +85,23 @@ final class BearerScopePermissionTest extends TestCase {
 			&& class_exists( 'Outpost_Composer_Config_Endpoint' );
 	}
 
+	/**
+	 * A request carrying the header, with the user resolved the way
+	 * WordPress resolves it before dispatch. The route never resolves it.
+	 */
 	private function dispatch_with_header( string $authorization ): \WP_REST_Response {
 		$_SERVER['HTTP_AUTHORIZATION'] = $authorization;
+		$this->resolve_current_user_like_core();
 		return rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
 	}
 
+	/**
+	 * A form-encoded POST: PHP fills `$_POST`, which IndieAuth reads during
+	 * WordPress's user resolution, and WP_REST_Request carries the same body.
+	 */
 	private function dispatch_with_form_token( string $token ): \WP_REST_Response {
+		$_POST['access_token'] = $token;
+		$this->resolve_current_user_like_core();
 		$request = new WP_REST_Request( 'POST', '/outpost/v1/composer-config' );
 		$request->set_body_params( array( 'access_token' => $token ) );
 		return rest_get_server()->dispatch( $request );

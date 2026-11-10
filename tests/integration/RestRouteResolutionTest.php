@@ -343,12 +343,13 @@ final class RestRouteResolutionTest extends TestCase {
 	/**
 	 * @test
 	 */
-	public function media_lookup_body_token_is_only_restored_on_the_lookup_route(): void {
+	public function media_lookup_body_token_is_never_copied_into_the_header(): void {
 		// Third instance of the class: the bearer reinjection used to hook
 		// determine_current_user globally and scope itself by strpos() on
-		// REQUEST_URI. Now it lives in the lookup route's own permission
-		// callback, so dispatching ANY other route with a body token and the
-		// lookup path as a decoy restores nothing.
+		// REQUEST_URI, and later lived in the lookup route's permission
+		// callback. Since the wp.org review of 2026-09-14 no Outpost code
+		// copies a body token into the header or switches users, on any
+		// route: IndieAuth reads `$_POST['access_token']` itself.
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		wp_set_current_user( 0 );
 		$_POST['access_token']  = 'decoy-token'; // outpost-lint:fixture-credential
@@ -363,12 +364,13 @@ final class RestRouteResolutionTest extends TestCase {
 		rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/wp/v2/users' ) );
 		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'No reinjection on a route that is not the lookup.' );
 
-		// The lookup route itself DOES restore the header for its validating filter.
 		$wp->query_vars = array( 'rest_route' => '/outpost/v1/lookup' );
 		$request        = new WP_REST_Request( 'POST', '/outpost/v1/lookup' );
 		$request->set_body_params( array( 'kind' => 'book', 'q' => 'dune', 'access_token' => 'decoy-token' ) );
-		rest_get_server()->dispatch( $request );
-		$this->assertSame( 'Bearer decoy-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null );
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'No reinjection on the lookup route either.' );
+		$this->assertSame( 0, get_current_user_id(), 'The lookup route must not switch users.' );
+		$this->assertSame( 401, $response->get_status() );
 		unset( $_POST['access_token'], $_SERVER['HTTP_AUTHORIZATION'] );
 	}
 }

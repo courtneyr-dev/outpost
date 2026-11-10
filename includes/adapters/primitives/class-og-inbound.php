@@ -277,8 +277,10 @@ final class Outpost_Og_Inbound {
 		$blocks = array();
 		if ( preg_match_all( '~<script\b[^>]*\btype\s*=\s*"application/ld\+json"[^>]*>(.*?)</script>~is', $body, $matches ) ) {
 			foreach ( $matches[1] as $raw ) {
-				$decoded = json_decode( trim( $raw ), true );
-				if ( is_array( $decoded ) ) {
+				// Third-party markup: skip any block that isn't valid JSON
+				// decoding to an object or list.
+				$decoded = json_decode( trim( $raw ), true, 64 );
+				if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
 					// Some sites wrap in @graph; flatten one level.
 					if ( isset( $decoded['@graph'] ) && is_array( $decoded['@graph'] ) ) {
 						foreach ( $decoded['@graph'] as $item ) {

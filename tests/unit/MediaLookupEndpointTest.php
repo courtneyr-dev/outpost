@@ -552,19 +552,21 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_rejects_unvalidated_body_access_token(): void {
 		$request = new \WP_REST_Request( 'POST', '/' );
 		$request->set_body_params( array( 'access_token' => 'x' ) ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
-		// An unvalidated body token resolves no user: determine_current_user is the
-		// only authority, and it is left at its default (false) here.
+		// IndieAuth rejected the form token during WordPress's own user
+		// resolution, so the request is anonymous. The callback neither
+		// re-validates the token nor switches users.
 		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
 		WP_Mock::userFunction( 'rest_do_request' )->never();
 
 		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
 
-		$this->assertSame( 'Bearer x', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'The body token was read and handed to the validating filter.' );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'The callback must not write a request header.' );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
@@ -598,25 +600,24 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		);
 	}
 
-	public function test_permission_authenticates_a_body_token_via_determine_current_user(): void {
-		// Managed host stripped the header; the token rides in the form body.
+	public function test_permission_allows_a_form_body_token_wordpress_resolved(): void {
+		// Managed host stripped the header; the token rides in the form body,
+		// where IndieAuth's determine_current_user callback reads it during
+		// WordPress's own user resolution.
 		$request = new \WP_REST_Request( 'POST', '/' );
 		$request->set_body_params( array( 'access_token' => 'body-token' ) ); // outpost-lint:fixture-credential
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
-		// IndieAuth (or any determine_current_user authority) validates the
-		// restored header and returns the user id.
-		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 7 );
-		WP_Mock::userFunction( 'wp_set_current_user' )->once()->with( 7 );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		// H6: the resolved token carries a scope this read-only route accepts.
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( $request ) );
-		$this->assertSame( 'Bearer body-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'Header restored for the validating filter.' );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'The callback must not write a request header.' );
 	}
 
 	public function test_permission_does_not_restore_header_when_one_is_present(): void {
@@ -637,9 +638,10 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'Bearer already-here', $_SERVER['HTTP_AUTHORIZATION'] );
 	}
 
-	public function test_permission_authenticates_a_json_body_token(): void {
-		// The PWA's real request shape: Content-Type application/json, the
-		// token in the JSON body, the header stripped by the host.
+	public function test_permission_refuses_a_json_body_token_wordpress_did_not_resolve(): void {
+		// IndieAuth reads the header and form-encoded bodies only. A token in
+		// a JSON body with the header stripped leaves the request anonymous,
+		// and the callback does not rescue it by switching users.
 		$request = new \WP_REST_Request( 'POST', '/' );
 		$request->set_body( '{"access_token":"json-token"}' ); // outpost-lint:fixture-credential
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
@@ -647,14 +649,16 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 7 );
-		WP_Mock::userFunction( 'wp_set_current_user' )->once()->with( 7 );
-		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
-		// H6: the resolved token carries a scope this read-only route accepts.
-		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
-		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
+		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( false )->reply( false );
+		WP_Mock::userFunction( 'rest_do_request' )->never();
 
-		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( $request ) );
-		$this->assertSame( 'Bearer json-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null );
+		$result = Outpost_Media_Lookup_Endpoint::check_permission( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER );
 	}
 
 	public function test_permission_never_reads_a_token_from_the_query_string(): void {

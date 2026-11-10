@@ -285,15 +285,11 @@ final class Outpost_Composer_Config_Endpoint {
 	 * @return bool
 	 */
 	public static function permission_check( WP_REST_Request $request ): bool {
-		// Authenticate an Outpost/IndieAuth bearer token the same way the
-		// media-lookup route does: read it from the Authorization header or,
-		// on managed-WP hosts that strip that header (GoDaddy), the Micropub
-		// `access_token` request body, then let IndieAuth's
-		// determine_current_user callback validate it. This is what lets a
-		// token-authenticated request succeed WITHOUT the wp-admin cookie —
-		// the cookie path was the CSRF surface the 1.0.4 fix closed, and it
-		// never reached this endpoint on a header-stripping host anyway.
-		self::authenticate_bearer_token( $request );
+		// WordPress has already resolved the user: IndieAuth's
+		// determine_current_user callback validates a bearer token from the
+		// Authorization header or a form-encoded `access_token` field. A
+		// token-authenticated request needs no wp-admin cookie, so it never
+		// meets the cookie/nonce CSRF check the 1.0.4 fix closed.
 		// Read-only: aggregates companion-plugin status + taxonomy terms +
 		// settings, writes nothing but a rate-limit transient. A token
 		// scoped for `read` alone (as well as `create`/`update`) may use it.

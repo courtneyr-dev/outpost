@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { fetch_preview, extract_title, PreviewError, type PreviewEnvironment } from './preview';
+import {
+	fetch_preview,
+	fetch_source_preview,
+	extract_title,
+	PreviewError,
+	type PreviewEnvironment,
+} from './preview';
 
 function make_response(init: { status?: number; body?: unknown }): Response {
 	const body = typeof init.body === 'string' ? init.body : JSON.stringify(init.body ?? {});
@@ -158,5 +164,66 @@ describe('fetch_preview', () => {
 		await expect(
 			fetch_preview({ url: 'https://example.test/', accessToken: 'abc' }, env),
 		).rejects.toBeInstanceOf(PreviewError);
+	});
+});
+
+describe('preview request transport', () => {
+	function capture(): { env: PreviewEnvironment; seen: () => { url: string; init: RequestInit } } {
+		let seen: { url: string; init: RequestInit } | undefined;
+		const env: PreviewEnvironment = {
+			fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+				seen = { url: String(input), init: init ?? {} };
+				return make_response({
+					body: { html: '<title>x</title>', finalUrl: 'u', contentType: 'text/html', extracted: {} },
+				});
+			},
+		};
+		return {
+			env,
+			seen: () => {
+				if (!seen) throw new Error('fetch was not called');
+				return seen;
+			},
+		};
+	}
+
+	// IndieAuth reads a token from the Authorization header or a
+	// form-encoded `access_token` field, never from a JSON body, and the
+	// server no longer switches users to rescue one.
+	it('fetch_preview sends a form-encoded token body without cookies', async () => {
+		const { env, seen } = capture();
+		await fetch_preview(
+			{ url: 'https://example.test/a?b=1&c=2', accessToken: 'tok-123', sourceId: 'spotify' },
+			env,
+		);
+		const { url, init } = seen();
+		expect(init.credentials).toBe('omit');
+		expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+			'application/x-www-form-urlencoded',
+		);
+		expect(url).not.toContain('tok-123');
+		const body = Object.fromEntries(new URLSearchParams(String(init.body)));
+		expect(body).toEqual({
+			url: 'https://example.test/a?b=1&c=2',
+			access_token: 'tok-123',
+			source_id: 'spotify',
+		});
+	});
+
+	it('fetch_source_preview sends a form-encoded token body without cookies', async () => {
+		const { env, seen } = capture();
+		await fetch_source_preview(
+			{ url: 'https://example.test/', accessToken: 'tok-456', sourceId: 'youtube' },
+			env,
+		).catch(() => undefined);
+		const { url, init } = seen();
+		expect(init.credentials).toBe('omit');
+		expect(url).not.toContain('tok-456');
+		const body = Object.fromEntries(new URLSearchParams(String(init.body)));
+		expect(body).toEqual({
+			url: 'https://example.test/',
+			access_token: 'tok-456',
+			source_id: 'youtube',
+		});
 	});
 });

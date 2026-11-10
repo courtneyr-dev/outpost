@@ -116,14 +116,11 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * Permission callback. Requires the edit_posts capability, with a filter
 	 * override for site admins who want to lock it down.
 	 *
-	 * Managed-WP hosts (GoDaddy's Apache) strip the Authorization header, so
-	 * the PWA sends the IndieAuth token in the request body. The shared
-	 * bearer-auth trait restores it and asks `determine_current_user` (the
-	 * IndieAuth plugin's own authority) to validate it, exactly as the preview,
-	 * geocode, and syndicate-targets routes do. Doing this HERE — inside the
-	 * route's permission callback — scopes it by construction: the REST
-	 * dispatcher has already identified the route, so no URI or query-string
-	 * matching is involved. An earlier build hooked a global
+	 * WordPress resolves the user before this runs: IndieAuth validates a
+	 * token from the Authorization header or a form-encoded `access_token`
+	 * field (the PWA sends both, for hosts that strip the header). This
+	 * callback checks that user and the token's scope; it never resolves or
+	 * switches users. An earlier build hooked a global
 	 * `determine_current_user` filter scoped by `strpos()` on REQUEST_URI,
 	 * which reinjected the token on any route whose URI merely contained the
 	 * lookup path (pre-1.0.4 audit, route-resolution class).
@@ -131,7 +128,6 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
 		// Read-only: proxies a metadata lookup, writes nothing. A token
 		// scoped for `read` alone (as well as `create`/`update`) may use it.
 		$can_edit  = current_user_can( 'edit_posts' );

@@ -112,25 +112,20 @@ final class Outpost_Share_Target_Controller {
 		if ( '' === $text && isset( $_GET['text'] ) && is_string( $_GET['text'] ) ) {
 			$text = wp_kses( wp_unslash( $_GET['text'] ), array() );
 		}
-		// The url field is usually one bare URL, sanitized as one; share sheets
-		// sometimes put text there instead, which is kept as text and handed
-		// to the same detection the text field gets.
-		$url = '';
-		if ( isset( $_POST['url'] ) && is_string( $_POST['url'] ) ) {
-			$url = preg_match( '#^https?://\S+$#i', wp_unslash( $_POST['url'] ) )
-				? esc_url_raw( wp_unslash( $_POST['url'] ), array( 'http', 'https' ) )
-				: wp_kses( wp_unslash( $_POST['url'] ), array() );
-		}
+		// The url field is usually one bare URL, but share sheets sometimes put
+		// text there. It is sanitized as text here; sanitize_shared_url() then
+		// decides, on the sanitized value, whether it is one bare http(s) URL
+		// (esc_url_raw()) or text for the same link detection `text` gets.
+		$url = isset( $_POST['url'] ) && is_string( $_POST['url'] ) ? wp_kses( wp_unslash( $_POST['url'] ), array() ) : '';
 		if ( '' === $url && isset( $_GET['url'] ) && is_string( $_GET['url'] ) ) {
-			$url = preg_match( '#^https?://\S+$#i', wp_unslash( $_GET['url'] ) )
-				? esc_url_raw( wp_unslash( $_GET['url'] ), array( 'http', 'https' ) )
-				: wp_kses( wp_unslash( $_GET['url'] ), array() );
+			$url = wp_kses( wp_unslash( $_GET['url'] ), array() );
 		}
 		// phpcs:enable
 
-		// The shared-field sanitizers finish the job on the variables: UTF-8
-		// check, whitespace, the `&` wp_kses() encoded, and esc_url_raw() when
-		// the url field is one bare URL. The Shortcut endpoints use the same two.
+		// The shared-field sanitizers finish the job on the sanitized values:
+		// UTF-8 check, control characters, whitespace, the `&` wp_kses()
+		// encoded, and esc_url_raw() with an http/https allowlist when the url
+		// field is one bare URL. The Shortcut endpoints use the same two.
 		return array(
 			'title' => Outpost_Source_Detector::sanitize_shared_text( $title ),
 			'text'  => Outpost_Source_Detector::sanitize_shared_text( $text ),

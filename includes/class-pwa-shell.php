@@ -597,7 +597,10 @@ final class Outpost_PWA_Shell {
 		);
 
 		self::send_json_header();
-		echo wp_json_encode( $manifest );
+		// Default escaping plus hex-encoded <, >, &, ' and ", so no manifest
+		// value (the plugin URL comes from a filterable core function) can
+		// form markup if a client ever renders the response as HTML.
+		echo wp_json_encode( $manifest, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		self::halt();
 	}
 

@@ -145,14 +145,12 @@ final class Outpost_Manual_Share_Controller {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability. Filterable.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// This callback guards all three routes. GET /manual-share-chips
 		// returns static chip metadata — read-only, so a `read` scope
 		// suffices in addition to `create`/`update`. Both POST routes

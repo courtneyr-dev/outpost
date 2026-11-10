@@ -147,8 +147,8 @@ final class Outpost_Shortcut_Controller {
 		if ( '' === $raw ) {
 			return null;
 		}
-		$decoded = json_decode( $raw, true );
-		if ( ! is_array( $decoded ) ) {
+		$decoded = json_decode( $raw, true, 16 );
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
 			return null;
 		}
 		return $decoded;
