@@ -127,7 +127,7 @@ describe('appearance: sync_appearance transport', () => {
 		expect(seen?.url).not.toContain('secret-token-abc');
 		expect(seen?.init.credentials).toBe('omit');
 		expect(seen?.init.method).toBe('POST');
-		const body = JSON.parse(String(seen?.init.body)) as Record<string, string>;
+		const body = Object.fromEntries(new URLSearchParams(String(seen?.init.body))) as Record<string, string>;
 		expect(body['access_token']).toBe('secret-token-abc');
 		expect(body['style_source']).toBe('site');
 		expect(body).not.toHaveProperty('mode_preference');
@@ -135,7 +135,7 @@ describe('appearance: sync_appearance transport', () => {
 
 	it('a read sends only the token', async () => {
 		await sync_appearance('t', {}, { fetch: answer(200, { mode_preference: 'system', style_source: 'outpost', css: '' }) });
-		expect(Object.keys(JSON.parse(String(seen?.init.body)) as object)).toEqual(['access_token']);
+		expect(Object.keys(Object.fromEntries(new URLSearchParams(String(seen?.init.body))) as object)).toEqual(['access_token']);
 	});
 
 	it.each([
@@ -205,7 +205,7 @@ describe('appearance: start screen', () => {
 	it('sends start_screen only when it changes', async () => {
 		let seen: Record<string, string> = {};
 		const fetch = ((_: string, init: RequestInit) => {
-			seen = JSON.parse(String(init.body)) as Record<string, string>;
+			seen = Object.fromEntries(new URLSearchParams(String(init.body))) as Record<string, string>;
 			return Promise.resolve(new Response(JSON.stringify({ mode_preference: 'system', style_source: 'outpost', start_screen: 'life' }), { status: 200 }));
 		}) as unknown as typeof globalThis.fetch;
 		const out = await sync_appearance('t', { start: 'life' }, { fetch });

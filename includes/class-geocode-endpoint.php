@@ -55,6 +55,9 @@ final class Outpost_Geocode_Endpoint {
 	 * user side without sacrificing realistic responses. */
 	private const HTTP_TIMEOUT = 3;
 
+	/** Largest Nominatim response body parsed (1 MB). */
+	private const MAX_RESPONSE_BYTES = 1048576;
+
 	/** Cap on result count returned to the client. */
 	private const MAX_RESULTS = 5;
 
@@ -104,8 +107,6 @@ final class Outpost_Geocode_Endpoint {
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// Read-only: proxies Nominatim, writes nothing but a rate-limit /
 		// result cache transient. A token scoped for `read` alone (as well
 		// as `create`/`update`) may use it.
@@ -372,14 +373,36 @@ final class Outpost_Geocode_Endpoint {
 			);
 		}
 
-		$body    = (string) wp_remote_retrieve_body( $response );
-		$decoded = json_decode( $body, true );
-		if ( ! is_array( $decoded ) ) {
-			return new WP_Error(
-				'geocode_failed',
-				__( 'Geocoding service returned invalid JSON.', 'outpost-mobile-publishing' ),
-				array( 'status' => 502 )
-			);
+		return self::parse_results( (string) wp_remote_retrieve_body( $response ) );
+	}
+
+	/**
+	 * Decode and validate a Nominatim search response.
+	 *
+	 * The body comes from a third-party server, so nothing in it is trusted:
+	 * invalid JSON or a payload that isn't a list of places fails closed
+	 * with a WP_Error. Each place needs numeric `lat`/`lon` inside the valid
+	 * coordinate ranges and a non-empty string `display_name`; any other
+	 * entry is skipped. String fields are sanitized before they reach the
+	 * REST response.
+	 *
+	 * @internal Public for unit tests.
+	 *
+	 * @param string $body Raw response body.
+	 * @return array<int, array{lat: float, lon: float, displayName: string, type: string}>|WP_Error
+	 */
+	public static function parse_results( string $body ) {
+		$invalid = new WP_Error(
+			'geocode_failed',
+			__( 'Geocoding service returned invalid JSON.', 'outpost-mobile-publishing' ),
+			array( 'status' => 502 )
+		);
+		if ( '' === $body || strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
+			return $invalid;
+		}
+		$decoded = json_decode( $body, true, 16 );
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) || ! array_is_list( $decoded ) ) {
+			return $invalid;
 		}
 
 		$results = array();
@@ -387,18 +410,24 @@ final class Outpost_Geocode_Endpoint {
 			if ( ! is_array( $entry ) ) {
 				continue;
 			}
-			$lat          = isset( $entry['lat'] ) ? (string) $entry['lat'] : '';
-			$lon          = isset( $entry['lon'] ) ? (string) $entry['lon'] : '';
-			$display_name = isset( $entry['display_name'] ) ? (string) $entry['display_name'] : '';
-			if ( '' === $lat || '' === $lon || '' === $display_name ) {
+			$lat          = $entry['lat'] ?? null;
+			$lon          = $entry['lon'] ?? null;
+			$display_name = $entry['display_name'] ?? null;
+			if ( ! is_numeric( $lat ) || ! is_numeric( $lon ) || ! is_string( $display_name ) ) {
 				continue;
 			}
-			// Lat/lon are returned as strings; cast to float to normalize.
+			$lat          = (float) $lat;
+			$lon          = (float) $lon;
+			$display_name = sanitize_text_field( $display_name );
+			if ( $lat < -90.0 || $lat > 90.0 || $lon < -180.0 || $lon > 180.0 || '' === $display_name ) {
+				continue;
+			}
+			$type      = isset( $entry['type'] ) && is_string( $entry['type'] ) ? sanitize_key( $entry['type'] ) : '';
 			$results[] = array(
-				'lat'         => (float) $lat,
-				'lon'         => (float) $lon,
+				'lat'         => $lat,
+				'lon'         => $lon,
 				'displayName' => $display_name,
-				'type'        => isset( $entry['type'] ) ? (string) $entry['type'] : '',
+				'type'        => $type,
 			);
 		}
 

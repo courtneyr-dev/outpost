@@ -110,8 +110,6 @@ final class Outpost_Manual_Share_Status_Controller {
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// This callback guards both the read-only GET routes (status,
 		// pending-summary) and the mutating POST routes (dismiss-reminder,
 		// snooze-all — both write reminder_dismissed_until). GET requests

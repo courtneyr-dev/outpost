@@ -75,14 +75,12 @@ final class Outpost_Syndicate_Targets_Endpoint {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability. Filterable.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// Read-only: static companion-chip metadata, writes nothing. A
 		// token scoped for `read` alone (as well as `create`/`update`) may
 		// use it.

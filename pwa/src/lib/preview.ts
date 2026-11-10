@@ -82,6 +82,19 @@ export interface FetchPreviewParams {
 const PREVIEW_ENDPOINT = '/wp-json/outpost/v1/preview';
 
 /**
+ * Form-encoded preview request body. The token rides as `access_token`, the
+ * field IndieAuth reads from `$_POST` when the host strips the
+ * Authorization header; a JSON body is never read for authentication.
+ */
+function preview_body(url: string, access_token: string, source_id?: string): string {
+	const body = new URLSearchParams();
+	body.append('url', url);
+	body.append('access_token', access_token);
+	if (source_id) body.append('source_id', source_id);
+	return body.toString();
+}
+
+/**
  * Fetch a preview from the Outpost preview endpoint.
  *
  * Validates the URL client-side (fast feedback before round-trip), POSTs
@@ -108,22 +121,20 @@ export async function fetch_preview(
 		// that strip the Authorization header (GoDaddy's Apache config dropping
 		// HTTP_AUTHORIZATION). That created a token-leak path through web-server
 		// access logs, browser history, and Cloudflare cache keys. Token now lives
-		// in the body's `access_token` field (Micropub spec compliant) so the same
-		// stripping fallback works without leaking through URLs.
+		// in a form-encoded `access_token` body field (Micropub spec), which
+		// IndieAuth reads when the host strips the header, without leaking
+		// through URLs. `credentials: 'omit'` keeps a wp-admin cookie from
+		// turning this into a nonce-less cookie request.
 		const url_with_cache_bust = PREVIEW_ENDPOINT + '?_t=' + String(Date.now());
 		response = await env.fetch(url_with_cache_bust, {
 			method: 'POST',
-			credentials: 'include',
+			credentials: 'omit',
 			headers: {
 				Authorization: 'Bearer ' + params.accessToken,
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({
-				url: params.url,
-				access_token: params.accessToken,
-				...(params.sourceId ? { source_id: params.sourceId } : {}),
-			}),
+			body: preview_body(params.url, params.accessToken, params.sourceId),
 		});
 	} catch (err) {
 		throw new PreviewError(
@@ -208,17 +219,13 @@ export async function fetch_source_preview(
 		const url_with_cache_bust = PREVIEW_ENDPOINT + '?_t=' + String(Date.now());
 		response = await env.fetch(url_with_cache_bust, {
 			method: 'POST',
-			credentials: 'include',
+			credentials: 'omit',
 			headers: {
 				Authorization: 'Bearer ' + params.accessToken,
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({
-				url: params.url,
-				source_id: params.sourceId,
-				access_token: params.accessToken,
-			}),
+			body: preview_body(params.url, params.accessToken, params.sourceId),
 		});
 	} catch (err) {
 		throw new PreviewError(

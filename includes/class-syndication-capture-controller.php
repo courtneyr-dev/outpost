@@ -96,14 +96,12 @@ final class Outpost_Syndication_Capture_Controller {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope.
 	 *
 	 * @return bool|WP_Error
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
-		self::authenticate_bearer_token( $request );
-
 		// This callback guards both the read-only GET /pending route and
 		// the mutating POST /capture route (writes completed_at + silo_url
 		// to the audit log and outpost_syndication_links). GET requests

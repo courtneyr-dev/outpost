@@ -71,7 +71,7 @@ describe('fetch_composer_config', () => {
 		expect(seen?.url).not.toContain('secret-token-abc');
 		expect(seen?.url).not.toContain('_o_token');
 		expect(String(seen?.init.body)).toContain('secret-token-abc');
-		const parsed = JSON.parse(String(seen?.init.body)) as { access_token?: string };
+		const parsed = Object.fromEntries(new URLSearchParams(String(seen?.init.body))) as { access_token?: string };
 		expect(parsed.access_token).toBe('secret-token-abc');
 	});
 

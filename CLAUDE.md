@@ -145,10 +145,10 @@ Every feature and bugfix lands with tests — failing test first, then the fix. 
 Sanitize input, validate data, escape output (Security Trinity above). Secrets live in env/config, never in code or commits. Public-facing features get a security review pass before shipping.
 
 Real incidents from this repo's history, so the pattern doesn't regress:
-- **Bearer-token-in-URL leak** — the token used to ride in the query string; moved to the JSON body (Micropub-spec compliant) so it stops leaking through access logs, browser history, and CDN cache keys.
+- **Bearer-token-in-URL leak** — the token used to ride in the query string; moved to the request body so it stops leaking through access logs, browser history, and CDN cache keys. Since the 2026-11 wp.org review fix it rides as a form-encoded `access_token` field (Micropub spec), which IndieAuth reads itself; Outpost never switches users to accept a token, so a JSON-body token authenticates nothing.
 - **Filter privilege-escalation** — a hostile `outpost_companion_adapters` filter could once instantiate arbitrary classes; now restricted to `Outpost_*_Adapter`-pattern class names plus a `is_subclass_of` check.
 - **Token-store XSS size limit** — the encrypted IndexedDB token store defeats casual DevTools inspection (non-extractable `CryptoKey`) but does **not** defeat same-origin XSS; that's documented honestly rather than oversold, and is why CSP work matters.
-- **Cookie + bearer credential collision** — a same-origin PWA calling WordPress REST with `Authorization: Bearer` also carries the `wordpress_logged_in_*` cookie if the user is logged into wp-admin in the same browser. WordPress's cookie-auth path then demands a nonce bearer auth doesn't have, and the request 403s. Fix: `credentials: 'omit'` on every bearer-authenticated fetch. Endpoints that intentionally support cookie fallback keep `credentials: 'include'`.
+- **Cookie + bearer credential collision** — a same-origin PWA calling WordPress REST with `Authorization: Bearer` also carries the `wordpress_logged_in_*` cookie if the user is logged into wp-admin in the same browser. WordPress's cookie-auth path then demands a nonce bearer auth doesn't have, and the request 403s. Fix: `credentials: 'omit'` on every bearer-authenticated fetch. Since the 2026-11 wp.org review fix no PWA fetch uses `credentials: 'include'` (preview was the last).
 
 ## Accessibility
 

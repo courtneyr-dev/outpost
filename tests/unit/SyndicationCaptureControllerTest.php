@@ -129,7 +129,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
@@ -171,7 +171,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_denies_bearer_token_scoped_for_profile_only_on_capture(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
 
@@ -186,7 +186,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_bearer_token_scoped_for_create_on_capture(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
@@ -203,7 +203,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		// scope alone must not authorize it.
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
@@ -219,7 +219,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		// GET /pending is read-only, so a `read`-only token is enough.
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
@@ -237,7 +237,7 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 		// a `draft`-scoped token is refused on the mutating /capture route.
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::onFilter( 'determine_current_user' )->with( false )->reply( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'draft' ) );
 

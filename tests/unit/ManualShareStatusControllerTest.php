@@ -138,7 +138,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		// H6: bearer_has_scope() reads indieauth_scopes via the real
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
@@ -157,7 +157,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_read_scope_authorizes_get(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 
@@ -172,7 +172,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_read_scope_alone_refused_on_post(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
 

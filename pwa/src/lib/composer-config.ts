@@ -84,9 +84,9 @@ export async function fetch_composer_config(
 ): Promise<ComposerConfig> {
 	// The bearer travels in the Authorization header AND the request body:
 	//   - The header works on hosts that pass it through to PHP.
-	//   - Managed-WP hosts (GoDaddy) strip the Authorization header, so the
-	//     token also rides in the JSON body's `access_token` field
-	//     (Micropub-spec), which the endpoint reads when the header is gone.
+	//   - Some hosts strip the Authorization header, so the token also rides
+	//     in a form-encoded `access_token` body field (Micropub spec), which
+	//     IndieAuth reads from `$_POST` when the header is gone.
 	//     This is a POST for that reason — a GET can't carry a body reliably —
 	//     and the token stays out of the query string, so it never lands in
 	//     access logs, referrers, or CDN cache keys.
@@ -103,10 +103,10 @@ export async function fetch_composer_config(
 			credentials: 'omit',
 			headers: {
 				Authorization: 'Bearer ' + access_token,
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/x-www-form-urlencoded',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({ access_token }),
+			body: new URLSearchParams({ access_token }).toString(),
 		});
 	} catch (err) {
 		throw new ComposerConfigError(

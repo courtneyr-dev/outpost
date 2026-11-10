@@ -83,7 +83,7 @@ describe('useAppearance', () => {
 		write_cache({ mode: 'night', source: 'site', css: '', me: 'https://a.test/', pending: { mode: 'night' } }, storage);
 		const bodies: Array<Record<string, string>> = [];
 		const fetch = vi.fn((_: string, init: RequestInit) => {
-			bodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+			bodies.push(Object.fromEntries(new URLSearchParams(String(init.body))) as Record<string, string>);
 			return Promise.resolve(server('night', 'site', '.outpost-source-site{}'));
 		});
 		const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: fetch as unknown as typeof globalThis.fetch } });
@@ -188,7 +188,7 @@ describe('useAppearance', () => {
 			write_cache({ mode: 'night', source: 'site', css: 'x', start: 'home', me: 'https://a.test/' }, storage);
 			const bodies: Array<Record<string, string>> = [];
 			const fetch = vi.fn((_: string, init: RequestInit) => {
-				bodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+				bodies.push(Object.fromEntries(new URLSearchParams(String(init.body))) as Record<string, string>);
 				return Promise.resolve(server('night', 'site', 'x', bodies.length > 1 ? 'recipe' : 'home'));
 			});
 			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: fetch as unknown as typeof globalThis.fetch } });
@@ -220,7 +220,7 @@ describe('useAppearance', () => {
 			write_cache({ mode: 'night', source: 'site', css: 'x', start: 'about', me: 'https://a.test/' }, storage);
 			const bodies: Array<Record<string, string>> = [];
 			const fetch = vi.fn((_: string, init: RequestInit) => {
-				bodies.push(JSON.parse(String(init.body)) as Record<string, string>);
+				bodies.push(Object.fromEntries(new URLSearchParams(String(init.body))) as Record<string, string>);
 				return Promise.resolve(bodies.length > 1 ? server('system', 'outpost', '', 'home') : server('night', 'site', 'x', 'about'));
 			});
 			const h = harness({ accessToken: 't', me: 'https://a.test/', storage, env: { fetch: fetch as unknown as typeof globalThis.fetch } });

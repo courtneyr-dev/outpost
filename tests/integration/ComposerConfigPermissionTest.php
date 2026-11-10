@@ -181,11 +181,11 @@ final class ComposerConfigPermissionTest extends TestCase {
 	}
 
 	/**
-	 * A bearer token in the request body authenticates the endpoint even when
-	 * the Authorization header never reaches PHP (managed-WP hosts like GoDaddy
-	 * strip it). This is the path that broke composer-config on live after the
-	 * 1.0.4 CSRF fix removed the cookie fallback: the token now authenticates
-	 * through Outpost_Bearer_Auth, with no wp-admin cookie involved.
+	 * A bearer token in a form-encoded body authenticates the endpoint even
+	 * when the Authorization header never reaches PHP (some hosts strip
+	 * it): IndieAuth reads `$_POST['access_token']` while WordPress
+	 * resolves the user, before the route runs. No wp-admin cookie is
+	 * involved.
 	 *
 	 * The token is `create`-scoped: H6's scope gate refuses a bearer
 	 * request whose token carries no create/update/read scope, and under
@@ -195,53 +195,50 @@ final class ComposerConfigPermissionTest extends TestCase {
 	 */
 	public function body_token_authenticates_when_the_header_is_stripped(): void {
 		// IndieAuthTokenFixture: a real IndieAuth token when IndieAuth is
-		// loaded, otherwise a stand-in whose determine_current_user validator
-		// reads the Authorization header the trait restores from the body.
+		// loaded, otherwise a stand-in that reads the header and
+		// `$_POST['access_token']`, the two places IndieAuth reads.
 		$token = $this->issue_indieauth_token( $this->editor_id, array( 'create' ) );
-		wp_set_current_user( 0 );
-		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 
 		try {
-			// dispatch() skips WP_REST_Server::serve_request(), which is what
-			// copies $_POST and the raw body onto the request on a real HTTP
-			// call. The trait reads the token from the request, so each probe
-			// builds its request the way core would.
-			$ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => $token ) ) );
-
-			// Each real HTTP request is a fresh process; reset the user, the
-			// header the trait restored, and IndieAuth's verified-token state
-			// so the next token is judged alone.
-			wp_set_current_user( 0 );
-			$this->reset_indieauth_request_state();
-			$bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'form' => 'not-a-real-token' ) ) );
-
-			// The PWA's real shape: Content-Type application/json.
-			wp_set_current_user( 0 );
-			$this->reset_indieauth_request_state();
-			$json_ok = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => $token ) ) );
-
-			wp_set_current_user( 0 );
-			$this->reset_indieauth_request_state();
-			$json_bad = rest_get_server()->dispatch( $this->composer_config_request( array( 'json' => 'not-a-real-token' ) ) );
-
-			// A valid token in the URL must not authenticate: query strings
-			// reach access logs, browser history, and CDN cache keys.
-			wp_set_current_user( 0 );
-			$this->reset_indieauth_request_state();
-			$query              = rest_get_server()->dispatch( $this->composer_config_request( array( 'query' => $token ) ) );
-			$header_after_query = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+			$ok        = $this->probe( array( 'form' => $token ) );
+			$bad       = $this->probe( array( 'form' => 'not-a-real-token' ) );
+			$json      = $this->probe( array( 'json' => $token ) );
+			$json_user = get_current_user_id();
+			$json_hdr  = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+			$query     = $this->probe( array( 'query' => $token ) );
+			$query_hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
 		} finally {
 			$this->reset_indieauth_request_state();
 			wp_set_current_user( 0 );
 		}
 
-		$this->assertSame( 200, $ok->get_status(), 'A valid body token must authenticate with no header and no cookie.' );
+		$this->assertSame( 200, $ok->get_status(), 'A valid form-encoded token must authenticate with no header and no cookie.' );
 		$this->assertArrayHasKey( 'companions', (array) $ok->get_data() );
-		$this->assertSame( 401, $bad->get_status(), 'A bogus body token must be rejected.' );
-		$this->assertSame( 200, $json_ok->get_status(), 'A valid token in a JSON body must authenticate.' );
-		$this->assertSame( 401, $json_bad->get_status(), 'A bogus token in a JSON body must be rejected.' );
+		$this->assertSame( 401, $bad->get_status(), 'A bogus form-encoded token must be rejected.' );
+		// wp.org review 2026-09-14: the route never switches users, so a
+		// token IndieAuth can't read (a JSON body) authenticates nobody.
+		$this->assertSame( 401, $json->get_status(), 'A token in a JSON body is not a credential.' );
+		$this->assertSame( 0, $json_user, 'The route must not switch to the JSON-body token\'s user.' );
+		$this->assertNull( $json_hdr, 'The route must not copy a body token into the Authorization header.' );
 		$this->assertSame( 401, $query->get_status(), 'A token in the query string must not authenticate.' );
-		$this->assertNull( $header_after_query, 'A query-string token must not be restored to the Authorization header.' );
+		$this->assertNull( $query_hdr, 'A query-string token must not be restored to the Authorization header.' );
+	}
+
+	/**
+	 * One request, as a fresh PHP process sees it: clear the previous
+	 * request's credentials, let PHP fill `$_POST` for a form body, resolve
+	 * the user the way core does before dispatch, then dispatch.
+	 *
+	 * @param array<string, string> $token One of 'form', 'json', 'query' => token.
+	 */
+	private function probe( array $token ): \WP_REST_Response {
+		$this->reset_indieauth_request_state();
+		wp_set_current_user( 0 );
+		if ( isset( $token['form'] ) ) {
+			$_POST['access_token'] = $token['form'];
+		}
+		$this->resolve_current_user_like_core();
+		return rest_get_server()->dispatch( $this->composer_config_request( $token ) );
 	}
 
 	/**

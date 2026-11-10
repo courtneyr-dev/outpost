@@ -238,4 +238,55 @@ final class ShareTargetControllerTest extends TestCase {
 
 		$this->assertSame( array(), $this->redirects );
 	}
+
+	/**
+	 * wp.org review 2026-09-14: the url field is sanitized before anything
+	 * inspects it. Markup and non-http schemes never reach the composer.
+	 *
+	 * @return array<string, array{0:string, 1:string}> superglobal, raw url field
+	 */
+	public function hostile_url_fields(): array {
+		return array(
+			'POST: markup after a bare link'  => array( 'POST', 'https://example.com/a%20b"><script>alert(1)</script>' ),
+			'GET: markup after a bare link'   => array( 'GET', 'https://example.com/a%20b"><script>alert(1)</script>' ),
+			'POST: javascript scheme'         => array( 'POST', 'javascript:alert(document.cookie)' ),
+			'GET: data scheme'                => array( 'GET', 'data:text/html,<script>alert(1)</script>' ),
+			'POST: tag-wrapped link'          => array( 'POST', '<a href="javascript:alert(1)">https://example.com/a%20b</a>' ),
+		);
+	}
+
+	/**
+	 * @dataProvider hostile_url_fields
+	 */
+	public function test_hostile_url_field_never_reaches_the_composer_raw( string $source, string $raw ): void {
+		if ( 'GET' === $source ) {
+			$_GET = array( 'url' => $raw );
+		} else {
+			$_POST = array( 'url' => $raw );
+		}
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$carried = '';
+		foreach ( $this->redirects as $redirect ) {
+			parse_str( (string) parse_url( $redirect[0], PHP_URL_QUERY ), $query );
+			$carried .= ' ' . implode( ' ', array_filter( $query, 'is_string' ) );
+		}
+		// No markup and no non-http scheme survives. Quote stripping is
+		// core's esc_url_raw(), which the unit mock passes through; the
+		// integration suite checks it against real core.
+		$this->assertStringNotContainsString( '<', $carried );
+		$this->assertStringNotContainsStringIgnoringCase( 'javascript:', $carried );
+		$this->assertStringNotContainsStringIgnoringCase( 'data:', $carried );
+	}
+
+	public function test_tag_wrapped_url_field_keeps_only_the_http_link(): void {
+		$_POST = array( 'url' => '<a href="javascript:alert(1)">https://example.com/a%20b</a>' );
+		$this->mock_core_sanitizers();
+
+		Outpost_Share_Target_Controller::handle_request();
+
+		$this->assertSame( 'https://example.com/a%20b', $this->redirected_url_param() );
+	}
 }

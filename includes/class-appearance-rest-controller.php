@@ -89,9 +89,6 @@ final class Outpost_Appearance_REST_Controller {
 	 * @return bool|\WP_Error
 	 */
 	public static function permission_check( ?\WP_REST_Request $request = null ) {
-		if ( null !== $request ) {
-			self::authenticate_bearer_token( $request );
-		}
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error(
 				'outpost_appearance_unauthorized',

@@ -70,9 +70,9 @@ trait IndieAuthTokenFixture {
 	/**
 	 * Resolve the current user the way WordPress does before it dispatches
 	 * a REST request, and leave it set, as IndieAuth's
-	 * `determine_current_user` callback leaves it. The route's
-	 * `authenticate_bearer_token()` then returns early without resolving
-	 * anything itself.
+	 * `determine_current_user` callback leaves it. Outpost's routes never
+	 * resolve or switch the user themselves; this stands in for the
+	 * resolution a fresh request gets from core.
 	 */
 	private function resolve_current_user_like_core(): int {
 		wp_set_current_user( 0 );
