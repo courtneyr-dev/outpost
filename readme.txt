@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.25
+Stable tag:        1.0.26
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -238,6 +238,12 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
 
+= 1.0.26 =
+* Security: Outpost no longer switches the current user. Every REST permission check uses the user WordPress already resolved, plus the token's scope, and a token in a JSON body authenticates nothing, as the Micropub spec says.
+* Security: the composer's preview, settings and appearance requests send the access token form-encoded without cookies, the same way geocode, media lookup and moods already did.
+* Fixed: place search ignores malformed geocoder responses (invalid JSON, very deep or over 1 MB) and keeps only places with valid coordinates.
+* Fixed: a URL shared to Outpost is sanitized before Outpost reads it, and the web app manifest escapes its JSON for HTML.
+
 = 1.0.25 =
 * New: Outpost opens to a Home screen with a card for each kind of post, and every tab ends with a ← Home link. Going Home keeps everything you've typed or attached, and Home marks a tab that holds an unsent draft.
 * New: choose the screen Outpost opens to (Home, any tab, or About) under Preferences › Default start screen. It's saved to your site, so it follows you to every device. Sharing to Outpost still opens the tab your content belongs in.
@@ -381,6 +387,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
+
+= 1.0.26 =
+Security hardening from the WordPress.org plugin review. No settings change.
 
 = 1.0.25 =
 Outpost now opens to a Home screen. To open straight to Post as before, choose Post under Preferences › Default start screen.
