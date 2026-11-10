@@ -7,6 +7,20 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.26] - 2026-11-10
+
+### Security
+
+- Removed `wp_set_current_user()` from the bearer-auth trait. `authenticate_bearer_token()` and `resolve_token_user()` are gone: permission callbacks check the user WordPress resolved plus the token scope, and never switch users or write `$_SERVER['HTTP_AUTHORIZATION']`. A token in a JSON body authenticates nothing, matching the Micropub spec (#306).
+- Preview, composer-config and appearance requests from the PWA send a form-encoded `access_token` with `credentials: 'omit'`, the shape geocode, media lookup and moods already use (#306).
+
+### Fixed
+
+- Geocode decodes the Nominatim body in `parse_results()`, which fails closed on invalid JSON, non-lists, depth over 16 and bodies over 1 MB, and keeps only places with numeric, in-range coordinates (#306).
+- The JSON-LD reader on the preview path and the Shortcut payload reader check `json_last_error()` (#306).
+- The share target reads its `url` field through `wp_kses()` before any `preg_match()`, and the manifest echo adds `JSON_HEX_TAG|AMP|APOS|QUOT` (#306).
+- `WporgReviewGuardsTest` fails the build on a `wp_set_current_user()` call, any `JSON_UNESCAPED_*` flag, an echoed `wp_json_encode()` without the hex flags, or a superglobal passed whole to a helper (#306).
+
 ## [1.0.25] - 2026-11-08
 
 ### Added
