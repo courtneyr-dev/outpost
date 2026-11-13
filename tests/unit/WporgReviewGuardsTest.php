@@ -50,6 +50,21 @@ final class WporgReviewGuardsTest extends TestCase {
 		return is_array( $token ) ? $token[1] : $token;
 	}
 
+	/**
+	 * T10-S3-06: the server's idea of the Outpost PWA client_id (origin plus
+	 * Outpost_Client_Identity::COMPOSER_PATH) must match what the PWA sends
+	 * (origin plus COMPOSER_URL in pwa/src/index.tsx). If they drift, the
+	 * PWA silently loses connected-account enrichment.
+	 */
+	public function test_server_composer_path_matches_the_pwa_client_id_path(): void {
+		$root = dirname( __DIR__, 2 );
+		$php  = (string) file_get_contents( $root . '/includes/auth/class-outpost-client-identity.php' );
+		$ts   = (string) file_get_contents( $root . '/pwa/src/index.tsx' );
+		$this->assertSame( 1, preg_match( "/const COMPOSER_PATH = '([^']+)';/", $php, $server ) );
+		$this->assertSame( 1, preg_match( "/const COMPOSER_URL = '([^']+)';/", $ts, $pwa ) );
+		$this->assertSame( $pwa[1], $server[1] );
+	}
+
 	public function test_scan_covers_the_plugin_source(): void {
 		$files = array_keys( self::shipped_tokens() );
 		$this->assertContains( 'includes/trait-bearer-auth.php', $files );

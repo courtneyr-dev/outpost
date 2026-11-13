@@ -80,9 +80,32 @@ final class NotionShareTargetPreviewTest extends TestCase {
 		);
 		$this->assertGreaterThan( 0, $this->test_user_id, 'Failed to create test user.' );
 		wp_set_current_user( $this->test_user_id );
+
+		// Arrive the way the PWA does: IndieAuth verified a bearer token
+		// issued to this site's Outpost client. Connected Notion enrichment
+		// is reserved for that client (T10-S3-06; ConnectedAccountReadsTest
+		// covers every other caller).
+		$GLOBALS['wp_rest_auth_cookie'] = false;
+		add_filter( 'indieauth_response', array( self::class, 'outpost_pwa_response' ) );
+		add_filter( 'indieauth_scopes', array( self::class, 'outpost_pwa_scopes' ) );
+	}
+
+	/** @return array<string, string> */
+	public static function outpost_pwa_response(): array {
+		return array(
+			'client_id' => \Outpost_Client_Identity::outpost_client_id(),
+			'scope'     => 'create update media',
+		);
+	}
+
+	/** @return string[] */
+	public static function outpost_pwa_scopes(): array {
+		return array( 'create', 'update', 'media' );
 	}
 
 	protected function tearDown(): void {
+		remove_filter( 'indieauth_response', array( self::class, 'outpost_pwa_response' ) );
+		remove_filter( 'indieauth_scopes', array( self::class, 'outpost_pwa_scopes' ) );
 		if ( $this->test_user_id > 0 ) {
 			Outpost_Credentials_Store::delete( 'notion', $this->test_user_id );
 			require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -103,8 +126,8 @@ final class NotionShareTargetPreviewTest extends TestCase {
 
 	/**
 	 * Build a WP_REST_Request matching what the PWA composer sends to
-	 * /wp-json/outpost/v1/preview. The body carries the shared URL;
-	 * cookie auth flows from wp_set_current_user() in setUp().
+	 * /wp-json/outpost/v1/preview. The body carries the shared URL; the
+	 * user and the verified Outpost client come from setUp().
 	 */
 	private function build_preview_request( string $url ): WP_REST_Request {
 		$request = new WP_REST_Request( 'POST', '/outpost/v1/preview' );
