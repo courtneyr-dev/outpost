@@ -43,7 +43,7 @@ afterEach(() => {
 
 async function effects(): Promise<void> {
 	await vi.waitFor(() => expect(root.firstElementChild).not.toBeNull());
-	await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+	await new Promise((resolve) => setTimeout(resolve, 60));
 }
 
 describe('useRevealError', () => {

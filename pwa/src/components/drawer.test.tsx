@@ -12,6 +12,8 @@ beforeEach(() => {
 afterEach(() => {
 	render(null, root);
 	root.remove();
+	document.querySelector('style[data-drawer-test]')?.remove();
+	document.body.style.overflow = '';
 });
 
 function mount(open: boolean, onClose = vi.fn()): ReturnType<typeof vi.fn> {
@@ -61,5 +63,26 @@ describe('Drawer', () => {
 		await flush();
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 		expect(on_close).toHaveBeenCalledOnce();
+	});
+
+	it('leaves page scrolling alone when the stylesheet is blocked', async () => {
+		mount(true);
+		await flush();
+		expect(document.body.style.overflow).toBe('');
+	});
+
+	it('locks page scrolling only while a fixed drawer is open', async () => {
+		const style = document.createElement('style');
+		style.dataset.drawerTest = '';
+		style.textContent = '.outpost-drawer { position: fixed; }';
+		document.head.appendChild(style);
+
+		mount(true);
+		await flush();
+		expect(document.body.style.overflow).toBe('hidden');
+
+		mount(false);
+		await flush();
+		expect(document.body.style.overflow).toBe('');
 	});
 });

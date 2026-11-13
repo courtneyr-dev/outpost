@@ -115,6 +115,7 @@
 	/* Focus — violet ink, 15:1 on paper. Orange is 2.38:1 on paper and
 	 * can't carry focus in the light scheme. */
 	--outpost-focus-ring-color: #241c4a;
+	--outpost-focus: var(--outpost-focus-ring-color);
 	--outpost-focus-ring-width: 2px;
 	--outpost-focus-ring-offset: 2px;
 	--outpost-focus-ring-style: solid;
@@ -172,7 +173,6 @@
 	/* --- Compatibility aliases (transitional) --------------------------- */
 	--outpost-border: var(--outpost-card-border);
 	--outpost-radius: var(--outpost-radius-md);
-	--outpost-focus: var(--outpost-focus-ring-color);
 	--outpost-text-muted: #5f5873;
 	--outpost-primary-bg: var(--outpost-button-primary-bg);
 	--outpost-primary-fg: var(--outpost-button-primary-fg);
@@ -225,6 +225,7 @@
 	--outpost-segment-bg-selected: #e8e6f1;
 	--outpost-segment-fg-selected: #241c4a;
 	--outpost-focus-ring-color: #241c4a;
+	--outpost-focus: var(--outpost-focus-ring-color);
 	--outpost-text-muted: #5f5873;
 	--outpost-border: #7a70b0;
 	--outpost-link: #5b4a9e;
@@ -280,6 +281,7 @@
 	--outpost-segment-bg-selected: #3b3463;
 	--outpost-segment-fg-selected: #f7f4ff;
 	--outpost-focus-ring-color: #ff9a2e;
+	--outpost-focus: var(--outpost-focus-ring-color);
 	--outpost-text-muted: #c9c1ef;
 	--outpost-border: #9a90cf;
 	--outpost-link: #a59bd6;
@@ -336,6 +338,7 @@
 		--outpost-segment-bg-selected: #3b3463;
 		--outpost-segment-fg-selected: #f7f4ff;
 		--outpost-focus-ring-color: #ff9a2e;
+		--outpost-focus: var(--outpost-focus-ring-color);
 		--outpost-text-muted: #c9c1ef;
 		--outpost-border: #9a90cf;
 		--outpost-link: #a59bd6;

@@ -113,6 +113,8 @@ export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps
 	// when the user drags inside the drawer.
 	useEffect(() => {
 		if (!open) return;
+		const drawer = drawer_ref.current;
+		if (!drawer || getComputedStyle(drawer).position !== 'fixed') return;
 		const original_overflow = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return (): void => {

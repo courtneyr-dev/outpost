@@ -364,7 +364,7 @@
 
 .outpost-tab:focus {
 	outline: 2px solid var(--outpost-focus, currentColor);
-	outline-offset: -2px;
+	outline-offset: 2px;
 }
 
 /* Selected: the active fill plus an inset border and heavier weight, so

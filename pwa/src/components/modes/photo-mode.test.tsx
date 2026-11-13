@@ -130,6 +130,7 @@ describe('PhotoMode submit errors', () => {
 		expect(alert.nextElementSibling?.classList.contains('outpost-status')).toBe(true);
 		expect(alert.nextElementSibling?.nextElementSibling?.classList.contains('outpost-publish')).toBe(true);
 		expect(scroll_into_view).toHaveBeenCalledWith({ block: 'nearest' });
+		expect(scroll_into_view.mock.contexts[0]).toBe(alert);
 		expect(alert.compareDocumentPosition(root.querySelector('.outpost-drawer') as Element)).toBe(
 			Node.DOCUMENT_POSITION_PRECEDING,
 		);

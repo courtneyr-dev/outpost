@@ -78,16 +78,36 @@ describe('process_photo validation', () => {
 		});
 	});
 
-	it('accepts a 15 MB JPEG through the default size gate', async () => {
-		const file = make_file('image/jpeg', 15 * 1024 * 1024);
-		const result = await Promise.race([
-			process_photo(file).then(
-				() => null,
-				(error: unknown) => error,
-			),
-			new Promise<null>((resolve) => setTimeout(() => resolve(null), 25)),
-		]);
-		if (result) expect(result).not.toMatchObject({ code: 'too_large' });
+	it('accepts a JPEG exactly at the 50 MB default cap', async () => {
+		const original_image = globalThis.Image;
+		const original_create_object_url = URL.createObjectURL;
+		const original_revoke_object_url = URL.revokeObjectURL;
+		class FailingImage {
+			onload: ((event: Event) => void) | null = null;
+			onerror: ((event: Event) => void) | null = null;
+
+			set src(_value: string) {
+				queueMicrotask(() => this.onerror?.(new Event('error')));
+			}
+		}
+		Object.defineProperty(globalThis, 'Image', {
+			configurable: true,
+			value: FailingImage,
+		});
+		URL.createObjectURL = () => 'blob:test-photo';
+		URL.revokeObjectURL = () => undefined;
+
+		try {
+			const file = make_file('image/jpeg', 50 * 1024 * 1024);
+			await expect(process_photo(file)).rejects.toMatchObject({ code: 'load_failed' });
+		} finally {
+			Object.defineProperty(globalThis, 'Image', {
+				configurable: true,
+				value: original_image,
+			});
+			URL.createObjectURL = original_create_object_url;
+			URL.revokeObjectURL = original_revoke_object_url;
+		}
 	});
 
 	it('rejects a JPEG over the 50 MB default cap', async () => {
