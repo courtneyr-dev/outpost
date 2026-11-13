@@ -5,9 +5,8 @@
  * Handles the existing `/post/share-target` route as a real
  * dispatcher. Web Share Target Level 2 POSTs share data here; this
  * controller extracts the URL via the priority chain, runs it
- * through `Outpost_Source_Detector::dispatch`, optionally enqueues
- * the B2 preview transient for unambiguous routes, and 303-redirects
- * to the composer.
+ * through `Outpost_Source_Detector::dispatch`, and 303-redirects to
+ * the composer.
  *
  * GET requests with no share parameters fall through to the existing
  * `Outpost_PWA_Shell::render()` so direct navigation to /post/share-target
@@ -18,12 +17,11 @@
  * and an OS-initiated share navigation cannot carry an Authorization
  * header — so a cookie gate here 401'd every share fired from a phone's
  * share sheet (desktop only worked when a wp-admin cookie happened to
- * ride along). Dispatch itself is a pure same-origin redirect
- * computation: no fetch fires, nothing is written. The one auth-gated
- * side effect is the B2 preview transient warm-up (it spends the user's
- * per-user preview rate-limit budget), which stays cookie-gated below
- * and additionally self-guards inside enqueue_preview_transient().
- * The composer the redirect lands on enforces its own client-side auth.
+ * ride along). The route is a pure same-origin redirect computation:
+ * it reads, writes, and fetches nothing for any user, signed in or not,
+ * so the share fields are untrusted text that only shapes the redirect.
+ * The composer the redirect lands on enforces its own auth and asks the
+ * person before it fetches or saves anything.
  *
  * @package Outpost
  */
@@ -37,9 +35,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Share_Target_Controller {
-
-	/** Transient TTL for pre-fill preview cache (per-user, per-URL hash). */
-	private const PREFILL_TRANSIENT_TTL = 5 * MINUTE_IN_SECONDS;
 
 	/**
 	 * Handle the inbound share-target request. Called from
@@ -76,14 +71,6 @@ final class Outpost_Share_Target_Controller {
 
 		$context  = self::build_context();
 		$decision = Outpost_Source_Detector::dispatch( $url, $context );
-
-		// Preview warm-up is the only authenticated side effect: it spends
-		// the user's per-user preview rate-limit budget, so anonymous
-		// share navigations (phones — see the class docblock) skip it and
-		// the composer fetches the preview itself after sign-in.
-		if ( 'auto' === $decision['route_type'] && ! empty( $decision['prefill_token'] ) && self::is_authenticated() ) {
-			self::enqueue_preview_transient( $url, (string) $decision['prefill_token'], (string) $decision['source_id'] );
-		}
 
 		self::redirect( (string) $decision['redirect_url'] );
 	}
@@ -196,71 +183,6 @@ final class Outpost_Share_Target_Controller {
 			$query[] = rawurlencode( (string) $key ) . '=' . rawurlencode( (string) $value );
 		}
 		return Outpost_Source_Detector::COMPOSER_PATH . '?' . implode( '&', $query );
-	}
-
-	/**
-	 * Enqueue the B2 preview transient for an auto-routed dispatch.
-	 * Fire-and-forget — the composer falls back to a fresh fetch if
-	 * the transient isn't present when it loads. Uses a short-timeout
-	 * non-blocking POST to the existing /preview endpoint.
-	 *
-	 * The transient itself is set by the preview endpoint when it
-	 * sees `?cached_for=` on a fresh request; F6 just fires the
-	 * preview ahead of the redirect so the cache is warm by the
-	 * time the composer asks for it.
-	 *
-	 * Public so `Outpost_IOS_Shortcut_REST_Controller` can call it directly
-	 * without duplicating the transient-key + payload logic.
-	 *
-	 * @param string $url       Source URL.
-	 * @param string $token     Pre-fill token (URL hash).
-	 * @param string $source_id Source ID.
-	 */
-	public static function enqueue_preview_transient( string $url, string $token, string $source_id ): void {
-		$user_id = get_current_user_id();
-		if ( $user_id <= 0 ) {
-			return;
-		}
-		$key = self::transient_key( $user_id, $token );
-		// Mark the slot as "fetch in flight" so the composer waits a
-		// reasonable interval before falling back to its own fetch.
-		// The actual preview content gets written by a follow-up
-		// request from the composer. The pending marker keeps this
-		// fire-and-forget — we don't synchronously hit /preview here
-		// because the share-target redirect should be instant.
-		set_transient(
-			$key,
-			array(
-				'status'    => 'pending',
-				'url'       => $url,
-				'source_id' => $source_id,
-				'enqueued'  => time(),
-			),
-			self::PREFILL_TRANSIENT_TTL
-		);
-	}
-
-	/**
-	 * Build the per-user transient key for a pre-fill cache slot.
-	 *
-	 * @param int    $user_id Owning user ID.
-	 * @param string $token   URL hash.
-	 * @return string
-	 */
-	public static function transient_key( int $user_id, string $token ): string {
-		return 'outpost_prefill_' . $user_id . '_' . $token;
-	}
-
-	/**
-	 * Whether the current request carries a WordPress cookie session.
-	 *
-	 * Gates only the preview-transient warm-up — never the dispatch
-	 * redirect (see the class docblock for the phone share-sheet flow).
-	 *
-	 * @return bool
-	 */
-	private static function is_authenticated(): bool {
-		return is_user_logged_in();
 	}
 
 	/**

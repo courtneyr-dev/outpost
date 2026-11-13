@@ -341,7 +341,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$decision = Outpost_Source_Detector::dispatch( 'https://example.com/page' );
 
-		$this->assertNull( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision );
 		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'] );
 	}
 
@@ -367,10 +367,10 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'auto', $decision['route_type'] );
 		$this->assertSame( 'listen', $decision['mode'] );
 		$this->assertSame( 'fake-spotify', $decision['source_id'] );
-		$this->assertNotEmpty( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision, 'T10-S3-01: no server-side prefill state.' );
 	}
 
-	public function test_dispatch_auto_redirect_url_includes_mode_and_token(): void {
+	public function test_dispatch_auto_redirect_url_includes_mode_and_source(): void {
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
 		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
 
@@ -389,7 +389,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertStringContainsString( 'mode=watch', $decision['redirect_url'] );
 		$this->assertStringContainsString( 'source=fake', $decision['redirect_url'] );
-		$this->assertStringContainsString( 'cached_for=', $decision['redirect_url'] );
+		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'], 'T10-S3-01: no server-side cache to look up.' );
 	}
 
 	public function test_dispatch_redirect_url_is_absolute(): void {
@@ -444,20 +444,6 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'specific', $decision['source_id'] );
 	}
 
-	// --- prefill_token determinism ---------------------------------------
-
-	public function test_prefill_token_is_deterministic_for_a_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$this->assertSame( $a, $b );
-		$this->assertSame( 16, strlen( $a ) );
-	}
-
-	public function test_prefill_token_varies_by_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/a' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/b' );
-		$this->assertNotSame( $a, $b );
-	}
 
 	// --- per-request memoization -----------------------------------------
 

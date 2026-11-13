@@ -149,14 +149,6 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 
 		$decision = Outpost_Source_Detector::dispatch( $resolved, $context );
 
-		if ( 'auto' === ( $decision['route_type'] ?? '' ) && ! empty( $decision['prefill_token'] ) ) {
-			Outpost_Share_Target_Controller::enqueue_preview_transient(
-				$resolved,
-				(string) $decision['prefill_token'],
-				(string) ( $decision['source_id'] ?? '' )
-			);
-		}
-
 		return new \WP_REST_Response(
 			array(
 				'redirect_url' => (string) $decision['redirect_url'],

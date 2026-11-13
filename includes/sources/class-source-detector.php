@@ -244,7 +244,6 @@ final class Outpost_Source_Detector {
 	 *         'mode_default'  => string|null,        // present for picker
 	 *         'source_id'     => string,
 	 *         'redirect_url'  => string,             // /post/?mode=... or /post/?picker=...
-	 *         'prefill_token' => string|null,        // hash for B2 transient lookup
 	 *     ]
 	 *
 	 * @param string             $url     The URL to dispatch.
@@ -291,10 +290,8 @@ final class Outpost_Source_Detector {
 	}
 
 	/**
-	 * Build the auto-route decision for an unambiguous source. The
-	 * caller (Share_Target_Controller / Shortcut_Controller) is
-	 * responsible for enqueueing the B2 preview transient associated
-	 * with `prefill_token` before issuing the redirect.
+	 * Build the auto-route decision for an unambiguous source. Pure: the
+	 * caller only redirects; nothing is stored or fetched on the server.
 	 *
 	 * @param Outpost_Source_Base $source Matched source.
 	 * @param string              $url    Source URL.
@@ -304,22 +301,19 @@ final class Outpost_Source_Detector {
 		$caps      = $source->capabilities();
 		$mode      = $source->mode_for_url( $url );
 		$source_id = isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : 'unknown';
-		$token     = self::prefill_token( $url );
 
 		$query_args = array(
-			'mode'       => $mode,
-			'source'     => $source_id,
-			'url'        => $url,
-			'cached_for' => $token,
+			'mode'   => $mode,
+			'source' => $source_id,
+			'url'    => $url,
 		);
 		return array(
-			'route_type'    => 'auto',
-			'mode'          => $mode,
-			'mode_options'  => null,
-			'mode_default'  => null,
-			'source_id'     => $source_id,
-			'redirect_url'  => self::build_composer_url( $query_args ),
-			'prefill_token' => $token,
+			'route_type'   => 'auto',
+			'mode'         => $mode,
+			'mode_options' => null,
+			'mode_default' => null,
+			'source_id'    => $source_id,
+			'redirect_url' => self::build_composer_url( $query_args ),
 		);
 	}
 
@@ -343,13 +337,12 @@ final class Outpost_Source_Detector {
 			'url'     => $url,
 		);
 		return array(
-			'route_type'    => 'picker',
-			'mode'          => null,
-			'mode_options'  => $info['mode_options'],
-			'mode_default'  => $info['mode_default'],
-			'source_id'     => $info['id'],
-			'redirect_url'  => self::build_composer_url( $query_args ),
-			'prefill_token' => null, // No preview enqueue on picker dispatch.
+			'route_type'   => 'picker',
+			'mode'         => null,
+			'mode_options' => $info['mode_options'],
+			'mode_default' => $info['mode_default'],
+			'source_id'    => $info['id'],
+			'redirect_url' => self::build_composer_url( $query_args ),
 		);
 	}
 
@@ -401,17 +394,5 @@ final class Outpost_Source_Detector {
 			return $base;
 		}
 		return $base . '?' . implode( '&', $pairs );
-	}
-
-	/**
-	 * Hash a URL into a stable token used as the B2 preview cache key.
-	 * Short hash — eight hex chars — is plenty for the per-user
-	 * 5-minute transient namespace and keeps the redirect URL short.
-	 *
-	 * @param string $url Source URL.
-	 * @return string
-	 */
-	public static function prefill_token( string $url ): string {
-		return substr( md5( $url ), 0, 16 );
 	}
 }

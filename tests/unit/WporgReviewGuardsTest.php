@@ -189,4 +189,26 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		$this->assertSame( array(), $passed, 'Read single keys inside wp_unslash() and a sanitizer instead.' );
 	}
+
+	/**
+	 * T10 (2026-11-13): share intake (share-target route and iOS Shortcut)
+	 * keeps no server-side state. The removed prefill transient had no
+	 * reader, so nothing may write `outpost_prefill_*` or carry its helpers.
+	 */
+	public function test_share_intake_keeps_no_prefill_state(): void {
+		$found = array();
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			foreach ( $tokens as $token ) {
+				if ( ! is_array( $token ) ) {
+					continue;
+				}
+				$literal = T_CONSTANT_ENCAPSED_STRING === $token[0] && preg_match( '/outpost_prefill_|cached_for/', $token[1] );
+				$symbol  = T_STRING === $token[0] && in_array( $token[1], array( 'enqueue_preview_transient', 'prefill_token', 'PREFILL_TRANSIENT_TTL' ), true );
+				if ( $literal || $symbol ) {
+					$found[] = $file . ':' . $token[2] . ' ' . $token[1];
+				}
+			}
+		}
+		$this->assertSame( array(), $found );
+	}
 }
