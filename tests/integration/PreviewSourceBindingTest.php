@@ -19,8 +19,8 @@ namespace Outpost\Tests\Integration;
 
 use Outpost_Credentials_Store;
 use Outpost_Preview_Endpoint;
+use PHPUnit\Framework\TestCase;
 use WP_REST_Request;
-use WP_UnitTestCase as TestCase;
 
 final class PreviewSourceBindingTest extends TestCase {
 
@@ -38,7 +38,14 @@ final class PreviewSourceBindingTest extends TestCase {
 		if ( ! class_exists( 'Outpost_Preview_Endpoint' ) || ! class_exists( 'Outpost_Source_Registry' ) ) {
 			$this->markTestSkipped( 'Skipped under unit bootstrap. Run via `npm run test:integration` inside wp-env tests-cli.' );
 		}
-		$this->editor_id = (int) self::factory()->user->create( array( 'role' => 'editor' ) );
+		$this->editor_id = (int) wp_insert_user(
+			array(
+				'user_login' => 'binding_editor_' . uniqid(),
+				'user_pass'  => wp_generate_password( 24, true ),
+				'user_email' => 'binding_editor_' . uniqid() . '@example.test',
+				'role'       => 'editor',
+			)
+		);
 		wp_set_current_user( $this->editor_id );
 		$this->outbound = array();
 		add_filter( 'pre_http_request', array( $this, 'record_and_stub' ), 0, 3 );
@@ -48,6 +55,8 @@ final class PreviewSourceBindingTest extends TestCase {
 		remove_filter( 'pre_http_request', array( $this, 'record_and_stub' ), 0 );
 		if ( $this->editor_id > 0 ) {
 			Outpost_Credentials_Store::delete( 'notion', $this->editor_id );
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+			wp_delete_user( $this->editor_id );
 		}
 		wp_set_current_user( 0 );
 		parent::tearDown();

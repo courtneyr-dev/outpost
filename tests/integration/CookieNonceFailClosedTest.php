@@ -18,8 +18,8 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Integration;
 
+use PHPUnit\Framework\TestCase;
 use WP_REST_Request;
-use WP_UnitTestCase as TestCase;
 
 final class CookieNonceFailClosedTest extends TestCase {
 
@@ -46,7 +46,14 @@ final class CookieNonceFailClosedTest extends TestCase {
 		$this->saved_request     = $_REQUEST;
 		$this->saved_auth_cookie = $GLOBALS['wp_rest_auth_cookie'] ?? null;
 
-		$this->editor_id = (int) self::factory()->user->create( array( 'role' => 'editor' ) );
+		$this->editor_id = (int) wp_insert_user(
+			array(
+				'user_login' => 'nonce_editor_' . uniqid(),
+				'user_pass'  => wp_generate_password( 24, true ),
+				'user_email' => 'nonce_editor_' . uniqid() . '@example.test',
+				'role'       => 'editor',
+			)
+		);
 		$this->meta_writes = 0;
 		add_action( 'added_user_meta', array( $this, 'count_meta_write' ), 10, 2 );
 		add_action( 'updated_user_meta', array( $this, 'count_meta_write' ), 10, 2 );
@@ -60,6 +67,10 @@ final class CookieNonceFailClosedTest extends TestCase {
 		$_REQUEST                       = $this->saved_request;
 		$GLOBALS['wp_rest_auth_cookie'] = $this->saved_auth_cookie;
 		wp_set_current_user( 0 );
+		if ( $this->editor_id > 0 ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+			wp_delete_user( $this->editor_id );
+		}
 		parent::tearDown();
 	}
 
@@ -195,7 +206,7 @@ final class CookieNonceFailClosedTest extends TestCase {
 
 		$result = $this->serve( $this->appearance_post() );
 
-		$this->assertWPError( $result['auth'] );
+		$this->assertInstanceOf( \WP_Error::class, $result['auth'] );
 		$this->assertSame( 'rest_cookie_invalid_nonce', $result['auth']->get_error_code() );
 		$this->assertNull( $result['response'] );
 		$this->assertSame( 0, $this->meta_writes );
