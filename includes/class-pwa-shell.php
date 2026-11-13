@@ -737,15 +737,20 @@ function is_share_target_request(url) {
 // to the PHP dispatcher, which routes them by content. The database and
 // store names must match pwa/src/lib/share-inbox.ts.
 //
-// Any page can submit a form to this path, so a share is untrusted input:
-// only supported raster images within the limits below are parked (sizes
-// are checked before any bytes are read), and a share still waiting in the
-// inbox is never replaced. Everything else passes through to the server,
-// which keeps nothing.
+// The share may come from any app or page, so every field and file is
+// untrusted: only image types the composer can upload (pwa/src/lib/photo.ts),
+// within the limits below, are parked, and sizes are checked before any
+// bytes are read. Parked photos wait for the person: the composer shows them
+// for review and nothing is used until they choose. The inbox holds the
+// waiting share (`pending`) and at most one newer share (`candidate`) while
+// the person decides between them; neither is ever overwritten, and a third
+// share is not kept. Everything else passes through to the server, which
+// keeps nothing.
 const SHARE_INBOX_DB = 'outpost-share-inbox';
 const SHARE_INBOX_STORE = 'inbox';
 const SHARE_INBOX_KEY = 'pending';
-const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/avif'];
+const SHARE_INBOX_CANDIDATE_KEY = 'candidate';
+const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 // Same per-file cap the composer applies before upload (pwa/src/lib/photo.ts).
 const SHARE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const SHARE_MAX_FILES = 10;
@@ -765,21 +770,31 @@ function open_share_inbox() {
 	});
 }
 
-// Park the share only when the inbox is empty. add() fails on an existing
-// key, so a share that is still waiting is never replaced; resolves false
-// when it was kept.
+// Park a share in the first free slot: `pending`, else `candidate`.
+// Resolves with the slot used, or 'refused' when both are taken. Rejects
+// when IndexedDB fails.
 async function park_shared_photos(payload) {
 	const db = await open_share_inbox();
 	try {
-		return await new Promise((resolve) => {
+		return await new Promise((resolve, reject) => {
 			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
-			const req = tx.objectStore(SHARE_INBOX_STORE).add(payload, SHARE_INBOX_KEY);
-			req.onerror = (event) => {
-				event.preventDefault();
+			const store = tx.objectStore(SHARE_INBOX_STORE);
+			let slot = 'refused';
+			const keys = store.getAllKeys();
+			keys.onsuccess = () => {
+				const taken = keys.result.map(String);
+				if (!taken.includes(SHARE_INBOX_KEY)) {
+					slot = SHARE_INBOX_KEY;
+				} else if (!taken.includes(SHARE_INBOX_CANDIDATE_KEY)) {
+					slot = SHARE_INBOX_CANDIDATE_KEY;
+				}
+				if (slot !== 'refused') {
+					store.add(payload, slot);
+				}
 			};
-			tx.oncomplete = () => resolve(true);
-			tx.onerror = () => resolve(false);
-			tx.onabort = () => resolve(false);
+			tx.oncomplete = () => resolve(slot);
+			tx.onerror = () => reject(tx.error);
+			tx.onabort = () => reject(tx.error);
 		});
 	} finally {
 		db.close();
@@ -817,18 +832,22 @@ async function handle_share_post(event) {
 			lastModified: typeof photo.lastModified === 'number' ? photo.lastModified : Date.now(),
 			buffer: await photo.arrayBuffer(),
 		})));
-		await park_shared_photos({
+		const slot = await park_shared_photos({
 			files: records,
 			title: String(form.get('title') || ''),
 			text: String(form.get('text') || ''),
 			received: Date.now(),
 		});
+		// The composer shows what is waiting for review; `refused` tells it
+		// this share wasn't kept because two were already waiting.
+		const refused = 'refused' === slot ? '&refused=1' : '';
+		return Response.redirect(SHELL_URL + '?mode=photo&shared=photos' + refused, 303);
 	} catch (_err) {
-		// IndexedDB unavailable (storage pressure, private mode). The
-		// composer still opens on the Photo tab; the user picks the photo
-		// again from the library.
+		// IndexedDB unavailable (storage pressure, private mode): nothing
+		// was kept. The composer opens on the Photo tab with nothing to
+		// review; the person picks the photo again from the library.
+		return Response.redirect(SHELL_URL + '?mode=photo', 303);
 	}
-	return Response.redirect(SHELL_URL + '?mode=photo&shared=photos', 303);
 }
 
 self.addEventListener('fetch', (event) => {

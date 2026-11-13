@@ -6,16 +6,19 @@
  * its three PHP echoes are replaced with test values, and its `fetch` listener
  * is driven with real Request/FormData/File objects against fake IndexedDB.
  *
- * Contract under test: a share POST to /post/share-target parks images only
- * when they are a supported raster type and within the per-file, count, and
- * total limits; it never replaces a share that is still waiting; anything
- * else passes through to the server untouched.
+ * Contract under test (S3-05 v1.1): a share POST to the worker's own
+ * /post/share-target parks images only when they are a type the composer can
+ * upload and within the per-file, count, and total limits (checked before the
+ * bytes are read). The inbox holds the waiting share and at most one newer
+ * candidate; neither is overwritten and a third share is refused. The
+ * initiating app may be external; anything else passes through untouched.
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { SUPPORTED_IMAGE_TYPES, MAX_PHOTO_BYTES } from './photo';
 
 const ORIGIN = 'http://localhost';
 const MB = 1024 * 1024;
@@ -40,8 +43,9 @@ function sw_source(): string {
 
 let passthrough: Request[];
 let fetch_listener: FetchListener;
+let policy: { types: string[]; perFile: number; files: number; total: number };
 
-function load_worker(): void {
+function load_worker(factory: IDBFactory | { open: () => unknown } = globalThis.indexedDB): void {
 	const listeners: Record<string, unknown> = {};
 	const self_stub = {
 		location: new URL(ORIGIN + '/post/sw'),
@@ -61,14 +65,24 @@ function load_worker(): void {
 		delete: async (): Promise<boolean> => true,
 		match: async (): Promise<undefined> => undefined,
 	};
-	const run = new Function('self', 'fetch', 'caches', 'indexedDB', 'Response', 'Request', 'URL', sw_source());
+	const run = new Function(
+		'self',
+		'fetch',
+		'caches',
+		'indexedDB',
+		'Response',
+		'Request',
+		'URL',
+		sw_source() +
+			'\nreturn { types: SHARE_IMAGE_TYPES, perFile: SHARE_MAX_FILE_BYTES, files: SHARE_MAX_FILES, total: SHARE_MAX_TOTAL_BYTES };',
+	);
 	// A worker resolves a relative Response.redirect() against its own URL; Node needs it absolute.
 	class WorkerResponse extends Response {
 		static override redirect(url: string | URL, status?: number): Response {
 			return Response.redirect(new URL(String(url), ORIGIN).href, status);
 		}
 	}
-	run(self_stub, fetch_stub, caches_stub, globalThis.indexedDB, WorkerResponse, Request, URL);
+	policy = run(self_stub, fetch_stub, caches_stub, factory, WorkerResponse, Request, URL) as typeof policy;
 	fetch_listener = listeners.fetch as FetchListener;
 }
 
@@ -94,7 +108,7 @@ function huge_image(name: string, size: number): File {
 	return image(name, size);
 }
 
-async function inbox(): Promise<{ title: string; files: { name: string }[] } | undefined> {
+async function inbox(slot = 'pending'): Promise<{ title: string; files: { name: string }[] } | undefined> {
 	const db = await new Promise<IDBDatabase>((res, rej) => {
 		const r = indexedDB.open('outpost-share-inbox', 1);
 		r.onupgradeneeded = (): void => {
@@ -104,7 +118,7 @@ async function inbox(): Promise<{ title: string; files: { name: string }[] } | u
 		r.onerror = (): void => rej(r.error);
 	});
 	const value = await new Promise<unknown>((res) => {
-		const q = db.transaction('inbox').objectStore('inbox').get('pending');
+		const q = db.transaction('inbox').objectStore('inbox').get(slot);
 		q.onsuccess = (): void => res(q.result);
 	});
 	db.close();
@@ -127,22 +141,38 @@ describe('service worker share intake (T10-S3-05)', () => {
 		expect(passthrough.length).toBe(0);
 	});
 
-	it('never replaces a share that is still waiting', async () => {
+	it('keeps a second share as the candidate and refuses a third', async () => {
 		await dispatch(share([image('first.png')], { title: 'first' }));
-		await dispatch(share([image('second.png')], { title: 'second' }));
+		const second = await dispatch(share([image('second.png')], { title: 'second' }));
+		const third = await dispatch(share([image('third.png')], { title: 'third' }));
 
-		const kept = await inbox();
-		expect(kept?.title).toBe('first');
-		expect(kept?.files.map((f) => f.name)).toEqual(['first.png']);
+		expect(second?.headers.get('Location')).toBe(ORIGIN + '/post/?mode=photo&shared=photos');
+		expect(third?.headers.get('Location')).toBe(ORIGIN + '/post/?mode=photo&shared=photos&refused=1');
+		expect((await inbox('pending'))?.title).toBe('first');
+		expect((await inbox('candidate'))?.title).toBe('second');
+	});
+
+	it('parks nothing and promises no photos when IndexedDB fails', async () => {
+		load_worker({
+			open: () => {
+				const req: { onerror?: () => void; error: Error } = { error: new Error('blocked') };
+				setTimeout(() => req.onerror?.(), 0);
+				return req;
+			},
+		});
+		const response = await dispatch(share([image('a.png')]));
+
+		expect(response?.status).toBe(303);
+		expect(response?.headers.get('Location')).toBe(ORIGIN + '/post/?mode=photo');
 	});
 
 	it('passes unsupported types through without parking', async () => {
-		for (const type of ['text/plain', 'image/svg+xml', 'application/octet-stream']) {
+		for (const type of ['text/plain', 'image/svg+xml', 'application/octet-stream', 'image/heic', 'image/heif']) {
 			const response = await dispatch(share([image('x', 16, type)]));
 			expect(response?.status).toBe(200);
 		}
 		expect(await inbox()).toBeUndefined();
-		expect(passthrough.length).toBe(3);
+		expect(passthrough.length).toBe(5);
 	});
 
 	it('drops a file over the per-file limit before reading it', async () => {
@@ -194,5 +224,45 @@ describe('service worker share intake (T10-S3-05)', () => {
 			await dispatch(new Request('http://elsewhere.test/post/share-target', { method: 'POST', body: new FormData() })),
 		).toBeNull();
 		expect(await inbox()).toBeUndefined();
+	});
+
+	it('accepts a file of exactly the per-file limit and drops one byte over', async () => {
+		await dispatch(share([image('at-limit.png', 10 * MB), image('over.png', 10 * MB + 1)]));
+
+		expect((await inbox())?.files.map((f) => f.name)).toEqual(['at-limit.png']);
+	});
+
+	it('accepts exactly the file-count limit', async () => {
+		await dispatch(share(Array.from({ length: 10 }, (_, i) => image(`p${String(i)}.png`))));
+
+		expect((await inbox())?.files.length).toBe(10);
+	});
+
+	it('accepts exactly the total limit and refuses one byte over', async () => {
+		await dispatch(share(Array.from({ length: 5 }, (_, i) => image(`t${String(i)}.png`, 10 * MB))));
+		expect((await inbox())?.files.length).toBe(5);
+
+		globalThis.indexedDB = new IDBFactory();
+		load_worker();
+		passthrough = [];
+		await dispatch(share([...Array.from({ length: 5 }, (_, i) => image(`t${String(i)}.png`, 10 * MB)), image('extra.png', 1)]));
+		expect(await inbox()).toBeUndefined();
+		expect(passthrough.length).toBe(1);
+	});
+});
+
+describe('share policy parity (T10-S3-05 v1.1)', () => {
+	it('the worker accepts exactly the types and per-file size the upload processor accepts', () => {
+		load_worker();
+		expect([...policy.types].sort()).toEqual([...SUPPORTED_IMAGE_TYPES].sort());
+		expect(policy.perFile).toBe(MAX_PHOTO_BYTES);
+		expect(policy.files).toBe(10);
+		expect(policy.total).toBe(50 * MB);
+	});
+
+	it('the Photo file picker offers the same types', () => {
+		const tsx = readFileSync(resolve(__dirname, '../components/modes/photo-mode.tsx'), 'utf8');
+		const accept = /accept="([^"]+)"/.exec(tsx)?.[1] ?? '';
+		expect(accept.split(',').sort()).toEqual([...SUPPORTED_IMAGE_TYPES].sort());
 	});
 });

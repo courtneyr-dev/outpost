@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { JSX } from 'preact';
+import { Fragment, type JSX } from 'preact';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../lib/token-store';
 import { sign_out } from '../lib/sign-out';
 import { START_SCREEN_WAIT_MS, initial_screen } from '../lib/start-screen';
@@ -21,7 +21,20 @@ import { HomeScreen } from './home-screen';
 import { QueueBadge } from './queue-badge';
 import { InstallPrompt } from './install-prompt';
 import type { OfflineQueueEnvironment } from '../lib/offline-queue';
-import { peek_share_target } from '../lib/share-target';
+import {
+	hold_share_for_review,
+	release_held_share,
+	discard_held_share,
+	stash_share_target,
+	type ShareTargetData,
+} from '../lib/share-target';
+import {
+	read_share_inbox,
+	resolve_share_inbox,
+	type ShareInboxEnvironment,
+	type ShareInboxState,
+} from '../lib/share-inbox';
+import { ShareReview } from './share-review';
 import { useAppearance } from '../lib/use-appearance';
 import type { AppearanceEnvironment } from '../lib/appearance';
 import { AppHeader } from './app-header';
@@ -82,7 +95,11 @@ export interface ComposerTabsProps {
 	appearanceEnv?: AppearanceEnvironment;
 	/** Device storage the modes keep drafts in; defaults to localStorage. */
 	draftStorage?: DraftStorage | null;
+	/** Injectable IndexedDB for the photo share inbox (tests pass fake-indexeddb). */
+	shareInboxEnv?: ShareInboxEnvironment;
 }
+
+const EMPTY_INBOX: ShareInboxState = { pending: null, candidate: null };
 
 /**
  * Tracks whether the tab strip has more tabs off either edge, for the
@@ -141,7 +158,20 @@ export function ComposerTabs({
 	queueEnv,
 	appearanceEnv,
 	draftStorage,
+	shareInboxEnv,
 }: ComposerTabsProps) {
+	// A share is held for review before any mode mounts (this initializer runs
+	// before the children render), so no mode can pick it up on its own.
+	const [held_share, setHeldShare] = useState<ShareTargetData | null>(() => hold_share_for_review());
+	const [share_inbox, setShareInbox] = useState<ShareInboxState>(EMPTY_INBOX);
+	const [share_status, setShareStatus] = useState('');
+	const [review_status, setReviewStatus] = useState(() =>
+		held_share?.shareRefused
+			? "Another photo share arrived but wasn't kept, because two were already waiting. Choose below, then share it again."
+			: '',
+	);
+	// Bumped per mode to remount it, so it reads a share released to it.
+	const [generation, setGeneration] = useState<Partial<Record<ModeId, number>>>({});
 	const appearance = useAppearance({
 		accessToken: token.accessToken,
 		me: token.me,
@@ -161,7 +191,7 @@ export function ComposerTabs({
 	// `view` is null while the saved start screen is still unknown.
 	const [first_screen] = useState<StartScreen | null>(() =>
 		initial_screen({
-			share: peek_share_target(),
+			share: held_share,
 			start: appearance.state.start,
 			ready: appearance.ready,
 			timedOut: false,
@@ -220,6 +250,87 @@ export function ComposerTabs({
 	const go_home = (): void => {
 		setView('home');
 		requestAnimationFrame(() => home_heading.current?.focus());
+	};
+
+	const inbox_waiting = share_inbox.pending !== null || share_inbox.candidate !== null;
+	const review_tab: ModeId | null = held_share ? held_share.tab : inbox_waiting ? 'photo' : null;
+
+	const refresh_share_inbox = async (): Promise<ShareInboxState> => {
+		const next = await read_share_inbox(shareInboxEnv);
+		setShareInbox(next);
+		return next;
+	};
+
+	useEffect(() => {
+		let cancelled = false;
+		read_share_inbox(shareInboxEnv)
+			.then((next) => {
+				if (cancelled) return;
+				setShareInbox(next);
+				// A photo share left waiting from an earlier visit opens its review.
+				if (!held_share && (next.pending || next.candidate)) {
+					setActive('photo');
+					setView('tabs');
+				}
+			})
+			.catch(() => undefined);
+		return (): void => {
+			cancelled = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- read once on mount; decisions refresh it.
+	}, []);
+
+	const reopen = (tab: ModeId, remount: boolean): void => {
+		if (remount) setGeneration((g) => ({ ...g, [tab]: (g[tab] ?? 0) + 1 }));
+		setActive(tab);
+		setView('tabs');
+		requestAnimationFrame(() => tab_refs.current[tab]?.focus());
+	};
+
+	const use_shared = (): void => {
+		if (!review_tab) return;
+		const released = release_held_share();
+		if (!released && share_inbox.pending) {
+			stash_share_target({ tab: 'photo', sharedPhotos: true });
+		}
+		setHeldShare(null);
+		setShareInbox(EMPTY_INBOX);
+		setReviewStatus('');
+		setShareStatus(`Shared content added to the ${review_tab === 'listen' ? 'Doing' : review_tab} form.`);
+		reopen(review_tab, true);
+	};
+
+	const discard_shared = async (): Promise<void> => {
+		if (!review_tab) return;
+		const had_photos = inbox_waiting || held_share?.sharedPhotos === true;
+		discard_held_share();
+		setHeldShare(null);
+		if (had_photos) await resolve_share_inbox('discard', shareInboxEnv).catch(() => undefined);
+		setShareInbox(EMPTY_INBOX);
+		setReviewStatus('');
+		setShareStatus('Shared content discarded.');
+		reopen(review_tab, false);
+	};
+
+	const keep_earlier_share = async (): Promise<void> => {
+		await resolve_share_inbox('keep_earlier', shareInboxEnv).catch(() => undefined);
+		await refresh_share_inbox();
+		setReviewStatus('Kept the earlier share. The new one was discarded.');
+	};
+
+	const use_new_share = async (): Promise<void> => {
+		await resolve_share_inbox('use_new', shareInboxEnv).catch(() => undefined);
+		await refresh_share_inbox();
+		setReviewStatus('Using the new share. The earlier one was discarded.');
+	};
+
+	const discard_both_shares = async (): Promise<void> => {
+		discard_held_share();
+		setHeldShare(null);
+		await resolve_share_inbox('discard', shareInboxEnv).catch(() => undefined);
+		setShareInbox(EMPTY_INBOX);
+		setReviewStatus('');
+		setShareStatus('Both shares discarded.');
 	};
 	const [composer_config, setComposerConfig] = useState<ComposerConfig | null>(null);
 	const [config_error, setConfigError] = useState<'unauthorized' | 'forbidden' | 'fetch_failed' | null>(null);
@@ -362,6 +473,7 @@ export function ComposerTabs({
 				<PhotoMode
 					token={token}
 					{...(micropubEnv ? { micropubEnv } : {})}
+					{...(shareInboxEnv ? { shareInboxEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
 			),
@@ -520,6 +632,29 @@ export function ComposerTabs({
 				<div class="outpost-start-status" role="status" aria-live="polite">
 					{view === null ? <p class="outpost-status">Opening Outpost…</p> : null}
 				</div>
+				<div class="outpost-share-status" role="status" aria-live="polite">
+					{share_status ? <p class="outpost-status">{share_status}</p> : null}
+				</div>
+				{review_tab !== null && (
+					<ShareReview
+						share={held_share}
+						inbox={share_inbox}
+						status={review_status}
+						onUse={use_shared}
+						onDiscard={(): void => {
+							void discard_shared();
+						}}
+						onKeepEarlier={(): void => {
+							void keep_earlier_share();
+						}}
+						onUseNew={(): void => {
+							void use_new_share();
+						}}
+						onDiscardBoth={(): void => {
+							void discard_both_shares();
+						}}
+					/>
+				)}
 				{view === 'home' && (
 					<HomeScreen
 						siteHost={typeof window !== 'undefined' ? window.location.host : ''}
@@ -573,7 +708,7 @@ export function ComposerTabs({
 						aria-labelledby={`outpost-tab-${mode.id}`}
 						hidden={view !== 'tabs' || active !== mode.id}
 					>
-						{mode.render()}
+						<Fragment key={generation[mode.id] ?? 0}>{mode.render()}</Fragment>
 					</div>
 				))}
 				<Scenery />

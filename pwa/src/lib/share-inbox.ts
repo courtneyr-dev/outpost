@@ -24,6 +24,9 @@
 export const SHARE_INBOX_DB = 'outpost-share-inbox';
 export const SHARE_INBOX_STORE = 'inbox';
 export const SHARE_INBOX_KEY = 'pending';
+/** A second share that arrived while `pending` waited for a decision. */
+export const SHARE_INBOX_CANDIDATE_KEY = 'candidate';
+export type ShareInboxSlot = typeof SHARE_INBOX_KEY | typeof SHARE_INBOX_CANDIDATE_KEY;
 
 /** One parked photo, as the service worker writes it. */
 export interface SharedPhotoRecord {
@@ -132,7 +135,8 @@ function to_file(record: SharedPhotoRecord): File {
  */
 export async function stash_shared_photos(
 	payload: SharedPhotos,
-	env: ShareInboxEnvironment = default_env()
+	env: ShareInboxEnvironment = default_env(),
+	slot: ShareInboxSlot = SHARE_INBOX_KEY
 ): Promise<void> {
 	if (!env.indexedDB) return;
 	const record: SharedPhotosRecord = {
@@ -144,7 +148,7 @@ export async function stash_shared_photos(
 	const db = await open_inbox(env.indexedDB);
 	try {
 		const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
-		tx.objectStore(SHARE_INBOX_STORE).put(record, SHARE_INBOX_KEY);
+		tx.objectStore(SHARE_INBOX_STORE).put(record, slot);
 		await await_transaction(tx);
 	} finally {
 		db.close();
@@ -188,6 +192,87 @@ export async function consume_shared_photos(
 		};
 	} catch (_err) {
 		return null;
+	} finally {
+		db.close();
+	}
+}
+
+/** Rebuild a stored record into composer-ready photos, or null when unusable. */
+function from_record(record: unknown): SharedPhotos | null {
+	if (!record || typeof record !== 'object') return null;
+	const v = record as Record<string, unknown>;
+	const photos = Array.isArray(v.files) ? v.files.filter(is_photo_record) : [];
+	if (photos.length === 0) return null;
+	return {
+		files: photos.map(to_file),
+		title: typeof v.title === 'string' ? v.title : '',
+		text: typeof v.text === 'string' ? v.text : '',
+		received: typeof v.received === 'number' ? v.received : 0,
+	};
+}
+
+/** What is waiting in the share inbox. Reads only; nothing is removed. */
+export interface ShareInboxState {
+	pending: SharedPhotos | null;
+	candidate: SharedPhotos | null;
+}
+
+/**
+ * Read both inbox slots without consuming them. A share waits here until
+ * the person chooses: opening Photo never removes it.
+ */
+export async function read_share_inbox(
+	env: ShareInboxEnvironment = default_env()
+): Promise<ShareInboxState> {
+	const empty: ShareInboxState = { pending: null, candidate: null };
+	if (!env.indexedDB) return empty;
+	let db: IDBDatabase;
+	try {
+		db = await open_inbox(env.indexedDB);
+	} catch (_err) {
+		return empty;
+	}
+	try {
+		const store = db.transaction(SHARE_INBOX_STORE, 'readonly').objectStore(SHARE_INBOX_STORE);
+		const pending: unknown = await await_request(store.get(SHARE_INBOX_KEY));
+		const candidate: unknown = await await_request(store.get(SHARE_INBOX_CANDIDATE_KEY));
+		return { pending: from_record(pending), candidate: from_record(candidate) };
+	} catch (_err) {
+		return empty;
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * Apply the person's decision about waiting shares.
+ *
+ * - `discard`: drop the waiting share (and any candidate).
+ * - `keep_earlier`: drop the newer candidate; the earlier share keeps waiting.
+ * - `use_new`: the candidate replaces the earlier share, which is dropped.
+ */
+export async function resolve_share_inbox(
+	action: 'discard' | 'keep_earlier' | 'use_new',
+	env: ShareInboxEnvironment = default_env()
+): Promise<void> {
+	if (!env.indexedDB) return;
+	const db = await open_inbox(env.indexedDB);
+	try {
+		const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
+		const store = tx.objectStore(SHARE_INBOX_STORE);
+		if (action === 'discard') {
+			store.delete(SHARE_INBOX_KEY);
+			store.delete(SHARE_INBOX_CANDIDATE_KEY);
+		} else if (action === 'keep_earlier') {
+			store.delete(SHARE_INBOX_CANDIDATE_KEY);
+		} else {
+			const candidate: unknown = await await_request(store.get(SHARE_INBOX_CANDIDATE_KEY));
+			if (candidate !== undefined) {
+				store.put(candidate, SHARE_INBOX_KEY);
+				store.delete(SHARE_INBOX_CANDIDATE_KEY);
+			}
+		}
+		await await_transaction(tx);
 	} finally {
 		db.close();
 	}

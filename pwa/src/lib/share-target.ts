@@ -75,6 +75,11 @@ export interface ShareTargetData {
 	sourceId?: string;
 	/** Photo tab only — the service worker parked shared image files in the share inbox for PhotoMode to drain. */
 	sharedPhotos?: boolean;
+	/**
+	 * Photo tab only — another photo share arrived while two were already
+	 * waiting, so the service worker didn't keep it.
+	 */
+	shareRefused?: boolean;
 }
 
 const REPLY_VARIANT_VALUES: ReplyVariant[] = [
@@ -119,6 +124,8 @@ const LIFE_VARIANT_VALUES: LifeVariant[] = [
 ];
 
 const KEY = 'outpost.share_target';
+/** Where a share waits for the person's decision (see hold_share_for_review). */
+const HELD_KEY = 'outpost.share_review';
 
 function safe_session_get(key: string): string | null {
 	try {
@@ -169,6 +176,7 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const title = (params.get('title') ?? '').trim();
 	const source_id = (params.get('source') ?? '').trim();
 	const shared = (params.get('shared') ?? '').trim();
+	const refused = (params.get('refused') ?? '').trim() === '1';
 
 	if (!mode && !picker) {
 		return null;
@@ -214,6 +222,7 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 		return {
 			tab: 'photo',
 			...(shared === 'photos' ? { sharedPhotos: true } : {}),
+			...(shared === 'photos' && refused ? { shareRefused: true } : {}),
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
@@ -357,4 +366,49 @@ export function peek_share_target(): ShareTargetData | null {
 	} catch (_err) {
 		return null;
 	}
+}
+
+/**
+ * Take the stashed intake out of the modes' reach until the person decides.
+ *
+ * A share can come from any page, so the composer holds it for review
+ * ("Use shared content" / "Discard shared content") instead of letting each
+ * mode consume it on mount. Called once, before the modes render: it moves
+ * the stash to a separate key, so a mode mounting now finds nothing. A share
+ * already held (the page reloaded during review) stays held; a newer stash
+ * from this navigation replaces it.
+ */
+export function hold_share_for_review(): ShareTargetData | null {
+	const fresh = safe_session_get(KEY);
+	if (fresh) {
+		safe_session_remove(KEY);
+		safe_session_set(HELD_KEY, fresh);
+	}
+	const raw = safe_session_get(HELD_KEY);
+	if (!raw) return null;
+	try {
+		return JSON.parse(raw) as ShareTargetData;
+	} catch (_err) {
+		safe_session_remove(HELD_KEY);
+		return null;
+	}
+}
+
+/** "Use shared content": hand the held share to its mode's normal intake. */
+export function release_held_share(): ShareTargetData | null {
+	const raw = safe_session_get(HELD_KEY);
+	safe_session_remove(HELD_KEY);
+	if (!raw) return null;
+	safe_session_set(KEY, raw);
+	try {
+		return JSON.parse(raw) as ShareTargetData;
+	} catch (_err) {
+		safe_session_remove(KEY);
+		return null;
+	}
+}
+
+/** "Discard shared content": drop the held share. */
+export function discard_held_share(): void {
+	safe_session_remove(HELD_KEY);
 }

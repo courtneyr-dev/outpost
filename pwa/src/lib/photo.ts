@@ -19,6 +19,13 @@
 
 const ALLOWED_MIME_PREFIXES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 
+/**
+ * The upload policy, exported so tests can hold the service worker's share
+ * intake (includes/class-pwa-shell.php) to the same types and size cap.
+ */
+export const SUPPORTED_IMAGE_TYPES: readonly string[] = ALLOWED_MIME_PREFIXES;
+export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
 export class PhotoError extends Error {
 	constructor(
 		message: string,
@@ -55,7 +62,7 @@ export async function process_photo(
 ): Promise<ProcessedPhoto> {
 	const max_dimension = options.maxDimension ?? 2048;
 	const quality = options.quality ?? 0.9;
-	const max_bytes = options.maxBytes ?? 10 * 1024 * 1024;
+	const max_bytes = options.maxBytes ?? MAX_PHOTO_BYTES;
 
 	if (!is_supported_image_type(file.type)) {
 		throw new PhotoError(

@@ -136,16 +136,6 @@ export function PhotoMode({
 		null
 	);
 	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
-	// A share is untrusted until the person acts on it: any page can submit
-	// the share form, so shared photos and text fill the form but aren't
-	// saved as a draft (or written over the person's own draft) until the
-	// first input or change inside the form.
-	const [intake_unconfirmed, setIntakeUnconfirmed] = useState(
-		() => peek_share_target()?.tab === 'photo',
-	);
-	const confirm_intake = (): void => {
-		if (intake_unconfirmed) setIntakeUnconfirmed(false);
-	};
 	const saved_draft = useDraft({
 		mode: 'photo',
 		me: token.me,
@@ -156,7 +146,6 @@ export function PhotoMode({
 			photos: [...entries, ...pending_photos].map(describe_photo),
 		},
 		restored: draft !== null,
-		hold: intake_unconfirmed,
 	});
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(
@@ -433,13 +422,7 @@ export function PhotoMode({
 				Share a photo or a gallery, with alt text for each image.
 			</p>
 
-			<form
-				class="outpost-form-row"
-				onSubmit={handle_submit}
-				onInputCapture={confirm_intake}
-				onChangeCapture={confirm_intake}
-				novalidate
-			>
+			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<label class="outpost-label" for="outpost-photo-file">
 					{entries.length === 0 ? 'Photo' : 'Add more photos'}
 				</label>
