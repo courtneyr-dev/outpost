@@ -7,6 +7,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.27] - 2026-11-13
+
+### Changed
+
+- The seven composer modes use two rows of native buttons instead of a scrolling tab strip (item 3).
+- More options opens and closes even when a page optimizer blocks Outpost's stylesheet (item 4).
+- Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (item 6).
+- Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (item 5).
+
 ## [1.0.26] - 2026-11-10
 
 ### Security

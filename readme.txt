@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.26
+Stable tag:        1.0.27
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -237,6 +237,12 @@ Outpost evolves from prior IndieWeb work for WordPress.
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.27 =
+* Changed: the seven composer modes use two rows of native buttons, so every mode stays visible and reachable with Tab.
+* Fixed: More options opens and closes even when a page optimizer blocks Outpost's stylesheet.
+* Fixed: publish errors appear beside the Publish button, and Outpost accepts photos up to 50 MB before resizing them.
+* Fixed: a post keeps the default category Outpost sets without also keeping WordPress's fallback category.
 
 = 1.0.26 =
 * Security: Outpost no longer switches the current user. Every REST permission check uses the user WordPress already resolved, plus the token's scope, and a token in a JSON body authenticates nothing, as the Micropub spec says.
