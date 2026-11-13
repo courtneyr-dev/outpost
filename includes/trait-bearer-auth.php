@@ -93,6 +93,65 @@ trait Outpost_Bearer_Auth {
 	}
 
 	/**
+	 * Whether this is a first-party wp-admin browser request: WordPress
+	 * authenticated the logged-in cookie, the REST nonce is present and
+	 * valid, and no other credential rides along (no bearer token, no
+	 * IndieAuth-verified response, no Application Password).
+	 *
+	 * Routes that return a person's connected-account data accept only this
+	 * (T10-S3-06). It fails closed on its own instead of relying on core's
+	 * `rest_cookie_check_errors()`, which an earlier
+	 * `rest_authentication_errors` callback can skip.
+	 *
+	 * @param WP_REST_Request $request Current REST request.
+	 */
+	protected static function is_first_party_cookie_request( WP_REST_Request $request ): bool {
+		global $wp_rest_auth_cookie;
+		if ( true !== $wp_rest_auth_cookie || ! is_user_logged_in() ) {
+			return false;
+		}
+		if ( '' !== self::bearer_token( $request ) ) {
+			return false;
+		}
+		if ( ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null ) ) {
+			return false;
+		}
+		if ( function_exists( 'rest_get_authenticated_app_password' ) && null !== rest_get_authenticated_app_password() ) {
+			return false;
+		}
+		$nonce = Outpost_Request_Headers::rest_nonce();
+		if ( '' === $nonce ) {
+			return false;
+		}
+		if ( false === wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Whether IndieAuth authenticated this request for the Outpost PWA
+	 * itself: a verified token response whose `client_id` is exactly this
+	 * site's Outpost client identifier (Outpost_Client_Identity). A cookie
+	 * session or an Application Password never counts, and neither does a
+	 * missing, malformed, or different client identifier.
+	 */
+	protected static function is_outpost_pwa_bearer(): bool {
+		global $wp_rest_auth_cookie;
+		if ( true === $wp_rest_auth_cookie ) {
+			return false;
+		}
+		if ( function_exists( 'rest_get_authenticated_app_password' ) && null !== rest_get_authenticated_app_password() ) {
+			return false;
+		}
+		$response = function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null;
+		if ( ! is_array( $response ) || ! isset( $response['client_id'] ) ) {
+			return false;
+		}
+		return Outpost_Client_Identity::is_outpost_client( $response['client_id'] );
+	}
+
+	/**
 	 * Find a bearer token in the Authorization header or an `access_token`
 	 * body field. Returns '' when no token is present.
 	 *

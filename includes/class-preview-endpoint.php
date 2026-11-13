@@ -441,6 +441,16 @@ final class Outpost_Preview_Endpoint {
 	 */
 	private static function handle_via_authenticated_source( Outpost_Source_Base $source, string $source_id, string $url ) {
 		unset( $source );  // Reserved for future per-source attribute reads.
+		// Connected-account enrichment reads the person's stored credential
+		// and calls the provider with it, so only the Outpost PWA gets it: an
+		// IndieAuth bearer whose verified client_id is exactly this site's
+		// Outpost client (T10-S3-06). Every other caller, including a cookie
+		// session or an Application Password, falls through to the generic
+		// preview before any credential is read, so the answer can't reveal
+		// whether a provider is connected.
+		if ( ! self::is_outpost_pwa_bearer() ) {
+			return null;
+		}
 		$user_id = (int) get_current_user_id();
 		if ( $user_id <= 0 ) {
 			// Anonymous request — no per-user creds to dispatch with.
