@@ -286,15 +286,33 @@ final class Outpost_Pending_Syndication_Notice {
 		unset( $post_id );
 	}
 
+	/**
+	 * The post the editor screen is showing, or 0 when there is none or the
+	 * current user may not edit it.
+	 *
+	 * `post` is read from the query (post.php?post=NN) only to pick which
+	 * post's own pending entries to show; it is a positive integer or
+	 * nothing. The `edit_post` check runs before any caller reads post
+	 * meta, because post-new.php?post=NN renders for any user who can
+	 * create posts, whoever owns post NN.
+	 */
 	private static function current_post_id(): int {
-		// post=NN on post.php; new posts have no id yet.
-		if ( isset( $_GET['post'] ) && is_numeric( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			return (int) $_GET['post']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$post_id = 0;
+		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- selects which post's notice to show; no state change.
+			$raw = sanitize_text_field( wp_unslash( (string) $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( 1 === preg_match( '/^[1-9][0-9]{0,18}$/', $raw ) ) {
+				$post_id = (int) $raw;
+			}
+		} elseif ( isset( $GLOBALS['post'] ) && $GLOBALS['post'] instanceof WP_Post ) {
+			$post_id = (int) $GLOBALS['post']->ID;
 		}
-		if ( isset( $GLOBALS['post'] ) && $GLOBALS['post'] instanceof WP_Post ) {
-			return (int) $GLOBALS['post']->ID;
+		if ( $post_id <= 0 ) {
+			return 0;
 		}
-		return 0;
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return 0;
+		}
+		return $post_id;
 	}
 
 	private static function label_for( string $platform_id ): string {

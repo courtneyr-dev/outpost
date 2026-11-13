@@ -40,11 +40,19 @@ final class PendingSyndicationNoticeTest extends \WP_Mock\Tools\TestCase {
 	/** @var array<int, array<string, mixed>> */
 	private array $meta_store = array();
 
+	/** @var array<int, bool> Post id => whether the current user may edit it. */
+	private array $can_edit = array();
+
+	/** Number of get_post_meta() reads in the current test. */
+	private int $meta_reads = 0;
+
 	private Fake_Editor_Screen $screen;
 
 	public function setUp(): void {
 		WP_Mock::setUp();
 		$this->meta_store = array();
+		$this->can_edit   = array( 42 => true );
+		$this->meta_reads = 0;
 		$this->screen     = new Fake_Editor_Screen();
 		$_GET             = array();
 		unset( $GLOBALS['post'] );
@@ -56,8 +64,13 @@ final class PendingSyndicationNoticeTest extends \WP_Mock\Tools\TestCase {
 		);
 		WP_Mock::userFunction( 'get_post_meta' )->andReturnUsing(
 			function ( int $post_id, string $key, bool $single ) {
+				++$this->meta_reads;
 				return $this->meta_store[ $post_id ][ $key ] ?? '';
 			}
+		);
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn ( $v ): string => is_string( $v ) ? trim( $v ) : '' );
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing(
+			fn ( string $cap, $post_id = 0 ): bool => 'edit_post' === $cap && ( $this->can_edit[ (int) $post_id ] ?? false )
 		);
 		WP_Mock::userFunction( 'get_post' )->andReturnUsing(
 			static fn ( int $post_id ) => new \WP_Post( array(
@@ -251,5 +264,73 @@ final class PendingSyndicationNoticeTest extends \WP_Mock\Tools\TestCase {
 			'admin_notices output lands in .hide-if-js.block-editor-no-js and is never visible; '
 				. 'the block editor gets the notice through enqueue_editor_notice() instead.'
 		);
+	}
+
+	// =====================================================================
+	// T10-S3-04: post-level authorization before any metadata read
+	// =====================================================================
+
+	public function test_no_payload_for_a_post_the_user_cannot_edit(): void {
+		$this->seed_pending( 42 );
+		$this->can_edit[42] = false; // A Contributor on post-new.php?post=42 (another author's post).
+		$_GET['post']       = '42';
+
+		Outpost_Pending_Syndication_Notice::enqueue_editor_notice();
+
+		$this->assertSame( array(), $this->inline_scripts(), 'No pending-share metadata for a post the user cannot edit.' );
+		$this->assertSame( 0, $this->meta_reads, 'Authorization comes before any post-meta read.' );
+	}
+
+	public function test_classic_notice_is_silent_for_a_post_the_user_cannot_edit(): void {
+		$this->seed_pending( 42 );
+		$this->can_edit[42]         = false;
+		$_GET['post']               = '42';
+		$this->screen->block_editor = false;
+		WP_Mock::userFunction( 'esc_html' )->andReturnUsing( static fn ( string $s ): string => $s );
+
+		ob_start();
+		Outpost_Pending_Syndication_Notice::maybe_render();
+		$html = (string) ob_get_clean();
+
+		$this->assertSame( '', $html );
+		$this->assertSame( 0, $this->meta_reads );
+	}
+
+	/**
+	 * @return array<string, array{0: string}>
+	 */
+	public static function invalid_post_ids(): array {
+		return array(
+			'zero'     => array( '0' ),
+			'negative' => array( '-42' ),
+			'decimal'  => array( '4.2' ),
+			'text'     => array( 'abc' ),
+		);
+	}
+
+	/**
+	 * @dataProvider invalid_post_ids
+	 *
+	 * @param string $raw The `post` query value.
+	 */
+	public function test_invalid_post_ids_read_nothing( string $raw ): void {
+		$this->seed_pending( 42 );
+		$_GET['post'] = $raw;
+
+		Outpost_Pending_Syndication_Notice::enqueue_editor_notice();
+
+		$this->assertSame( array(), $this->inline_scripts() );
+		$this->assertSame( 0, $this->meta_reads );
+	}
+
+	public function test_global_post_fallback_is_also_authorized(): void {
+		$this->seed_pending( 42 );
+		$this->can_edit[42] = false;
+		$GLOBALS['post']    = new \WP_Post( array( 'ID' => 42, 'post_author' => 7 ) );
+
+		Outpost_Pending_Syndication_Notice::enqueue_editor_notice();
+
+		$this->assertSame( array(), $this->inline_scripts() );
+		$this->assertSame( 0, $this->meta_reads );
 	}
 }
