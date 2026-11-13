@@ -28,7 +28,7 @@ import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import type { DoingVariant } from '../../lib/share-target';
-import { fetch_source_preview, PreviewError } from '../../lib/preview';
+import { fetch_source_preview, PreviewError, type PreviewEnvironment } from '../../lib/preview';
 import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
@@ -68,6 +68,8 @@ export interface ListenModeProps {
 	composerConfig?: ComposerConfig;
 	/** Injectable environment for the metadata lookup (tests pass a stub). */
 	mediaLookupEnv?: MediaLookupEnvironment;
+	/** Injectable environment for the source preview (tests pass a stub). */
+	previewEnv?: PreviewEnvironment;
 }
 
 type Variant =
@@ -532,7 +534,13 @@ function is_embeddable_media_url(url: string): boolean {
 	return EMBEDDABLE_MEDIA_HOSTS.some((provider) => host === provider || host.endsWith('.' + provider));
 }
 
-export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv }: ListenModeProps) {
+export function ListenMode({
+	token,
+	micropubEnv,
+	composerConfig,
+	mediaLookupEnv,
+	previewEnv,
+}: ListenModeProps) {
 	const initial_share = consume_share_target_for_doing();
 	// A share wins over an unsent draft, as in NoteMode.
 	const [draft] = useState(() =>
@@ -548,11 +556,12 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'listen'),
 	);
 	const [target_url, setTargetUrl] = useState(initial_share.url ?? draft_text(d?.target));
-	// Source-id from share-target dispatch — drives the auto-preview
-	// fetch on mount and gets passed through to the submission so
+	// Source-id from share-target dispatch. It enables the "Fill in details
+	// from this link" action and is passed through to the submission so
 	// downstream filters (e.g., post-format inference) can see it.
 	const [source_id] = useState(initial_share.sourceId ?? '');
-	// Cover URL + publication populated by the auto-preview fetch.
+	const [filling_details, setFillingDetails] = useState(false);
+	// Cover URL + publication populated by the source preview.
 	// User-invisible state — they round-trip into the h-entry submission
 	// as `u-photo` and `p-publication` respectively.
 	const [cover_url, setCoverUrl] = useState(draft_text(draft?.meta.cover));
@@ -646,48 +655,38 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		setGeoError(null);
 	}, [variant]);
 
-	// Auto-fetch source preview when ListenMode mounts via a share-target
-	// dispatch with sourceId set (Spotify/YouTube/etc.). Best-effort:
-	// errors are logged but don't surface to the user — pre-fill is a
-	// nice-to-have and the user can always type fields manually. Only
-	// fires on first mount; subsequent variant switches don't re-fetch.
-	useEffect(() => {
-		if (!source_id || !target_url) return;
-		let cancelled = false;
-		(async (): Promise<void> => {
-			try {
-				const result = await fetch_source_preview({
-					url: target_url,
-					accessToken: token.accessToken,
-					sourceId: source_id,
-				});
-				if (cancelled) return;
-				const e = result.extracted;
-				const name = e['p-name'] ?? e.name ?? '';
-				const author = e['p-author'] ?? e.author ?? '';
-				const photo = e['u-photo'] ?? e.photo ?? '';
-				const pub = e['p-publication'] ?? e.publication ?? '';
-				if (name && !watch_title) setWatchTitle(name);
-				if (author && !person_name) setPersonName(author);
-				if (photo) setCoverUrl(photo);
-				if (pub) setPublication(pub);
-			} catch (err) {
-				if (cancelled) return;
-				if (typeof console !== 'undefined') {
-					const code = err instanceof PreviewError ? err.code : 'unknown';
-					console.warn('Outpost: source preview pre-fill failed (' + code + ')');
-				}
+	// Fill Title / Artist / cover from the shared link's source, only when
+	// the person asks (T10). A share or a link that lands here may come
+	// from any page, so arrival prefills the visible fields but never sends
+	// a request on the person's behalf. Best-effort: a failure leaves the
+	// fields for the person to type.
+	const handle_fill_from_link = async (): Promise<void> => {
+		const url = target_url.trim();
+		if (!source_id || !url || filling_details) return;
+		setFillingDetails(true);
+		try {
+			const result = await fetch_source_preview(
+				{ url, accessToken: token.accessToken, sourceId: source_id },
+				...(previewEnv ? [previewEnv] : []),
+			);
+			const e = result.extracted;
+			const name = e['p-name'] ?? e.name ?? '';
+			const author = e['p-author'] ?? e.author ?? '';
+			const photo = e['u-photo'] ?? e.photo ?? '';
+			const pub = e['p-publication'] ?? e.publication ?? '';
+			if (name && !watch_title) setWatchTitle(name);
+			if (author && !person_name) setPersonName(author);
+			if (photo) setCoverUrl(photo);
+			if (pub) setPublication(pub);
+		} catch (err) {
+			if (typeof console !== 'undefined') {
+				const code = err instanceof PreviewError ? err.code : 'unknown';
+				console.warn('Outpost: source preview pre-fill failed (' + code + ')');
 			}
-		})();
-		return (): void => {
-			cancelled = true;
-		};
-		// Mount-only effect; intentional empty-ish deps to avoid re-firing
-		// on user input. The `source_id` and `target_url` are captured at
-		// mount via consume_share_target_for_doing() and don't change in
-		// this component's lifetime.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+		} finally {
+			setFillingDetails(false);
+		}
+	};
 
 	const handle_geocode_search = async (event?: Event): Promise<void> => {
 		event?.preventDefault();
@@ -1141,6 +1140,20 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					spellcheck={false}
 					required={config.targetRequired}
 				/>
+				{source_id && target_url.trim() && (
+					<div class="outpost-form-actions">
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => {
+								void handle_fill_from_link();
+							}}
+							disabled={submitting || filling_details}
+						>
+							{filling_details ? 'Fetching…' : 'Fill in details from this link'}
+						</button>
+					</div>
+				)}
 
 				{config.lookup && (
 					<MediaLookup

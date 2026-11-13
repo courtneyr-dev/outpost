@@ -73,8 +73,6 @@ export interface ShareTargetData {
 	url?: string;
 	/** Source adapter id (e.g. 'spotify', 'youtube') — informational, may drive future routing decisions. */
 	sourceId?: string;
-	/** Cached preview transient token from F6 dispatcher; lets the mode component fetch parsed metadata via /preview. */
-	cachedFor?: string;
 	/** Photo tab only — the service worker parked shared image files in the share inbox for PhotoMode to drain. */
 	sharedPhotos?: boolean;
 }
@@ -148,7 +146,7 @@ function safe_session_remove(key: string): void {
 
 /**
  * Parse F6 dispatcher query params landed on the composer route
- * (/post/?mode=...&picker=...&default=...&source=...&cached_for=...&url=...).
+ * (/post/?mode=...&picker=...&default=...&source=...&url=...).
  *
  * Returns null when no F6-shaped params are present — caller should
  * fall through to the legacy `parse_share_target` for the
@@ -160,10 +158,6 @@ function safe_session_remove(key: string): void {
  *   - `picker=reply` + `default=X`  → tab: reply with X as initial variant
  *   - `mode=photo&shared=photos`    → tab: photo, with the shared pictures
  *                                     waiting in the share inbox (share-inbox.ts)
- *
- * The `cached_for` token is preserved in sessionStorage alongside
- * the dispatch data so the composer can read the pre-fill transient
- * once it mounts.
  */
 export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const params = new URLSearchParams(search);
@@ -174,7 +168,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const text = (params.get('text') ?? '').trim();
 	const title = (params.get('title') ?? '').trim();
 	const source_id = (params.get('source') ?? '').trim();
-	const cached_for = (params.get('cached_for') ?? '').trim();
 	const shared = (params.get('shared') ?? '').trim();
 
 	if (!mode && !picker) {
@@ -199,7 +192,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -212,7 +204,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -226,7 +217,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -237,7 +227,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			lifeVariant: mode as LifeVariant,
 			...(text ? { content: text } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -249,7 +238,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -263,7 +251,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 

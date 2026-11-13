@@ -244,14 +244,17 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
-	 * Resolve a Source_Base for this request. Honors explicit
-	 * `source_id` first; falls back to URL-based matching via
-	 * `Outpost_Source_Registry::find_for_url`.
+	 * Resolve a Source_Base for this request.
 	 *
-	 * Returns null only when neither path resolves — e.g. the
-	 * registry is empty in a test context. Production boot
-	 * registers Source_Unknown as the universal fallback so the
-	 * URL match always finds at least that.
+	 * The source decides which adapter runs and which service the server
+	 * contacts, so the URL decides it. A client-supplied `source_id` is only
+	 * a hint between sources that all claim the URL: it is honored when
+	 * that source is registered, is not the catch-all Source_Unknown, and
+	 * matches the URL under the same rules the share route uses. Anything
+	 * else falls back to `Outpost_Source_Registry::find_for_url()`.
+	 *
+	 * Returns null only when the registry is empty (a test context).
+	 * Production boot registers Source_Unknown as the universal fallback.
 	 *
 	 * @param WP_REST_Request $request The incoming REST request.
 	 * @param string          $url     Source URL.
@@ -262,9 +265,9 @@ final class Outpost_Preview_Endpoint {
 			return null;
 		}
 		$source_id = $request->get_param( 'source_id' );
-		if ( is_string( $source_id ) && '' !== $source_id ) {
+		if ( is_string( $source_id ) && '' !== $source_id && Outpost_Source_Unknown::ID !== $source_id ) {
 			$by_id = Outpost_Source_Registry::get_by_id( $source_id );
-			if ( null !== $by_id ) {
+			if ( null !== $by_id && $by_id->matches_url( $url ) ) {
 				return $by_id;
 			}
 		}
