@@ -442,21 +442,28 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 		return copy?.textContent ?? '';
 	}
 
-	const CASES: Array<[string, string, ShareTargetData, ShareTargetData | undefined]> = [
-		['one photo share', 'Use shared content', PHOTO, undefined],
-		['one photo share', 'Discard shared content', PHOTO, undefined],
-		['two photo shares', 'Keep earlier share', PHOTO, PHOTO],
-		['two photo shares', 'Use new share', PHOTO, PHOTO],
-		['two photo shares', 'Discard both', PHOTO, PHOTO],
-		['text, then photo', 'Keep earlier share', TEXT, PHOTO],
-		['text, then photo', 'Use new share', TEXT, PHOTO],
-		['text, then photo', 'Discard both', TEXT, PHOTO],
-		['photo, then text', 'Keep earlier share', PHOTO, TEXT],
-		['photo, then text', 'Use new share', PHOTO, TEXT],
-		['photo, then text', 'Discard both', PHOTO, TEXT],
+	/** The exact message each outcome announces (written out, not imported). */
+	const UNREADABLE = "Couldn't read the shared photos on this device, so this choice wasn't applied. Reload and try again.";
+	const NOT_APPLIED =
+		"Your choice wasn't applied because this device couldn't update its saved shares. Nothing changed; try again.";
+
+	// [label, action, earlier, candidate, expected]. A choice that keeps a photo
+	// it can't read is UNREADABLE; one that must change stored photos is NOT_APPLIED.
+	const CASES: Array<[string, string, ShareTargetData, ShareTargetData | undefined, string]> = [
+		['one photo share', 'Use shared content', PHOTO, undefined, UNREADABLE],
+		['one photo share', 'Discard shared content', PHOTO, undefined, NOT_APPLIED],
+		['two photo shares', 'Keep earlier share', PHOTO, PHOTO, UNREADABLE],
+		['two photo shares', 'Use new share', PHOTO, PHOTO, UNREADABLE],
+		['two photo shares', 'Discard both', PHOTO, PHOTO, NOT_APPLIED],
+		['text, then photo', 'Keep earlier share', TEXT, PHOTO, NOT_APPLIED],
+		['text, then photo', 'Use new share', TEXT, PHOTO, UNREADABLE],
+		['text, then photo', 'Discard both', TEXT, PHOTO, NOT_APPLIED],
+		['photo, then text', 'Keep earlier share', PHOTO, TEXT, UNREADABLE],
+		['photo, then text', 'Use new share', PHOTO, TEXT, NOT_APPLIED],
+		['photo, then text', 'Discard both', PHOTO, TEXT, NOT_APPLIED],
 	];
 
-	it.each(CASES)('%s: "%s" keeps the review, both slots, and the summary', async (_label, action, earlier, candidate) => {
+	it.each(CASES)('%s: "%s" keeps the review, both slots, and the summary', async (_label, action, earlier, candidate, expected) => {
 		await waiting(earlier, candidate);
 		const before_slots = slots();
 		const before_summary = summary();
@@ -469,9 +476,23 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 		expect(slots()).toEqual(before_slots);
 		expect(summary()).toBe(before_summary);
 		const status = region()?.querySelector('[role="status"]')?.textContent ?? '';
-		expect(status).toMatch(/wasn.t applied|couldn.t read/i);
+		expect(status).toBe(expected);
 		expect(status).not.toMatch(/discarded|kept the|using the|added to/i);
 		expect(root.querySelector('.outpost-share-status')?.textContent ?? '').not.toMatch(/discarded|added to/i);
+	});
+
+	it('announces the unreadable-photo outcome when a choice would keep a photo it cannot read', async () => {
+		await waiting(PHOTO);
+		click('Use shared content');
+		await wait(40);
+		expect(region()?.querySelector('[role="status"]')?.textContent).toBe(UNREADABLE);
+	});
+
+	it('announces the failed-update outcome when a choice must change stored photos', async () => {
+		await waiting(PHOTO);
+		click('Discard shared content');
+		await wait(40);
+		expect(region()?.querySelector('[role="status"]')?.textContent).toBe(NOT_APPLIED);
 	});
 
 	it('text-only decisions still work without IndexedDB', async () => {
@@ -601,7 +622,9 @@ describe('share inbox storage failures (T10-S3-05 v1.2)', () => {
 		await wait(40);
 
 		expect(region()).not.toBeNull();
-		expect(region()?.querySelector('[role="status"]')?.textContent).toMatch(/wasn.t applied|try again/i);
+		expect(region()?.querySelector('[role="status"]')?.textContent).toBe(
+			"Your choice wasn't applied because this device couldn't update its saved shares. Nothing changed; try again.",
+		);
 		expect(region()?.textContent).not.toMatch(/discarded/i);
 		expect(sessionStorage.getItem('outpost.share_review')).not.toBeNull();
 		expect((await read_share_inbox({ indexedDB: globalThis.indexedDB })).pending?.title).toBe('A');
