@@ -26,6 +26,7 @@ import { draft_text, read_draft, useDraft, type DraftFields } from '../../lib/dr
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -148,6 +149,8 @@ export function PhotoMode({
 		restored: draft !== null,
 	});
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(
 		null
 	);
@@ -615,11 +618,44 @@ export function PhotoMode({
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. Always
-				    mounted; only the text content changes (empty when there's nothing to
-				    say). `--empty` collapses the box instead of `hidden`, which would pull
-				    the region out of the accessibility tree between announcements. */}
+				<DraftStatus state={saved_draft.state} />
+
+				{composerConfig && (
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+						idPrefix="outpost-photo"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={micropub_endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							disabled={submitting}
+							idPrefix="outpost-photo"
+						/>
+					</Drawer>
+				)}
+
+				{composerConfig && (
+					<div class="outpost-form-actions">
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting}
+						>
+							More options
+						</button>
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
 				<div
+					ref={error_ref}
 					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
 					role="alert"
 					aria-live="assertive"
@@ -656,41 +692,6 @@ export function PhotoMode({
 						''
 					)}
 				</p>
-
-				<DraftStatus state={saved_draft.state} />
-
-				{composerConfig && (
-					<Drawer
-						open={more_open}
-						onClose={(): void => setMoreOpen(false)}
-						title="More options"
-						idPrefix="outpost-photo"
-					>
-						<MorePanel
-							token={token}
-							composerConfig={composerConfig}
-							values={more_values}
-							onChange={setMoreValues}
-							micropubEndpoint={micropub_endpoint}
-							{...(micropubEnv ? { micropubEnv } : {})}
-							disabled={submitting}
-							idPrefix="outpost-photo"
-						/>
-					</Drawer>
-				)}
-
-				{composerConfig && (
-					<div class="outpost-form-actions">
-						<button
-							class="outpost-button outpost-button--secondary"
-							type="button"
-							onClick={(): void => setMoreOpen(true)}
-							disabled={submitting}
-						>
-							More options
-						</button>
-					</div>
-				)}
 
 				<PublishButton
 					idPrefix="outpost-photo"

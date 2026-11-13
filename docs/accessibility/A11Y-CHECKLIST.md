@@ -40,11 +40,12 @@ A3-REQUIREMENTS.md should add a contrast verification item.
 
 ### Phase C — Composer mode focus management
 
-**WCAG 2.4.3 Focus Order** requires that tab order matches the visual reading order. When Phase C lands the mode tabs (Note → Reply → Photo → Listen group → Article):
+**WCAG 2.4.3 Focus Order** requires that tab order matches the visual reading order. The [Wave O decision](../decisions/session-wave-o.md) replaces the former tab pattern with seven native mode buttons:
 
-- [ ] Tabs implement WAI-ARIA's [tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/): `role="tablist"` on the container, `role="tab"` on each tab button, `role="tabpanel"` on each mode body, `aria-controls`/`aria-labelledby` linking them.
-- [ ] Arrow-key navigation between tabs (left/right arrows move focus, Tab moves out of the tablist).
-- [ ] When a mode is selected, focus moves to the first interactive element of that mode's panel (or stays on the tab — both are valid; pick one and document).
+- [ ] The container has `role="group"` and the accessible name "Composer modes".
+- [ ] The group contains seven native buttons, and exactly one has `aria-current="true"`.
+- [ ] Tab reaches every mode button in visual order; Enter and Space select the focused mode.
+- [ ] Arrow keys do not move focus or change the selected mode.
 - [ ] When a mode is opened from the More pull-out, focus moves to the mode's content; closing the pull-out returns focus to the trigger.
 
 ### Phase D — Reduced motion + offline announcements

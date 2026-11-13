@@ -101,3 +101,27 @@ describe('P4: the publish button', () => {
 		expect(rules_for('.outpost-button[disabled]').join('\n')).not.toMatch(/dashed/);
 	});
 });
+
+describe('composer mode focus', () => {
+	it('draws the focused mode button outside its edge', () => {
+		const focused = rules_for('.outpost-tab:focus').join('\n');
+		expect(focused).toMatch(/outline-offset:\s*(?!0(?:\D|$)|-)\d/);
+	});
+});
+
+describe('drawer stylesheet fallbacks', () => {
+	it('overrides hidden only when the drawer stylesheet loads', () => {
+		expect(rules_for('.outpost-drawer').join('\n')).toMatch(/display:\s*flex/);
+		expect(rules_for('.outpost-drawer-scrim').join('\n')).toMatch(/display:\s*block/);
+	});
+});
+
+describe('selected mode button', () => {
+	it('has base and forced-colors rules', () => {
+		expect(rules_for('.outpost-tab[aria-current="true"]').length).toBeGreaterThan(0);
+
+		const forced_colors = media_blocks(/forced-colors:\s*active/);
+		const selected = forced_colors.flatMap((block) => rules_for('.outpost-tab[aria-current="true"]', block));
+		expect(selected.length).toBeGreaterThan(0);
+	});
+});

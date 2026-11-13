@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
 	MicropubError,
 	type HEntryProperties,
@@ -21,6 +21,7 @@ import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -300,6 +301,8 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
 	const [rsvp_value, setRsvpValue] = useState<RsvpValue>(is_rsvp(draft_rsvp) ? draft_rsvp : 'yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
@@ -568,48 +571,6 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. Always
-				    mounted; only the text content changes (empty when there's nothing to
-				    say). `--empty` collapses the box instead of `hidden`, which would pull
-				    the region out of the accessibility tree between announcements. */}
-				<div
-					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
-					role="alert"
-					aria-live="assertive"
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class={`outpost-status${
-						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
-					}`}
-					aria-live="polite"
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<ExternalLink href={status.location}>View published post</ExternalLink>
-								{a11y_active && (
-									<>
-										{' · '}
-										<ExternalLink href={`${status.location}?edac_view=1`}>
-											View accessibility report
-										</ExternalLink>
-									</>
-								)}
-							</>
-						) : (
-							'Posted, but the server did not return a link. Check your site to confirm it published.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
-
 				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
@@ -653,6 +614,46 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						</button>
 					)}
 				</div>
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
 
 				<PublishButton
 					idPrefix="outpost-reply"

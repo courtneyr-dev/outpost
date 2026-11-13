@@ -604,9 +604,10 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * Each value is looked up by name, then by slug, in the `category`
 	 * taxonomy. Existing terms are reused; new terms are created on the
-	 * fly via wp_insert_term. Append-mode is used so any categories the
-	 * Micropub plugin already assigned (from the `category[]` lookup)
-	 * stay in place.
+	 * fly via wp_insert_term. When the post holds only core's fallback
+	 * category and the request did not name it, the resolved categories
+	 * replace that fallback. Otherwise they append so categories the
+	 * Micropub plugin already assigned stay in place.
 	 *
 	 * Runs unconditionally — `category` is a core WordPress taxonomy on
 	 * every site, no companion-plugin gating needed.
@@ -650,7 +651,32 @@ final class Outpost_Micropub_Bridges {
 		if ( empty( $ids ) ) {
 			return;
 		}
-		wp_set_post_categories( $post_id, $ids, true );
+		$current = wp_get_post_categories( $post_id );
+		$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
+		$core    = (int) get_option( 'default_category' );
+		$append  = array( $core ) !== $current || in_array( $core, $ids, true ) || self::request_names_category( $properties, $core );
+		wp_set_post_categories( $post_id, $ids, $append );
+	}
+
+	/**
+	 * Whether the standard Micropub category property names a category.
+	 *
+	 * @param array<string, mixed> $properties Flat properties map.
+	 * @param int                  $term_id    Category term ID to match.
+	 */
+	private static function request_names_category( array $properties, int $term_id ): bool {
+		$raw    = $properties['category'] ?? null;
+		$values = is_array( $raw ) ? $raw : array( $raw );
+		foreach ( $values as $value ) {
+			if ( ! is_string( $value ) ) {
+				continue;
+			}
+			$term = get_category_by_slug( sanitize_title( $value ) );
+			if ( $term instanceof \WP_Term && $term_id === (int) $term->term_id ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -664,12 +690,11 @@ final class Outpost_Micropub_Bridges {
 	 * Settings > Writing default category, which is not what a site that
 	 * configured Outpost defaults asked for.
 	 *
-	 * Categories apply only when the request carried no `mp-categories`
-	 * AND the post holds nothing but core's fallback category (or none),
-	 * so a category the Micropub plugin resolved from `category[]` is
-	 * left alone. They replace rather than append, so core's fallback
-	 * doesn't ride along. Tags append only when the request carried no
-	 * `category[]` at all.
+	 * Categories apply only when the request carried no `mp-categories`,
+	 * the post holds nothing but core's fallback category (or none), and
+	 * `category[]` did not name that fallback. They replace rather than
+	 * append, so an unrequested core fallback doesn't ride along. Tags
+	 * append only when the request carried no `category[]` at all.
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map.
@@ -685,7 +710,7 @@ final class Outpost_Micropub_Bridges {
 				$current = wp_get_post_categories( $post_id );
 				$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
 				$core    = (int) get_option( 'default_category' );
-				if ( empty( $current ) || array( $core ) === $current ) {
+				if ( empty( $current ) || ( array( $core ) === $current && ! self::request_names_category( $properties, $core ) ) ) {
 					wp_set_post_categories( $post_id, $ids, false );
 				}
 			}

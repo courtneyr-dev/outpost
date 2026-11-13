@@ -320,17 +320,7 @@
 	flex-wrap: wrap;
 }
 
-/*
- * Composer tabs (Phase C0).
- *
- * WAI-ARIA tabs pattern. The visual tab strip is structural — paint comes
- * from theme tokens with neutral fallbacks per the Hard Contract.
- *
- * The selected tab visually merges with the panel below it via a 1px
- * negative margin and a transparent border-bottom that matches the
- * theme's surface color (or transparent fallback). Inactive tabs have
- * a transparent border so the underline reads as the panel boundary.
- */
+/* Composer mode button group. Paint comes from theme tokens. */
 .outpost-composer {
 	display: flex;
 	flex-direction: column;
@@ -349,96 +339,49 @@
 	border-block-end: 1px solid var(--outpost-border);
 }
 
-.outpost-tablist-cue {
-	position: absolute;
-	inset-block: 0;
-	display: none;
-	align-items: center;
-	padding-inline: 0.25rem;
-	font-size: 1.375rem;
-	font-weight: 700;
-	line-height: 1;
-	pointer-events: none;
-	background: var(--outpost-surface-bg);
-	color: var(--outpost-surface-fg);
-}
-
-.outpost-tablist-cue--start {
-	inset-inline-start: 0;
-}
-
-.outpost-tablist-cue--end {
-	inset-inline-end: 0;
-}
-
-.outpost-tablist-wrap[data-overflow-start="true"] .outpost-tablist-cue--start,
-.outpost-tablist-wrap[data-overflow-end="true"] .outpost-tablist-cue--end {
-	display: flex;
-}
-
 .outpost-tablist {
-	display: flex;
-	/* Single-row horizontal scroll on narrow screens. With 7 tabs
-	 * (Post / Reply / Photo / Doing / Life / Recipe / About) the previous
-	 * `flex-wrap: wrap` produced 2 rows on a 360 px phone, breaking the
-	 * visual "tab merges into panel below" treatment. Scroll-snap keeps
-	 * each tab tappable without clipping. */
-	flex-wrap: nowrap;
-	overflow-x: auto;
-	scroll-snap-type: x proximity;
-	-webkit-overflow-scrolling: touch;
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
 	gap: 0.25rem;
-	padding: 0.5rem 1.5rem 0;
-	/* Snap points respect the side padding, so the strip rests at 0
-	 * and the start cue only shows after the person scrolls. */
-	scroll-padding-inline: 1.5rem;
-	scrollbar-width: none;
-}
-
-.outpost-tablist::-webkit-scrollbar {
-	display: none;
-}
-
-.outpost-tab {
-	scroll-snap-align: start;
-	flex: 0 0 auto;
+	/* Narrower than the panel's 1.5rem so four bold labels fit on one
+	 * line at a 320 px viewport (bold "Recipe" needs about 57 px). */
+	padding: 0.5rem 0.25rem 0;
 }
 
 .outpost-tab {
 	min-height: 2.75rem;
-	padding: 0.5rem 0.875rem;
-	border: 1px solid transparent;
-	border-block-end: none;
-	border-radius: var(--outpost-radius, 0.375rem) var(--outpost-radius, 0.375rem) 0 0;
+	padding: 0.5rem 0.125rem;
+	border: 1px solid var(--outpost-card-border, currentColor);
+	border-radius: var(--outpost-radius, 0.375rem);
 	font: inherit;
 	font-weight: 500;
+	text-align: center;
+	overflow-wrap: anywhere;
 	cursor: pointer;
 	background: transparent;
 	color: inherit;
-	margin-block-end: -1px;
 }
 
 .outpost-tab:focus {
 	outline: 2px solid var(--outpost-focus, currentColor);
-	outline-offset: -2px;
+	outline-offset: 2px;
 }
 
-/* Selected: the action fill plus a 3px foreground edge and heavier
- * weight, so the state never rests on the fill color alone (the light
- * orange is 2.38:1 against paper). */
-.outpost-tab[aria-selected="true"] {
+/* Selected: the active fill plus an inset border and heavier weight, so
+ * the state never rests on fill color alone. */
+.outpost-tab[aria-current="true"] {
 	background: var(--outpost-tab-bg-active);
 	color: var(--outpost-tab-fg-active);
 	border-color: var(--outpost-tab-indicator);
-	box-shadow: inset 0 -3px 0 var(--outpost-tab-indicator);
+	box-shadow: inset 0 0 0 2px var(--outpost-tab-indicator);
 	font-weight: 700;
 }
 
-.outpost-tab[aria-selected="false"] {
+.outpost-tab:not([aria-current="true"]) {
 	color: var(--outpost-tab-fg);
 }
 
-[role="tabpanel"][hidden] {
+.outpost-mode-panel[hidden] {
 	display: none;
 }
 
@@ -1002,6 +945,9 @@
  * via JS while open.
  */
 .outpost-drawer-scrim {
+	/* Overrides the UA [hidden] rule so the fade still runs; without this
+	 * stylesheet, `hidden` removes a closed scrim (drawer.tsx). */
+	display: block;
 	position: fixed;
 	inset: 0;
 	z-index: 40;
@@ -1732,8 +1678,8 @@
 .outpost-mode-system .outpost-tab:not(.outpost-tab--plain) {
 	font-family: var(--outpost-font-family-display);
 	font-style: italic;
-	font-size: 1.0625rem;
-	padding-inline: 0.875rem;
+	font-size: 1rem;
+	padding-inline: 0.125rem;
 }
 
 /* Form inputs — flat boxed fields on the field surface (the approved
@@ -2151,7 +2097,7 @@
 		color: CanvasText;
 	}
 
-	.outpost-tab[aria-selected="true"],
+	.outpost-tab[aria-current="true"],
 	.outpost-radio:has(input:checked),
 	.outpost-choice:has(input:checked),
 	.outpost-mode-switch__option:has(input:checked) {

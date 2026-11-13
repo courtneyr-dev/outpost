@@ -30,32 +30,9 @@ import { Scenery } from './scenery';
 import { DRAFT_SAVE_DELAY_MS, draft_modes, drafts_available, type DraftMode, type DraftStorage } from '../lib/drafts';
 
 /**
- * Composer tab framework — the WAI-ARIA tabs pattern for switching
- * between post kinds.
- *
- * Per the A11Y-CHECKLIST forward gate for Phase C composer-mode focus
- * management:
- *   - role="tablist" on the container with aria-label
- *   - role="tab" on each tab button with aria-selected, aria-controls,
- *     and roving tabindex (selected tab is 0, others are -1)
- *   - role="tabpanel" on each panel with aria-labelledby
- *   - Arrow keys move focus AND select the adjacent tab (automatic
- *     activation — appropriate for cheap tab switches that just toggle
- *     visibility)
- *   - Home/End jump to first/last tab
- *   - Wraps at the ends (ArrowRight from last → first; ArrowLeft from
- *     first → last)
- *
- * Phase C0 lands this framework with the Note mode plugged in. Reply,
- * Photo, Listen, and Article render placeholder cards naming which
- * Phase C session lands the real implementation. All five panels are
- * rendered eagerly with `hidden` toggling visibility — this preserves
- * mode state (e.g. text typed into Note's textarea) across tab
- * switches.
- *
- * Phase F may surface additional tabs gated on companion-plugin
- * presence (e.g. Listen group only when Post Kinds is active). The
- * ModeId union and the modes array would extend then.
+ * Composer mode button group. Every mode is a native button in the normal
+ * Tab order; aria-current identifies the selected mode. All panels render
+ * eagerly and toggle with `hidden`, preserving form state across switches.
  */
 
 /**
@@ -82,55 +59,6 @@ export interface ComposerTabsProps {
 	appearanceEnv?: AppearanceEnvironment;
 	/** Device storage the modes keep drafts in; defaults to localStorage. */
 	draftStorage?: DraftStorage | null;
-}
-
-/**
- * Tracks whether the tab strip has more tabs off either edge, for the
- * visible overflow cue on narrow screens, and keeps the selected tab in
- * view.
- */
-function useTabOverflow(active: string, visible: boolean): {
-	ref: { current: HTMLDivElement | null };
-	start: boolean;
-	end: boolean;
-} {
-	const ref = useRef<HTMLDivElement | null>(null);
-	const [edges, setEdges] = useState({ start: false, end: false });
-	useEffect(() => {
-		const el = ref.current;
-		if (!el) return;
-		const measure = (): void => {
-			const start = el.scrollLeft > 1;
-			const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-			setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
-		};
-		measure();
-		el.addEventListener('scroll', measure, { passive: true });
-		window.addEventListener('resize', measure);
-		return (): void => {
-			el.removeEventListener('scroll', measure);
-			window.removeEventListener('resize', measure);
-		};
-		// A strip hidden behind Home measures zero wide; measure again when it shows.
-	}, [visible]);
-	// Scroll only the strip, and only after the first render: calling
-	// scrollIntoView() on load moved the browser's sequential-focus
-	// starting point past the header, so Tab skipped it.
-	const first_render = useRef(true);
-	useEffect(() => {
-		if (first_render.current) {
-			first_render.current = false;
-			return;
-		}
-		const strip = ref.current;
-		const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-		if (!strip || !selected) return;
-		const left = selected.offsetLeft - strip.offsetLeft;
-		if (left < strip.scrollLeft || left + selected.offsetWidth > strip.scrollLeft + strip.clientWidth) {
-			strip.scrollTo?.({ left: Math.max(0, left - 24) });
-		}
-	}, [active, visible]);
-	return { ref, ...edges };
 }
 
 export function ComposerTabs({
@@ -423,35 +351,6 @@ export function ComposerTabs({
 		},
 	];
 
-	const handle_keydown = (event: KeyboardEvent, current_index: number): void => {
-		let next_index: number | null = null;
-		switch (event.key) {
-			case 'ArrowRight':
-				next_index = (current_index + 1) % modes.length;
-				break;
-			case 'ArrowLeft':
-				next_index = (current_index - 1 + modes.length) % modes.length;
-				break;
-			case 'Home':
-				next_index = 0;
-				break;
-			case 'End':
-				next_index = modes.length - 1;
-				break;
-			default:
-				return;
-		}
-		event.preventDefault();
-		const next_mode = modes[next_index];
-		if (!next_mode) return;
-		setActive(next_mode.id);
-		// Focus the newly-selected tab so screen readers announce it and
-		// keyboard users see the visible focus indicator move.
-		tab_refs.current[next_mode.id]?.focus();
-	};
-
-	const overflow = useTabOverflow(active, view === 'tabs');
-
 	const config_message =
 		config_error === 'unauthorized'
 			? {
@@ -533,44 +432,31 @@ export function ComposerTabs({
 				<div
 					hidden={view !== 'tabs'}
 					class="outpost-tablist-wrap"
-					data-overflow-start={overflow.start ? 'true' : 'false'}
-					data-overflow-end={overflow.end ? 'true' : 'false'}
 				>
-					<div
-						ref={overflow.ref}
-						role="tablist"
-						aria-label="Composer modes"
-						class="outpost-tablist"
-					>
-						{modes.map((mode, index) => (
+					<div role="group" aria-label="Composer modes" class="outpost-tablist">
+						{modes.map((mode) => (
 							<button
 								key={mode.id}
 								ref={(el): void => {
 									tab_refs.current[mode.id] = el;
 								}}
 								id={`outpost-tab-${mode.id}`}
-								role="tab"
 								type="button"
 								class="outpost-tab"
-								aria-selected={active === mode.id}
 								aria-controls={`outpost-panel-${mode.id}`}
-								tabIndex={active === mode.id ? 0 : -1}
+								aria-current={active === mode.id ? 'true' : undefined}
 								onClick={(): void => setActive(mode.id)}
-								onKeyDown={(event: KeyboardEvent): void => handle_keydown(event, index)}
 							>
 								{mode.label}
 							</button>
 						))}
 					</div>
-					<span class="outpost-tablist-cue outpost-tablist-cue--start" aria-hidden="true">‹</span>
-					<span class="outpost-tablist-cue outpost-tablist-cue--end" aria-hidden="true">›</span>
 				</div>
 				{modes.map((mode) => (
 					<div
 						key={mode.id}
 						id={`outpost-panel-${mode.id}`}
-						role="tabpanel"
-						aria-labelledby={`outpost-tab-${mode.id}`}
+						class="outpost-mode-panel"
 						hidden={view !== 'tabs' || active !== mode.id}
 					>
 						{mode.render()}
