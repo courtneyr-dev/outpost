@@ -20,6 +20,11 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (#318).
 - Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (#319).
 
+### Fixed
+
+- Keyboard focus rings follow night and system modes.
+- Opening More options no longer locks page scroll when the stylesheet is blocked.
+
 ## [1.0.26] - 2026-11-10
 
 ### Security

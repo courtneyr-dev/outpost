@@ -403,6 +403,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Upgrade Notice ==
 
+= 1.0.27 =
+Mode tabs are now two rows of buttons (arrow keys no longer switch modes); posts no longer keep WordPress's fallback category next to the Outpost default.
+
 = 1.0.26 =
 Security hardening from the WordPress.org plugin review. No settings change.
 
