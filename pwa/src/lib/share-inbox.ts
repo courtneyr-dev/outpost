@@ -257,15 +257,16 @@ export async function read_share_inbox(
  *
  * `keep` names the slot whose photos survive (they end up in `pending`,
  * where Photo mode drains them); null keeps none. Every other record is
- * removed. Resolves only after the transaction commits and rejects when it
- * can't open, errors, or aborts, so the caller can keep the review open and
- * say the choice wasn't applied.
+ * removed. Resolves only after the transaction commits and rejects when
+ * there is no IndexedDB, or it can't open, errors, or aborts, so the caller
+ * can keep the review open and say the choice wasn't applied. A missing
+ * backend is a failure, not a no-op: records it can't see may still exist.
  */
 export async function keep_shared_photos(
 	keep: ShareInboxSlot | null,
 	env: ShareInboxEnvironment = default_env()
 ): Promise<void> {
-	if (!env.indexedDB) return;
+	if (!env.indexedDB) throw new Error('share inbox: IndexedDB is unavailable');
 	const db = await open_inbox(env.indexedDB);
 	try {
 		const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');

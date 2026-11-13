@@ -26,6 +26,8 @@ export interface ShareReviewProps {
 	shares: WaitingShare[];
 	/** Status for the region's own live region (for example, a refused share). */
 	status: string;
+	/** The "Use shared content" button, so focus can move there after a conflict choice. */
+	useButtonRef?: { current: HTMLButtonElement | null };
 	onUse: () => void;
 	onDiscard: () => void;
 	onKeepEarlier: () => void;
@@ -73,6 +75,7 @@ function Summary({ share, photos }: WaitingShare) {
 export function ShareReview({
 	shares,
 	status,
+	useButtonRef,
 	onUse,
 	onDiscard,
 	onKeepEarlier,
@@ -122,7 +125,12 @@ export function ShareReview({
 					</p>
 					<Summary {...earlier} />
 					<div class="outpost-form-actions">
-						<button class="outpost-button" type="button" onClick={onUse}>
+						<button
+							{...(useButtonRef ? { ref: useButtonRef } : {})}
+							class="outpost-button"
+							type="button"
+							onClick={onUse}
+						>
 							Use shared content
 						</button>
 						<button class="outpost-button outpost-button--secondary" type="button" onClick={onDiscard}>

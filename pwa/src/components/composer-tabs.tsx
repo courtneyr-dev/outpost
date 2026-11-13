@@ -106,7 +106,7 @@ export interface ComposerTabsProps {
 const SHARE_REFUSED =
 	"Another share arrived but wasn't kept, because two were already waiting. Choose below, then share it again.";
 const SHARE_UNREADABLE =
-	"Couldn't read the shared photos on this device. Reload to try again, or discard the share.";
+	"Couldn't read the shared photos on this device, so this choice wasn't applied. Reload and try again.";
 const SHARE_READING = 'Still reading the shared photos. Try again in a moment.';
 const SHARE_NOT_APPLIED =
 	"Your choice wasn't applied because this device couldn't update its saved shares. Nothing changed; try again.";
@@ -228,6 +228,8 @@ export function ComposerTabs({
 	// Set once a decision is applied, so the first inbox read can't bring
 	// back a share the person already used or discarded.
 	const decided = useRef(false);
+	// Where focus goes when a conflict narrows to one share.
+	const review_use_button = useRef<HTMLButtonElement | null>(null);
 	// Bumped per mode to remount it, so it reads a share released to it.
 	const [generation, setGeneration] = useState<Partial<Record<ModeId, number>>>({});
 	const appearance = useAppearance({
@@ -437,6 +439,9 @@ export function ComposerTabs({
 		setPhotoSlots([kept.sharedPhotos ? SHARE_INBOX_KEY : null]);
 		if (kept.sharedPhotos) setShareInbox(await read_share_inbox(shareInboxEnv));
 		setReviewStatus(message);
+		// The conflict buttons are gone; the single-share review renders before
+		// the next frame, so move focus into it rather than leave it on <body>.
+		requestAnimationFrame(() => review_use_button.current?.focus());
 	};
 
 	const discard_both_shares = async (): Promise<void> => {
@@ -759,6 +764,7 @@ export function ComposerTabs({
 					<ShareReview
 						shares={waiting}
 						status={review_status}
+						useButtonRef={review_use_button}
 						onUse={(): void => {
 							void use_shared();
 						}}
