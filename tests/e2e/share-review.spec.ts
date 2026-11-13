@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { share_photo, sign_in } from './helpers';
 
 /**
- * T10-S3-05 v1.1: shared content waits for "Use shared content".
+ * T10-S3-05 v1.1–v1.2: shared content waits for "Use shared content", and
+ * while it waits the decision is the only thing on screen.
  *
  * Runs in a real browser against the wp-env site: the PHP shell, the service
  * worker it emits, and the committed bundle. /preview is stubbed so no request
@@ -62,7 +63,8 @@ test('a shared photo is not saved as a draft until it is accepted', async ({ pag
 	const review = page.getByRole('region', { name: 'Shared content' });
 	await expect(review).toBeVisible();
 	await expect(review).toContainText('shared.png');
-	await page.locator('#outpost-photo-name').fill('typing is not accepting');
+	// The form can't be reached until the person decides (v1.2).
+	await expect(page.locator('#outpost-photo-name')).toBeHidden();
 	await page.waitForTimeout(1200);
 	expect(await drafts(page)).not.toContain('Shared photo title');
 	await expect(review).toBeVisible();
@@ -130,4 +132,97 @@ test('the decision controls work from the keyboard and have accessible names', a
 
 	await expect(review).toBeHidden();
 	await expect(page.locator('#outpost-note-content')).toHaveValue('Shared words');
+});
+
+/** Where Tab can reach from inside the review: one entry per stop, in order. */
+async function tab_stops(page: Page, count: number): Promise<string[]> {
+	const stops: string[] = [];
+	for (let i = 0; i < count; i++) {
+		await page.keyboard.press('Tab');
+		stops.push(
+			await page.evaluate(() => {
+				const el = document.activeElement;
+				if (!el || el === document.body) return 'body';
+				if (el.closest('[data-outpost-share-review]')) return 'review';
+				if (el.getAttribute('name') === 'outpost-header-mode') return 'appearance';
+				return el.outerHTML.slice(0, 80);
+			}),
+		);
+	}
+	return stops;
+}
+
+test('while a share waits, only the decision can be reached; afterwards focus lands on its tab', async ({ page }) => {
+	await page.goto('/post/?mode=note&text=Shared%20words');
+	const review = page.getByRole('region', { name: 'Shared content' });
+	await expect(review).toBeVisible();
+
+	await expect(page.getByRole('tablist', { name: 'Composer modes' })).toBeHidden();
+	await expect(page.locator('#outpost-panel-note')).toBeHidden();
+	await expect(page.getByRole('button', { name: 'Preferences' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Home' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: /^Post/ })).toHaveCount(0);
+
+	const stops = await tab_stops(page, 12);
+	expect(stops.filter((s) => !['review', 'appearance', 'body'].includes(s))).toEqual([]);
+
+	await review.getByRole('button', { name: 'Use shared content' }).click();
+	await expect(review).toBeHidden();
+	await expect(page.getByRole('tab', { name: 'Post' })).toBeFocused();
+	await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible();
+	await expect(page.locator('#outpost-note-content')).toHaveValue('Shared words');
+});
+
+test('a recipe share fills the name and notes, and shows the link it does not import', async ({ page }) => {
+	await page.goto('/post/?mode=recipe&title=Shared%20pie&text=Grandma%27s%20notes&url=https%3A%2F%2Fexample.test%2Fpie');
+	const review = page.getByRole('region', { name: 'Shared content' });
+	await expect(review).toContainText('https://example.test/pie');
+	await expect(review).toContainText('Recipe form');
+	await review.getByRole('button', { name: 'Use shared content' }).click();
+	await expect(page.locator('#outpost-recipe-name')).toHaveValue('Shared pie');
+	await expect(page.locator('#outpost-recipe-content')).toHaveValue("Grandma's notes");
+	expect(await page.evaluate(() => sessionStorage.getItem('outpost.share_target'))).toBeNull();
+});
+
+test('a second text share waits beside the first, both survive a reload, and a third is refused', async ({ page }) => {
+	await page.goto('/post/?mode=note&text=First%20shared%20words');
+	await expect(page.getByRole('region', { name: 'Shared content' })).toBeVisible();
+	await page.goto('/post/?mode=bookmark&url=https%3A%2F%2Fexample.test%2Fsecond');
+
+	const conflict = page.getByRole('region', { name: 'Two shares are waiting' });
+	await expect(conflict).toContainText('First shared words');
+	await expect(conflict).toContainText('https://example.test/second');
+
+	await page.reload();
+	await expect(conflict).toContainText('First shared words');
+	await expect(conflict).toContainText('https://example.test/second');
+
+	await page.goto('/post/?mode=note&text=Third%20shared%20words');
+	await expect(conflict).not.toContainText('Third shared words');
+	await expect(conflict.getByRole('status')).toContainText("wasn't kept");
+
+	await conflict.getByRole('button', { name: 'Use new share' }).click();
+	const review = page.getByRole('region', { name: 'Shared content' });
+	await expect(review).toContainText('https://example.test/second');
+	await review.getByRole('button', { name: 'Use shared content' }).click();
+	await expect(page.locator('#outpost-reply-target')).toHaveValue('https://example.test/second');
+});
+
+test('a photo share after a text share is one decision; choosing it keeps its photo', async ({ page }) => {
+	await page.goto('/post/?mode=note&text=First%20shared%20words');
+	await expect(page.getByRole('region', { name: 'Shared content' })).toBeVisible();
+	await share_photo(page, 'later.png', 'Later photo');
+
+	await expect(page.locator('[data-outpost-share-review]')).toHaveCount(1);
+	const conflict = page.getByRole('region', { name: 'Two shares are waiting' });
+	await expect(conflict).toContainText('First shared words');
+	await expect(conflict).toContainText('later.png');
+
+	await conflict.getByRole('button', { name: 'Use new share' }).click();
+	const review = page.getByRole('region', { name: 'Shared content' });
+	await expect(review).toContainText('later.png');
+	await expect(review).not.toContainText('First shared words');
+	await review.getByRole('button', { name: 'Use shared content' }).click();
+	await expect(page.locator('#outpost-photo-name')).toHaveValue('Later photo');
+	await expect(page.locator('[id^="outpost-photo-alt-"]')).toHaveCount(1);
 });
