@@ -342,13 +342,15 @@
 .outpost-tablist {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 0.5rem;
-	padding: 0.5rem 1.5rem 0;
+	gap: 0.25rem;
+	/* Narrower than the panel's 1.5rem so four bold labels fit on one
+	 * line at a 320 px viewport (bold "Recipe" needs about 57 px). */
+	padding: 0.5rem 0.25rem 0;
 }
 
 .outpost-tab {
 	min-height: 2.75rem;
-	padding: 0.5rem 0.875rem;
+	padding: 0.5rem 0.125rem;
 	border: 1px solid var(--outpost-card-border, currentColor);
 	border-radius: var(--outpost-radius, 0.375rem);
 	font: inherit;
@@ -1676,8 +1678,8 @@
 .outpost-mode-system .outpost-tab:not(.outpost-tab--plain) {
 	font-family: var(--outpost-font-family-display);
 	font-style: italic;
-	font-size: 1.0625rem;
-	padding-inline: 0.875rem;
+	font-size: 1rem;
+	padding-inline: 0.125rem;
 }
 
 /* Form inputs — flat boxed fields on the field surface (the approved
