@@ -211,4 +211,40 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		$this->assertSame( array(), $found );
 	}
+
+	/**
+	 * T10 (2026-11-13): "make sure the nonce logic is correct ... fail early
+	 * if the nonce is missing." No wp_verify_nonce() call may share its
+	 * statement with an `&&`: an AND-gated nonce check is skipped whenever
+	 * the other operand short-circuits. Every check stands alone (or uses the
+	 * reviewer's own `! isset() || ! wp_verify_nonce()` early-fail form) and
+	 * fails before the protected work. The behavioral side of this lives in
+	 * BearerAuthCookieNonceTest and the CookieNonceFailClosedTest integration test.
+	 */
+	public function test_no_nonce_check_is_and_gated(): void {
+		$found    = array();
+		$verified = 0;
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			$count = count( $tokens );
+			for ( $i = 0; $i < $count; $i++ ) {
+				if ( ! is_array( $tokens[ $i ] ) || T_STRING !== $tokens[ $i ][0] || 'wp_verify_nonce' !== $tokens[ $i ][1] ) {
+					continue;
+				}
+				++$verified;
+				// Walk out to the statement boundaries on both sides.
+				for ( $a = $i - 1; $a >= 0 && ! in_array( self::text( $tokens[ $a ] ), array( ';', '{', '}' ), true ); $a-- ) {
+					if ( is_array( $tokens[ $a ] ) && T_BOOLEAN_AND === $tokens[ $a ][0] ) {
+						$found[] = $file . ':' . $tokens[ $i ][2];
+					}
+				}
+				for ( $b = $i + 1; $b < $count && ! in_array( self::text( $tokens[ $b ] ), array( ';', '{', '}' ), true ); $b++ ) {
+					if ( is_array( $tokens[ $b ] ) && T_BOOLEAN_AND === $tokens[ $b ][0] ) {
+						$found[] = $file . ':' . $tokens[ $i ][2];
+					}
+				}
+			}
+		}
+		$this->assertGreaterThan( 0, $verified, 'The scan must see the plugin\'s nonce checks.' );
+		$this->assertSame( array(), array_values( array_unique( $found ) ) );
+	}
 }
