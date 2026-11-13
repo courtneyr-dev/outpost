@@ -221,6 +221,11 @@ describe('share inbox state and decisions (T10-S3-05 v1.2)', () => {
 		expect(await read_share_inbox({ indexedDB: factory })).toEqual({ status: 'ok', pending: null, candidate: null });
 	});
 
+	it('rejects when there is no IndexedDB, like any other storage failure (v1.3)', async () => {
+		await expect(keep_shared_photos(null, { indexedDB: undefined })).rejects.toBeTruthy();
+		await expect(keep_shared_photos(SHARE_INBOX_KEY, { indexedDB: undefined })).rejects.toBeTruthy();
+	});
+
 	it.each(['open', 'tx-error', 'abort'] as const)('rejects on a %s failure and changes nothing', async (mode) => {
 		const factory = new IDBFactory();
 		await stash_shared_photos(parked('Earlier'), { indexedDB: factory }, SHARE_INBOX_KEY);

@@ -226,3 +226,53 @@ test('a photo share after a text share is one decision; choosing it keeps its ph
 	await expect(page.locator('#outpost-photo-name')).toHaveValue('Later photo');
 	await expect(page.locator('[id^="outpost-photo-alt-"]')).toHaveCount(1);
 });
+
+test.describe('focus after a conflict choice (v1.3)', () => {
+	for (const action of ['Keep earlier share', 'Use new share']) {
+		test(`"${action}" from the keyboard moves focus to Use shared content, inside the decision`, async ({ page }) => {
+			await share_photo(page, 'earlier.png', 'Earlier');
+			await share_photo(page, 'newer.png', 'Newer');
+			const conflict = page.getByRole('region', { name: 'Two shares are waiting' });
+			await expect(conflict).toBeVisible();
+
+			await conflict.getByRole('button', { name: action }).focus();
+			await page.keyboard.press('Enter');
+
+			const review = page.getByRole('region', { name: 'Shared content' });
+			await expect(review).toBeVisible();
+			await expect(review.getByRole('button', { name: 'Use shared content' })).toBeFocused();
+			const stops = await tab_stops(page, 6);
+			expect(stops.filter((s) => !['review', 'appearance', 'body'].includes(s))).toEqual([]);
+		});
+	}
+
+	test('a choice the device cannot save keeps the conflict and focus on the button', async ({ page }) => {
+		// Page-side only: the composer's share-inbox writes throw; the service worker is untouched.
+		await page.addInitScript(() => {
+			const original = IDBDatabase.prototype.transaction;
+			IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<IDBDatabase['transaction']>) {
+				const flag = (window as unknown as { __outpostFailInboxWrites?: boolean }).__outpostFailInboxWrites;
+				if (flag && this.name === 'outpost-share-inbox' && args[1] === 'readwrite') {
+					throw new DOMException('blocked for the test', 'UnknownError');
+				}
+				return original.apply(this, args);
+			} as IDBDatabase['transaction'];
+		});
+		await share_photo(page, 'earlier.png', 'Earlier');
+		await share_photo(page, 'newer.png', 'Newer');
+		const conflict = page.getByRole('region', { name: 'Two shares are waiting' });
+		await expect(conflict).toBeVisible();
+		await page.evaluate(() => {
+			(window as unknown as { __outpostFailInboxWrites?: boolean }).__outpostFailInboxWrites = true;
+		});
+
+		const use_new = conflict.getByRole('button', { name: 'Use new share' });
+		await use_new.focus();
+		await page.keyboard.press('Enter');
+
+		await expect(conflict.getByRole('status')).toContainText("wasn't applied");
+		await expect(conflict).toContainText('earlier.png');
+		await expect(conflict).toContainText('newer.png');
+		await expect(use_new).toBeFocused();
+	});
+});

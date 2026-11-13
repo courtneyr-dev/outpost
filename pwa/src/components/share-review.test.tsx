@@ -265,8 +265,7 @@ describe.each(CASES)('$mode share waits for "Use shared content"', (c) => {
 		expect(outside.map((el) => el.outerHTML.slice(0, 60))).toEqual([]);
 
 		click('Use shared content');
-		await wait(40);
-		expect(document.activeElement?.id).toBe(`outpost-tab-${c.mode}`);
+		await vi.waitFor(() => expect(document.activeElement?.id).toBe(`outpost-tab-${c.mode}`));
 		expect(sessionStorage.getItem('outpost.share_target')).toBeNull();
 	});
 });
@@ -416,6 +415,123 @@ describe('a decision made before the share inbox is read (T10-S3-05 v1.2)', () =
 
 		expect(region()).toBeNull();
 		expect(sessionStorage.getItem('outpost.share_review')).toBeNull();
+	});
+});
+
+describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () => {
+	const PHOTO: ShareTargetData = { tab: 'photo', sharedPhotos: true };
+	const TEXT: ShareTargetData = { tab: 'note', content: 'Shared words' };
+
+	/** Put shares straight into the two session slots, then mount with no IndexedDB. */
+	async function waiting(earlier: ShareTargetData, candidate?: ShareTargetData): Promise<void> {
+		sessionStorage.setItem('outpost.share_review', JSON.stringify(earlier));
+		if (candidate) sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify(candidate));
+		inbox_env = { indexedDB: undefined };
+		mount();
+		await wait(30);
+	}
+
+	function slots(): Array<string | null> {
+		return [sessionStorage.getItem('outpost.share_review'), sessionStorage.getItem('outpost.share_review_candidate')];
+	}
+
+	/** What the region shows, without its live status line. */
+	function summary(): string {
+		const copy = region()?.cloneNode(true) as HTMLElement | undefined;
+		copy?.querySelector('[role="status"]')?.remove();
+		return copy?.textContent ?? '';
+	}
+
+	const CASES: Array<[string, string, ShareTargetData, ShareTargetData | undefined]> = [
+		['one photo share', 'Use shared content', PHOTO, undefined],
+		['one photo share', 'Discard shared content', PHOTO, undefined],
+		['two photo shares', 'Keep earlier share', PHOTO, PHOTO],
+		['two photo shares', 'Use new share', PHOTO, PHOTO],
+		['two photo shares', 'Discard both', PHOTO, PHOTO],
+		['text, then photo', 'Keep earlier share', TEXT, PHOTO],
+		['text, then photo', 'Use new share', TEXT, PHOTO],
+		['text, then photo', 'Discard both', TEXT, PHOTO],
+		['photo, then text', 'Keep earlier share', PHOTO, TEXT],
+		['photo, then text', 'Use new share', PHOTO, TEXT],
+		['photo, then text', 'Discard both', PHOTO, TEXT],
+	];
+
+	it.each(CASES)('%s: "%s" keeps the review, both slots, and the summary', async (_label, action, earlier, candidate) => {
+		await waiting(earlier, candidate);
+		const before_slots = slots();
+		const before_summary = summary();
+		expect(region()).not.toBeNull();
+
+		click(action);
+		await wait(40);
+
+		expect(region()).not.toBeNull();
+		expect(slots()).toEqual(before_slots);
+		expect(summary()).toBe(before_summary);
+		const status = region()?.querySelector('[role="status"]')?.textContent ?? '';
+		expect(status).toMatch(/wasn.t applied|couldn.t read/i);
+		expect(status).not.toMatch(/discarded|kept the|using the|added to/i);
+		expect(root.querySelector('.outpost-share-status')?.textContent ?? '').not.toMatch(/discarded|added to/i);
+	});
+
+	it('text-only decisions still work without IndexedDB', async () => {
+		await waiting(TEXT, { tab: 'note', content: 'Second words' });
+		click('Use new share');
+		await wait(30);
+		click('Use shared content');
+		await wait(40);
+
+		expect(region()).toBeNull();
+		expect(field('outpost-note-content').value).toBe('Second words');
+		expect(slots()).toEqual([null, null]);
+	});
+});
+
+describe('focus after a conflict choice (T10-S3-05 v1.3)', () => {
+	async function two_photos(): Promise<void> {
+		const photo = (name: string): File => new File([new Uint8Array([1])], name, { type: 'image/jpeg' });
+		await stash_shared_photos({ files: [photo('earlier.jpg')], title: 'Earlier', text: '', received: 1 }, inbox_env, 'pending');
+		await stash_shared_photos({ files: [photo('newer.jpg')], title: 'Newer', text: '', received: 2 }, inbox_env, 'candidate');
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+		mount();
+		await wait(30);
+	}
+
+	it.each(['Keep earlier share', 'Use new share'])('"%s" moves focus to Use shared content once the single review exists', async (action) => {
+		await two_photos();
+		button(action)?.focus();
+		click(action);
+		await vi.waitFor(() => expect((document.activeElement?.textContent ?? '').trim()).toBe('Use shared content'));
+
+		expect(region()?.querySelector('h2')?.textContent).toBe('Shared content');
+		expect(document.activeElement?.closest('[data-outpost-share-review]')).not.toBeNull();
+	});
+
+	it('moves focus the same way for a text conflict', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		button('Keep earlier share')?.focus();
+		click('Keep earlier share');
+		await vi.waitFor(() => expect((document.activeElement?.textContent ?? '').trim()).toBe('Use shared content'));
+	});
+
+	it('leaves focus on the activated button when the choice fails', async () => {
+		sessionStorage.setItem('outpost.share_review', JSON.stringify({ tab: 'photo', sharedPhotos: true }));
+		sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'note', content: 'Shared words' }));
+		inbox_env = { indexedDB: undefined };
+		mount();
+		await wait(30);
+		const keep = button('Use new share');
+		keep?.focus();
+		click('Use new share');
+		await wait(60);
+
+		expect(region()?.querySelector('h2')?.textContent).toBe('Two shares are waiting');
+		expect(document.activeElement).toBe(keep);
 	});
 });
 
