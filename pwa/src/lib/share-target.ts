@@ -126,6 +126,8 @@ const LIFE_VARIANT_VALUES: LifeVariant[] = [
 const KEY = 'outpost.share_target';
 /** Where a share waits for the person's decision (see hold_share_for_review). */
 const HELD_KEY = 'outpost.share_review';
+/** A second share that arrived while the first still waited. */
+const CANDIDATE_KEY = 'outpost.share_review_candidate';
 
 function safe_session_get(key: string): string | null {
 	try {
@@ -368,47 +370,81 @@ export function peek_share_target(): ShareTargetData | null {
 	}
 }
 
+/** Shares waiting for a decision, earliest first (at most two). */
+export interface HeldShares {
+	shares: ShareTargetData[];
+	/** A share arrived while two were already waiting and wasn't kept. */
+	refused: boolean;
+}
+
+function parse_held(raw: string | null): ShareTargetData | null {
+	if (!raw) return null;
+	try {
+		const data = JSON.parse(raw) as ShareTargetData;
+		return data && typeof data === 'object' && typeof data.tab === 'string' ? data : null;
+	} catch (_err) {
+		return null;
+	}
+}
+
+/**
+ * Write the waiting shares back to their two session slots, earliest first.
+ * Anything past two is dropped; callers refuse a third share before this.
+ */
+export function set_held_shares(shares: ShareTargetData[]): void {
+	const [earlier, candidate] = shares;
+	if (earlier) safe_session_set(HELD_KEY, JSON.stringify(earlier));
+	else safe_session_remove(HELD_KEY);
+	if (candidate) safe_session_set(CANDIDATE_KEY, JSON.stringify(candidate));
+	else safe_session_remove(CANDIDATE_KEY);
+}
+
 /**
  * Take the stashed intake out of the modes' reach until the person decides.
  *
  * A share can come from any page, so the composer holds it for review
  * ("Use shared content" / "Discard shared content") instead of letting each
  * mode consume it on mount. Called once, before the modes render: it moves
- * the stash to a separate key, so a mode mounting now finds nothing. A share
- * already held (the page reloaded during review) stays held; a newer stash
- * from this navigation replaces it.
+ * the stash into a session slot, so a mode mounting now finds nothing.
+ *
+ * Two slots: a share that arrives while another waits becomes the new
+ * share, and the person picks one. A third share replaces neither; it is
+ * refused and `refused` says so. Both slots survive a reload until the
+ * person decides. A photo share the service worker already refused (both
+ * photo slots full) is refused here too, since its bytes were never kept.
  */
-export function hold_share_for_review(): ShareTargetData | null {
-	const fresh = safe_session_get(KEY);
+export function hold_share_for_review(): HeldShares {
+	const fresh_raw = safe_session_get(KEY);
+	safe_session_remove(KEY);
+	const shares = [parse_held(safe_session_get(HELD_KEY)), parse_held(safe_session_get(CANDIDATE_KEY))].filter(
+		(s): s is ShareTargetData => s !== null,
+	);
+	let refused = false;
+	const fresh = parse_held(fresh_raw);
 	if (fresh) {
-		safe_session_remove(KEY);
-		safe_session_set(HELD_KEY, fresh);
+		if (fresh.shareRefused || shares.length >= 2) {
+			refused = true;
+		} else {
+			shares.push(fresh);
+		}
 	}
-	const raw = safe_session_get(HELD_KEY);
-	if (!raw) return null;
-	try {
-		return JSON.parse(raw) as ShareTargetData;
-	} catch (_err) {
-		safe_session_remove(HELD_KEY);
-		return null;
-	}
+	set_held_shares(shares);
+	return { shares, refused };
 }
 
-/** "Use shared content": hand the held share to its mode's normal intake. */
+/**
+ * "Use shared content": hand the earliest held share to its mode's normal
+ * intake and clear both slots. Only called with a single share waiting.
+ */
 export function release_held_share(): ShareTargetData | null {
-	const raw = safe_session_get(HELD_KEY);
-	safe_session_remove(HELD_KEY);
-	if (!raw) return null;
-	safe_session_set(KEY, raw);
-	try {
-		return JSON.parse(raw) as ShareTargetData;
-	} catch (_err) {
-		safe_session_remove(KEY);
-		return null;
-	}
+	const data = parse_held(safe_session_get(HELD_KEY));
+	set_held_shares([]);
+	if (!data) return null;
+	safe_session_set(KEY, JSON.stringify(data));
+	return data;
 }
 
-/** "Discard shared content": drop the held share. */
+/** "Discard shared content" / "Discard both": drop every held share. */
 export function discard_held_share(): void {
-	safe_session_remove(HELD_KEY);
+	set_held_shares([]);
 }

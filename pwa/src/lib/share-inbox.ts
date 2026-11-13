@@ -211,8 +211,15 @@ function from_record(record: unknown): SharedPhotos | null {
 	};
 }
 
-/** What is waiting in the share inbox. Reads only; nothing is removed. */
+/**
+ * What is waiting in the share inbox. Reads only; nothing is removed.
+ *
+ * `status` separates an empty inbox from one that couldn't be read: a
+ * blocked or failing IndexedDB is `unavailable`, never "nothing waiting",
+ * so the composer doesn't drop a share it simply couldn't see.
+ */
 export interface ShareInboxState {
+	status: 'ok' | 'unavailable';
 	pending: SharedPhotos | null;
 	candidate: SharedPhotos | null;
 }
@@ -224,55 +231,56 @@ export interface ShareInboxState {
 export async function read_share_inbox(
 	env: ShareInboxEnvironment = default_env()
 ): Promise<ShareInboxState> {
-	const empty: ShareInboxState = { pending: null, candidate: null };
-	if (!env.indexedDB) return empty;
+	const unavailable: ShareInboxState = { status: 'unavailable', pending: null, candidate: null };
+	if (!env.indexedDB) return unavailable;
 	let db: IDBDatabase;
 	try {
 		db = await open_inbox(env.indexedDB);
 	} catch (_err) {
-		return empty;
+		return unavailable;
 	}
 	try {
 		const store = db.transaction(SHARE_INBOX_STORE, 'readonly').objectStore(SHARE_INBOX_STORE);
 		const pending: unknown = await await_request(store.get(SHARE_INBOX_KEY));
 		const candidate: unknown = await await_request(store.get(SHARE_INBOX_CANDIDATE_KEY));
-		return { pending: from_record(pending), candidate: from_record(candidate) };
+		return { status: 'ok', pending: from_record(pending), candidate: from_record(candidate) };
 	} catch (_err) {
-		return empty;
+		return unavailable;
 	} finally {
 		db.close();
 	}
 }
 
 /**
- * Apply the person's decision about waiting shares.
+ * Apply the person's decision about waiting photo shares, in one
+ * transaction.
  *
- * - `discard`: drop the waiting share (and any candidate).
- * - `keep_earlier`: drop the newer candidate; the earlier share keeps waiting.
- * - `use_new`: the candidate replaces the earlier share, which is dropped.
+ * `keep` names the slot whose photos survive (they end up in `pending`,
+ * where Photo mode drains them); null keeps none. Every other record is
+ * removed. Resolves only after the transaction commits and rejects when it
+ * can't open, errors, or aborts, so the caller can keep the review open and
+ * say the choice wasn't applied.
  */
-export async function resolve_share_inbox(
-	action: 'discard' | 'keep_earlier' | 'use_new',
+export async function keep_shared_photos(
+	keep: ShareInboxSlot | null,
 	env: ShareInboxEnvironment = default_env()
 ): Promise<void> {
 	if (!env.indexedDB) return;
 	const db = await open_inbox(env.indexedDB);
 	try {
 		const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
+		const done = await_transaction(tx);
+		// Observed below; this keeps an early abort from going unhandled.
+		done.catch(() => undefined);
 		const store = tx.objectStore(SHARE_INBOX_STORE);
-		if (action === 'discard') {
-			store.delete(SHARE_INBOX_KEY);
-			store.delete(SHARE_INBOX_CANDIDATE_KEY);
-		} else if (action === 'keep_earlier') {
-			store.delete(SHARE_INBOX_CANDIDATE_KEY);
+		const kept: unknown = keep ? await await_request(store.get(keep)) : undefined;
+		if (kept !== undefined) {
+			store.put(kept, SHARE_INBOX_KEY);
 		} else {
-			const candidate: unknown = await await_request(store.get(SHARE_INBOX_CANDIDATE_KEY));
-			if (candidate !== undefined) {
-				store.put(candidate, SHARE_INBOX_KEY);
-				store.delete(SHARE_INBOX_CANDIDATE_KEY);
-			}
+			store.delete(SHARE_INBOX_KEY);
 		}
-		await await_transaction(tx);
+		store.delete(SHARE_INBOX_CANDIDATE_KEY);
+		await done;
 	} finally {
 		db.close();
 	}

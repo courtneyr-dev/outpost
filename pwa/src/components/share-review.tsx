@@ -1,5 +1,5 @@
 import type { ShareTargetData } from '../lib/share-target';
-import type { SharedPhotos, ShareInboxState } from '../lib/share-inbox';
+import type { SharedPhotos } from '../lib/share-inbox';
 
 /**
  * Review a share before it reaches a composer form (T10-S3-05).
@@ -8,17 +8,22 @@ import type { SharedPhotos, ShareInboxState } from '../lib/share-inbox';
  * share parameters) can come from any page, so the composer holds it here
  * until the person chooses "Use shared content" or "Discard shared content".
  * Nothing from it is saved as a draft, previewed, posted, or queued before
- * that choice. When two photo shares are waiting, the person picks which to
- * keep first.
+ * that choice. When two shares are waiting (text, link, or photo, in any
+ * mix), the person picks which to keep first. While this region is open it
+ * is the only thing on the screen a person can act on.
  *
  * Shared text is rendered as text (Preact escapes it); nothing here fetches
  * or follows a shared link.
  */
+/** One share waiting for a decision; photo bytes come from the share inbox. */
+export interface WaitingShare {
+	share: ShareTargetData;
+	photos: SharedPhotos | null;
+}
+
 export interface ShareReviewProps {
-	/** The held intake from the share dispatch, if any. */
-	share: ShareTargetData | null;
-	/** Photo shares waiting in the share inbox. */
-	inbox: ShareInboxState;
+	/** Waiting shares, earliest first: one for a review, two for a conflict. */
+	shares: WaitingShare[];
 	/** Status for the region's own live region (for example, a refused share). */
 	status: string;
 	onUse: () => void;
@@ -43,14 +48,15 @@ function photo_names(photos: SharedPhotos): string {
 	return `${count}: ${names.join(', ')}`;
 }
 
-function Summary({ share, photos }: { share: ShareTargetData | null; photos: SharedPhotos | null }) {
-	const title = share?.title || photos?.title || '';
-	const text = share?.content || photos?.text || '';
+function Summary({ share, photos }: WaitingShare) {
+	const title = share.title || photos?.title || '';
+	const text = share.content || photos?.text || '';
 	const rows: Array<[string, string]> = [];
 	if (title) rows.push(['Title', title]);
 	if (text) rows.push(['Text', text]);
-	if (share?.url) rows.push(['Link', share.url]);
+	if (share.url) rows.push(['Link', share.url]);
 	if (photos) rows.push(['Photos', photo_names(photos)]);
+	else if (share.sharedPhotos) rows.push(['Photos', 'Shared photos on this device']);
 	if (rows.length === 0) return <p>This share carried no text, link, or photo.</p>;
 	return (
 		<dl class="outpost-share-review__summary">
@@ -65,8 +71,7 @@ function Summary({ share, photos }: { share: ShareTargetData | null; photos: Sha
 }
 
 export function ShareReview({
-	share,
-	inbox,
+	shares,
 	status,
 	onUse,
 	onDiscard,
@@ -74,9 +79,9 @@ export function ShareReview({
 	onUseNew,
 	onDiscardBoth,
 }: ShareReviewProps) {
-	const conflict = inbox.pending !== null && inbox.candidate !== null;
+	const [earlier, candidate] = shares;
 	const heading_id = 'outpost-share-review-title';
-	const target = share ? TAB_LABELS[share.tab] : 'Photo';
+	if (!earlier) return null;
 
 	return (
 		<section
@@ -84,16 +89,16 @@ export function ShareReview({
 			aria-labelledby={heading_id}
 			data-outpost-share-review=""
 		>
-			{conflict ? (
+			{candidate ? (
 				<>
 					<h2 id={heading_id} class="outpost-card__title">
 						Two shares are waiting
 					</h2>
-					<p>Choose which photo share to keep. Nothing is saved or posted until you use it.</p>
-					<h3>Earlier share</h3>
-					<Summary share={null} photos={inbox.pending} />
-					<h3>New share</h3>
-					<Summary share={null} photos={inbox.candidate} />
+					<p>Choose which share to keep. Nothing is saved or posted until you use it.</p>
+					<h3>Earlier share, for the {TAB_LABELS[earlier.share.tab]} form</h3>
+					<Summary {...earlier} />
+					<h3>New share, for the {TAB_LABELS[candidate.share.tab]} form</h3>
+					<Summary {...candidate} />
 					<div class="outpost-form-actions">
 						<button class="outpost-button outpost-button--secondary" type="button" onClick={onKeepEarlier}>
 							Keep earlier share
@@ -112,10 +117,10 @@ export function ShareReview({
 						Shared content
 					</h2>
 					<p>
-						Something was shared to the {target} form. Nothing from it is saved, previewed, or posted until
-						you choose Use shared content.
+						Something was shared to the {TAB_LABELS[earlier.share.tab]} form. Nothing from it is saved,
+						previewed, or posted until you choose Use shared content.
 					</p>
-					<Summary share={share} photos={inbox.pending} />
+					<Summary {...earlier} />
 					<div class="outpost-form-actions">
 						<button class="outpost-button" type="button" onClick={onUse}>
 							Use shared content

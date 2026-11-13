@@ -95,6 +95,18 @@ function region(): HTMLElement | null {
 	return root.querySelector('[data-outpost-share-review]');
 }
 
+/** Controls a person can reach: not inside a hidden or inert subtree, and not disabled. */
+function reachable(): Element[] {
+	return Array.from(root.querySelectorAll('button, input, textarea, select, a[href]')).filter(
+		(el) => !el.closest('[hidden], [inert]') && !(el as HTMLButtonElement).disabled,
+	);
+}
+
+function remount(): void {
+	render(null, root);
+	mount();
+}
+
 function preview_calls(): number {
 	return vi.mocked(fetch_preview).mock.calls.length + vi.mocked(fetch_source_preview).mock.calls.length;
 }
@@ -158,6 +170,12 @@ const CASES: ModeCase[] = [
 		share: { tab: 'life', lifeVariant: 'mood', content: SHARED_TEXT },
 		filled: { id: 'outpost-life-content', value: SHARED_TEXT },
 		typed: 'outpost-life-title',
+	},
+	{
+		mode: 'recipe',
+		share: { tab: 'recipe', title: 'Shared title', content: SHARED_TEXT, url: 'https://example.test/recipe' },
+		filled: { id: 'outpost-recipe-content', value: SHARED_TEXT },
+		typed: 'outpost-recipe-name',
 	},
 	{
 		mode: 'photo',
@@ -236,6 +254,258 @@ describe.each(CASES)('$mode share waits for "Use shared content"', (c) => {
 		if (c.photo) {
 			expect((await read_share_inbox(inbox_env)).pending).toBeNull();
 		}
+	});
+
+	it('shows only the decision while it is open, then returns focus to the tab', async () => {
+		await arrive(c);
+
+		const outside = reachable().filter(
+			(el) => !el.closest('[data-outpost-share-review]') && (el as HTMLInputElement).name !== 'outpost-header-mode',
+		);
+		expect(outside.map((el) => el.outerHTML.slice(0, 60))).toEqual([]);
+
+		click('Use shared content');
+		await wait(40);
+		expect(document.activeElement?.id).toBe(`outpost-tab-${c.mode}`);
+		expect(sessionStorage.getItem('outpost.share_target')).toBeNull();
+	});
+});
+
+describe('text and link share conflicts (T10-S3-05 v1.2)', () => {
+	it('holds a second share as the new one instead of replacing the first', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'reply', replyVariant: 'bookmark', url: 'https://example.test/second' });
+		remount();
+		await wait(30);
+
+		const r = region();
+		expect(r?.querySelector('h2')?.textContent).toBe('Two shares are waiting');
+		expect(r?.textContent).toContain('First shared words');
+		expect(r?.textContent).toContain('https://example.test/second');
+	});
+
+	it('keeps both waiting shares across a reload until the person decides', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		remount();
+		await wait(30);
+
+		expect(region()?.textContent).toContain('First shared words');
+		expect(region()?.textContent).toContain('Second shared words');
+	});
+
+	it('refuses a third share without replacing either and says so', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Third shared words' });
+		remount();
+		await wait(30);
+
+		expect(region()?.textContent).not.toContain('Third shared words');
+		expect(region()?.querySelector('[role="status"]')?.textContent).toMatch(/wasn.t kept/i);
+	});
+
+	it('Keep earlier share, then Use shared content, fills the first share', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		click('Keep earlier share');
+		await wait(30);
+		click('Use shared content');
+		await wait(40);
+
+		expect(field('outpost-note-content').value).toBe('First shared words');
+	});
+
+	it('Use new share, then Use shared content, fills the second share', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		click('Use new share');
+		await wait(30);
+		click('Use shared content');
+		await wait(40);
+
+		expect(field('outpost-note-content').value).toBe('Second shared words');
+	});
+
+	it('Discard both clears both waiting shares', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Second shared words' });
+		remount();
+		await wait(30);
+		click('Discard both');
+		await wait(30);
+		remount();
+		await wait(30);
+
+		expect(region()).toBeNull();
+	});
+
+	it('shows one decision when a photo share arrives after a text share', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		mount();
+		await wait(30);
+		await stash_shared_photos({ files: [new File([new Uint8Array([1])], 'later.jpg', { type: 'image/jpeg' })], title: 'Later', text: '', received: 2 }, inbox_env, 'pending');
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+		remount();
+		await wait(30);
+
+		expect(root.querySelectorAll('[data-outpost-share-review]').length).toBe(1);
+		expect(region()?.textContent).toContain('First shared words');
+		expect(region()?.textContent).toContain('later.jpg');
+
+		click('Use new share');
+		await wait(30);
+		expect(region()?.textContent).toContain('later.jpg');
+		expect(region()?.textContent).not.toContain('First shared words');
+		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Later');
+	});
+});
+
+describe('a decision made before the share inbox is read (T10-S3-05 v1.2)', () => {
+	/** Fake-indexeddb behind an open that answers only after `ms`. */
+	function slow_env(ms: number): ShareInboxEnvironment {
+		const real = globalThis.indexedDB;
+		return {
+			indexedDB: {
+				open(name: string, version?: number): IDBOpenDBRequest {
+					const proxy = { result: null as unknown, error: null, onsuccess: null as null | (() => void), onerror: null, onupgradeneeded: null as null | (() => void) };
+					setTimeout(() => {
+						const req = real.open(name, version);
+						req.onupgradeneeded = (): void => {
+							proxy.result = req.result;
+							proxy.onupgradeneeded?.();
+						};
+						req.onsuccess = (): void => {
+							proxy.result = req.result;
+							proxy.onsuccess?.();
+						};
+					}, ms);
+					return proxy as unknown as IDBOpenDBRequest;
+				},
+			} as unknown as IDBFactory,
+		};
+	}
+
+	it('stays made: the first inbox read does not bring a discarded share back', async () => {
+		stash_share_target({ tab: 'note', content: 'First shared words' });
+		inbox_env = slow_env(60);
+		mount();
+		await wait(5);
+		click('Discard shared content');
+		await wait(150);
+
+		expect(region()).toBeNull();
+		expect(sessionStorage.getItem('outpost.share_review')).toBeNull();
+	});
+});
+
+describe('share inbox storage failures (T10-S3-05 v1.2)', () => {
+	/** Wrap fake-indexeddb so read-write work fails the given way. */
+	function failing_env(mode: 'open' | 'write' | 'abort'): ShareInboxEnvironment {
+		const real = globalThis.indexedDB;
+		return {
+			indexedDB: {
+				open(name: string, version?: number): IDBOpenDBRequest {
+					if (mode === 'open') {
+						const req = { error: new DOMException('blocked'), onerror: null as null | (() => void) } as unknown as IDBOpenDBRequest;
+						setTimeout(() => (req.onerror as unknown as (() => void) | null)?.(), 0);
+						return req;
+					}
+					const req = real.open(name, version);
+					const original = req.addEventListener.bind(req);
+					void original;
+					const wrap = (): void => {
+						const db = req.result;
+						const tx = db.transaction.bind(db);
+						db.transaction = ((stores: string | string[], m?: IDBTransactionMode) => {
+							if (m === 'readwrite' && mode === 'write') throw new DOMException('write failed', 'UnknownError');
+							const t = tx(stores, m);
+							if (m === 'readwrite' && mode === 'abort') {
+								// Abort while the transaction is still active, after work is queued on it.
+								const store_of = t.objectStore.bind(t);
+								t.objectStore = ((store_name: string) => {
+									const store = store_of(store_name);
+									queueMicrotask(() => t.abort());
+									return store;
+								}) as IDBTransaction['objectStore'];
+							}
+							return t;
+						}) as IDBDatabase['transaction'];
+					};
+					const handler = { set: undefined as undefined | ((e: Event) => void) };
+					Object.defineProperty(req, 'onsuccess', {
+						set(fn: (e: Event) => void) {
+							handler.set = fn;
+							req.addEventListener('success', (e) => {
+								wrap();
+								handler.set?.(e);
+							});
+						},
+						get() {
+							return handler.set;
+						},
+					});
+					return req;
+				},
+			} as unknown as IDBFactory,
+		};
+	}
+
+	async function photo_share_waiting(): Promise<void> {
+		await stash_shared_photos({ files: [new File([new Uint8Array([1])], 'a.jpg', { type: 'image/jpeg' })], title: 'A', text: '', received: 1 }, inbox_env, 'pending');
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+	}
+
+	it.each(['write', 'abort'] as const)('a %s failure on Discard keeps the review and says the choice wasn\'t applied', async (mode) => {
+		await photo_share_waiting();
+		inbox_env = failing_env(mode);
+		mount();
+		await wait(30);
+		click('Discard shared content');
+		await wait(40);
+
+		expect(region()).not.toBeNull();
+		expect(region()?.querySelector('[role="status"]')?.textContent).toMatch(/wasn.t applied|try again/i);
+		expect(region()?.textContent).not.toMatch(/discarded/i);
+		expect(sessionStorage.getItem('outpost.share_review')).not.toBeNull();
+		expect((await read_share_inbox({ indexedDB: globalThis.indexedDB })).pending?.title).toBe('A');
+	});
+
+	it('an inbox that cannot be opened is reported, not treated as empty', async () => {
+		await photo_share_waiting();
+		inbox_env = failing_env('open');
+		mount();
+		await wait(30);
+
+		expect(region()).not.toBeNull();
+		expect(region()?.querySelector('[role="status"]')?.textContent).toMatch(/couldn.t read/i);
+		expect(button('Use shared content')).not.toBeNull();
+	});
+
+	it('read_share_inbox reports failure instead of an empty inbox', async () => {
+		const state = await read_share_inbox(failing_env('open'));
+		expect(state.status).toBe('unavailable');
+		expect((await read_share_inbox(inbox_env)).status).toBe('ok');
 	});
 });
 
