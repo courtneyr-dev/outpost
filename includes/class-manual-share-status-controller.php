@@ -154,18 +154,25 @@ final class Outpost_Manual_Share_Status_Controller {
 			return new WP_Error( 'rest_forbidden_post', __( 'You do not have permission to view this post\'s syndication.', 'outpost-mobile-publishing' ), array( 'status' => 403 ) );
 		}
 
+		return new WP_REST_Response( self::build_status_payload( $post_id ), 200 );
+	}
+
+	/**
+	 * Build the full audit log, summary, and status for one post.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array{post_id: int, status: string, summary: array{total: int, complete: int, pending: int, abandoned: int}, entries: array<int, array<string, mixed>>}
+	 */
+	public static function build_status_payload( int $post_id ): array {
 		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
 		$status  = Outpost_Manual_Share_Status_Computer::compute_status_for_entries( $entries );
 		$summary = Outpost_Manual_Share_Status_Computer::summarize_entries( $entries );
 
-		return new WP_REST_Response(
-			array(
-				'post_id' => $post_id,
-				'status'  => $status,
-				'summary' => $summary,
-				'entries' => $entries,
-			),
-			200
+		return array(
+			'post_id' => $post_id,
+			'status'  => $status,
+			'summary' => $summary,
+			'entries' => $entries,
 		);
 	}
 

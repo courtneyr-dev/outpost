@@ -218,6 +218,19 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 0, $payload['summary']['complete'] );
 	}
 
+	public function test_status_rest_response_is_identical_to_builder_payload(): void {
+		$this->seed_entry( 42, 'instagram-feed' );
+
+		$response = Outpost_Manual_Share_Status_Controller::handle_status_request(
+			$this->build_request( array( 'post_id' => 42 ) )
+		);
+
+		$this->assertSame(
+			Outpost_Manual_Share_Status_Controller::build_status_payload( 42 ),
+			$response->get_data()
+		);
+	}
+
 	public function test_status_endpoint_403_for_user_without_edit(): void {
 		$this->user_can_edit_post = false;
 		$result = Outpost_Manual_Share_Status_Controller::handle_status_request(

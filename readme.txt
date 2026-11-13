@@ -41,6 +41,14 @@ Long-form documentation — installation, settings, common tasks, troubleshootin
 
 WordPress 6.5 or newer, PHP 8.2 or newer.
 
+== Abilities ==
+
+Outpost registers these public, read-only abilities when WordPress provides the Abilities API. Switch options for abilities that can write default to off; read abilities have no switch.
+
+* `outpost/get-syndicate-targets` — Capability: `edit_posts`. Switch: none (read ability).
+* `outpost/get-share-status` — Capability: `edit_post` for an existing post. Switch: none (read ability).
+* `outpost/get-composer-config` — Capability: `edit_posts`. Switch: none (read ability).
+
 = Required plugins =
 
 Outpost publishes through the IndieWeb's own standards rather than a proprietary service, so it needs the two plugins that provide them. Both are free on WordPress.org, and Outpost tells you which one is missing:
@@ -239,6 +247,7 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 == Changelog ==
 
 = 1.0.27 =
+* Added: three read-only WordPress abilities for syndication targets, share status and composer settings.
 * Changed: the seven composer modes use two rows of native buttons, so every mode stays visible and reachable with Tab.
 * Fixed: More options opens and closes even when a page optimizer blocks Outpost's stylesheet.
 * Fixed: publish errors appear beside the Publish button, and Outpost accepts photos up to 50 MB before resizing them.

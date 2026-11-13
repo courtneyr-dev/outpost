@@ -236,6 +236,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-pending-syndication-notice.php
 // Phase F13 audit-log surfacing.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-admin-column.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/abilities/class-outpost-abilities.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
@@ -254,6 +255,10 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-start-screen.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-appearance-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-appearance-settings-page.php';
+
+// Hook before init so an earlier consumer cannot initialize the lazy ability
+// registries before Outpost attaches its category and ability callbacks.
+Outpost_Abilities::register();
 
 /**
  * Wire up Outpost's component registrations at `init` priority 0.

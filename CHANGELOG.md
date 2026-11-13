@@ -9,12 +9,16 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.27] - 2026-11-13
 
+### Added
+
+- Added three public, read-only WordPress abilities: `outpost/get-syndicate-targets`, `outpost/get-share-status`, and `outpost/get-composer-config`. They reuse the REST payload builders without applying REST permission filters, bearer-token scopes, or the composer-config route's rate-limit transient (#321).
+
 ### Changed
 
-- The seven composer modes use two rows of native buttons instead of a scrolling tab strip (item 3).
-- More options opens and closes even when a page optimizer blocks Outpost's stylesheet (item 4).
-- Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (item 6).
-- Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (item 5).
+- The seven composer modes use two rows of native buttons instead of a scrolling tab strip (#316).
+- More options opens and closes even when a page optimizer blocks Outpost's stylesheet (#317).
+- Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (#318).
+- Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (#319).
 
 ## [1.0.26] - 2026-11-10
 
