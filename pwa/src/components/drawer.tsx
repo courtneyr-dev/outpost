@@ -23,6 +23,7 @@ import type { ComponentChildren } from 'preact';
  * Drawer renders unconditionally (always in the DOM) — the open prop
  * toggles a data attribute that drives the slide CSS. Keeps animation
  * smooth on close, and lets focus-restore reliably target the trigger.
+ * Native `hidden` is the fallback when a page optimizer blocks the CSS.
  */
 
 export interface DrawerProps {
@@ -132,9 +133,11 @@ export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps
 
 	return (
 		<>
+			{/* On 2026-10-28 a page optimizer blocked the stylesheet; hidden keeps a closed drawer out of view. */}
 			<div
 				class="outpost-drawer-scrim"
 				data-open={open ? 'true' : 'false'}
+				hidden={!open}
 				onClick={onClose}
 				aria-hidden="true"
 			/>
@@ -142,6 +145,7 @@ export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps
 				ref={drawer_ref}
 				class="outpost-drawer"
 				data-open={open ? 'true' : 'false'}
+				hidden={!open}
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={title_id}

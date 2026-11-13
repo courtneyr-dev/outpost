@@ -454,6 +454,8 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			->once()
 			->with( 'name', 'Tech', 'category' )
 			->andReturn( new WP_Term( array( 'term_id' => 7 ) ) );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 3 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 1 );
 		WP_Mock::userFunction( 'wp_set_post_categories' )
 			->once()
 			->with( 42, array( 7 ), true );
@@ -479,6 +481,8 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			->andReturn( array( 'term_id' => 99 ) );
 		WP_Mock::userFunction( 'is_wp_error' )
 			->andReturn( false );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 3 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 1 );
 		WP_Mock::userFunction( 'wp_set_post_categories' )
 			->once()
 			->with( 42, array( 99 ), true );
@@ -505,6 +509,8 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 						: new WP_Term( array( 'term_id' => 12 ) );
 				}
 			);
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 3 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 1 );
 		WP_Mock::userFunction( 'wp_set_post_categories' )
 			->once()
 			->with( 42, array( 12 ), true );
@@ -513,6 +519,63 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			array( 42, array( 'mp-categories' => array( 'Tech-Stuff' ) ) )
 		);
 		$this->assertEquals( 2, $call_count );
+	}
+
+	public function test_apply_categories_replaces_only_the_core_fallback(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'Activity' )->andReturn( 'Activity' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->once()
+			->with( 'name', 'Activity', 'category' )
+			->andReturn( new WP_Term( array( 'term_id' => 1105 ) ) );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 7 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 7 );
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 1105 ), false );
+
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Activity' ) ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_categories_appends_to_another_existing_category(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'Activity' )->andReturn( 'Activity' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->once()
+			->with( 'name', 'Activity', 'category' )
+			->andReturn( new WP_Term( array( 'term_id' => 1105 ) ) );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 3 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 7 );
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 1105 ), true );
+
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'Activity' ) ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	public function test_apply_categories_keeps_the_core_fallback_when_requested(): void {
+		WP_Mock::userFunction( 'sanitize_text_field' )->once()->with( 'WordPress' )->andReturn( 'WordPress' );
+		WP_Mock::userFunction( 'get_term_by' )
+			->once()
+			->with( 'name', 'WordPress', 'category' )
+			->andReturn( new WP_Term( array( 'term_id' => 7 ) ) );
+		WP_Mock::userFunction( 'wp_get_post_categories' )->once()->with( 42 )->andReturn( array( 7 ) );
+		WP_Mock::userFunction( 'get_option' )->once()->with( 'default_category' )->andReturn( 7 );
+		WP_Mock::userFunction( 'wp_set_post_categories' )
+			->once()
+			->with( 42, array( 7 ), true );
+
+		$this->invoke_private(
+			'apply_categories',
+			array( 42, array( 'mp-categories' => array( 'WordPress' ) ) )
+		);
+		$this->assertTrue( true );
 	}
 
 	// --- Place name bridge (mp-place-name → _outpost_place_name post meta) ---

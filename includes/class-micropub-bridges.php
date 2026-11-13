@@ -604,9 +604,10 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * Each value is looked up by name, then by slug, in the `category`
 	 * taxonomy. Existing terms are reused; new terms are created on the
-	 * fly via wp_insert_term. Append-mode is used so any categories the
-	 * Micropub plugin already assigned (from the `category[]` lookup)
-	 * stay in place.
+	 * fly via wp_insert_term. When the post holds only core's fallback
+	 * category and the request did not name it, the resolved categories
+	 * replace that fallback. Otherwise they append so categories the
+	 * Micropub plugin already assigned stay in place.
 	 *
 	 * Runs unconditionally — `category` is a core WordPress taxonomy on
 	 * every site, no companion-plugin gating needed.
@@ -650,7 +651,11 @@ final class Outpost_Micropub_Bridges {
 		if ( empty( $ids ) ) {
 			return;
 		}
-		wp_set_post_categories( $post_id, $ids, true );
+		$current = wp_get_post_categories( $post_id );
+		$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
+		$core    = (int) get_option( 'default_category' );
+		$append  = array( $core ) !== $current || in_array( $core, $ids, true );
+		wp_set_post_categories( $post_id, $ids, $append );
 	}
 
 	/**

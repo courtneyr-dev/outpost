@@ -34,7 +34,7 @@ export interface ProcessOptions {
 	maxDimension?: number;
 	/** JPEG quality 0–1 (default 0.9). */
 	quality?: number;
-	/** Hard size cap in bytes (default 10 MB). */
+	/** Hard size cap in bytes (default 50 MB). */
 	maxBytes?: number;
 }
 
@@ -55,7 +55,7 @@ export async function process_photo(
 ): Promise<ProcessedPhoto> {
 	const max_dimension = options.maxDimension ?? 2048;
 	const quality = options.quality ?? 0.9;
-	const max_bytes = options.maxBytes ?? 10 * 1024 * 1024;
+	const max_bytes = options.maxBytes ?? 50 * 1024 * 1024;
 
 	if (!is_supported_image_type(file.type)) {
 		throw new PhotoError(

@@ -78,6 +78,23 @@ describe('process_photo validation', () => {
 		});
 	});
 
+	it('accepts a 15 MB JPEG through the default size gate', async () => {
+		const file = make_file('image/jpeg', 15 * 1024 * 1024);
+		const result = await Promise.race([
+			process_photo(file).then(
+				() => null,
+				(error: unknown) => error,
+			),
+			new Promise<null>((resolve) => setTimeout(() => resolve(null), 25)),
+		]);
+		if (result) expect(result).not.toMatchObject({ code: 'too_large' });
+	});
+
+	it('rejects a JPEG over the 50 MB default cap', async () => {
+		const file = make_file('image/jpeg', 50 * 1024 * 1024 + 1);
+		await expect(process_photo(file)).rejects.toMatchObject({ code: 'too_large' });
+	});
+
 	it('error is an instance of PhotoError', async () => {
 		const file = make_file('application/pdf', 100);
 		await expect(process_photo(file)).rejects.toBeInstanceOf(PhotoError);
