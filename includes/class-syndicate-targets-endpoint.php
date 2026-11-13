@@ -121,18 +121,27 @@ final class Outpost_Syndicate_Targets_Endpoint {
 			? $raw_mode
 			: null;
 
+		return new WP_REST_Response( self::build_payload( $mode ), 200 );
+	}
+
+	/**
+	 * Build the mode-aware syndication target payload.
+	 *
+	 * @param string|null $mode Requested composer mode, or null for all modes.
+	 * @return array{mode_requested: string|null, mode_applied: string|null, mode_recognized: bool, chips: array<int, array<string, mixed>>}
+	 */
+	public static function build_payload( ?string $mode ): array {
+
 		$known_modes     = Outpost_Companion_Registry::known_modes();
 		$mode_recognized = null !== $mode && in_array( $mode, $known_modes, true );
 		$applied_filter  = $mode_recognized ? $mode : null;
 		$chips           = Outpost_Companion_Registry::chips_for_mode( $mode );
 
-		$payload = array(
+		return array(
 			'mode_requested'  => $mode,
 			'mode_applied'    => $applied_filter,
 			'mode_recognized' => $mode_recognized || null === $mode,
 			'chips'           => $chips,
 		);
-
-		return new WP_REST_Response( $payload, 200 );
 	}
 }
