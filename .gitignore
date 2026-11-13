@@ -114,3 +114,6 @@ wp-includes/
 # Docs site build output (docs/ is an Astro Starlight project)
 docs/dist/
 docs/.astro/
+
+# Playwright session token minted by tests/e2e/global-setup.ts
+tests/e2e/.auth/
