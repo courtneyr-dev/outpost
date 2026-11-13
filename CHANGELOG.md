@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added three public, read-only WordPress abilities: `outpost/get-syndicate-targets`, `outpost/get-share-status`, and `outpost/get-composer-config`. They reuse the REST payload builders without applying REST permission filters, bearer-token scopes, or the composer-config route's rate-limit transient.
+
 ## [1.0.26] - 2026-11-10
 
 ### Security
