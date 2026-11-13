@@ -736,9 +736,20 @@ function is_share_target_request(url) {
 // Nothing is uploaded until the user posts. Text-only shares pass through
 // to the PHP dispatcher, which routes them by content. The database and
 // store names must match pwa/src/lib/share-inbox.ts.
+//
+// Any page can submit a form to this path, so a share is untrusted input:
+// only supported raster images within the limits below are parked (sizes
+// are checked before any bytes are read), and a share still waiting in the
+// inbox is never replaced. Everything else passes through to the server,
+// which keeps nothing.
 const SHARE_INBOX_DB = 'outpost-share-inbox';
 const SHARE_INBOX_STORE = 'inbox';
 const SHARE_INBOX_KEY = 'pending';
+const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/avif'];
+// Same per-file cap the composer applies before upload (pwa/src/lib/photo.ts).
+const SHARE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const SHARE_MAX_FILES = 10;
+const SHARE_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 
 function open_share_inbox() {
 	return new Promise((resolve, reject) => {
@@ -754,15 +765,21 @@ function open_share_inbox() {
 	});
 }
 
+// Park the share only when the inbox is empty. add() fails on an existing
+// key, so a share that is still waiting is never replaced; resolves false
+// when it was kept.
 async function park_shared_photos(payload) {
 	const db = await open_share_inbox();
 	try {
-		await new Promise((resolve, reject) => {
+		return await new Promise((resolve) => {
 			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
-			tx.objectStore(SHARE_INBOX_STORE).put(payload, SHARE_INBOX_KEY);
-			tx.oncomplete = () => resolve();
-			tx.onerror = () => reject(tx.error);
-			tx.onabort = () => reject(tx.error);
+			const req = tx.objectStore(SHARE_INBOX_STORE).add(payload, SHARE_INBOX_KEY);
+			req.onerror = (event) => {
+				event.preventDefault();
+			};
+			tx.oncomplete = () => resolve(true);
+			tx.onerror = () => resolve(false);
+			tx.onabort = () => resolve(false);
 		});
 	} finally {
 		db.close();
@@ -782,9 +799,11 @@ async function handle_share_post(event) {
 	const photos = form.getAll('photos').filter((entry) =>
 		entry && typeof entry === 'object' &&
 		typeof entry.size === 'number' && entry.size > 0 &&
-		/^image\//.test(entry.type || '')
+		entry.size <= SHARE_MAX_FILE_BYTES &&
+		SHARE_IMAGE_TYPES.includes(String(entry.type || '').toLowerCase())
 	);
-	if (photos.length === 0) {
+	const total = photos.reduce((sum, photo) => sum + photo.size, 0);
+	if (photos.length === 0 || photos.length > SHARE_MAX_FILES || total > SHARE_MAX_TOTAL_BYTES) {
 		return fetch(passthrough);
 	}
 	try {

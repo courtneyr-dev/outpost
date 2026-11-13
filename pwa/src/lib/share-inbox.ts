@@ -13,8 +13,10 @@
  * Each photo is parked as a plain record — name, type, bytes — rather than
  * a File, because Blob storage in IndexedDB has a patchy history across
  * engines and bytes rebuild into a File for free. One record under a fixed
- * key: a newer share replaces an older one that was never consumed.
- * Nothing here is uploaded until the user posts.
+ * key: the service worker never replaces a share that is still waiting, and
+ * it parks only supported raster images within its size and count limits.
+ * Nothing here is uploaded until the user posts, and Photo mode saves no
+ * draft from a share until the person edits the form.
  *
  * The database, store, and key names must match the service worker.
  */

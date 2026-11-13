@@ -190,6 +190,12 @@ export interface UseDraftOptions {
 	meta?: DraftFields;
 	/** True when the form opened from a saved draft. */
 	restored?: boolean;
+	/**
+	 * While true, nothing is saved: the fields hold input the person hasn't
+	 * confirmed yet (a share that any page could have sent). Saving resumes
+	 * with the next change after it turns false.
+	 */
+	hold?: boolean;
 	storage?: DraftStorage | null;
 }
 
@@ -205,6 +211,7 @@ export function useDraft({
 	fields,
 	meta = {},
 	restored = false,
+	hold = false,
 	storage,
 }: UseDraftOptions): UseDraftResult {
 	const [state, setState] = useState<DraftSaveState>(restored ? 'restored' : 'idle');
@@ -231,6 +238,7 @@ export function useDraft({
 		}
 		cancel();
 		setState('idle');
+		if (hold) return;
 		timer.current = setTimeout(() => {
 			timer.current = null;
 			const { fields: f, meta: m } = latest.current;
@@ -239,7 +247,7 @@ export function useDraft({
 			setState(blank ? 'idle' : ok ? 'saved' : 'unavailable');
 		}, DRAFT_SAVE_DELAY_MS);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- `snapshot` is the serialized fields+meta; the objects themselves are new every render.
-	}, [snapshot, mode, me]);
+	}, [snapshot, mode, me, hold]);
 
 	useEffect(() => cancel, []);
 
