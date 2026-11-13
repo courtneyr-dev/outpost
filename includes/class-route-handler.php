@@ -68,10 +68,6 @@ final class Outpost_Route_Handler {
 			// extension as long as the response is JavaScript.
 			'^post/sw/?$'            => 'sw',
 			'^post/share-target/?$'  => 'share-target',
-			// iOS Shortcut bridge (Phase F6). Web Share Target API
-			// never landed in iOS Safari; the Shortcut hits this
-			// JSON endpoint instead.
-			'^post/shortcut/?$'      => 'shortcut',
 			'^post/auth/callback/?$' => 'auth-callback',
 			'^post/?$'               => 'composer',
 		);
@@ -148,11 +144,6 @@ final class Outpost_Route_Handler {
 				// to the PWA shell only when no share data is present.
 				Outpost_Share_Target_Controller::handle_request();
 				Outpost_PWA_Shell::render();
-				break;
-			case 'shortcut':
-				// F6: iOS Shortcut bridge endpoint. Always halts after
-				// handle_request — POST-only, JSON-in, redirect-out.
-				Outpost_Shortcut_Controller::handle_request();
 				break;
 			case 'composer':
 			case 'auth-callback':

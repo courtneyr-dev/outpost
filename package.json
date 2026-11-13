@@ -1,6 +1,6 @@
 {
   "name": "outpost-mobile-publishing",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "files": [
     "admin",
     "assets",
@@ -12,6 +12,7 @@
     "uninstall.php",
     "readme.txt",
     "LICENSE",
+    "THIRD-PARTY-LICENSES.txt",
     "!**/.gitkeep",
     "!build/pwa/**/*.map"
   ],

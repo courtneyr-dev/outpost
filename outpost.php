@@ -3,9 +3,10 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.26
+ * Version:           1.0.27
  * Requires at least: 6.5
  * Requires PHP:      8.2
+ * Requires Plugins:  indieauth, micropub
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
  * License:           GPLv2 or later
@@ -22,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.26' );
+define( 'OUTPOST_VERSION', '1.0.27' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -130,7 +131,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
 // Phase F6 dispatcher + share-target / Shortcut bridge controllers.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-share-target-controller.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-shortcut-controller.php';
 // Phase F7 first concrete inbound source.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-spotify.php';
 // Phase F15 second concrete inbound source.
@@ -241,8 +241,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
 // FX iOS Shortcut bridge.
-require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token-authenticator.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-app-password.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-ios-shortcut-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-ios-shortcut-settings-page.php';
 // FY Theming — token resolver, theme.json reader, contrast, mode controller.
@@ -332,8 +331,8 @@ add_action(
 		Outpost_Admin_Page::register();
 		// Register Settings API options (Phase H).
 		Outpost_Settings::register();
-		// FX iOS Shortcut bridge — REST endpoint + auth filter + admin page.
-		Outpost_IOS_Shortcut_Token_Authenticator::register();
+		// FX iOS Shortcut bridge — application-password scope + REST endpoint + admin page.
+		Outpost_IOS_Shortcut_App_Password::register();
 		Outpost_IOS_Shortcut_REST_Controller::register();
 		Outpost_IOS_Shortcut_Settings_Page::register();
 		// FY Theming — REST endpoint + appearance settings sub-menu.

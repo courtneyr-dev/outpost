@@ -24,7 +24,7 @@ WordPress removes the plugin files and runs Outpost's uninstall script.
 Deleting the plugin runs Outpost's uninstaller on a single site and on every site of a multisite network. In version 1.0.24 it removes:
 
 - **Outpost options:** settings, destination API keys, the generated encryption key, Bridgy silo choices, Telegraph settings, and the `/post` rewrite bookkeeping.
-- **Per-person data:** encrypted service credentials, iOS Shortcut tokens, Light, Dark, or System choices, token overrides, and dismissed-notice markers.
+- **Per-person data:** encrypted service credentials, the iOS Shortcut application password Outpost created (other application passwords stay), legacy iOS Shortcut tokens, Light, Dark, or System choices, token overrides, and dismissed-notice markers.
 - **Outpost's own post meta:** syndication targets and recorded syndication links, POSSE retry state, manual-share and Bridgy logs, Telegraph page links, XFN relationship choices, and check-in place names.
 - **Cached data** (transients) and any scheduled syndication retries.
 

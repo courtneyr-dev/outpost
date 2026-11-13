@@ -9,20 +9,16 @@
  *
  * AUTH
  *
- * Authentication is handled by `Outpost_IOS_Shortcut_Token_Authenticator`
- * via the `rest_authentication_errors` filter. By the time
- * permission_callback runs, the current user is set if (and only
- * if) the token resolved. We require `edit_posts` so even a valid
- * token belonging to a Subscriber-level user can't dispatch.
+ * WordPress core authenticates the request: the Shortcut sends a
+ * WordPress Application Password over HTTP Basic auth, and
+ * `Outpost_IOS_Shortcut_App_Password` keeps an Outpost-created
+ * password limited to this route. Outpost never sets the current
+ * user itself. We require `edit_posts` so a Subscriber-level user
+ * can't dispatch.
  *
- * RELATIONSHIP TO F6'S /post/shortcut
- *
- * F6 ships `/post/shortcut` (a PWA route handled at template_redirect)
- * which returns 303 redirects for cookie-authed users. FX adds this
- * REST endpoint as the iOS-Shortcut-friendly contract: JSON in,
- * JSON out, Bearer token auth. Both endpoints can coexist; iOS
- * Shortcut users point at this one, the F6 endpoint stays for
- * cookie-authed direct hits.
+ * This REST endpoint is the only Shortcut contract: JSON in, JSON out.
+ * The earlier cookie-only `/post/shortcut` page route was removed in
+ * 1.0.27.
  *
  * @package Outpost
  */
@@ -160,11 +156,6 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 				(string) ( $decision['source_id'] ?? '' )
 			);
 		}
-
-		// Authenticator already recorded first-seen on Bearer success.
-		// For cookie-authed POSTs to this REST route (atypical but
-		// possible), record here too.
-		Outpost_IOS_Shortcut_Token::record_first_seen_if_unset( get_current_user_id() );
 
 		return new \WP_REST_Response(
 			array(

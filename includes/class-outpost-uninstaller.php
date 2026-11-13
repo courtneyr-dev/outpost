@@ -44,7 +44,16 @@ final class Outpost_Uninstaller {
 		'outpost_telegraph_author_name',
 		'outpost_telegraph_author_url',
 		'outpost_appearance_schema',
+		'outpost_ios_shortcut_legacy_purged',
 	);
+
+	/**
+	 * `app_id` of the iOS Shortcut application passwords Outpost creates
+	 * (Outpost_IOS_Shortcut_App_Password::APP_ID; repeated here because the
+	 * plugin isn't loaded during uninstall). Only passwords with this id are
+	 * deleted; passwords the person made for anything else stay.
+	 */
+	private const SHORTCUT_APP_ID = 'eb290b80-79b0-4104-b470-4d6188280ccc';
 
 	/** Exact user-meta keys Outpost owns (deleted for every user). */
 	private const USER_META_KEYS = array(
@@ -88,6 +97,10 @@ final class Outpost_Uninstaller {
 	 * Run the full uninstall — every site on multisite, otherwise the one site.
 	 */
 	public static function run(): void {
+		// Application passwords live in network-wide user meta, so they are
+		// removed once, not per site.
+		self::delete_shortcut_application_passwords();
+
 		if ( is_multisite() ) {
 			$site_ids = get_sites(
 				array(
@@ -104,6 +117,30 @@ final class Outpost_Uninstaller {
 			return;
 		}
 		self::clean_current_site();
+	}
+
+	/**
+	 * Delete the iOS Shortcut application passwords Outpost created, for every
+	 * user who has one, and leave every other application password alone.
+	 */
+	public static function delete_shortcut_application_passwords(): void {
+		if ( ! class_exists( 'WP_Application_Passwords' ) ) {
+			return;
+		}
+		$user_ids = get_users(
+			array(
+				'blog_id'  => 0,
+				'meta_key' => '_application_passwords', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one-time uninstall sweep.
+				'fields'   => 'ID',
+			)
+		);
+		foreach ( (array) $user_ids as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( (int) $user_id ) as $item ) {
+				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) && isset( $item['uuid'] ) ) {
+					WP_Application_Passwords::delete_application_password( (int) $user_id, (string) $item['uuid'] );
+				}
+			}
+		}
 	}
 
 	/**

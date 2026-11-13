@@ -7,6 +7,24 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.27] - Unreleased
+
+### Security
+
+- The iOS Shortcut authenticates with a core WordPress Application Password that Outpost creates with a fixed `app_id` (`Outpost_IOS_Shortcut_App_Password`). Core's `wp_authenticate_application_password_errors` hook limits that password to the resolved `/outpost/v1/shortcut` route; Outpost no longer hooks `determine_current_user` or `rest_authentication_errors` for it. `Outpost_IOS_Shortcut_Token` and `Outpost_IOS_Shortcut_Token_Authenticator` are removed, and legacy plaintext tokens are purged once on `admin_init`. The settings page shows a new password once and stores nothing; uninstall deletes only Outpost's application passwords.
+- Removed the composer-config `rest_authentication_errors` override (`allow_anonymous_for_self()`, priority 999). Another plugin's REST gate now stands on that route like any other.
+
+### Removed
+
+- The retired cookie-only `/post/shortcut` rewrite route and `Outpost_Shortcut_Controller`, which no client could pass and which read `php://input` with `json_decode()`.
+
+### Changed
+
+- The encryption-key notice renders only where `outpost_is_notice_screen()` allows (Plugins screens and Outpost pages), keeps its dismissal across versions (one key per reason), links to the public settings docs instead of an unregistered admin page, and uses its own `outpost_dismiss_key_notice` query key instead of core's `action`.
+- `outpost.php` declares `Requires Plugins: indieauth, micropub`, so core enforces the dependencies.
+- The preview fetcher's `curl_setopt( CURLOPT_RESOLVE )` DNS pin carries an inline `phpcs:ignore` with its reason, and `phpcs.xml.dist` no longer excludes the sniff for that file, so `composer lint` matches Plugin Check.
+- readme: External services covers the media-lookup services and cover-image hosts; the Threads terms link points at the Threads Terms of Use; Source Code documents `src/` and `npm run build:wp`; Preact's MIT license ships in `THIRD-PARTY-LICENSES.txt`.
+
 ## [1.0.26] - 2026-11-10
 
 ### Security

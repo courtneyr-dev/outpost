@@ -209,7 +209,7 @@ final class Outpost_Share_Target_Controller {
 	 * preview ahead of the redirect so the cache is warm by the
 	 * time the composer asks for it.
 	 *
-	 * Public so `Outpost_Shortcut_Controller` can call it directly
+	 * Public so `Outpost_IOS_Shortcut_REST_Controller` can call it directly
 	 * without duplicating the transient-key + payload logic.
 	 *
 	 * @param string $url       Source URL.
@@ -274,7 +274,7 @@ final class Outpost_Share_Target_Controller {
 	 * 2026-05-09 review-theater incident).
 	 *
 	 * Pattern mirrors gotcha #10's `set_payload_source_for_tests` on
-	 * `Outpost_Shortcut_Controller` (PR #74). See
+	 * the former `Outpost_Shortcut_Controller` (PR #74; removed in 1.0.27). See
 	 * `docs/dev/integration-test-gotchas.md`.
 	 *
 	 * @var callable|null

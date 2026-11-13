@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.26
+Stable tag:        1.0.27
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -170,7 +170,13 @@ Outpost also recognizes links you share from many sites (YouTube, Reddit, TikTok
     * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
     * **Spotify** — open.spotify.com/oembed. [Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/).
     * **SoundCloud** — soundcloud.com/oembed. [Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy).
-* **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
+* **Media lookups** — the "Look it up" search is available only when the Post Kinds for IndieWeb in Block Themes companion plugin is active. Outpost hands your search text to that plugin, and the plugin sends it to the lookup service for the kind of entry: TMDB (films and TV), Open Library (books), MusicBrainz (music), RAWG (video games), BoardGameGeek (board games), or Foursquare (places). When results include cover art, your browser loads each image directly from that service's image host (for example image.tmdb.org, covers.openlibrary.org, or coverartarchive.org), which receives your IP address and browser details. Nothing is sent until you search.
+    * **TMDB** — [Terms](https://www.themoviedb.org/api-terms-of-use), [Privacy](https://www.themoviedb.org/privacy-policy).
+    * **Open Library (Internet Archive)** — [Terms and Privacy](https://archive.org/about/terms.php).
+    * **MusicBrainz and Cover Art Archive (MetaBrainz Foundation)** — [Terms](https://musicbrainz.org/doc/About/Data_License), [Privacy](https://metabrainz.org/privacy).
+    * **RAWG** — [Terms](https://rawg.io/terms), [Privacy](https://rawg.io/privacy_policy).
+    * **BoardGameGeek** — [Terms](https://boardgamegeek.com/terms), [Privacy](https://boardgamegeek.com/privacy).
+    * **Foursquare** — [Terms](https://foursquare.com/legal/terms), [Privacy](https://foursquare.com/legal/privacy).
 
 = Geocoding =
 
@@ -193,7 +199,7 @@ These destinations have no posting API Outpost can use, so sharing to them is a 
 
 * **Facebook** — www.facebook.com/sharer.php. [Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/).
 * **X** — twitter.com/intent/tweet. [Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy).
-* **Threads** — www.threads.net/intent/post. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
+* **Threads** — www.threads.net/intent/post. [Terms](https://help.instagram.com/769983657850450), [Privacy](https://privacycenter.instagram.com/policy).
 * **Pinterest** — www.pinterest.com/pin/create/button/. [Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy).
 * **Reddit** — www.reddit.com/submit. [Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy).
 * **LinkedIn** — the LinkedIn app, or www.linkedin.com to finish by hand. [Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy).
@@ -213,7 +219,11 @@ These destinations have no posting API Outpost can use, so sharing to them is a 
 
 The composer interface ships as compiled JavaScript in `build/pwa/`. Its human-readable source is the `pwa/src/` directory (TypeScript + Preact) in the public development repository: [github.com/courtneyr-dev/outpost](https://github.com/courtneyr-dev/outpost). The repository also carries the full PHP source, the test suites, and the build tooling.
 
-To rebuild the compiled assets from source: `npm install`, then `npm run build` (Node 20.10 or newer). Vite writes the production bundle to `build/pwa/`, and the shipped bundle is the unmodified output of that build for this version.
+The block-editor sidebar ships as compiled JavaScript and CSS in `build/index.js`, `build/index.css`, and `build/index-rtl.css`. Its source is the `src/` directory in the same repository.
+
+To rebuild the compiled assets from source: `npm install`, then `npm run build:all` (Node 20.10 or newer). That runs `npm run build:wp` (wp-scripts writes the sidebar to `build/index.*`) and `npm run build` (Vite writes the composer bundle to `build/pwa/`). The shipped files are the unmodified output of those builds for this version.
+
+The composer bundle includes Preact (MIT License, Copyright (c) 2015-present Jason Miller). The license text ships in `THIRD-PARTY-LICENSES.txt` at the plugin root.
 
 == Screenshots ==
 
@@ -221,7 +231,7 @@ To rebuild the compiled assets from source: `npm install`, then `npm run build` 
 2. The Outpost admin page with per-variant bookmarklets, the composer link, and phone install steps.
 3. OAuth Connections — connect life-tracking providers such as Notion, Polar Flow, Oura, Ride With GPS, Ravelry, and WHOOP.
 4. Appearance settings — Light, Dark, or System and per-token color overrides, with automatic contrast adjustment.
-5. The Outpost iOS Shortcut Bridge — site URL, per-user token, and connection status for share-sheet posting from iPhone.
+5. The Outpost iOS Shortcut Bridge — site URL, user name, and the Shortcut's WordPress application password for share-sheet posting from iPhone.
 6. Note mode on a phone, signed in — write a note and pick syndication targets before posting.
 7. The composer offline — posts made without a connection wait in the queue until you reconnect.
 
@@ -233,10 +243,19 @@ Outpost evolves from prior IndieWeb work for WordPress.
 * Micropub plugin by David Shanske — the server endpoint Outpost depends on.
 * IndieAuth plugin by Matthias Pfefferle and David Shanske — authentication.
 * Bridgy by Ryan Barrett — round-trip syndication service.
+* Preact by Jason Miller and contributors (MIT License) — the UI library inside the composer bundle.
 
 The IndieWeb WordPress community built the foundation Outpost sits on top of.
 
 == Changelog ==
+
+= 1.0.27 =
+* Security: the iOS Shortcut signs in with a WordPress application password that Outpost creates for you, instead of an Outpost token. Login is handled by WordPress, and the password works only for the Shortcut's endpoint. Older Shortcut tokens are deleted on upgrade; create a password under Settings → Outpost iOS Shortcut and update the Shortcut.
+* Security: Outpost no longer overrides another plugin's REST authentication decision for the composer settings endpoint.
+* Removed: the retired /post/shortcut address. The Shortcut uses /wp-json/outpost/v1/shortcut.
+* Changed: the encryption-key notice shows only on the Plugins screen and Outpost's own pages, stays dismissed after updates, and links to the setup instructions.
+* Changed: the plugin header declares its required plugins, so WordPress asks for IndieAuth and Micropub before activating Outpost.
+* Docs: External services lists the media-lookup services and their cover-image hosts; the readme credits Preact and explains how to rebuild the editor sidebar.
 
 = 1.0.26 =
 * Security: Outpost no longer switches the current user. Every REST permission check uses the user WordPress already resolved, plus the token's scope, and a token in a JSON body authenticates nothing, as the Micropub spec says.
@@ -387,6 +406,9 @@ The IndieWeb WordPress community built the foundation Outpost sits on top of.
 * Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
 
 == Upgrade Notice ==
+
+= 1.0.27 =
+If you use the ready-made iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut and paste it into the Shortcut.
 
 = 1.0.26 =
 Security hardening from the WordPress.org plugin review. No settings change.

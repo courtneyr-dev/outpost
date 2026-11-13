@@ -759,7 +759,8 @@ final class Outpost_Preview_Endpoint {
 			$pin_entry   = self::resolve_pin_entry( $current, $ip );
 			$pin_resolve = static function ( $handle ) use ( $pin_entry ): void {
 				// WP_Http has no DNS-pin option, so set CURLOPT_RESOLVE directly: curl connects only to the IP the SSRF guard vetted.
-				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) );
+				// The request itself still goes through wp_safe_remote_get(); this only adjusts the handle WordPress created.
+				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- http_api_curl handler; pins the IP the SSRF guard vetted (DNS rebinding).
 			};
 
 			// `http_api_curl` is an action (`do_action_ref_array()` in

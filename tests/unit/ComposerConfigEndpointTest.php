@@ -195,160 +195,24 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$result = $this->invoke_private( 'resolve_post_formats', array( 'active' ) );
 		$this->assertEquals( array( 'aside', 'image' ), $result );
 	}
-	// --- allow_anonymous_for_self: route identity = resolved rest_route ----
-	//
-	// The late (priority 999) rest_authentication_errors filter exists so a
-	// third-party "must be logged in" gate cannot stop the composer-config
-	// request from reaching its own edit_posts permission callback. It must
-	// key on the route WordPress will DISPATCH, never on REQUEST_URI. The
-	// audited defect: a request to the composer-config PATH carrying
-	// ?rest_route=/wp/v2/posts/5&_method=DELETE&_wpnonce=bogus had core's
-	// invalid-nonce error cleared and executed the DELETE as the cookie user.
+	// --- No authentication override (1.0.27) --------------------------------
 
-	public function test_csrf_regression_bogus_nonce_smuggled_through_composer_path_is_not_cleared(): void {
-		$this->mock_is_wp_error();
-		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/composer-config?rest_route=/wp/v2/posts/5&_method=DELETE&_wpnonce=bogus';
-		$this->set_resolved_route( '/wp/v2/posts/5' );
-		$error = new \WP_Error( 'rest_cookie_invalid_nonce', 'Cookie check failed', array( 'status' => 403 ) );
-
-		$result = Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error );
-
-		$this->assertSame( $error, $result, 'A nonce failure on a route we do not own must survive untouched.' );
-	}
-
-	public function test_third_party_gate_is_cleared_for_our_own_resolved_route(): void {
-		$this->mock_is_wp_error();
-		// Anonymous build-time prefetch: the opt-out's reason to exist. A
-		// logged-out request carries no cookie session for the nonce guard to
-		// protect, so a third-party gate is still cleared to reach edit_posts.
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/composer-config';
-		$this->set_resolved_route( '/outpost/v1/composer-config' );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked by a hardening plugin', array( 'status' => 401 ) );
-
-		$this->assertNull( Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	public function test_third_party_gate_is_cleared_for_plain_permalink_form(): void {
-		$this->mock_is_wp_error();
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		$_SERVER['REQUEST_URI'] = '/?rest_route=/outpost/v1/composer-config';
-		$this->set_resolved_route( '/outpost/v1/composer-config' );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked', array( 'status' => 401 ) );
-
-		$this->assertNull( Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	public function test_trailing_slash_on_resolved_route_still_matches(): void {
-		$this->mock_is_wp_error();
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		$this->set_resolved_route( '/outpost/v1/composer-config/' );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked', array( 'status' => 401 ) );
-
-		$this->assertNull( Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	// --- allow_anonymous_for_self: the nonce-less cookie-session guard --------
-	//
-	// SEC-2026-09-21. Core's rest_cookie_check_errors (priority 100) demotes a
-	// cookie session to anonymous ONLY when it is the first filter to see an
-	// error. An earlier rest_authentication_errors result — the iOS Shortcut
-	// authenticator's out-of-scope 401 (priority 10), a hardening plugin's
-	// gate, any bearer-validation error — short-circuits it, leaving the
-	// wp-admin cookie user current with no nonce ever verified. The opt-out
-	// must not clear that error, or a cross-origin request rides the cookie.
-
-	public function test_nonceless_cookie_session_error_is_not_cleared_on_our_route(): void {
-		$this->mock_is_wp_error();
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
-		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing(
-			static fn( $nonce ) => 'good-nonce' === $nonce ? 1 : false
-		);
-		unset( $_REQUEST['_wpnonce'], $_SERVER['HTTP_X_WP_NONCE'] );
-		$this->set_resolved_route( '/outpost/v1/composer-config' );
-		// Not core's own invalid-nonce error: the earlier out-of-scope 401.
-		$error = new \WP_Error( 'outpost_ios_shortcut_token_out_of_scope', 'scoped', array( 'status' => 401 ) );
-
+	/**
+	 * Earlier versions cleared other plugins' rest_authentication_errors
+	 * results for this route. That overrode another plugin's security
+	 * decision, so 1.0.27 removed it: register() hooks the route and nothing
+	 * else, and no override method remains.
+	 */
+	public function test_register_adds_no_rest_authentication_errors_filter(): void {
+		outpost_test_reset_hooks();
+		Outpost_Composer_Config_Endpoint::register();
 		$this->assertSame(
-			$error,
-			Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ),
-			'A nonce-less cookie session must keep the pre-empting error; clearing it revives the session.'
+			array( array( Outpost_Composer_Config_Endpoint::class, 'register_route' ) ),
+			array_column( outpost_test_actions_for( 'rest_api_init' ), 'callback' )
 		);
-	}
-
-	public function test_valid_nonce_cookie_session_is_still_cleared_on_our_route(): void {
-		// Positive control: the same shape with a genuine wp_rest nonce is a
-		// legitimate same-origin request, so the opt-out still clears the gate.
-		$this->mock_is_wp_error();
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
-		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing(
-			static fn( $nonce ) => 'good-nonce' === $nonce ? 1 : false
+		$this->assertFalse(
+			method_exists( Outpost_Composer_Config_Endpoint::class, 'allow_anonymous_for_self' ),
+			'The authentication override must stay removed.'
 		);
-		$_REQUEST['_wpnonce'] = 'good-nonce';
-		$this->set_resolved_route( '/outpost/v1/composer-config' );
-		$error = new \WP_Error( 'outpost_ios_shortcut_token_out_of_scope', 'scoped', array( 'status' => 401 ) );
-
-		$this->assertNull(
-			Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ),
-			'A valid nonce proves same-origin intent, so the gate clears as before.'
-		);
-	}
-
-	public function test_core_invalid_nonce_error_is_never_cleared_even_on_our_own_route(): void {
-		// Core's cookie-nonce check is WordPress's CSRF defense. The opt-out
-		// exists for third-party blanket gates, not to disable that.
-		$this->mock_is_wp_error();
-		$this->set_resolved_route( '/outpost/v1/composer-config' );
-		$error = new \WP_Error( 'rest_cookie_invalid_nonce', 'Cookie check failed', array( 'status' => 403 ) );
-
-		$this->assertSame( $error, Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	public function test_fails_closed_when_no_route_was_resolved(): void {
-		$this->mock_is_wp_error();
-		// Decoy: the path says composer-config, but WordPress resolved nothing.
-		$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/composer-config';
-		$this->set_resolved_route( null );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked', array( 'status' => 401 ) );
-
-		$this->assertSame( $error, Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-
-		unset( $GLOBALS['wp'] );
-		$this->assertSame( $error, Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	public function test_route_smuggled_in_another_query_key_does_not_match(): void {
-		$this->mock_is_wp_error();
-		$_SERVER['REQUEST_URI'] = '/?rest_route=/wp/v2/users&x=rest_route=/outpost/v1/composer-config';
-		$this->set_resolved_route( '/wp/v2/users' );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked', array( 'status' => 401 ) );
-
-		$this->assertSame( $error, Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ) );
-	}
-
-	public function test_unrelated_route_passes_null_and_true_through_unchanged(): void {
-		$this->mock_is_wp_error();
-		$this->set_resolved_route( '/wp/v2/posts' );
-
-		$this->assertNull( Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( null ) );
-		$this->assertTrue( Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( true ) );
-	}
-
-	public function test_filter_never_consults_request_uri(): void {
-		// Same resolved route, wildly different URIs: identical decisions.
-		$this->mock_is_wp_error();
-		$this->set_resolved_route( '/wp/v2/posts/5' );
-		$error = new \WP_Error( 'rest_not_logged_in', 'blocked', array( 'status' => 401 ) );
-
-		foreach ( array(
-			'/wp-json/outpost/v1/composer-config',
-			'/wp-json/outpost/v1/composer-config/',
-			'/wp-json/outpost/v1/composer-config?rest_route=/wp/v2/posts/5',
-			'/?rest_route=/outpost/v1/composer-config',
-			'/wp-json/wp/v2/posts/5',
-		) as $uri ) {
-			$_SERVER['REQUEST_URI'] = $uri;
-			$this->assertSame( $error, Outpost_Composer_Config_Endpoint::allow_anonymous_for_self( $error ), "URI must not matter: $uri" );
-		}
 	}
 }

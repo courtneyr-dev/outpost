@@ -2,11 +2,15 @@
 /**
  * Outpost_Encryption_Key_Notice (G3.5a).
  *
- * Persistent admin notice that fires when Outpost's encryption key
- * lives in wp_options instead of wp-config.php's
- * `OUTPOST_ENCRYPTION_KEY` constant. Notice is dismissible per-user,
- * but re-appears on each plugin version update via a version-stamped
- * dismissal key.
+ * Admin notice that fires when Outpost's encryption key lives in
+ * wp_options instead of wp-config.php's `OUTPOST_ENCRYPTION_KEY`
+ * constant, or when that constant is defined with the wrong length.
+ *
+ * Guideline 11 scope: the notice renders only where
+ * `outpost_is_notice_screen()` allows — the Plugins screens and
+ * Outpost's own pages — never on the dashboard or unrelated screens.
+ * A dismissal is permanent for that user and that reason; plugin
+ * updates don't bring it back.
  *
  * @package Outpost
  * @since   0.1.69
@@ -21,19 +25,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Outpost_Encryption_Key_Notice {
 
 	/**
-	 * Dismissal user-meta key prefix; full key suffixed with plugin
-	 * version so a new plugin version re-shows the notice.
+	 * Dismissal user-meta key prefix; the full key adds the reason the
+	 * notice showed (`database` or `constant_length`), so dismissing one
+	 * warning doesn't silence the other. The uninstaller removes every
+	 * key with this prefix.
 	 */
 	private const DISMISSAL_META_PREFIX = 'outpost_dismissed_encryption_key_notice_';
 
 	private const DISMISS_NONCE_ACTION = 'outpost_dismiss_encryption_key_notice';
 
-	private const DISMISS_QUERY_ACTION = 'outpost_dismiss_encryption_key_notice';
+	/**
+	 * Query key that marks a dismissal request. Unique to Outpost, so the
+	 * handler never has to read core's generic `action` parameter.
+	 */
+	public const DISMISS_QUERY_KEY = 'outpost_dismiss_key_notice';
 
 	/**
-	 * Hook registration. Wires the admin_notices output, the dismissal
-	 * AJAX-style query handler, and the docs-link tag for the
-	 * "[Show instructions →]" link target.
+	 * Public documentation for moving the key into wp-config.php.
+	 */
+	private const DOCS_URL = 'https://courtneyr-dev.github.io/outpost/settings/#api-keys-tab';
+
+	/**
+	 * Hook registration.
 	 *
 	 * @since 0.1.69
 	 */
@@ -43,8 +56,9 @@ final class Outpost_Encryption_Key_Notice {
 	}
 
 	/**
-	 * Render the notice when (a) constant not defined AND (b) wp_options
-	 * key exists AND (c) current user has not dismissed for this version.
+	 * Render the notice when (a) the screen is a Plugins screen or an
+	 * Outpost page, (b) the constant isn't usable, (c) the wp_options key
+	 * exists, and (d) the current user hasn't dismissed this reason.
 	 *
 	 * @since 0.1.69
 	 */
@@ -52,10 +66,12 @@ final class Outpost_Encryption_Key_Notice {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		if ( ! function_exists( 'outpost_is_notice_screen' ) || ! outpost_is_notice_screen() ) {
+			return;
+		}
 		if ( Outpost_Encryption_Key_Resolver::constant_is_usable() ) {
 			return;
 		}
-		$constant_is_wrong_length = Outpost_Encryption_Key_Resolver::constant_is_defined();
 		if ( ! Outpost_Encryption_Key_Resolver::option_value_exists() ) {
 			return;
 		}
@@ -63,20 +79,19 @@ final class Outpost_Encryption_Key_Notice {
 		if ( $user_id <= 0 ) {
 			return;
 		}
-		$dismissal_key = self::dismissal_meta_key();
-		if ( '1' === (string) get_user_meta( $user_id, $dismissal_key, true ) ) {
+		$reason = self::current_reason();
+		if ( '1' === (string) get_user_meta( $user_id, self::DISMISSAL_META_PREFIX . $reason, true ) ) {
 			return;
 		}
 
 		$dismiss_url = wp_nonce_url(
-			add_query_arg( 'action', self::DISMISS_QUERY_ACTION, admin_url() ),
+			add_query_arg( self::DISMISS_QUERY_KEY, $reason ),
 			self::DISMISS_NONCE_ACTION
 		);
-		$docs_url    = admin_url( 'admin.php?page=outpost-docs&doc=encryption-key' );
 
-		echo '<div class="notice notice-warning is-dismissible outpost-encryption-key-notice">';
+		echo '<div class="notice notice-warning outpost-encryption-key-notice">';
 		echo '<p>';
-		if ( $constant_is_wrong_length ) {
+		if ( 'constant_length' === $reason ) {
 			echo esc_html__(
 				'Outpost: OUTPOST_ENCRYPTION_KEY is defined in wp-config.php but is not 32 raw bytes, so Outpost is ignoring it and using the key stored in the database. Wrap the value in base64_decode().',
 				'outpost-mobile-publishing'
@@ -87,10 +102,9 @@ final class Outpost_Encryption_Key_Notice {
 				'outpost-mobile-publishing'
 			);
 		}
-		echo ' <a href="' . esc_url( $docs_url ) . '" target="_blank" rel="noopener">';
-		echo esc_html__( 'Show instructions →', 'outpost-mobile-publishing' );
-		echo '</a>';
-		echo ' <a href="' . esc_url( $dismiss_url ) . '" style="margin-left:0.5em;">';
+		echo ' <a href="' . esc_url( self::DOCS_URL ) . '" target="_blank" rel="noopener">';
+		echo esc_html__( 'Show instructions', 'outpost-mobile-publishing' );
+		echo '</a> | <a href="' . esc_url( $dismiss_url ) . '">';
 		echo esc_html__( 'Dismiss', 'outpost-mobile-publishing' );
 		echo '</a>';
 		echo '</p>';
@@ -98,43 +112,39 @@ final class Outpost_Encryption_Key_Notice {
 	}
 
 	/**
-	 * Handle dismissal via the URL passed back from the notice's
-	 * "Dismiss" link. Records dismissal under the version-stamped
-	 * meta key so a plugin upgrade reshow the notice.
+	 * Record a dismissal from the notice's "Dismiss" link.
+	 *
+	 * Order: capability, then an isset() check on Outpost's own query key
+	 * (no value is read), then the nonce, and only then the value.
 	 *
 	 * @since 0.1.69
 	 */
 	public static function maybe_handle_dismissal(): void {
-		// Capability first, then the request read, then the nonce: the order the
-		// Plugins Team reads for, even though the value is only compared to a
-		// constant before any guard.
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( (string) $_GET['action'] ) ) : '';
-		if ( self::DISMISS_QUERY_ACTION !== $action ) {
+		if ( ! isset( $_GET[ self::DISMISS_QUERY_KEY ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only; the nonce is verified on the next line before any value is read.
 			return;
 		}
 		check_admin_referer( self::DISMISS_NONCE_ACTION );
+		$reason  = sanitize_key( wp_unslash( (string) $_GET[ self::DISMISS_QUERY_KEY ] ) );
 		$user_id = get_current_user_id();
-		if ( $user_id > 0 ) {
-			update_user_meta( $user_id, self::dismissal_meta_key(), '1' );
+		if ( $user_id > 0 && in_array( $reason, array( 'database', 'constant_length' ), true ) ) {
+			update_user_meta( $user_id, self::DISMISSAL_META_PREFIX . $reason, '1' );
 		}
-		wp_safe_redirect( remove_query_arg( array( 'action', '_wpnonce' ) ) );
+		wp_safe_redirect( remove_query_arg( array( self::DISMISS_QUERY_KEY, '_wpnonce' ) ) );
 		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
 			exit;
 		}
 	}
 
 	/**
-	 * Per-version dismissal key. Plugin upgrades show the notice
-	 * again so users with stale dismissal don't lose visibility on
-	 * the recommendation.
+	 * Why the notice would show right now.
 	 *
-	 * @return string
+	 * @return string `constant_length` when the constant is defined but
+	 *                unusable, otherwise `database`.
 	 */
-	private static function dismissal_meta_key(): string {
-		$version = defined( 'OUTPOST_VERSION' ) ? (string) OUTPOST_VERSION : 'dev';
-		return self::DISMISSAL_META_PREFIX . sanitize_key( $version );
+	private static function current_reason(): string {
+		return Outpost_Encryption_Key_Resolver::constant_is_defined() ? 'constant_length' : 'database';
 	}
 }
