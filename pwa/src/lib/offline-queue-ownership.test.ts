@@ -465,3 +465,71 @@ describe('the H5 plaintext-token scrub is the only write to a row flush() does n
 		expect(await snapshot()).toEqual(before);
 	});
 });
+
+/**
+ * Abort a transaction after a write has really been requested inside it
+ * (T10-S3-07 v1.1 closeout): wrap one IDBCursor write method so it performs
+ * the real write, records it, and then aborts the cursor's own transaction
+ * before it can commit. IndexedDB must roll every request in it back.
+ */
+function abort_after_first(method: 'delete' | 'update'): { writes: () => number; restore: () => void } {
+	let count = 0;
+	const original = IDBCursor.prototype[method] as (...args: unknown[]) => IDBRequest;
+	const spy = vi.spyOn(IDBCursor.prototype, method).mockImplementation(function (this: IDBCursor, ...args: unknown[]) {
+		const request = Reflect.apply(original, this, args) as IDBRequest;
+		count += 1;
+		const store = this.source as IDBObjectStore;
+		if (count === 1) store.transaction.abort();
+		return request;
+	} as never);
+	return { writes: () => count, restore: () => spy.mockRestore() };
+}
+
+describe('rollback after a write has started (T10-S3-07 v1.1 closeout)', () => {
+	it('remove_owned_entries: one owned row deleted, then the transaction aborts, and every row survives byte-for-byte', async () => {
+		await queue_as(ALICE, 'Alice text post');
+		await queue_as(BOB, 'Bob text post');
+		await queue_as(ALICE, 'Alice photo post', true);
+		await write_raw({ source: 'note', properties: { content: 'Legacy post' }, micropubEndpoint: ENDPOINT, createdAt: 1, attempts: 0 });
+		const before = await snapshot();
+		const seam = abort_after_first('delete');
+		try {
+			await expect(remove_owned_entries(canonical_account(ALICE), env)).rejects.toBeTruthy();
+		} finally {
+			seam.restore();
+		}
+
+		expect(seam.writes()).toBe(1);
+		expect(await snapshot()).toEqual(before);
+	});
+
+	it('H5 scrub: one cursor.update() removes the token, then the transaction aborts; the row keeps everything and nothing is sent', async () => {
+		const legacy = {
+			source: 'note',
+			properties: { content: 'Queued before 1.0.22' },
+			micropubEndpoint: ENDPOINT,
+			me: ALICE,
+			createdAt: 1,
+			attempts: 2,
+			lastError: 'post_failed: earlier failure',
+			accessToken: 'LEGACY-PLAINTEXT',
+		};
+		await write_raw(legacy);
+		await write_raw({ ...legacy, properties: { content: 'Second legacy row' } });
+		await queue_as(ALICE, 'Alice text post');
+		const before = await snapshot();
+		expect(JSON.stringify(before)).toContain('LEGACY-PLAINTEXT');
+		await sign_in_as(ALICE);
+		const server = recording();
+		const seam = abort_after_first('update');
+		try {
+			await expect(flush(server.env, env, { tokenStore: tokens })).rejects.toBeTruthy();
+		} finally {
+			seam.restore();
+		}
+
+		expect(seam.writes()).toBe(1);
+		expect(server.sent).toEqual([]);
+		expect(await snapshot()).toEqual(before);
+	});
+});

@@ -251,6 +251,68 @@ describe('signing out with queued posts', () => {
 	});
 });
 
+describe('the account identity is fixed when the choice opens (T10-S3-07 v1.1 closeout)', () => {
+	beforeEach(async () => {
+		await seed([ALICE, 'Alice post one'], [BOB, 'Bob post'], [ALICE, 'Alice post two']);
+	});
+
+	function mount_as(owner: string, env: OfflineQueueEnvironment): void {
+		render(
+			<SignOutControl owner={owner} queueEnv={env} clearSignIn={clear_sign_in} finishSignOut={finish_sign_out} />,
+			root,
+		);
+	}
+
+	it('a rerender with another account doesn’t change which posts Remove deletes', async () => {
+		const env = queue_env();
+		mount_as(ALICE_ID, env);
+		await click('Sign out of this device');
+		mount_as('https://example.test/bob', env);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await click('Remove my queued posts and sign out');
+
+		expect(await contents()).toEqual(['Bob post']);
+	});
+
+	it('a retry after a partial failure keeps using the captured account', async () => {
+		const env = queue_env();
+		queue_writes_fail = true;
+		mount_as(ALICE_ID, env);
+		await click('Sign out of this device');
+		mount_as('https://example.test/bob', env);
+		await click('Remove my queued posts and sign out');
+		queue_writes_fail = false;
+		await click('Try removing my queued posts again');
+
+		expect(await contents()).toEqual(['Bob post']);
+	});
+
+	it('an abort after one delete was issued rolls everything back and shows the partial failure', async () => {
+		const before = await list({ indexedDB: real });
+		let deletes = 0;
+		const original = IDBCursor.prototype.delete;
+		const spy = vi.spyOn(IDBCursor.prototype, 'delete').mockImplementation(function (this: IDBCursor) {
+			const request = original.call(this);
+			deletes += 1;
+			(this.source as IDBObjectStore).transaction.abort();
+			return request;
+		});
+		try {
+			mount();
+			await click('Sign out of this device');
+			await click('Remove my queued posts and sign out');
+		} finally {
+			spy.mockRestore();
+		}
+
+		expect(deletes).toBe(1);
+		expect(clear_sign_in).toHaveBeenCalledTimes(1);
+		expect(finish_sign_out).not.toHaveBeenCalled();
+		expect(status()).toBe(PARTIAL);
+		expect(await list({ indexedDB: real })).toEqual(before);
+	});
+});
+
 describe('the control itself', () => {
 	it('stays signed in and says so when the queue can’t be read', async () => {
 		const broken: OfflineQueueEnvironment = {
