@@ -197,6 +197,23 @@ export interface HEntryProperties {
 	 * sibling property — see listen-mode.tsx for the routing.
 	 */
 	'mp-place-name'?: string;
+	/**
+	 * Comic details Post Kinds' comic card reads from a `read-of` entry
+	 * sent with `pkiw-kind: comics`. Dates are `YYYY-MM-DD`.
+	 */
+	'mp-series'?: string;
+	'mp-volume'?: string;
+	'mp-issue-number'?: string;
+	'mp-publisher'?: string;
+	'mp-started-at'?: string;
+	'mp-finished-at'?: string;
+	/**
+	 * Cover image URL and its alt text for kinds whose card shows a cover
+	 * (comics). Unlike `photo`, the Micropub plugin doesn't download it into
+	 * the media library.
+	 */
+	'mp-cover-image'?: string;
+	'mp-cover-image-alt'?: string;
 }
 
 export interface SyndicationTarget {

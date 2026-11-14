@@ -341,6 +341,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 *
 	 * @return array{
 	 *     companions: array<string, string>,
+	 *     postKinds: array{comics: bool},
 	 *     postFormats: array<int, string>|null,
 	 *     xfnRels: array<int, string>,
 	 *     existingCategories: array<int, array{slug: string, name: string}>,
@@ -384,6 +385,9 @@ final class Outpost_Composer_Config_Endpoint {
 
 		return array(
 			'companions'         => $companions,
+			'postKinds'          => array(
+				'comics' => 'active' === $companions['post-kinds'] && Outpost_Post_Kinds_Adapter::supports_comics(),
+			),
 			'postFormats'        => $post_formats,
 			'xfnRels'            => self::XFN_RELS,
 			'existingCategories' => self::list_terms( 'category' ),

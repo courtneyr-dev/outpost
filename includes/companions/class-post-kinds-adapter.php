@@ -45,6 +45,7 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 			'post-kinds.listen',
 			'post-kinds.watch',
 			'post-kinds.read',
+			'post-kinds.comics',
 			'post-kinds.event',
 			'post-kinds.photo',
 			'post-kinds.video',
@@ -92,6 +93,22 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 			return (string) pkiw_get_safe_title( (int) $post->ID );
 		}
 		return (string) $post->post_title;
+	}
+
+	/**
+	 * Whether the installed Post Kinds builds the comic card.
+	 *
+	 * Post Kinds turns a Micropub `read-of` entry that carries
+	 * `pkiw-kind: comics` into a `post-kinds-indieweb/comic-card`, and
+	 * `\PKIW\Comic_Strip` ships in every release that can do that. An older
+	 * Post Kinds still sets the comics term from the hint but builds a read
+	 * card, so the composer offers its Comic variant only when this returns
+	 * true.
+	 *
+	 * @return bool
+	 */
+	public static function supports_comics(): bool {
+		return class_exists( '\PKIW\Comic_Strip' );
 	}
 
 	/**
