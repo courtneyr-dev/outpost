@@ -137,7 +137,11 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 	private function assert_untouched(): void {
 		$this->assertSame( array(), array_values( preg_grep( '/^outpost_oauth_state_/', $this->transients ) ), 'No OAuth state is written.' );
 		$this->assertSame( array(), $this->outbound, 'Nothing is sent to the provider.' );
-		$this->assertTrue( Outpost_Credentials_Store::is_configured( 'oura', $this->admin_id ), 'The stored credential stays.' );
+		$this->assertSame(
+			array( 'access_token' => 'SYNTHETIC-OURA-TOKEN' ),
+			Outpost_Credentials_Store::get( 'oura', $this->admin_id ),
+			'The stored credential stays exactly as it was.'
+		);
 	}
 
 	/** @return array<string, array{0: string, 1: string}> */
