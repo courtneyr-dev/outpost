@@ -23,11 +23,53 @@ final class Outpost_Abilities {
 	private const READ_SCOPES = array( 'create', 'update', 'read' );
 
 	/**
+	 * The REST requests whose handlers are running, innermost last.
+	 *
+	 * @var array<int, WP_REST_Request>
+	 */
+	private static array $requests = array();
+
+	/**
 	 * Hook category and ability registration into the Abilities API lifecycle.
 	 */
 	public static function register(): void {
 		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
 		add_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
+		add_filter( 'rest_request_before_callbacks', array( self::class, 'enter_request' ), 10, 3 );
+		add_filter( 'rest_request_after_callbacks', array( self::class, 'leave_request' ), 10, 3 );
+	}
+
+	/**
+	 * Remember the request whose permission callback core is about to run,
+	 * so the credential gate sees the same headers and body the routes see.
+	 *
+	 * @param mixed           $response Response so far (passed through).
+	 * @param array<string, mixed> $handler Route handler (unused).
+	 * @param WP_REST_Request $request  The request being handled.
+	 * @return mixed
+	 */
+	public static function enter_request( $response, $handler, $request ) {
+		unset( $handler );
+		if ( $request instanceof WP_REST_Request ) {
+			self::$requests[] = $request;
+		}
+		return $response;
+	}
+
+	/**
+	 * Forget the request once its handler finished.
+	 *
+	 * @param mixed           $response Response (passed through).
+	 * @param array<string, mixed> $handler Route handler (unused).
+	 * @param WP_REST_Request $request  The request that was handled.
+	 * @return mixed
+	 */
+	public static function leave_request( $response, $handler, $request ) {
+		unset( $handler );
+		if ( $request instanceof WP_REST_Request && end( self::$requests ) === $request ) {
+			array_pop( self::$requests );
+		}
+		return $response;
 	}
 
 	/**
@@ -249,13 +291,15 @@ final class Outpost_Abilities {
 	 * credential check every Outpost route makes (a cookie session needs a
 	 * valid REST nonce; a token needs create, update or read scope). Core's
 	 * Abilities REST controller calls only this callback, so it can't be
-	 * weaker than the routes (F5-01). A PHP caller with no cookie session
-	 * and no token keeps the capability check alone.
+	 * weaker than the routes (F5-01). Inside a REST request it checks that
+	 * request, body token included; a PHP caller with no cookie session and
+	 * no token keeps the capability check alone.
 	 *
 	 * @return bool
 	 */
 	public static function can_read_outpost(): bool {
-		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( new WP_REST_Request( 'GET' ), self::READ_SCOPES );
+		$request = array() === self::$requests ? new WP_REST_Request( 'GET' ) : end( self::$requests );
+		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, self::READ_SCOPES );
 	}
 
 	/**
