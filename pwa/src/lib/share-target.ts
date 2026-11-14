@@ -362,10 +362,34 @@ export function consume_share_target(): ShareTargetData | null {
  * consume_share_target() to drain.
  */
 export function peek_share_target(): ShareTargetData | null {
-	const raw = safe_session_get(KEY);
+	return parse_share(safe_session_get(KEY));
+}
+
+/**
+ * The composer tabs a share can open. Keyed by the `tab` union so a new
+ * tab that isn't listed here fails to compile.
+ */
+const SHARE_TABS: Record<ShareTargetData['tab'], true> = {
+	note: true,
+	reply: true,
+	photo: true,
+	listen: true,
+	life: true,
+	recipe: true,
+};
+
+/**
+ * Parse a stored share, or null when it isn't one the composer can open.
+ * sessionStorage can hold an old value or a hand-edited one; a `tab` that
+ * isn't a composer mode would open with no mode current (#323).
+ */
+function parse_share(raw: string | null): ShareTargetData | null {
 	if (!raw) return null;
 	try {
-		return JSON.parse(raw) as ShareTargetData;
+		const data: unknown = JSON.parse(raw);
+		if (typeof data !== 'object' || data === null) return null;
+		const tab: unknown = (data as { tab?: unknown }).tab;
+		return typeof tab === 'string' && Object.hasOwn(SHARE_TABS, tab) ? (data as ShareTargetData) : null;
 	} catch (_err) {
 		return null;
 	}
@@ -378,15 +402,6 @@ export interface HeldShares {
 	refused: boolean;
 }
 
-function parse_held(raw: string | null): ShareTargetData | null {
-	if (!raw) return null;
-	try {
-		const data = JSON.parse(raw) as ShareTargetData;
-		return data && typeof data === 'object' && typeof data.tab === 'string' ? data : null;
-	} catch (_err) {
-		return null;
-	}
-}
 
 /**
  * Write the waiting shares back to their two session slots, earliest first.
@@ -417,11 +432,11 @@ export function set_held_shares(shares: ShareTargetData[]): void {
 export function hold_share_for_review(): HeldShares {
 	const fresh_raw = safe_session_get(KEY);
 	safe_session_remove(KEY);
-	const shares = [parse_held(safe_session_get(HELD_KEY)), parse_held(safe_session_get(CANDIDATE_KEY))].filter(
+	const shares = [parse_share(safe_session_get(HELD_KEY)), parse_share(safe_session_get(CANDIDATE_KEY))].filter(
 		(s): s is ShareTargetData => s !== null,
 	);
 	let refused = false;
-	const fresh = parse_held(fresh_raw);
+	const fresh = parse_share(fresh_raw);
 	if (fresh) {
 		if (fresh.shareRefused || shares.length >= 2) {
 			refused = true;
@@ -438,7 +453,7 @@ export function hold_share_for_review(): HeldShares {
  * intake and clear both slots. Only called with a single share waiting.
  */
 export function release_held_share(): ShareTargetData | null {
-	const data = parse_held(safe_session_get(HELD_KEY));
+	const data = parse_share(safe_session_get(HELD_KEY));
 	set_held_shares([]);
 	if (!data) return null;
 	safe_session_set(KEY, JSON.stringify(data));

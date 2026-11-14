@@ -531,6 +531,15 @@ describe('ComposerTabs: Home and the start screen', () => {
 		await vi.waitFor(() => expect(visible_panels()).toEqual(['outpost-panel-photo']));
 	});
 
+	it('a share with an unknown tab falls back to the saved start screen (#323)', () => {
+		prefer_start('reply');
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'checkin', content: 'old value' }));
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		expect(root.querySelector('[data-outpost-share-review]')).toBeNull();
+		expect(visible_panels()).toEqual(['outpost-panel-reply']);
+		expect(root.querySelector('#outpost-tab-reply')?.getAttribute('aria-current')).toBe('true');
+	});
+
 	it("uses the site's saved start screen on a device that hasn't stored one", async () => {
 		mount_home(site({ mode_preference: 'night', style_source: 'outpost', start_screen: 'life' }));
 		await vi.waitFor(() => expect(visible_panels()).toEqual(['outpost-panel-life']));
