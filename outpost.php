@@ -896,10 +896,10 @@ add_action(
  * rule that limits them to the Shortcut route is Outpost code, so a password
  * left behind would work on every route core accepts application passwords
  * for (T10-S4-09). If one survives, it stops instead (T10-S4-27). The
- * person's other application passwords stay. Then
- * flushes rewrite rules so /post/* rules are dropped from the cache. The
- * rules themselves don't need explicit removal — they're regenerated on
- * every `init` and naturally disappear when this plugin is inactive.
+ * person's other application passwords stay. Then removes Outpost's
+ * rewrite rules and flushes: this hook runs while the rules registered at
+ * `init` are still in place, so a flush alone would write them back into
+ * the stored table (T10-S5-02).
  *
  * @since 0.1.0
  *
@@ -914,6 +914,7 @@ function outpost_deactivate( bool $network_wide = false ): void {
 		Outpost_Uninstaller::stop_deactivation();
 		return;
 	}
+	Outpost_Route_Handler::unregister_rewrite_rules();
 	flush_rewrite_rules();
 }
 register_deactivation_hook( __FILE__, 'outpost_deactivate' );

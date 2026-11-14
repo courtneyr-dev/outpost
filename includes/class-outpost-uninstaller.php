@@ -299,5 +299,14 @@ final class Outpost_Uninstaller {
 		foreach ( self::CRON_HOOKS as $hook ) {
 			wp_unschedule_hook( $hook );
 		}
+
+		// Rewrite rules. WP-CLI's `plugin uninstall --deactivate` runs this
+		// in the request that loaded Outpost, so drop its registered rules
+		// first; then delete the stored table, which WordPress rebuilds on
+		// the next request without Outpost (T10-S5-02).
+		if ( class_exists( 'Outpost_Route_Handler' ) ) {
+			Outpost_Route_Handler::unregister_rewrite_rules();
+		}
+		delete_option( 'rewrite_rules' );
 	}
 }

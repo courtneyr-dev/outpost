@@ -101,6 +101,26 @@ final class Outpost_Route_Handler {
 	}
 
 	/**
+	 * Remove Outpost's rules from the rules registered in this request.
+	 *
+	 * A flush regenerates the stored table from what's registered, and the
+	 * deactivation hook runs while Outpost's `init` registration still
+	 * stands. Only rules that still point at Outpost's query var are removed.
+	 */
+	public static function unregister_rewrite_rules(): void {
+		global $wp_rewrite;
+		if ( ! $wp_rewrite instanceof WP_Rewrite ) {
+			return;
+		}
+		foreach ( self::rules() as $regex => $target ) {
+			$query = 'index.php?' . self::QUERY_VAR . '=' . $target;
+			if ( isset( $wp_rewrite->extra_rules_top[ $regex ] ) && $query === $wp_rewrite->extra_rules_top[ $regex ] ) {
+				unset( $wp_rewrite->extra_rules_top[ $regex ] );
+			}
+		}
+	}
+
+	/**
 	 * Hand off to the right renderer for a matched Outpost rewrite rule.
 	 *
 	 * Hooked on template_redirect so WP's main query has already resolved,
