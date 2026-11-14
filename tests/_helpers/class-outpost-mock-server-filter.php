@@ -10,7 +10,11 @@
  * responses, so integration tests assert real WP-side roundtrip
  * behavior without hitting production APIs.
  *
- * Production safety:
+ * Test-only (T10-S3-09): this file lives under tests/_helpers/, which the
+ * WordPress.org package excludes, and only tests/integration/bootstrap.php
+ * loads and registers it. The plugin itself never references it.
+ *
+ * Earlier production-safety notes, kept for context:
  *   - The constant is NEVER defined in production environments.
  *     Setting it would require an explicit `define()` in wp-config.php.
  *   - The rewrite list is hardcoded (NOT a filter / option). Adding

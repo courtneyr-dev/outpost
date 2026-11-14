@@ -54,7 +54,6 @@ final class RouteHandlerTest extends TestCase {
 				// SW intentionally has no `.js` extension — see Outpost_Route_Handler::rules() comment.
 				'^post/sw/?$'                  => 'sw',
 				'^post/share-target/?$'        => 'share-target',
-				'^post/shortcut/?$'            => 'shortcut',
 				'^post/auth/callback/?$'       => 'auth-callback',
 				'^post/?$'                     => 'composer',
 			),

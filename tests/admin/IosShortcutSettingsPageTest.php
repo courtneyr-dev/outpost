@@ -1,11 +1,11 @@
 <?php
 /**
- * Unit tests for Outpost_IOS_Shortcut_Settings_Page (FX).
+ * Unit tests for Outpost_IOS_Shortcut_Settings_Page.
  *
- * Tests the admin-post action handlers (regenerate / revoke) and
- * the page renderer's data flow. Page HTML output is exercised via
- * output buffering for the key state branches: never-issued token,
- * issued-not-yet-connected, issued-and-connected.
+ * The page creates and revokes the person's Shortcut application password
+ * through core. A new password is printed once in the response that created
+ * it; Outpost stores nothing. The POST handler checks the capability, then
+ * the nonce, and only then reads the requested action.
  *
  * @package Outpost\Tests\Admin
  */
@@ -14,128 +14,86 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Admin;
 
+use Outpost_IOS_Shortcut_App_Password;
 use Outpost_IOS_Shortcut_Settings_Page;
-use Outpost_IOS_Shortcut_Token;
+use WP_Application_Passwords;
 use WP_Mock;
+
+require_once dirname( __DIR__ ) . '/auth/application-passwords-stub.php';
 
 final class IosShortcutSettingsPageTest extends \WP_Mock\Tools\TestCase {
 
-	/** @var array<int, array<string, mixed>> */
-	private array $user_meta = array();
+	private bool $can = true;
 
-	/** @var array<string, int> */
-	private array $token_index = array();
+	private bool $available = true;
 
-	private int $current_user_id = 42;
-
-	private bool $current_user_can = true;
+	/** @var string[] Order of guard calls. */
+	private array $calls = array();
 
 	public function setUp(): void {
 		WP_Mock::setUp();
-		$this->user_meta        = array();
-		$this->token_index      = array();
-		$this->current_user_id  = 42;
-		$this->current_user_can = true;
-		$_GET                   = array();
-		$_POST                  = array();
-		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
-			define( 'OUTPOST_TESTING_PWA_SHELL', true );
-		}
-		if ( ! defined( 'OUTPOST_PLUGIN_DIR' ) ) {
-			define( 'OUTPOST_PLUGIN_DIR', dirname( __DIR__, 2 ) . '/' );
-		}
+		WP_Application_Passwords::reset();
+		Outpost_IOS_Shortcut_Settings_Page::reset_for_tests();
+		$this->can       = true;
+		$this->available = true;
+		$this->calls     = array();
+		$_POST           = array();
+		$_SERVER['REQUEST_METHOD'] = 'POST';
 
-		WP_Mock::userFunction( 'wp_generate_password' )->andReturnUsing(
-			static fn ( int $length, bool $special, bool $extra ): string => substr(
-				str_replace( array( '+', '/', '=' ), 'A', base64_encode( random_bytes( $length ) ) ),
-				0,
-				$length
-			)
-		);
-		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
-			function ( int $user_id, string $key, bool $single ) {
-				$value = $this->user_meta[ $user_id ][ $key ] ?? '';
-				return $single ? $value : array( $value );
-			}
-		);
-		WP_Mock::userFunction( 'update_user_meta' )->andReturnUsing(
-			function ( int $user_id, string $key, $value ): bool {
-				if ( Outpost_IOS_Shortcut_Token::META_KEY === $key ) {
-					$this->token_index[ (string) $value ] = $user_id;
-				}
-				$this->user_meta[ $user_id ][ $key ] = $value;
-				return true;
-			}
-		);
-		WP_Mock::userFunction( 'delete_user_meta' )->andReturnUsing(
-			function ( int $user_id, string $key ): bool {
-				unset( $this->user_meta[ $user_id ][ $key ] );
-				return true;
-			}
-		);
-		WP_Mock::userFunction( 'get_current_user_id' )->andReturnUsing(
-			fn () => $this->current_user_id
-		);
+		$user             = new \WP_User();
+		$user->ID         = 7;
+		$user->user_login = 'author';
+
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 7 );
+		WP_Mock::userFunction( 'wp_get_current_user' )->andReturn( $user );
+		WP_Mock::userFunction( 'get_userdata' )->andReturn( $user );
+		WP_Mock::userFunction( 'wp_is_application_passwords_available_for_user' )->andReturnUsing( fn() => $this->available );
 		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing(
-			fn ( string $cap ) => $this->current_user_can
-		);
-		WP_Mock::userFunction( 'wp_nonce_field' )->andReturnUsing(
-			static fn ( string $action, string $name ): string => "<input name=\"$name\" type=\"hidden\" value=\"nonce-stub\">"
-		);
-		WP_Mock::userFunction( 'wp_verify_nonce' )->andReturnUsing(
-			static fn ( string $nonce, string $action ) => 'nonce-stub' === $nonce ? 1 : false
-		);
-		WP_Mock::userFunction( 'admin_url' )->andReturnUsing(
-			static fn ( string $path = '' ) => 'https://example.com/wp-admin/' . $path
-		);
-		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://example.com' );
-		WP_Mock::userFunction( 'add_query_arg' )->andReturnUsing(
-			static function ( $key, $value = null, $url = null ) {
-				if ( is_array( $key ) ) {
-					$query = http_build_query( $key );
-					return ( null !== $value ? $value : 'https://example.com/wp-admin/options-general.php' ) . '?' . $query;
-				}
-				return 'https://example.com/wp-admin/?' . urlencode( (string) $key ) . '=' . urlencode( (string) $value );
+			function () {
+				$this->calls[] = 'cap';
+				return $this->can;
 			}
 		);
-		WP_Mock::userFunction( 'wp_safe_redirect' )->andReturn( true );
+		WP_Mock::userFunction( 'check_admin_referer' )->andReturnUsing(
+			function ( $action, $name ) {
+				$this->calls[] = 'nonce';
+				$this->assertSame( 'outpost_ios_shortcut_password', $action );
+				$this->assertSame( 'outpost_ios_shortcut_nonce', $name );
+				return 1;
+			}
+		);
 		WP_Mock::userFunction( 'wp_die' )->andReturnUsing(
-			static function ( string $msg ) {
+			static function ( $msg ) {
 				throw new \RuntimeException( 'wp_die: ' . $msg );
 			}
 		);
-		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing(
-			static fn ( string $s ) => preg_replace( '/[^a-z0-9_]/', '', strtolower( $s ) )
-		);
-		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing(
-			static fn ( string $s ) => trim( $s )
-		);
-		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn ( $v ) => $v );
-		WP_Mock::userFunction( 'wp_date' )->andReturnUsing(
-			static fn ( string $fmt, int $ts ) => gmdate( $fmt, $ts )
-		);
-		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
-			static function ( string $key, $default = false ) {
-				if ( 'date_format' === $key ) {
-					return 'F j, Y';
-				}
-				if ( 'time_format' === $key ) {
-					return 'g:i a';
-				}
-				return $default;
+		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static fn( $s ) => preg_replace( '/[^a-z0-9_]/', '', strtolower( (string) $s ) ) );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $s ) => trim( (string) $s ) );
+		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://example.com' );
+		WP_Mock::userFunction( 'wp_nonce_field' )->andReturnUsing(
+			static function () {
+				echo '<input type="hidden" name="outpost_ios_shortcut_nonce" value="n">';
 			}
 		);
-
-		Outpost_IOS_Shortcut_Token::set_resolver_for_tests(
-			fn ( string $presented ): ?int => $this->token_index[ $presented ] ?? null
+		WP_Mock::userFunction( 'wp_date' )->andReturnUsing( static fn( $fmt, $ts ) => gmdate( 'Y-m-d', (int) $ts ) );
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing( static fn( $k, $d = false ) => $d );
+		WP_Mock::passthruFunction( '__' );
+		WP_Mock::passthruFunction( 'esc_html__' );
+		WP_Mock::passthruFunction( 'esc_attr' );
+		WP_Mock::passthruFunction( 'esc_url' );
+		WP_Mock::passthruFunction( 'esc_html' );
+		WP_Mock::userFunction( 'esc_html_e' )->andReturnUsing(
+			static function ( $s ) {
+				echo $s; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- test stub.
+			}
 		);
 	}
 
 	public function tearDown(): void {
-		Outpost_IOS_Shortcut_Token::set_resolver_for_tests( null );
-		WP_Mock::tearDown();
-		$_GET  = array();
 		$_POST = array();
+		unset( $_SERVER['REQUEST_METHOD'] );
+		WP_Mock::tearDown();
 	}
 
 	private function render(): string {
@@ -144,137 +102,77 @@ final class IosShortcutSettingsPageTest extends \WP_Mock\Tools\TestCase {
 		return (string) ob_get_clean();
 	}
 
-	// --- render branches -------------------------------------------------
-
-	public function test_render_emits_settings_page_heading(): void {
-		$html = $this->render();
-		$this->assertStringContainsString( '<h1>', $html );
-		$this->assertStringContainsString( 'iOS Shortcut Bridge', $html );
+	public function test_get_request_changes_nothing(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_POST[ Outpost_IOS_Shortcut_Settings_Page::ACTION_FIELD ] = 'create';
+		Outpost_IOS_Shortcut_Settings_Page::handle_post();
+		$this->assertSame( array(), WP_Application_Passwords::$store[7] ?? array() );
+		$this->assertSame( array(), $this->calls, 'A GET must not reach the guards or the handler.' );
 	}
 
-	public function test_render_shows_no_token_state_initially(): void {
-		$html = $this->render();
-		$this->assertStringContainsString( 'No token issued yet.', $html );
-		$this->assertStringContainsString( 'Generate token', $html );
+	public function test_capability_is_checked_before_the_nonce_and_before_input(): void {
+		$this->can = false;
+		$_POST[ Outpost_IOS_Shortcut_Settings_Page::ACTION_FIELD ] = 'create';
+		try {
+			Outpost_IOS_Shortcut_Settings_Page::handle_post();
+			$this->fail( 'Expected wp_die for a user without manage_options.' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( 'wp_die', $e->getMessage() );
+		}
+		$this->assertSame( array( 'cap' ), $this->calls, 'Nothing may run after the capability check fails.' );
+		$this->assertSame( array(), WP_Application_Passwords::$store[7] ?? array(), 'No password may be created.' );
 	}
 
-	public function test_render_shows_existing_token(): void {
-		$token = Outpost_IOS_Shortcut_Token::regenerate( $this->current_user_id );
+	public function test_create_runs_after_cap_and_nonce_and_shows_the_password_once(): void {
+		$_POST[ Outpost_IOS_Shortcut_Settings_Page::ACTION_FIELD ] = 'create';
+		Outpost_IOS_Shortcut_Settings_Page::handle_post();
 
-		$html = $this->render();
-
-		$this->assertStringContainsString( $token, $html );
-		$this->assertStringContainsString( 'Regenerate token', $html );
-	}
-
-	public function test_render_shows_not_connected_when_no_first_seen(): void {
-		Outpost_IOS_Shortcut_Token::regenerate( $this->current_user_id );
-
-		$html = $this->render();
-
-		$this->assertStringContainsString( 'Not connected yet.', $html );
-	}
-
-	public function test_render_shows_connected_when_first_seen_set(): void {
-		Outpost_IOS_Shortcut_Token::regenerate( $this->current_user_id );
-		$this->user_meta[ $this->current_user_id ][ Outpost_IOS_Shortcut_Token::FIRST_SEEN_META_KEY ] = '2026-05-04T12:00:00+00:00';
+		$this->assertSame( array( 'cap', 'nonce' ), array_slice( $this->calls, 0, 2 ), 'Capability, then nonce.' );
+		$this->assertSame( Outpost_IOS_Shortcut_App_Password::APP_ID, WP_Application_Passwords::$store[7][0]['app_id'] ?? null );
 
 		$html = $this->render();
+		$this->assertStringContainsString( 'plain-text-password', $html );
+		$this->assertStringContainsString( 'It will not be shown again', $html );
 
-		$this->assertStringContainsString( 'Connected.', $html );
-		$this->assertStringContainsString( 'First successful share', $html );
+		Outpost_IOS_Shortcut_Settings_Page::reset_for_tests();
+		$this->assertStringNotContainsString( 'plain-text-password', $this->render(), 'A later page load must not show the password again.' );
 	}
 
-	public function test_render_includes_site_url(): void {
+	public function test_revoke_deletes_the_outpost_password(): void {
+		WP_Application_Passwords::$store[7] = array(
+			array(
+				'uuid'      => 'x',
+				'app_id'    => Outpost_IOS_Shortcut_App_Password::APP_ID,
+				'created'   => 1700000000,
+				'last_used' => null,
+			),
+		);
+		$_POST[ Outpost_IOS_Shortcut_Settings_Page::ACTION_FIELD ] = 'revoke';
+		Outpost_IOS_Shortcut_Settings_Page::handle_post();
+		$this->assertSame( array(), WP_Application_Passwords::$store[7] );
+		$this->assertStringContainsString( 'Shortcut password revoked', $this->render() );
+	}
+
+	public function test_page_reports_created_and_last_used_dates(): void {
+		WP_Application_Passwords::$store[7] = array(
+			array(
+				'uuid'      => 'x',
+				'app_id'    => Outpost_IOS_Shortcut_App_Password::APP_ID,
+				'created'   => 1700000000,
+				'last_used' => 1700086400,
+			),
+		);
 		$html = $this->render();
-		$this->assertStringContainsString( 'https://example.com', $html );
-		$this->assertStringContainsString( '/wp-json/outpost/v1/shortcut', $html );
+		$this->assertStringContainsString( 'Created 2023-11-14.', $html );
+		$this->assertStringContainsString( 'Last used 2023-11-15.', $html );
+		$this->assertStringContainsString( 'Replace Shortcut password', $html );
+		$this->assertStringContainsString( 'author', $html, 'The page names the user the Shortcut signs in as.' );
 	}
 
-	public function test_render_handles_placeholder_icloud_link(): void {
-		// The shipped link file is a placeholder until the Shortcut is published.
-		$html = $this->render();
-		$this->assertStringContainsString( 'iCloud Shortcut link is not yet published', $html );
-	}
-
-	public function test_render_emits_revoke_form_when_token_present(): void {
-		Outpost_IOS_Shortcut_Token::regenerate( $this->current_user_id );
-
-		$html = $this->render();
-
-		$this->assertStringContainsString( 'Revoke token', $html );
-	}
-
-	public function test_render_omits_revoke_form_when_no_token(): void {
-		$html = $this->render();
-		$this->assertStringNotContainsString( 'Revoke token', $html );
-	}
-
-	// --- regenerate handler ---------------------------------------------
-
-	public function test_handle_regenerate_creates_token_with_valid_nonce(): void {
-		$_POST[ Outpost_IOS_Shortcut_Settings_Page::NONCE_NAME ] = 'nonce-stub';
-
-		Outpost_IOS_Shortcut_Settings_Page::handle_regenerate();
-
-		$this->assertNotNull( Outpost_IOS_Shortcut_Token::get_token( $this->current_user_id ) );
-	}
-
-	public function test_handle_regenerate_dies_on_invalid_nonce(): void {
-		$_POST[ Outpost_IOS_Shortcut_Settings_Page::NONCE_NAME ] = 'bad-nonce';
-
-		$this->expectException( \RuntimeException::class );
-		$this->expectExceptionMessage( 'Security check failed' );
-		Outpost_IOS_Shortcut_Settings_Page::handle_regenerate();
-	}
-
-	public function test_handle_regenerate_dies_when_capability_missing(): void {
-		$_POST[ Outpost_IOS_Shortcut_Settings_Page::NONCE_NAME ] = 'nonce-stub';
-		$this->current_user_can                                  = false;
-
-		$this->expectException( \RuntimeException::class );
-		Outpost_IOS_Shortcut_Settings_Page::handle_regenerate();
-	}
-
-	public function test_handle_revoke_clears_token(): void {
-		Outpost_IOS_Shortcut_Token::regenerate( $this->current_user_id );
-		$_POST[ Outpost_IOS_Shortcut_Settings_Page::NONCE_NAME ] = 'nonce-stub';
-
-		Outpost_IOS_Shortcut_Settings_Page::handle_revoke();
-
-		$this->assertNull( Outpost_IOS_Shortcut_Token::get_token( $this->current_user_id ) );
-	}
-
-	public function test_render_dies_for_user_without_capability(): void {
-		$this->current_user_can = false;
-
-		$this->expectException( \RuntimeException::class );
-		Outpost_IOS_Shortcut_Settings_Page::render();
-	}
-
-	// --- notice branches -------------------------------------------------
-
-	public function test_render_emits_regenerated_notice(): void {
-		$_GET['notice'] = 'regenerated';
-
-		$html = $this->render();
-
-		$this->assertStringContainsString( 'Token regenerated', $html );
-	}
-
-	public function test_render_emits_revoked_notice(): void {
-		$_GET['notice'] = 'revoked';
-
-		$html = $this->render();
-
-		$this->assertStringContainsString( 'Token revoked', $html );
-	}
-
-	public function test_render_ignores_unknown_notice(): void {
-		$_GET['notice'] = 'malicious-script-injection';
-
-		$html = $this->render();
-
-		$this->assertStringNotContainsString( 'malicious-script-injection', $html );
+	public function test_page_explains_when_application_passwords_are_unavailable(): void {
+		$this->available = false;
+		$html            = $this->render();
+		$this->assertStringContainsString( 'application passwords are not available', $html );
+		$this->assertStringNotContainsString( 'Create Shortcut password', $html, 'No create button when core has application passwords off.' );
 	}
 }

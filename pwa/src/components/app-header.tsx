@@ -14,6 +14,8 @@ export interface AppHeaderProps {
 	onOpenSettings: () => void;
 	settingsOpen: boolean;
 	settingsButtonRef?: { current: HTMLButtonElement | null };
+	/** Leave out the Preferences button (while a share waits for a decision). */
+	hideSettings?: boolean;
 }
 
 export const MODE_OPTIONS: ReadonlyArray<{ id: AppearanceMode; label: string }> = [
@@ -65,6 +67,7 @@ export function AppHeader({
 	onOpenSettings,
 	settingsOpen,
 	settingsButtonRef,
+	hideSettings = false,
 }: AppHeaderProps): preact.JSX.Element {
 	return (
 		<header class="outpost-app-header">
@@ -95,7 +98,7 @@ export function AppHeader({
 						</label>
 					))}
 				</fieldset>
-				<button
+				{!hideSettings && <button
 					{...(settingsButtonRef ? { ref: settingsButtonRef } : {})}
 					type="button"
 					class="outpost-icon-button"
@@ -108,7 +111,7 @@ export function AppHeader({
 						<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
 					</svg>
 					<span class="outpost-visually-hidden">Preferences</span>
-				</button>
+				</button>}
 			</div>
 		</header>
 	);

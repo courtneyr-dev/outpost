@@ -33,7 +33,7 @@ Attached to individual posts as they're published or syndicated:
 - `outpost_appearance_source`: your style source, Outpost Default or Use Site Theme.
 - `outpost_appearance_mode`: your Light, Dark, or System choice.
 - `outpost_appearance_overrides`: any token overrides you set on the Appearance page.
-- `outpost_ios_shortcut_token` and `outpost_ios_shortcut_first_seen`: the iOS Shortcut bridge token and when it was first used.
+- The iOS Shortcut's application password, stored by WordPress itself (hashed, in `_application_passwords` user meta) and tagged with Outpost's app ID. Outpost never stores the password. Versions before 1.0.27 stored a plaintext token in `outpost_ios_shortcut_token` (with `outpost_ios_shortcut_first_seen`); updating deletes both.
 - `outpost_creds_*`: your OAuth and API credentials, encrypted with libsodium (`sodium_crypto_secretbox`). Telegraph tokens moved into this encrypted store in version 1.0.0; an older plaintext copy is migrated into it and deleted the first time the adapter runs.
 - `outpost_dismissed_encryption_key_notice_*`: which version of the encryption-key notice you dismissed.
 

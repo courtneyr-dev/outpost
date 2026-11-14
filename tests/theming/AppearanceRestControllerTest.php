@@ -35,6 +35,9 @@ final class AppearanceRestControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturnUsing( fn (): int => $this->current_user );
+		// The signed-in person here is an editor; handle_post() checks
+		// edit_posts itself since T10-S4-06.
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing( fn ( $cap ): bool => 'edit_posts' === $cap && $this->current_user > 0 );
 		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
 			fn ( int $user_id, string $key, bool $single = false ) => $this->user_meta[ $user_id ][ $key ] ?? ''
 		);

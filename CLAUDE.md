@@ -324,7 +324,9 @@ Concrete `Extractor_Og_Tags` (regex, not DOMDocument; decodes HTML entities at p
 
 ## Phase F parallel work — FX-iOS-Shortcut (shipped)
 
-iOS Shortcut bridge (parallel session): a per-user long-lived token authenticates ONLY `/wp-json/outpost/v1/shortcut` — presenting it on any other route returns 401, and that scope enforcement is the security boundary; the `rest_authentication_errors` filter must match `REQUEST_URI`, not the unresolved REST route; settings page at Settings → Outpost iOS Shortcut Bridge; tokens never appear in fixtures. Full decisions: [docs/decisions/session-fx-ios-shortcut.md](docs/decisions/session-fx-ios-shortcut.md).
+**Amended 1.0.27 (wp.org review):** the Shortcut signs in with a core WordPress Application Password that Outpost creates with a fixed `app_id` (`Outpost_IOS_Shortcut_App_Password`). Outpost never maps a credential to a user or hooks `determine_current_user`; it only adds an error through core's `wp_authenticate_application_password_errors` when that password is used anywhere but the resolved `/outpost/v1/shortcut` route (covers XML-RPC too). The password is shown once and never stored by Outpost; legacy plaintext tokens are purged on upgrade. Never return to a plugin-defined login path: the Plugins Team rejects it ("Creating / login users").
+
+Original record: a per-user long-lived token authenticated ONLY `/wp-json/outpost/v1/shortcut`; settings page at Settings → Outpost iOS Shortcut Bridge; credentials never appear in fixtures. Full decisions: [docs/decisions/session-fx-ios-shortcut.md](docs/decisions/session-fx-ios-shortcut.md).
 
 ## Phase F parallel work — FY-Theming (shipped)
 

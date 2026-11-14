@@ -100,13 +100,9 @@ final class Outpost_Sidebar_Assets {
 	 * @since 0.1.79
 	 */
 	private static function warn_missing_build( string $asset_path, string $js_path ): void {
-		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
-			return;
-		}
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-		error_log(
+		Outpost_Debug_Log::write(
 			sprintf(
-				'Outpost sidebar build artifacts missing. Run `npm install && npm run build:wp` from the plugin root. Looked for: %s, %s',
+				'sidebar build artifacts missing. Run `npm install && npm run build:wp` from the plugin root. Looked for: %s, %s',
 				$asset_path,
 				$js_path
 			)

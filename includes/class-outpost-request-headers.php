@@ -99,6 +99,52 @@ final class Outpost_Request_Headers {
 	}
 
 	/**
+	 * A query-string value as a key (sanitize_key), or '' when it is absent
+	 * or not a scalar string or integer. An array- or object-shaped value (`?tab[]=x`)
+	 * is refused without a PHP warning (T10-S3-13). For display flags and
+	 * selectors only: a caller still checks the nonce and capability before
+	 * any protected effect.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_key( string $key ): string {
+		// sanitize_key() returns '' for an array or object, with no warning.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		return isset( $_GET[ $key ] ) ? sanitize_key( wp_unslash( $_GET[ $key ] ) ) : '';
+	}
+
+	/**
+	 * Whether the query string carries `$key` at all, in any shape.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_present( string $key ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only.
+		return isset( $_GET[ $key ] );
+	}
+
+	/**
+	 * A query-string value as short text (sanitize_text_field, length-capped),
+	 * or '' when it is absent or not a single string. Same rules as
+	 * query_key().
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key        `$_GET` key.
+	 * @param int    $max_length Longest value accepted; longer values are refused.
+	 */
+	public static function query_text( string $key, int $max_length = 200 ): string {
+		// sanitize_text_field() returns '' for an array or object, with no warning.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		return strlen( $value ) > $max_length ? '' : $value;
+	}
+
+	/**
 	 * The REST nonce presented with this request, unslashed and sanitized, or
 	 * '' when none was sent.
 	 *
