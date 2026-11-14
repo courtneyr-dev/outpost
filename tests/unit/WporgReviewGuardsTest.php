@@ -65,6 +65,45 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertSame( $pwa[1], $server[1] );
 	}
 
+	/**
+	 * T10-S3-09: test fixtures and test-time HTTP interception never ship.
+	 * The Test fetch-recent provider and the WireMock rewriter live only
+	 * under tests/, and no shipped PHP mentions them or branches on the
+	 * integration-test mock-server constant.
+	 */
+	public function test_no_test_provider_or_mock_http_interception_ships(): void {
+		$root = dirname( __DIR__, 2 );
+		$this->assertFileDoesNotExist( $root . '/includes/sources/class-outpost-fetch-recent-test-provider.php' );
+		$this->assertFileDoesNotExist( $root . '/includes/class-outpost-mock-server-filter.php' );
+
+		$offenders = array();
+		$files     = array_merge( array( $root . '/outpost.php', $root . '/uninstall.php' ), $this->php_files( $root . '/includes' ) );
+		foreach ( $files as $path ) {
+			if ( ! is_file( $path ) ) {
+				continue;
+			}
+			$source = (string) file_get_contents( $path );
+			foreach ( array( 'Fetch_Recent_Test_Provider', 'Mock_Server_Filter', 'OUTPOST_TEST_MOCK_SERVER_URL', "'Test (sample data)'" ) as $needle ) {
+				if ( false !== strpos( $source, $needle ) ) {
+					$offenders[] = substr( $path, strlen( $root ) + 1 ) . ': ' . $needle;
+				}
+			}
+		}
+		$this->assertSame( array(), $offenders );
+	}
+
+	/** @return string[] */
+	private function php_files( string $dir ): array {
+		$out = array();
+		$it  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $it as $file ) {
+			if ( $file instanceof \SplFileInfo && 'php' === $file->getExtension() ) {
+				$out[] = $file->getPathname();
+			}
+		}
+		return $out;
+	}
+
 	public function test_scan_covers_the_plugin_source(): void {
 		$files = array_keys( self::shipped_tokens() );
 		$this->assertContains( 'includes/trait-bearer-auth.php', $files );
