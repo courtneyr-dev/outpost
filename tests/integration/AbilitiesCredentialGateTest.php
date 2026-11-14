@@ -289,6 +289,25 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	}
 
 	/**
+	 * The same request handled twice (re-entrant dispatch) keeps the outer frame after the inner one leaves (Q-01).
+	 */
+	public function test_a_reentrant_request_keeps_its_outer_frame(): void {
+		wp_set_current_user( $this->editor_id );
+		$request = new WP_REST_Request( 'POST', '/outpost-test/v1/ability-gate' );
+		$request->set_body_params( array( 'access_token' => 'unverified-0000' ) );
+
+		Outpost_Abilities::enter_request( null, array(), $request );
+		Outpost_Abilities::enter_request( null, array(), $request );
+		Outpost_Abilities::leave_request( null, array(), $request );
+		try {
+			$this->assertFalse( Outpost_Abilities::can_read_outpost(), 'The outer frame still carries the body token.' );
+		} finally {
+			Outpost_Abilities::leave_request( null, array(), $request );
+		}
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'Both frames are gone afterwards.' );
+	}
+
+	/**
 	 * A plain PHP caller (no cookie session, no token) keeps the capability check alone.
 	 */
 	public function test_a_plain_php_caller_keeps_the_capability_check(): void {
