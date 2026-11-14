@@ -251,6 +251,44 @@ describe('service worker share intake (T10-S3-05)', () => {
 	});
 });
 
+describe('share intake bounds before and after parsing (T10-S4-16)', () => {
+	beforeEach(() => {
+		globalThis.indexedDB = new IDBFactory();
+		passthrough = [];
+		load_worker();
+	});
+
+	it('passes a body that declares more than the intake limit through without parsing it', async () => {
+		let parsed = false;
+		const declared = String(policy.total + 1024 * 1024 + 1);
+		const real = share([image('a.png')]);
+		const oversized = {
+			method: 'POST',
+			url: real.url,
+			headers: new Headers({ 'content-length': declared }),
+			clone: (): Request => real.clone(),
+			formData: async (): Promise<FormData> => {
+				parsed = true;
+				return real.formData();
+			},
+		} as unknown as Request;
+
+		await dispatch(oversized);
+
+		expect(parsed).toBe(false);
+		expect(passthrough.length).toBe(1);
+		expect(await inbox()).toBeUndefined();
+	});
+
+	it('stores at most 4,000 characters of shared title and text', async () => {
+		await dispatch(share([image('a.png')], { title: 'T'.repeat(5000), text: 'x'.repeat(9000) }));
+
+		const parked = (await inbox()) as unknown as { title: string; text: string } | undefined;
+		expect(parked?.title.length).toBe(4000);
+		expect(parked?.text.length).toBe(4000);
+	});
+});
+
 describe('share policy parity (T10-S3-05 v1.1)', () => {
 	it('the worker accepts exactly the types and per-file size the upload processor accepts', () => {
 		load_worker();

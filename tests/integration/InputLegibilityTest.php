@@ -121,6 +121,16 @@ final class InputLegibilityTest extends TestCase {
 	}
 
 	/**
+	 * T10-S4-16 (Phase 4 C-05): shared title and text are bounded. The text
+	 * rides into the composer redirect URL, so an unbounded share would make
+	 * an oversized request line.
+	 */
+	public function test_shared_text_is_capped_at_4000_characters(): void {
+		$this->assertSame( 4000, mb_strlen( \Outpost_Source_Detector::sanitize_shared_text( str_repeat( 'é', 9000 ) ) ) );
+		$this->assertSame( 'short text', \Outpost_Source_Detector::sanitize_shared_text( 'short text' ) );
+	}
+
+	/**
 	 * @dataProvider denied_urls
 	 */
 	public function test_a_malformed_or_unsafe_url_is_denied( string $input ): void {
