@@ -10,7 +10,7 @@ How to remove Outpost from your site, what the uninstaller cleans up, and what i
 1. In wp-admin, go to **Plugins → Installed Plugins**.
 2. Find **Outpost** and select **Deactivate**.
 
-Deactivation is reversible and deletes no data. It flushes WordPress's rewrite rules, so `/post` stops serving the composer. Reactivating restores it.
+Deactivation is reversible. It deletes one thing: the iOS Shortcut's application password, because the rule that limits it to the Shortcut works only while Outpost is active. After reactivating, create a new Shortcut password under **Settings → Outpost iOS Shortcut** and paste it into the Shortcut. Deactivation also flushes WordPress's rewrite rules, so `/post` stops serving the composer; reactivating restores it.
 
 ## Delete the plugin
 
