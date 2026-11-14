@@ -71,6 +71,45 @@ final class WporgReviewGuardsTest extends TestCase {
 	 * under tests/, and no shipped PHP mentions them or branches on the
 	 * integration-test mock-server constant.
 	 */
+	/**
+	 * T10-S3-10: shipped PHP logs only through Outpost_Debug_Log, which is
+	 * gated on WP_DEBUG === true, and no log call is handed a response body,
+	 * a raw error message, error data, headers, or a credential.
+	 */
+	public function test_logging_goes_through_the_debug_gate_with_bounded_fields(): void {
+		$root      = dirname( __DIR__, 2 );
+		$files     = array_merge( array( $root . '/outpost.php', $root . '/uninstall.php' ), $this->php_files( $root . '/includes' ) );
+		$offenders = array();
+		$calls     = 0;
+		foreach ( $files as $path ) {
+			if ( ! is_file( $path ) ) {
+				continue;
+			}
+			$rel    = substr( $path, strlen( $root ) + 1 );
+			$source = (string) file_get_contents( $path );
+			if ( 'includes/class-outpost-debug-log.php' !== $rel ) {
+				foreach ( array( 'error_log(', 'print_r(', 'var_export(', 'var_dump(', 'debug_print_backtrace(' ) as $raw ) {
+					if ( false !== strpos( $source, $raw ) ) {
+						$offenders[] = "$rel: $raw outside Outpost_Debug_Log";
+					}
+				}
+			}
+			if ( preg_match_all( '/Outpost_Debug_Log::write\((.*?)\);/s', $source, $m ) ) {
+				foreach ( $m[1] as $args ) {
+					++$calls;
+					// error_code() is the approved way to name a WP_Error; drop it,
+					// then flag any accessor or variable that could carry a secret.
+					$checked = (string) preg_replace( '/Outpost_Debug_Log::error_code\(\s*\$\w+(?:\[[^\]]*\])*\s*\)/', '', $args );
+					if ( preg_match( '/get_error_message|get_error_data|get_headers|\$\w*(?:body|response|token|secret|password|header|cookie|nonce|creds|credential)\w*/i', $checked ) ) {
+						$offenders[] = "$rel: unbounded log argument: " . preg_replace( '/\s+/', ' ', trim( $args ) );
+					}
+				}
+			}
+		}
+		$this->assertSame( array(), $offenders );
+		$this->assertGreaterThan( 0, $calls, 'The inventory must find the remaining diagnostics.' );
+	}
+
 	public function test_no_test_provider_or_mock_http_interception_ships(): void {
 		$root = dirname( __DIR__, 2 );
 		$this->assertFileDoesNotExist( $root . '/includes/sources/class-outpost-fetch-recent-test-provider.php' );
