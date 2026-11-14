@@ -264,12 +264,15 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( $url, Outpost_Source_Detector::sanitize_shared_url( $url ) );
 	}
 
-	public function test_sanitize_shared_url_keeps_the_link_inside_a_text_blob(): void {
+	public function test_the_url_field_adapter_keeps_the_link_inside_a_text_blob(): void {
 		CoreSanitizerMocks::register();
 
-		// iOS apps put a quote plus the link in the url field. esc_url_raw()
-		// empties a blob, so the blob has to stay text.
-		$clean = Outpost_Source_Detector::sanitize_shared_url( "A good line.\n\nhttps://example.com/a%20b/caf%C3%A9" );
+		// iOS apps put a quote plus the link in the url field. The URL-only
+		// sanitizer refuses prose (T10-S3-13 v1.1); the field adapter keeps it
+		// as text so the link inside can be found and validated.
+		$blob = "A good line.\n\nhttps://example.com/a%20b/caf%C3%A9";
+		$this->assertSame( '', Outpost_Source_Detector::sanitize_shared_url( $blob ) );
+		$clean = Outpost_Source_Detector::sanitize_shared_url_field( $blob );
 
 		$this->assertSame( 'A good line. https://example.com/a%20b/caf%C3%A9', $clean );
 		$this->assertSame(
