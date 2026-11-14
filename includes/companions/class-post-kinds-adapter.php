@@ -96,6 +96,41 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 	}
 
 	/**
+	 * Whether Post Kinds registered one of its card blocks on this site.
+	 *
+	 * The editor pickers insert a card only when its block type exists, so
+	 * a Post Kinds release without the card keeps the plain paragraph.
+	 *
+	 * @param string $name Block name, e.g. `post-kinds-indieweb/sleep-card`.
+	 */
+	public static function has_card_block( string $name ): bool {
+		return class_exists( 'WP_Block_Type_Registry' ) && WP_Block_Type_Registry::get_instance()->is_registered( $name );
+	}
+
+	/**
+	 * A Post Kinds kind term in the shape the block editor's `editPost()`
+	 * takes: term ids keyed by the `kind` taxonomy's REST base.
+	 *
+	 * Empty when the taxonomy or the term doesn't exist; Post Kinds then
+	 * files the post by its first card on save.
+	 *
+	 * @param string $slug Kind slug, e.g. `sleep`.
+	 * @return array<string, list<int>>
+	 */
+	public static function kind_terms( string $slug ): array {
+		$taxonomy = get_taxonomy( 'kind' );
+		if ( ! $taxonomy instanceof WP_Taxonomy ) {
+			return array();
+		}
+		$term = get_term_by( 'slug', $slug, 'kind' );
+		if ( ! $term instanceof WP_Term ) {
+			return array();
+		}
+		$base = is_string( $taxonomy->rest_base ) && '' !== $taxonomy->rest_base ? $taxonomy->rest_base : 'kind';
+		return array( $base => array( (int) $term->term_id ) );
+	}
+
+	/**
 	 * Whether the installed Post Kinds builds the comic card.
 	 *
 	 * Post Kinds turns a Micropub `read-of` entry that carries

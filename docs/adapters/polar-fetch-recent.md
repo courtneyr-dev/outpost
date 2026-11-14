@@ -52,6 +52,16 @@ The sport name is normalized: Polar returns `RUNNING` / `STRENGTH_TRAINING`; the
 
 ISO 8601 duration parsing handles `PT45M30S`-style values into total minutes for the title.
 
+With Post Kinds active (its `post-kinds-indieweb/exercise-card` block registered), the payload adds what the picker inserts in place of the paragraph:
+
+```
+blocks: [ { name: "post-kinds-indieweb/exercise-card",
+            attributes: { activity: "Running", distance: 5.2, distanceUnit: "km", duration: "PT32M" } } ]
+terms:  { kind: [ <id of the exercise term> ] }
+```
+
+The card keeps distance and duration private until its author turns on showing details, and it has no field for start time, calories or heart rate. `_outpost_polar_start_time` is left out of `post_meta` on this path, so the start time reaches neither the card, the content nor the meta. Polar's fractional seconds are rounded to whole seconds. `terms` is left out when the site has no `exercise` term yet; Post Kinds files the post by its first card on save.
+
 ## Roundtrip count
 
 Per modal open: 1 POST (start transaction) + 1 GET (list URLs) + N GETs (one per exercise, capped at `MAX_EXERCISES_PER_FETCH = 25`). If the caller's `count` is less than 25, the per-exercise loop short-circuits at count.
