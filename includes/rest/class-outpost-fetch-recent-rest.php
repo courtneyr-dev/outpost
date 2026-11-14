@@ -126,7 +126,10 @@ final class Outpost_Fetch_Recent_REST {
 	 * @param WP_REST_Request $request Current REST request.
 	 */
 	public static function permission_callback( WP_REST_Request $request ): bool {
-		return self::is_first_party_cookie_request( $request ) && current_user_can( 'edit_posts' );
+		if ( ! self::is_first_party_cookie_request( $request ) ) {
+			return false;
+		}
+		return current_user_can( 'edit_posts' );
 	}
 
 	/**

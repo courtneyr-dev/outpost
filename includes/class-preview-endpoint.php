@@ -128,24 +128,36 @@ final class Outpost_Preview_Endpoint {
 		// Read-only: fetches and sanitizes a target URL, writes nothing.
 		// A token scoped for `read` alone (as well as `create`/`update`)
 		// may use it.
-		$can_edit  = current_user_can( 'edit_posts' );
-		$has_scope = self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
-		$allow     = $can_edit && $has_scope;
+		$message = __( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+			// A capable user whose bearer token lacks scope is
+			// authenticated but forbidden (403); everyone else is
+			// simply not authenticated (401) — mirrors core's own
+			// rest_authorization_required_code() convention.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
 		/**
 		 * Override the preview-endpoint permission decision.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * Decides the capability check only. The credential check above has
+		 * already passed, so returning true never admits a cookie session
+		 * without a valid REST nonce or a token without an accepted scope.
+		 *
+		 * @param bool $allow Whether the current user has `edit_posts`.
 		 */
-		$allow = (bool) apply_filters( 'outpost_preview_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_preview_permission', current_user_can( 'edit_posts' ) );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' ),
-				// A capable user whose bearer token lacks scope is
-				// authenticated but forbidden (403); everyone else is
-				// simply not authenticated (401) — mirrors core's own
-				// rest_authorization_required_code() convention.
-				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
+				$message,
+				array( 'status' => 401 )
 			);
 		}
 		return true;

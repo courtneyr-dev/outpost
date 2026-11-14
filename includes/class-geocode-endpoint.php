@@ -110,22 +110,34 @@ final class Outpost_Geocode_Endpoint {
 		// Read-only: proxies Nominatim, writes nothing but a rate-limit /
 		// result cache transient. A token scoped for `read` alone (as well
 		// as `create`/`update`) may use it.
-		$can_edit  = current_user_can( 'edit_posts' );
-		$has_scope = self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
-		$allow     = $can_edit && $has_scope;
+		$message = __( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
 		/**
 		 * Override the geocode-endpoint permission decision.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * Decides the capability check only. The credential check above has
+		 * already passed, so returning true never admits a cookie session
+		 * without a valid REST nonce or a token without an accepted scope.
+		 *
+		 * @param bool $allow Whether the current user has `edit_posts`.
 		 */
-		$allow = (bool) apply_filters( 'outpost_geocode_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_geocode_permission', current_user_can( 'edit_posts' ) );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' ),
-				// See Outpost_Preview_Endpoint::check_permission() for the
-				// 401-vs-403 rationale.
-				array( 'status' => ( $can_edit && ! $has_scope ) ? 403 : 401 )
+				$message,
+				array( 'status' => 401 )
 			);
 		}
 		return true;

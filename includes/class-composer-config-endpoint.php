@@ -227,13 +227,23 @@ final class Outpost_Composer_Config_Endpoint {
 		// Read-only: aggregates companion-plugin status + taxonomy terms +
 		// settings, writes nothing but a rate-limit transient. A token
 		// scoped for `read` alone (as well as `create`/`update`) may use it.
-		$allow = current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+			return false;
+		}
 		/**
 		 * Override the composer-config permission decision.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * Decides the capability check only. The credential check above has
+		 * already passed, so returning true opens the route to anonymous
+		 * requests but never admits a cookie session without a valid REST
+		 * nonce or a token without an accepted scope.
+		 *
+		 * @param bool $allow Whether the current user has `edit_posts`.
 		 */
-		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
+		return (bool) apply_filters( 'outpost_composer_config_permission', current_user_can( 'edit_posts' ) );
 	}
 
 	/**

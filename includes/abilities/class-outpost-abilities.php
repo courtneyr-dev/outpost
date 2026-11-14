@@ -313,7 +313,10 @@ final class Outpost_Abilities {
 	 */
 	public static function can_read_outpost(): bool {
 		$request = array() === self::$requests ? new WP_REST_Request( 'GET' ) : end( self::$requests );
-		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, self::READ_SCOPES );
+		if ( ! self::bearer_has_scope( $request, self::READ_SCOPES ) ) {
+			return false;
+		}
+		return current_user_can( 'edit_posts' );
 	}
 
 	/**
@@ -333,7 +336,10 @@ final class Outpost_Abilities {
 			return false;
 		}
 
-		return self::can_read_outpost() && current_user_can( 'edit_post', $post_id );
+		if ( ! self::can_read_outpost() ) {
+			return false;
+		}
+		return current_user_can( 'edit_post', $post_id );
 	}
 
 	/**

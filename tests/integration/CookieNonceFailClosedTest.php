@@ -63,6 +63,7 @@ final class CookieNonceFailClosedTest extends TestCase {
 		remove_action( 'added_user_meta', array( $this, 'count_meta_write' ), 10 );
 		remove_action( 'updated_user_meta', array( $this, 'count_meta_write' ), 10 );
 		remove_filter( 'rest_authentication_errors', '__return_true', 5 );
+		remove_filter( 'outpost_composer_config_permission', '__return_true' );
 		$_SERVER                        = $this->saved_server;
 		$_REQUEST                       = $this->saved_request;
 		$GLOBALS['wp_rest_auth_cookie'] = $this->saved_auth_cookie;
@@ -210,5 +211,64 @@ final class CookieNonceFailClosedTest extends TestCase {
 		$this->assertSame( 'rest_cookie_invalid_nonce', $result['auth']->get_error_code() );
 		$this->assertNull( $result['response'] );
 		$this->assertSame( 0, $this->meta_writes );
+	}
+
+	/**
+	 * P-3 (T10 pushback): a site filter on `outpost_composer_config_permission`
+	 * decides the capability question only. It must never waive the cookie
+	 * session's nonce, so a filter returning true still leaves a cookie request
+	 * with a missing or invalid nonce refused, before any protected work.
+	 *
+	 * @dataProvider bad_nonces
+	 *
+	 * @param ?string $nonce Nonce to send.
+	 */
+	public function test_composer_config_filter_cannot_waive_the_nonce_behind_a_third_party_gate( ?string $nonce ): void {
+		add_filter( 'rest_authentication_errors', '__return_true', 5 );
+		add_filter( 'outpost_composer_config_permission', '__return_true' );
+		$this->arrive_as_cookie_editor( $nonce );
+		$rows_before = $this->config_rate_limit_rows();
+
+		$result = $this->serve( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
+
+		$this->assertTrue( $result['auth'], 'Precondition: the third-party gate made core skip its nonce check.' );
+		$this->assertNotNull( $result['response'] );
+		$this->assertGreaterThanOrEqual( 401, $result['response']->get_status(), 'The permission filter must not override a failed nonce check.' );
+		$this->assertArrayNotHasKey( 'companions', (array) $result['response']->get_data(), 'The handler must not build the config body.' );
+		$this->assertSame( $rows_before, $this->config_rate_limit_rows(), 'A refused request must not spend rate-limit budget.' );
+	}
+
+	/**
+	 * Default core demotes a nonce-less cookie session to user 0 but leaves
+	 * `$wp_rest_auth_cookie` true. The filter still must not admit it.
+	 */
+	public function test_composer_config_filter_cannot_waive_a_missing_nonce_under_default_core(): void {
+		add_filter( 'outpost_composer_config_permission', '__return_true' );
+		$this->arrive_as_cookie_editor( null );
+		$rows_before = $this->config_rate_limit_rows();
+
+		$result = $this->serve( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
+
+		$this->assertNotNull( $result['response'] );
+		$this->assertGreaterThanOrEqual( 401, $result['response']->get_status() );
+		$this->assertArrayNotHasKey( 'companions', (array) $result['response']->get_data() );
+		$this->assertSame( $rows_before, $this->config_rate_limit_rows() );
+	}
+
+	/**
+	 * Control: the documented anonymous opt-in still works. With no cookie
+	 * session and no token, the filter decides the capability result.
+	 */
+	public function test_composer_config_filter_still_opts_in_anonymous_requests(): void {
+		add_filter( 'outpost_composer_config_permission', '__return_true' );
+		wp_set_current_user( 0 );
+		$GLOBALS['wp_rest_auth_cookie'] = false;
+		unset( $_REQUEST['_wpnonce'], $_SERVER['HTTP_X_WP_NONCE'], $_SERVER['HTTP_AUTHORIZATION'] );
+
+		$result = $this->serve( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
+
+		$this->assertNotNull( $result['response'] );
+		$this->assertSame( 200, $result['response']->get_status() );
+		$this->assertArrayHasKey( 'companions', (array) $result['response']->get_data() );
 	}
 }

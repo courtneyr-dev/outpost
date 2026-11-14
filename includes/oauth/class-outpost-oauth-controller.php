@@ -154,8 +154,10 @@ final class Outpost_OAuth_Controller {
 	 * @param \WP_REST_Request $request REST request.
 	 */
 	public static function permission_check( \WP_REST_Request $request ): bool {
-		return self::is_first_party_cookie_request( $request )
-			&& current_user_can( 'manage_options' );
+		if ( ! self::is_first_party_cookie_request( $request ) ) {
+			return false;
+		}
+		return current_user_can( 'manage_options' );
 	}
 
 	/**

@@ -624,37 +624,61 @@ final class WporgReviewGuardsTest extends TestCase {
 
 	/**
 	 * T10 (2026-11-13): "make sure the nonce logic is correct ... fail early
-	 * if the nonce is missing." No wp_verify_nonce() call may share its
-	 * statement with an `&&`: an AND-gated nonce check is skipped whenever
-	 * the other operand short-circuits. Every check stands alone (or uses the
-	 * reviewer's own `! isset() || ! wp_verify_nonce()` early-fail form) and
-	 * fails before the protected work. The behavioral side of this lives in
-	 * BearerAuthCookieNonceTest and the CookieNonceFailClosedTest integration test.
+	 * if the nonce is missing." No nonce check may share its statement with
+	 * an `&&`: an AND-gated nonce check is skipped whenever the other operand
+	 * short-circuits. Every check stands alone (or uses the reviewer's own
+	 * `! isset() || ! wp_verify_nonce()` early-fail form) and fails before the
+	 * protected work.
+	 *
+	 * F-42 (2026-11-14) widened this. Outpost's REST callbacks check the
+	 * nonce inside helpers, so a call to one of those helpers counts the same
+	 * as `wp_verify_nonce()`. And a check's result may not be stored in a
+	 * variable: `$has_scope = self::bearer_has_scope(…)` followed by
+	 * `$allow = $can_edit && $has_scope` and a permission filter let a site
+	 * filter override a failed nonce. Each check returns its refusal where
+	 * it runs. The behavioral side lives in BearerAuthCookieNonceTest and the
+	 * CookieNonceFailClosedTest and PermissionFilterNonceTest integration tests.
 	 */
 	public function test_no_nonce_check_is_and_gated(): void {
+		$checks   = array( 'wp_verify_nonce', 'bearer_has_scope', 'is_first_party_cookie_request', 'can_read_outpost' );
 		$found    = array();
-		$verified = 0;
+		$verified = array();
 		foreach ( self::shipped_tokens() as $file => $tokens ) {
 			$count = count( $tokens );
 			for ( $i = 0; $i < $count; $i++ ) {
-				if ( ! is_array( $tokens[ $i ] ) || T_STRING !== $tokens[ $i ][0] || 'wp_verify_nonce' !== $tokens[ $i ][1] ) {
+				if ( ! is_array( $tokens[ $i ] ) || T_STRING !== $tokens[ $i ][0] || ! in_array( $tokens[ $i ][1], $checks, true ) ) {
 					continue;
 				}
-				++$verified;
+				// Skip the helper definitions and callable references such as
+				// `array( self::class, 'can_read_outpost' )`.
+				$prev = $i - 1;
+				while ( $prev >= 0 && is_array( $tokens[ $prev ] ) && T_WHITESPACE === $tokens[ $prev ][0] ) {
+					--$prev;
+				}
+				if ( $prev >= 0 && is_array( $tokens[ $prev ] ) && T_FUNCTION === $tokens[ $prev ][0] ) {
+					continue;
+				}
+				$verified[ $tokens[ $i ][1] ] = true;
+				$where                        = $file . ':' . $tokens[ $i ][2] . ' ' . $tokens[ $i ][1];
 				// Walk out to the statement boundaries on both sides.
 				for ( $a = $i - 1; $a >= 0 && ! in_array( self::text( $tokens[ $a ] ), array( ';', '{', '}' ), true ); $a-- ) {
 					if ( is_array( $tokens[ $a ] ) && T_BOOLEAN_AND === $tokens[ $a ][0] ) {
-						$found[] = $file . ':' . $tokens[ $i ][2];
+						$found[] = $where . ' (&&)';
+					}
+					if ( '=' === self::text( $tokens[ $a ] ) ) {
+						$found[] = $where . ' (stored in a variable)';
 					}
 				}
 				for ( $b = $i + 1; $b < $count && ! in_array( self::text( $tokens[ $b ] ), array( ';', '{', '}' ), true ); $b++ ) {
 					if ( is_array( $tokens[ $b ] ) && T_BOOLEAN_AND === $tokens[ $b ][0] ) {
-						$found[] = $file . ':' . $tokens[ $i ][2];
+						$found[] = $where . ' (&&)';
 					}
 				}
 			}
 		}
-		$this->assertGreaterThan( 0, $verified, 'The scan must see the plugin\'s nonce checks.' );
+		foreach ( $checks as $check ) {
+			$this->assertArrayHasKey( $check, $verified, "The scan must see the plugin's {$check}() calls." );
+		}
 		$this->assertSame( array(), array_values( array_unique( $found ) ) );
 	}
 }
