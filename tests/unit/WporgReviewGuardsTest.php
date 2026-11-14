@@ -117,7 +117,7 @@ final class WporgReviewGuardsTest extends TestCase {
 			$this->assertStringContainsString( $needle, $readme, "readme.txt keeps: $needle" );
 		}
 		foreach ( array(
-			'brid.gy', 'api.telegra.ph', 'api.beehiiv.com', 'api.buttondown.email', 'api.convertkit.com', 'write.as',
+			'api.telegra.ph', 'api.beehiiv.com', 'api.buttondown.email', 'api.convertkit.com', 'write.as',
 			'Vimeo', 'YouTube', 'Spotify', 'SoundCloud', 'TMDB', 'Open Library', 'MusicBrainz', 'RAWG', 'BoardGameGeek', 'Foursquare',
 			'nominatim.openstreetmap.org', 'api.notion.com', 'api.ouraring.com', 'api.prod.whoop.com', 'www.polaraccesslink.com',
 			'ridewithgps.com', 'api.ravelry.com', 'Facebook', 'Threads', 'Pinterest', 'Reddit', 'LinkedIn', 'Instagram', 'TikTok',
@@ -125,6 +125,15 @@ final class WporgReviewGuardsTest extends TestCase {
 		) as $service ) {
 			$this->assertStringContainsString( $service, $readme, "External services discloses $service." );
 		}
+		// T10-S4-02 (F-24): Outpost has no webmention sender, so Bridgy is
+		// not a service it contacts; the readme says so instead of listing it.
+		$this->assertStringNotContainsString( '* Bridgy', $readme, 'Bridgy is not listed as a service Outpost contacts.' );
+		$this->assertStringContainsString( 'Outpost sends nothing to Bridgy', $readme );
+		$this->assertStringContainsString(
+			'Threads ([Terms](https://help.instagram.com/769983657850450), [Privacy](https://help.instagram.com/515230437301944))',
+			$readme,
+			'Threads links its own terms and its supplemental privacy policy.'
+		);
 		$this->assertFileExists( $root . '/CHANGELOG.md' );
 		$this->assertMatchesRegularExpression( '/^CHANGELOG\.md$/m', (string) file_get_contents( $root . '/.distignore' ), 'CHANGELOG.md is not packaged.' );
 		$this->assertSame( 1, preg_match( '/^Stable tag:\s*(\S+)\s*$/m', $readme, $tag ) );
