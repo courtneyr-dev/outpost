@@ -4,19 +4,21 @@
  * Web Share Target Level 2 delivers shared image files as a multipart POST
  * to /post/share-target. The service worker (emitted by
  * includes/class-pwa-shell.php) intercepts that POST, parks the files here
- * in IndexedDB, and redirects to /post/?mode=photo&shared=photos. PhotoMode
- * drains the inbox when it mounts with that dispatch, so the picture is
- * already attached when the composer opens.
+ * in IndexedDB, and redirects to /post/?mode=photo&shared=photos. The
+ * composer (ComposerTabs) holds that share in ShareReview until the person
+ * chooses "Use shared content" or "Discard shared content"; only after Use
+ * does PhotoMode mount and drain the `pending` slot.
  *
  * IndexedDB rather than sessionStorage: the service worker has no window
  * (so no sessionStorage to share), and sessionStorage holds strings only.
  * Each photo is parked as a plain record — name, type, bytes — rather than
  * a File, because Blob storage in IndexedDB has a patchy history across
- * engines and bytes rebuild into a File for free. One record under a fixed
- * key: the service worker never replaces a share that is still waiting, and
- * it parks only supported raster images within its size and count limits.
- * Nothing here is uploaded until the user posts, and Photo mode saves no
- * draft from a share until the person edits the form.
+ * engines and bytes rebuild into a File for free. Two fixed slots: the
+ * waiting share (`pending`) and at most one newer share (`candidate`) while
+ * the person decides between them; the service worker never overwrites
+ * either, refuses a third share, and parks only supported raster images
+ * within its size and count limits. Nothing here is uploaded until the
+ * person chooses Use and then posts.
  *
  * The database, store, and key names must match the service worker.
  */

@@ -219,7 +219,8 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 
 	// Photo tab: photo + gallery (gallery routes through the same component).
 	// `shared=photos` is the service worker saying it parked the shared
-	// files in the inbox; PhotoMode drains them on mount.
+	// files in the inbox; ComposerTabs holds them for review, and PhotoMode
+	// drains them only after the person chooses Use.
 	if (mode === 'photo' || mode === 'gallery') {
 		return {
 			tab: 'photo',
