@@ -71,7 +71,7 @@
     "@wordpress/data": "^10.21.0",
     "@wordpress/edit-post": "^8.45.0",
     "@wordpress/element": "^6.21.0",
-    "@wordpress/env": "^11.5.0",
+    "@wordpress/env": "^12.1.0",
     "@wordpress/i18n": "^6.26.0",
     "@wordpress/icons": "^10.21.0",
     "@wordpress/plugins": "^7.45.0",
@@ -81,19 +81,19 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.0.0",
-    "happy-dom": "^20.11.13",
+    "happy-dom": "^21.0.4",
     "preact": "^10.24.0",
     "prettier": "^3.3.0",
     "prop-for-that": "0.7.12",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.68.0",
-    "vite": "^6.0.0",
+    "vite": "^6.4.6",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^3.2.7",
+    "vitest": "^4.1.12",
     "workbox-window": "^7.3.0"
   },
   "engines": {
-    "node": ">=20.10.0",
+    "node": ">=22.13.0",
     "npm": ">=10.0.0"
   },
   "jest": {
@@ -114,5 +114,9 @@
     "transform": {
       "\\.[jt]sx?$": "<rootDir>/node_modules/@wordpress/scripts/config/babel-transform.js"
     }
+  },
+  "overrides": {
+    "qs": "6.16.1",
+    "isomorphic-git": "1.38.6"
   }
 }

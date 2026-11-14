@@ -33,10 +33,7 @@ export default defineConfig({
 	plugins: [preact()],
 	test: {
 		environment: 'happy-dom',
-		poolOptions: {
-			forks: { execArgv },
-			threads: { execArgv },
-		},
+		execArgv,
 		globals: false,
 		include: ['pwa/src/**/*.{test,spec}.{ts,tsx}'],
 		coverage: {
