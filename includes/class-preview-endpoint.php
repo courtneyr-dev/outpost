@@ -734,6 +734,24 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
+	 * Whether the vetted-address pin will take effect for this request:
+	 * Requests picks its curl transport (it tries curl first, with the same
+	 * SSL capability it derives from the URL) and no WordPress proxy routes
+	 * the URL. Without both, the connection could resolve the host again.
+	 *
+	 * @param string $url URL about to be fetched.
+	 */
+	private static function pin_applies( string $url ): bool {
+		$https = 'https' === strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! class_exists( \WpOrg\Requests\Transport\Curl::class )
+			|| true !== \WpOrg\Requests\Transport\Curl::test( array( \WpOrg\Requests\Capability::SSL => $https ) ) ) {
+			return false;
+		}
+		$proxy = new \WP_HTTP_Proxy();
+		return ! ( $proxy->is_enabled() && $proxy->send_through_proxy( $url ) );
+	}
+
+	/**
 	 * Fetch a URL with SSRF-safe, per-hop redirect validation.
 	 *
 	 * `wp_safe_remote_get()` blocks loopback + RFC1918 but not the ranges
@@ -751,10 +769,10 @@ final class Outpost_Preview_Endpoint {
 	 * `WP_Http::request()` sends through Requests, and the action fires from
 	 * `WP_Http_Requests_Hooks::dispatch()` on Requests' `curl.before_send`
 	 * hook, so the pin only takes effect when Requests uses its curl
-	 * transport — if the curl extension is unavailable, Requests falls back
-	 * to `fsockopen`, and a configured `WP_PROXY_HOST` routes the connection
-	 * through a proxy instead; in both cases this pin has no effect and the
-	 * guard's per-hop revalidation is the only protection for that hop.
+	 * transport. If the curl extension can't serve the hop, Requests falls
+	 * back to `fsockopen`, and a configured `WP_PROXY_HOST` routes the
+	 * connection through a proxy; the pin would have no effect in either
+	 * case, so the hop is refused before anything is sent (T10-S4-17).
 	 *
 	 * @param string   $url             Initial URL (already scheme/host-validated).
 	 * @param string[] $accept_prefixes Accept header content-type prefixes.
@@ -766,6 +784,10 @@ final class Outpost_Preview_Endpoint {
 			$host = (string) wp_parse_url( $current, PHP_URL_HOST );
 			$ip   = '' === $host ? null : Outpost_Url_Guard::resolve_safe_ip( $host );
 			if ( null === $ip ) {
+				return self::generic_fetch_error();
+			}
+
+			if ( ! self::pin_applies( $current ) ) {
 				return self::generic_fetch_error();
 			}
 
