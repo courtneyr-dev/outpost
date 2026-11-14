@@ -5,9 +5,9 @@
  * `/oauth/{provider}/start`, `/disconnect` and `/verify` are wp-admin
  * actions gated on `manage_options`. IndieAuth's map_meta_cap never
  * restricts `manage_options`, so without a bearer check an admin's token
- * of any scope could call them. The routes refuse every bearer request;
- * a cookie session with a valid REST nonce, and a request with no
- * credential, are decided by the capability check as before.
+ * of any scope could call them. The routes need a cookie session with a
+ * valid REST nonce; every bearer request and every other logged-in request
+ * (an application password, for one) is refused (T10-S4-11).
  *
  * @package Outpost
  */

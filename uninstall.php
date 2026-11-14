@@ -6,8 +6,9 @@
  * deactivating it). Deletes exactly the persistent data Outpost created and
  * nothing WordPress or another plugin owns.
  *
- * Deactivation (`outpost_deactivate()` in outpost.php) is reversible and must
- * NOT delete user data. Uninstall is one-way — the admin chose to remove
+ * Deactivation (`outpost_deactivate()` in outpost.php) is reversible and
+ * deletes only the iOS Shortcut's application passwords, because the rule
+ * that limits them stops loading (T10-S4-09). Uninstall is one-way — the admin chose to remove
  * Outpost, so its own options, encrypted credentials, keys, tokens, caches,
  * transients, and scheduled events are removed here, on single-site and every
  * site of a multisite network. Posts, attachments, post content, alt text,

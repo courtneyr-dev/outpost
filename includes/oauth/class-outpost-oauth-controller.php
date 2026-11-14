@@ -8,9 +8,10 @@
  *   GET  /wp-json/outpost/v1/oauth/{provider}/callback   → exchange code, store creds
  *   POST /wp-json/outpost/v1/oauth/{provider}/disconnect → revoke + delete creds
  *
- * The start, disconnect and verify routes require a logged-in user with
- * manage_options and refuse any request that carries an IndieAuth bearer
- * token (see permission_check()). The callback URL pattern is fixed; each
+ * The start, disconnect and verify routes require the person's own
+ * wp-admin session (a cookie with a valid REST nonce) and manage_options;
+ * bearer tokens and application passwords are refused (see
+ * permission_check()). The callback URL pattern is fixed; each
  * provider's app registration uses its own callback URL with the provider
  * id in the path.
  *
