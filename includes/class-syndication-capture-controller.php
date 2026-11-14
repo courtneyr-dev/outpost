@@ -110,7 +110,7 @@ final class Outpost_Syndication_Capture_Controller {
 		$required_scopes = 'GET' === $request->get_method()
 			? array( 'create', 'update', 'read' )
 			: array( 'create', 'update' );
-		$message = __( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' );
+		$message         = __( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' );
 		// Credential first, and it fails early: a cookie session without a
 		// valid REST nonce, or a token without an accepted scope, is refused
 		// here, before the capability check. No filter can change this.

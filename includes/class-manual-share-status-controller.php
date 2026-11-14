@@ -118,7 +118,7 @@ final class Outpost_Manual_Share_Status_Controller {
 		$required_scopes = 'GET' === $request->get_method()
 			? array( 'create', 'update', 'read' )
 			: array( 'create', 'update' );
-		$message = __( 'Outpost manual-share status requires an authenticated user.', 'outpost-mobile-publishing' );
+		$message         = __( 'Outpost manual-share status requires an authenticated user.', 'outpost-mobile-publishing' );
 		// Credential first, and it fails early: a cookie session without a
 		// valid REST nonce, or a token without an accepted scope, is refused
 		// here, before the capability check. No filter can change this.
