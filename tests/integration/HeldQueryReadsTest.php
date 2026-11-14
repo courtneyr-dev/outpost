@@ -104,6 +104,9 @@ final class HeldQueryReadsTest extends TestCase {
 		return (string) ob_get_clean();
 	}
 
+	/**
+	 * An array shaped dismissal value writes nothing and raises no warning.
+	 */
 	public function test_an_array_shaped_dismissal_value_writes_nothing_and_raises_no_warning(): void {
 		$id = $this->user( 'administrator' );
 		$this->query(
@@ -118,6 +121,9 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertSame( '', get_user_meta( $id, self::DISMISSAL_DATABASE_META, true ) );
 	}
 
+	/**
+	 * A valid dismissal is recorded.
+	 */
 	public function test_a_valid_dismissal_is_recorded(): void {
 		$id = $this->user( 'administrator' );
 		$this->query(
@@ -132,6 +138,9 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertSame( '1', get_user_meta( $id, self::DISMISSAL_DATABASE_META, true ) );
 	}
 
+	/**
+	 * A dismissal without manage options does nothing.
+	 */
 	public function test_a_dismissal_without_manage_options_does_nothing(): void {
 		$id = $this->user( 'editor' );
 		$this->query(
@@ -146,6 +155,9 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertSame( '', get_user_meta( $id, self::DISMISSAL_DATABASE_META, true ) );
 	}
 
+	/**
+	 * A dismissal with a bad nonce stops before any write.
+	 */
 	public function test_a_dismissal_with_a_bad_nonce_stops_before_any_write(): void {
 		$id = $this->user( 'administrator' );
 		$this->query(
@@ -164,6 +176,9 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertSame( '', get_user_meta( $id, self::DISMISSAL_DATABASE_META, true ) );
 	}
 
+	/**
+	 * The OAuth notice names the registered provider label.
+	 */
 	public function test_the_oauth_notice_names_the_registered_provider_label(): void {
 		$provider = \Outpost_OAuth_Controller::get_provider( 'oura' );
 		$this->assertNotNull( $provider, 'Control: Oura is registered.' );
@@ -178,6 +193,9 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertStringContainsString( esc_html( $provider->label() . ' connected successfully.' ), $html );
 	}
 
+	/**
+	 * An unknown provider gets no notice.
+	 */
 	public function test_an_unknown_provider_gets_no_notice(): void {
 		$html = $this->notice(
 			array(
@@ -189,11 +207,17 @@ final class HeldQueryReadsTest extends TestCase {
 		$this->assertSame( '', $html );
 	}
 
+	/**
+	 * Array shaped OAuth values get no notice and no warning.
+	 */
 	public function test_array_shaped_oauth_values_get_no_notice_and_no_warning(): void {
 		$this->assertSame( '', $this->notice( array( 'outpost_oauth_status' => array( 'connected' ), 'outpost_oauth_provider' => 'oura' ) ) );
 		$this->assertSame( '', $this->notice( array( 'outpost_oauth_status' => 'connected', 'outpost_oauth_provider' => array( 'oura' ) ) ) );
 	}
 
+	/**
+	 * The OAuth page refuses a user without manage options.
+	 */
 	public function test_the_oauth_page_refuses_a_user_without_manage_options(): void {
 		$this->user( 'editor' );
 		$this->query( array( 'outpost_oauth_status' => 'connected', 'outpost_oauth_provider' => 'oura' ) );

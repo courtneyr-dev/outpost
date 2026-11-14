@@ -88,6 +88,9 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 		parent::tearDown();
 	}
 
+	/**
+	 * Record each transient name a request writes.
+	 */
 	public function record_transient( string $name ): void {
 		$this->transients[] = $name;
 	}
@@ -173,6 +176,9 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 		$this->assert_untouched();
 	}
 
+	/**
+	 * The wp-admin session starts a connection.
+	 */
 	public function test_the_wp_admin_session_starts_a_connection(): void {
 		$this->arrive_with_cookie( true );
 
@@ -180,6 +186,9 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 		$this->assertCount( 1, preg_grep( '/^outpost_oauth_state_/', $this->transients ), 'One OAuth state is written.' );
 	}
 
+	/**
+	 * The wp-admin session verifies a connection.
+	 */
 	public function test_the_wp_admin_session_verifies_a_connection(): void {
 		$this->arrive_with_cookie( true );
 
@@ -187,6 +196,9 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 		$this->assertNotSame( array(), $this->outbound, 'Verification asks the provider.' );
 	}
 
+	/**
+	 * The wp-admin session disconnects.
+	 */
 	public function test_the_wp_admin_session_disconnects(): void {
 		$this->arrive_with_cookie( true );
 

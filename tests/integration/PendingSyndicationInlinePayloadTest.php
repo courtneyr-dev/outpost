@@ -26,6 +26,9 @@ final class PendingSyndicationInlinePayloadTest extends TestCase {
 		}
 	}
 
+	/**
+	 * The inline payload carries no markup characters and round trips.
+	 */
 	public function test_the_inline_payload_carries_no_markup_characters_and_round_trips(): void {
 		$payload = array(
 			'message'   => 'Pending <!--<script> and </script> & "quotes" \'apostrophes\'',

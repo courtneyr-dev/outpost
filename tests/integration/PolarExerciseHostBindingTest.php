@@ -117,6 +117,9 @@ final class PolarExerciseHostBindingTest extends TestCase {
 		return array_column( $this->sent, 'url' );
 	}
 
+	/**
+	 * A permitted exercise url is fetched with the token and no redirects.
+	 */
 	public function test_a_permitted_exercise_url_is_fetched_with_the_token_and_no_redirects(): void {
 		$this->listed = array( $this->exercise_url( '9001' ), array( 'url' => $this->exercise_url( 'a-9_2' ) ) );
 

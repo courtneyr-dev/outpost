@@ -58,6 +58,9 @@ final class AppearanceHandlePostCapabilityTest extends TestCase {
 		return \Outpost_Appearance_REST_Controller::handle_post( $request );
 	}
 
+	/**
+	 * A user without edit posts is refused and nothing is written.
+	 */
 	public function test_a_user_without_edit_posts_is_refused_and_nothing_is_written(): void {
 		$subscriber = $this->user( 'subscriber' );
 		$before     = get_user_meta( $subscriber );
@@ -69,6 +72,9 @@ final class AppearanceHandlePostCapabilityTest extends TestCase {
 		$this->assertSame( $before, get_user_meta( $subscriber ), 'No preference is written.' );
 	}
 
+	/**
+	 * A user with edit posts still saves.
+	 */
 	public function test_a_user_with_edit_posts_still_saves(): void {
 		$author = $this->user( 'author' );
 

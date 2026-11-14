@@ -79,6 +79,9 @@ final class ShortcutRoutePermissionTest extends TestCase {
 		return $this->response()->get_status();
 	}
 
+	/**
+	 * The shortcut application password still works.
+	 */
 	public function test_the_shortcut_application_password_still_works(): void {
 		wp_set_current_user( $this->editor_id );
 		$GLOBALS['wp_rest_auth_cookie']               = false;
@@ -89,6 +92,9 @@ final class ShortcutRoutePermissionTest extends TestCase {
 		$this->assertSame( 200, $this->post() );
 	}
 
+	/**
+	 * A cookie session with a valid nonce works.
+	 */
 	public function test_a_cookie_session_with_a_valid_nonce_works(): void {
 		wp_set_current_user( $this->editor_id );
 		$GLOBALS['wp_rest_auth_cookie'] = true;
@@ -98,6 +104,9 @@ final class ShortcutRoutePermissionTest extends TestCase {
 		$this->assertSame( 200, $this->post() );
 	}
 
+	/**
+	 * A cookie session without a nonce is refused.
+	 */
 	public function test_a_cookie_session_without_a_nonce_is_refused(): void {
 		wp_set_current_user( $this->editor_id );
 		$GLOBALS['wp_rest_auth_cookie'] = true;

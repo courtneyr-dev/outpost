@@ -89,12 +89,18 @@ final class BridgyOutboundTest extends TestCase {
 		return 'brid.gy' === $host || str_ends_with( $host, '.brid.gy' );
 	}
 
+	/**
+	 * The recorder sees a Bridgy request when one is made.
+	 */
 	public function test_the_recorder_sees_a_bridgy_request_when_one_is_made(): void {
 		wp_remote_post( 'https://brid.gy/publish/webmention' );
 
 		$this->assertTrue( self::is_bridgy_host( $this->hosts[0] ?? '' ), 'Control: a brid.gy request is recorded.' );
 	}
 
+	/**
+	 * Publishing with every Bridgy target sends nothing to Bridgy.
+	 */
 	public function test_publishing_with_every_bridgy_target_sends_nothing_to_bridgy(): void {
 		$targets = $this->bridgy_targets();
 		$this->assertContains( 'https://brid.gy/publish/mastodon', $targets, 'Every Bridgy Publish silo target is used.' );
