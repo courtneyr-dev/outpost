@@ -46,12 +46,13 @@ Outpost publishes to your own site. It contacts a service below only for the fea
 
 Syndication (only for chips you leave on; the post's URL or content is sent):
 
-* Bridgy / Bridgy Fed: a webmention with the post URL to brid.gy, bsky.brid.gy, or fed.brid.gy. [About, terms, privacy](https://brid.gy/about)
 * Telegraph: off unless the `outpost_telegraph_enabled` option is set; then each published post (never a password-protected one) goes to api.telegra.ph, which makes a public copy, and the first use stores a Telegraph account token on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy)
 * Beehiiv (api.beehiiv.com): [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy)
 * Buttondown (api.buttondown.email): [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy)
 * Kit (api.convertkit.com; the broadcast's app.kit.com URL is saved on the post, never requested): [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy)
 * write.as: [Guidelines](https://write.as/guidelines), [Privacy](https://write.as/privacy)
+
+Bridgy chips (brid.gy, bsky.brid.gy, fed.brid.gy) only add a syndication target to the post your site's Micropub endpoint receives; Outpost sends nothing to Bridgy. A webmention plugin on your site may notify Bridgy, as that plugin discloses.
 
 Previews (only the URL you pasted is sent):
 
@@ -71,7 +72,7 @@ Connected accounts (only after you connect one; an encrypted token is stored on 
 
 Manual share (your site sends nothing; tapping a chip opens the service in your browser or app with the post's link and text, and for Pinterest its image URL):
 
-* Facebook ([Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/)), X ([Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy)), Threads ([Terms](https://help.instagram.com/769983657850450), [Privacy](https://privacycenter.instagram.com/policy)), Pinterest ([Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy)), Reddit ([Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy)), LinkedIn ([Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy)), Instagram ([Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy)), TikTok ([Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en)), Flickr ([Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy))
+* Facebook ([Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/)), X ([Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy)), Threads ([Terms](https://help.instagram.com/769983657850450), [Privacy](https://help.instagram.com/515230437301944)), Pinterest ([Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy)), Reddit ([Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy)), LinkedIn ([Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy)), Instagram ([Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy)), TikTok ([Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en)), Flickr ([Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy))
 * The iOS Shortcut installer links to www.icloud.com/shortcuts/ and opens only when you tap it. [Terms](https://www.apple.com/legal/internet-services/icloud/), [Privacy](https://www.apple.com/legal/privacy/)
 
 Sign-in happens between your browser and your own site's IndieAuth endpoint; nothing goes to a third party.
