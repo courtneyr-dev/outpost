@@ -37,6 +37,10 @@ final class Outpost_Abilities {
 		add_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
 		add_filter( 'rest_request_before_callbacks', array( self::class, 'enter_request' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( self::class, 'leave_request' ), 10, 3 );
+		// Core's rest_send_allow_header() (rest_post_dispatch, priority 10)
+		// runs the permission callback again; keep the request in view.
+		add_filter( 'rest_post_dispatch', array( self::class, 'enter_request' ), 9, 3 );
+		add_filter( 'rest_post_dispatch', array( self::class, 'leave_request' ), 11, 3 );
 	}
 
 	/**
@@ -57,7 +61,9 @@ final class Outpost_Abilities {
 	}
 
 	/**
-	 * Forget the request once its handler finished.
+	 * Forget the request once its handler finished, with anything tracked
+	 * after it: a nested request whose handler threw never reached its own
+	 * leave, and it must not outlive the request that started it.
 	 *
 	 * @param mixed           $response Response (passed through).
 	 * @param array<string, mixed> $handler Route handler (unused).
@@ -66,8 +72,9 @@ final class Outpost_Abilities {
 	 */
 	public static function leave_request( $response, $handler, $request ) {
 		unset( $handler );
-		if ( $request instanceof WP_REST_Request && end( self::$requests ) === $request ) {
-			array_pop( self::$requests );
+		$index = $request instanceof WP_REST_Request ? array_search( $request, self::$requests, true ) : false;
+		if ( false !== $index ) {
+			array_splice( self::$requests, (int) $index );
 		}
 		return $response;
 	}
