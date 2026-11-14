@@ -19,6 +19,7 @@ build/*
 !build/index.js
 !build/index.asset.php
 !build/index.css
+!build/index-rtl.css
 !build/style-index.css
 !build/index.css.map
 !build/index.js.map
