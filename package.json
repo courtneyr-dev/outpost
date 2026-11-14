@@ -114,5 +114,9 @@
     "transform": {
       "\\.[jt]sx?$": "<rootDir>/node_modules/@wordpress/scripts/config/babel-transform.js"
     }
+  },
+  "overrides": {
+    "qs": "6.16.1",
+    "isomorphic-git": "1.38.6"
   }
 }
