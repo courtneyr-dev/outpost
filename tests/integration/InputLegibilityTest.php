@@ -121,6 +121,62 @@ final class InputLegibilityTest extends TestCase {
 	}
 
 	/**
+	 * T10-S4-18 (re-review R-05): the note redirect for a link-free share
+	 * fits one encoded-byte budget. Character caps alone let two 4,000
+	 * character multibyte fields encode to a 48 KB request target.
+	 */
+	public function test_the_note_redirect_fits_its_encoded_byte_budget(): void {
+		$redirects = array();
+		\Outpost_Share_Target_Controller::set_redirect_callback_for_tests(
+			static function ( string $url ) use ( &$redirects ): void {
+				$redirects[] = $url;
+			}
+		);
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'title' => str_repeat( 'é', 4000 ),
+			'text'  => str_repeat( 'é', 4000 ),
+		);
+		try {
+			\Outpost_Share_Target_Controller::handle_request();
+		} finally {
+			\Outpost_Share_Target_Controller::set_redirect_callback_for_tests( null );
+		}
+		$this->assertCount( 1, $redirects );
+		$query = (string) wp_parse_url( $redirects[0], PHP_URL_QUERY );
+		$this->assertLessThanOrEqual( \Outpost_Share_Target_Controller::NOTE_QUERY_MAX_BYTES, strlen( $query ), 'The note query stays within its byte budget.' );
+		parse_str( $query, $args );
+		$this->assertSame( 'note', $args['mode'] ?? null );
+		$this->assertNotSame( '', $args['text'] ?? '', 'Text is shortened, not dropped.' );
+		$this->assertStringStartsWith( (string) $args['text'], str_repeat( 'é', 4000 ), 'The kept text is a whole-character prefix.' );
+		$this->assertTrue( mb_check_encoding( (string) $args['title'], 'UTF-8' ) && mb_check_encoding( (string) $args['text'], 'UTF-8' ) );
+	}
+
+	/**
+	 * A short link-free share keeps its whole title and text.
+	 */
+	public function test_a_short_note_share_is_kept_whole(): void {
+		$redirects = array();
+		\Outpost_Share_Target_Controller::set_redirect_callback_for_tests(
+			static function ( string $url ) use ( &$redirects ): void {
+				$redirects[] = $url;
+			}
+		);
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'title' => 'A title',
+			'text'  => 'Some shared words',
+		);
+		try {
+			\Outpost_Share_Target_Controller::handle_request();
+		} finally {
+			\Outpost_Share_Target_Controller::set_redirect_callback_for_tests( null );
+		}
+		parse_str( (string) wp_parse_url( $redirects[0] ?? '', PHP_URL_QUERY ), $args );
+		$this->assertSame( array( 'mode' => 'note', 'title' => 'A title', 'text' => 'Some shared words' ), $args );
+	}
+
+	/**
 	 * T10-S4-16 (Phase 4 C-05): shared title and text are bounded. The text
 	 * rides into the composer redirect URL, so an unbounded share would make
 	 * an oversized request line.
