@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.27
+Stable tag:        1.0.28
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -105,6 +105,12 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 
 == Changelog ==
 
+= 1.0.28 =
+* Security: posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as use the title the site prints, so a hidden check-in location stays private.
+* Added: a Comic type under Doing when Post Kinds can build comic cards.
+* Added: with Post Kinds, the Oura and Polar pickers insert sleep and exercise cards that keep clock times private.
+* Fixed: page optimizers no longer break the composer, an unknown shared tab no longer opens a blank screen, and the Appearance preview matches the composer's tabs.
+
 = 1.0.27 =
 * Security: the iOS Shortcut uses an application password limited to its endpoint and deleted on deactivation; upgrading deletes old Shortcut tokens.
 * Security, from the WordPress.org review: shared content waits for Use or Discard, cookie REST requests need a valid nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, and saved API keys never render.
@@ -116,6 +122,9 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 Earlier versions: see CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
+
+= 1.0.28 =
+Keeps hidden check-in locations out of posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as, and fixes the composer on sites running a page optimizer.
 
 = 1.0.27 =
 If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut. Mode tabs are now two rows of buttons.

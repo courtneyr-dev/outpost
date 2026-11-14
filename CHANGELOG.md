@@ -7,6 +7,24 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.28] - Unreleased
+
+### Security
+
+- Posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as, and the manual-share caption, use the title the site prints: Post Kinds' safe title (`pkiw_get_safe_title()`, Post Kinds 1.9.0+). A check-in with a hidden location no longer sends its stored "Checked in at <venue>" title off the site (#242).
+
+### Added
+
+- A Comic variant under Doing that sends a Post Kinds comic card: `read-of` with `pkiw-kind: comics`, creators, series, volume, issue number, publisher, started and finished dates, read status and rating. It shows only when the site's Post Kinds builds the comic card (`postKinds.comics` in the composer config, from `\PKIW\Comic_Strip`). A cover from the shared link goes out as `mp-cover-image`, never as `photo` (#243).
+- With Post Kinds active, the editor's Oura picker inserts a Post Kinds sleep card with the night's duration, files the post under the sleep kind and dates it at noon of the night. No bedtime, wake time or clock time reaches the card, the content or the meta (#260).
+- With Post Kinds active, the editor's Polar picker inserts a Post Kinds exercise card with the activity, distance and duration and files the post under the exercise kind. The card keeps distance and duration private until its author opts in; the start time and calories stay out of the card, the content and the meta (#259).
+
+### Fixed
+
+- The composer shell opts out of page optimizers on its own routes: Perfmatters, WP Rocket, Autoptimize and LiteSpeed Cache no longer rewrite its stylesheets or scripts into inline loaders its CSP blocks. The CSP is unchanged, and every other page keeps its optimizers (#320).
+- A stored share whose tab isn't a composer mode no longer opens a blank composer; the saved start screen opens instead (#323).
+- The Appearance settings preview draws the composer's two-row tab group with the composer's own rules, in both day and night previews (#324).
+
 ## [1.0.27] - Unreleased
 
 ### Security
