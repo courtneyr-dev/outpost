@@ -166,3 +166,90 @@ test.describe('signing out with queued posts', () => {
 		expect(await queue_contents(page)).toEqual(['Other person private words']);
 	});
 });
+
+test.describe('sign-out failures in the real UI (T10-S3-07 v1.1)', () => {
+	/**
+	 * Page-side switches: when set, deleting the sign-in token, or any write to
+	 * the queue database, throws. The service worker is untouched.
+	 */
+	async function install_failure_switches(page: Page): Promise<void> {
+		await page.addInitScript(() => {
+			type Flags = { __failTokenDelete?: boolean; __failQueueWrites?: boolean };
+			const flags = window as unknown as Flags;
+			const original_delete = IDBObjectStore.prototype.delete;
+			IDBObjectStore.prototype.delete = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
+				if (flags.__failTokenDelete && this.name === 'tokens') throw new DOMException('blocked for the test', 'UnknownError');
+				return original_delete.apply(this, args);
+			};
+			const original_transaction = IDBDatabase.prototype.transaction;
+			IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<IDBDatabase['transaction']>) {
+				if (flags.__failQueueWrites && this.name === 'outpost-queue' && args[1] === 'readwrite') {
+					throw new DOMException('blocked for the test', 'UnknownError');
+				}
+				return original_transaction.apply(this, args);
+			} as IDBDatabase['transaction'];
+		});
+	}
+
+	async function flip(page: Page, flag: '__failTokenDelete' | '__failQueueWrites', on: boolean): Promise<void> {
+		await page.evaluate(
+			([name, value]) => {
+				(window as unknown as Record<string, boolean>)[name as string] = value as boolean;
+			},
+			[flag, on] as const,
+		);
+	}
+
+	test.beforeEach(async ({ page }) => {
+		await install_failure_switches(page);
+		await page.route(STUB + '**', (route) => route.fulfill({ status: 503 }));
+		await seed(page, [
+			{ content: 'Own queued words', owner: canonical(session().me) },
+			{ content: 'Other person private words', owner: OTHER_OWNER },
+		]);
+		await page.reload();
+		await open_about(page);
+	});
+
+	test('when the sign-in can’t be removed, Remove deletes nothing and says the person is still signed in', async ({ page }) => {
+		await page.getByRole('button', { name: 'Sign out of this device' }).click();
+		await flip(page, '__failTokenDelete', true);
+		await page.getByRole('button', { name: 'Remove my queued posts and sign out' }).click();
+
+		await expect(page.locator('.outpost-status').filter({ hasText: 'still signed in' })).toHaveText(
+			'Couldn’t remove the sign-in from this device, so you’re still signed in and nothing was removed. Try again.',
+		);
+		expect(await has_token(page)).toBe(true);
+		expect(await queue_contents(page)).toEqual(['Own queued words', 'Other person private words']);
+		await expect(page.getByRole('button', { name: 'Remove my queued posts and sign out' })).toBeVisible();
+	});
+
+	test('when the posts can’t be removed after signing out, says so, keeps them, and a retry removes only this account’s', async ({ page }) => {
+		await page.getByRole('button', { name: 'Sign out of this device' }).click();
+		await flip(page, '__failQueueWrites', true);
+		await page.getByRole('button', { name: 'Remove my queued posts and sign out' }).click();
+
+		await expect(page.locator('.outpost-status').filter({ hasText: 'signed out of this device' })).toHaveText(
+			'You’re signed out of this device, but your queued posts couldn’t be removed and are still here. Try removing them again, or finish signing out and keep them.',
+		);
+		expect(await has_token(page)).toBe(false);
+		await flip(page, '__failQueueWrites', false);
+		expect(await queue_contents(page)).toEqual(['Own queued words', 'Other person private words']);
+
+		await page.getByRole('button', { name: 'Try removing my queued posts again' }).click();
+		await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible();
+		expect(await queue_contents(page)).toEqual(['Other person private words']);
+	});
+
+	test('“Finish signing out” after that partial failure reloads and keeps the posts', async ({ page }) => {
+		await page.getByRole('button', { name: 'Sign out of this device' }).click();
+		await flip(page, '__failQueueWrites', true);
+		await page.getByRole('button', { name: 'Remove my queued posts and sign out' }).click();
+		await expect(page.getByRole('button', { name: 'Finish signing out' })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Finish signing out' }).click();
+		await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible();
+		expect(await has_token(page)).toBe(false);
+		expect(await queue_contents(page)).toEqual(['Own queued words', 'Other person private words']);
+	});
+});

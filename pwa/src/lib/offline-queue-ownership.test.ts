@@ -10,7 +10,7 @@
  * byte-for-byte unchanged: no claim, no attempt, no error, no upload, no
  * request.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { canonical_account } from './account-identity';
@@ -97,6 +97,19 @@ async function queue_as(me: string, content: string, photo = false): Promise<voi
 		env,
 	);
 	expect(result.kind).toBe('queued');
+}
+
+/** Alice's text post queued before any endpoint was known. */
+async function enqueue_raw_owned_without_endpoint(): Promise<void> {
+	await write_raw({
+		source: 'note',
+		properties: { content: 'Alice post, endpoint unknown' },
+		micropubEndpoint: null,
+		me: ALICE,
+		owner: 'https://example.test/alice',
+		createdAt: 1,
+		attempts: 0,
+	});
 }
 
 /** Write a raw row straight into the queue store (legacy or malformed shapes). */
@@ -210,10 +223,31 @@ describe('Alice and Bob on one device', () => {
 		const left = await flush(server.env, env, { tokenStore: tokens });
 
 		expect(left).toEqual([]);
-		const posts = server.sent.filter((s) => s.method === 'POST' && s.url === ENDPOINT);
-		expect(posts).toHaveLength(2);
-		expect(server.sent.every((s) => s.authorization === null || s.authorization === 'Bearer alice-token')).toBe(true);
+		// Every request, in order, with its exact destination and credential.
+		// Each one here acts for Alice, so each carries her token; none of
+		// these request classes is meant to be unauthenticated.
+		expect(server.sent).toEqual([
+			{ url: ENDPOINT, method: 'POST', authorization: 'Bearer alice-token' },
+			{ url: ENDPOINT + '?q=config', method: 'GET', authorization: 'Bearer alice-token' },
+			{ url: MEDIA, method: 'POST', authorization: 'Bearer alice-token' },
+			{ url: ENDPOINT, method: 'POST', authorization: 'Bearer alice-token' },
+		]);
+		expect(server.sent.filter((s) => s.method === 'POST' && s.url === ENDPOINT)).toHaveLength(2);
 		expect(server.sent.filter((s) => s.url === MEDIA)).toHaveLength(1);
+	});
+
+	it('discovers the Micropub endpoint without credentials, and sends the post with Alice’s token', async () => {
+		await enqueue_raw_owned_without_endpoint();
+		await sign_in_as(ALICE, 'alice-token');
+		const server = recording();
+
+		expect(await flush(server.env, env, { tokenStore: tokens })).toEqual([]);
+
+		// Discovery fetches Alice's public profile page: intentionally no token.
+		expect(server.sent).toEqual([
+			{ url: ALICE, method: 'GET', authorization: null },
+			{ url: ENDPOINT, method: 'POST', authorization: 'Bearer alice-token' },
+		]);
 	});
 
 	it('treats a trailing-slash difference as the same account', async () => {
@@ -328,5 +362,106 @@ describe('dismissing and removing act only on the signed-in account’s rows', (
 		await queue_as(ALICE, 'Alice text post');
 		expect(await remove_owned_entries(null, env)).toBe(0);
 		expect(await list(env)).toHaveLength(1);
+	});
+});
+
+/** The real IndexedDB write methods, before any spy wraps them. */
+const original_put = IDBObjectStore.prototype.put;
+const original_update = IDBCursor.prototype.update;
+const original_delete = IDBObjectStore.prototype.delete;
+
+describe('the H5 plaintext-token scrub is the only write to a row flush() does not replay (T10-S3-07 v1.1)', () => {
+	const LEGACY = {
+		source: 'note',
+		properties: { content: 'Queued before 1.0.22' },
+		micropubEndpoint: ENDPOINT,
+		me: ALICE,
+		createdAt: 1,
+		attempts: 3,
+		lastError: 'post_failed: earlier failure',
+		retryable: true,
+		accessToken: 'LEGACY-PLAINTEXT',
+	};
+
+	function without_token(row: Record<string, unknown>): Record<string, unknown> {
+		const { accessToken: _drop, ...rest } = row;
+		return rest;
+	}
+
+	it.each([
+		['a locked legacy row (no owner), with Alice signed in', {}, ALICE],
+		['another account’s row, with Alice signed in', { owner: 'https://example.test/bob' }, ALICE],
+		['a locked legacy row, with no one signed in', {}, null],
+	])('%s: removes only the token field; nothing is claimed, retried, discovered, uploaded, sent, or deleted', async (_label, extra, signed_in) => {
+		await write_raw({ ...LEGACY, ...extra });
+		if (signed_in) await sign_in_as(signed_in);
+		const server = recording();
+
+		await flush(server.env, env, { tokenStore: tokens });
+
+		const rows = (await list(env)) as unknown as Array<Record<string, unknown>>;
+		expect(rows).toHaveLength(1);
+		const { id: _id, ...stored } = rows[0] as Record<string, unknown>;
+		expect(stored).toEqual(without_token({ ...LEGACY, ...extra }));
+		expect(JSON.stringify(rows)).not.toContain('LEGACY-PLAINTEXT');
+		expect(server.sent).toEqual([]);
+	});
+
+	it('writes nothing to rows without a token field', async () => {
+		await write_raw({ ...without_token(LEGACY) });
+		await queue_as(BOB, 'Bob post');
+		await sign_in_as(ALICE);
+		const writes: string[] = [];
+		const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (this: IDBObjectStore, ...args) {
+			writes.push('put');
+			return Reflect.apply(original_put, this, args) as IDBRequest<IDBValidKey>;
+		});
+		const update = vi.spyOn(IDBCursor.prototype, 'update').mockImplementation(function (this: IDBCursor, ...args) {
+			writes.push('update');
+			return Reflect.apply(original_update, this, args) as IDBRequest<IDBValidKey>;
+		});
+		const del = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (this: IDBObjectStore, ...args) {
+			writes.push('delete');
+			return Reflect.apply(original_delete, this, args) as IDBRequest<undefined>;
+		});
+		try {
+			await flush(recording().env, env, { tokenStore: tokens });
+		} finally {
+			put.mockRestore();
+			update.mockRestore();
+			del.mockRestore();
+		}
+
+		expect(writes).toEqual([]);
+	});
+
+	it('a failed scrub transaction stops the flush: no replay, and the row is intact', async () => {
+		await queue_as(ALICE, 'Alice text post');
+		await write_raw({ ...LEGACY });
+		const before = await snapshot();
+		await sign_in_as(ALICE);
+		const real = env.indexedDB;
+		const failing: OfflineQueueEnvironment = {
+			indexedDB: {
+				open(name: string, version?: number): IDBOpenDBRequest {
+					const req = real.open(name, version);
+					req.addEventListener('success', () => {
+						const db = req.result;
+						const transaction = db.transaction.bind(db);
+						db.transaction = ((stores: string | string[], mode?: IDBTransactionMode) => {
+							if (mode === 'readwrite') throw new DOMException('write blocked', 'UnknownError');
+							return transaction(stores, mode);
+						}) as IDBDatabase['transaction'];
+					});
+					return req;
+				},
+			} as unknown as IDBFactory,
+		};
+		const server = recording();
+
+		await expect(flush(server.env, failing, { tokenStore: tokens })).rejects.toBeTruthy();
+
+		expect(server.sent).toEqual([]);
+		expect(await snapshot()).toEqual(before);
 	});
 });

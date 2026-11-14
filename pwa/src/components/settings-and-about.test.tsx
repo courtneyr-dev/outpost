@@ -131,7 +131,8 @@ describe('AboutTab', () => {
 		companions: null,
 		onRetry: () => undefined,
 		onReauth: () => undefined,
-		onSignOut: () => undefined,
+		onClearSignIn: async () => undefined,
+		onFinishSignOut: () => undefined,
 		queueOwner: null,
 		preferences: {
 			mode: 'system' as const,
@@ -192,8 +193,9 @@ describe('AboutTab', () => {
 	});
 
 	it('offers sign-out in Connection and says what it removes', async () => {
+		const onClearSignIn = vi.fn(async () => undefined);
 		const onSignOut = vi.fn();
-		const root = mount(<AboutTab {...props} onSignOut={onSignOut} />);
+		const root = mount(<AboutTab {...props} onClearSignIn={onClearSignIn} onFinishSignOut={onSignOut} />);
 		const button = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Sign out of this device') as HTMLButtonElement;
 		const help = document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent ?? '';
 		expect(help).toContain('unsent drafts');
