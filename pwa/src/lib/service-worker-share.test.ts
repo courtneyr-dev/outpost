@@ -17,7 +17,7 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SUPPORTED_IMAGE_TYPES, MAX_PHOTO_BYTES } from './photo';
 
 const ORIGIN = 'http://localhost';
@@ -276,6 +276,23 @@ describe('share intake bounds before and after parsing (T10-S4-16)', () => {
 		await dispatch(oversized);
 
 		expect(parsed).toBe(false);
+		expect(passthrough.length).toBe(1);
+		expect(await inbox()).toBeUndefined();
+	});
+
+	it('stops reading a real multipart body past the intake limit and never parses it (T10-S4-19)', async () => {
+		const request = share([huge_image('a.png', 9 * MB), huge_image('b.png', 9 * MB), huge_image('c.png', 9 * MB), huge_image('d.png', 9 * MB), huge_image('e.png', 9 * MB), huge_image('f.png', 9 * MB)]);
+		expect(request.headers.get('content-length')).toBeNull();
+		const request_parse = vi.spyOn(Request.prototype, 'formData');
+		const response_parse = vi.spyOn(Response.prototype, 'formData');
+		try {
+			await dispatch(request);
+			expect(request_parse).not.toHaveBeenCalled();
+			expect(response_parse).not.toHaveBeenCalled();
+		} finally {
+			request_parse.mockRestore();
+			response_parse.mockRestore();
+		}
 		expect(passthrough.length).toBe(1);
 		expect(await inbox()).toBeUndefined();
 	});
