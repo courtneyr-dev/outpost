@@ -302,7 +302,7 @@ final class Outpost_Fetch_Recent_Oura {
 	 * @return array<string,mixed> Empty without Post Kinds.
 	 */
 	private static function post_kinds_sleep_parts( int $total_s, string $bedtime ): array {
-		if ( ! class_exists( 'WP_Block_Type_Registry' ) || ! WP_Block_Type_Registry::get_instance()->is_registered( self::SLEEP_CARD ) ) {
+		if ( ! Outpost_Post_Kinds_Adapter::has_card_block( self::SLEEP_CARD ) ) {
 			return array();
 		}
 		$attributes = array();
@@ -318,11 +318,9 @@ final class Outpost_Fetch_Recent_Oura {
 			),
 		);
 
-		$taxonomy = get_taxonomy( 'kind' );
-		$term     = $taxonomy instanceof WP_Taxonomy ? get_term_by( 'slug', 'sleep', 'kind' ) : false;
-		if ( $taxonomy instanceof WP_Taxonomy && $term instanceof WP_Term ) {
-			$base           = is_string( $taxonomy->rest_base ) && '' !== $taxonomy->rest_base ? $taxonomy->rest_base : 'kind';
-			$parts['terms'] = array( $base => array( (int) $term->term_id ) );
+		$terms = Outpost_Post_Kinds_Adapter::kind_terms( 'sleep' );
+		if ( array() !== $terms ) {
+			$parts['terms'] = $terms;
 		}
 
 		$night = self::night_of( $bedtime );

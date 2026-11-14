@@ -297,6 +297,19 @@ final class Outpost_Fetch_Recent_Polar {
 
 		$content = '<p>' . esc_html( $title ) . '</p>';
 
+		$post_meta = array(
+			'_outpost_polar_exercise_id' => $id,
+			'_outpost_polar_sport'       => $sport,
+			'_outpost_polar_start_time'  => $start,
+			'_outpost_polar_distance_m'  => (string) $distance_m,
+			'_outpost_polar_duration'    => $duration,
+		);
+		$card      = self::post_kinds_exercise_parts( $sport, $distance_m, $duration );
+		if ( array() !== $card ) {
+			// The exercise card keeps time of day private; so does the post.
+			unset( $post_meta['_outpost_polar_start_time'] );
+		}
+
 		return array(
 			'id'           => 'polar-exercise-' . $id,
 			'title'        => $title,
@@ -307,16 +320,88 @@ final class Outpost_Fetch_Recent_Polar {
 			'post_payload' => array(
 				'title'                  => $title,
 				'content'                => $content,
-				'post_meta'              => array(
-					'_outpost_polar_exercise_id' => $id,
-					'_outpost_polar_sport'       => $sport,
-					'_outpost_polar_start_time'  => $start,
-					'_outpost_polar_distance_m'  => (string) $distance_m,
-					'_outpost_polar_duration'    => $duration,
-				),
+				'post_meta'              => $post_meta,
 				'syndication_source_url' => null,
+			) + $card,
+		);
+	}
+
+	/** Post Kinds' exercise card block. */
+	private const EXERCISE_CARD = 'post-kinds-indieweb/exercise-card';
+
+	/**
+	 * With Post Kinds' exercise card registered (#259): the card holding the
+	 * activity, distance and duration, and the exercise kind term. The
+	 * picker inserts these instead of the paragraph.
+	 *
+	 * The card keeps distance and duration private until its author turns
+	 * on showing details, and it has no field for start time, calories or
+	 * heart rate, so none of those are sent.
+	 *
+	 * @return array<string,mixed> Empty without Post Kinds.
+	 */
+	private static function post_kinds_exercise_parts( string $sport, float $distance_m, string $duration ): array {
+		if ( ! Outpost_Post_Kinds_Adapter::has_card_block( self::EXERCISE_CARD ) ) {
+			return array();
+		}
+		$attributes = array();
+		if ( '' !== $sport ) {
+			$attributes['activity'] = $sport;
+		}
+		if ( $distance_m > 0 ) {
+			$attributes['distance']     = round( $distance_m / 1000, 2 );
+			$attributes['distanceUnit'] = 'km';
+		}
+		$seconds = self::iso8601_duration_to_seconds( $duration );
+		if ( $seconds > 0 ) {
+			$attributes['duration'] = self::seconds_to_iso8601_duration( $seconds );
+		}
+		$parts = array(
+			'blocks' => array(
+				array(
+					'name'       => self::EXERCISE_CARD,
+					'attributes' => $attributes,
+				),
 			),
 		);
+		$terms = Outpost_Post_Kinds_Adapter::kind_terms( 'exercise' );
+		if ( array() !== $terms ) {
+			$parts['terms'] = $terms;
+		}
+		return $parts;
+	}
+
+	/**
+	 * Whole seconds in a Polar ISO 8601 duration, which can carry
+	 * fractional seconds ("PT29M12.6S"). 0 when it isn't a duration.
+	 */
+	private static function iso8601_duration_to_seconds( string $duration ): int {
+		if ( 1 !== preg_match( '/^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/', $duration, $m ) ) {
+			return 0;
+		}
+		// An unmatched group is '' or absent; both read as 0.
+		return (int) round( (float) ( $m[1] ?? 0 ) * 3600 + (float) ( $m[2] ?? 0 ) * 60 + (float) ( $m[3] ?? 0 ) );
+	}
+
+	/**
+	 * Whole seconds as an ISO 8601 duration with zero parts left out, the
+	 * form Post Kinds' exercise card stores: 1752 is PT29M12S, 3600 is PT1H.
+	 */
+	private static function seconds_to_iso8601_duration( int $seconds ): string {
+		$h   = intdiv( $seconds, 3600 );
+		$m   = intdiv( $seconds % 3600, 60 );
+		$s   = $seconds % 60;
+		$out = 'PT';
+		if ( $h > 0 ) {
+			$out .= $h . 'H';
+		}
+		if ( $m > 0 ) {
+			$out .= $m . 'M';
+		}
+		if ( $s > 0 ) {
+			$out .= $s . 'S';
+		}
+		return $out;
 	}
 
 	/**
