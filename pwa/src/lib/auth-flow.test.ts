@@ -199,6 +199,27 @@ describe('handle_callback', () => {
 		).rejects.toMatchObject({ code: 'exchange_failed' });
 	});
 
+	it.each([
+		['user info', 'https://someone@courtneyr.dev/'],
+		['not a URL', 'courtneyr.dev'],
+	])('refuses, and stores nothing, when the verified me has no exact account identity (%s) (T10-S3-07)', async (_label, bad_me) => {
+		env.sessionStorage.setItem('outpost.auth.state', 's');
+		env.sessionStorage.setItem('outpost.auth.verifier', 'v');
+		env.sessionStorage.setItem('outpost.auth.token_endpoint', 'https://a/token');
+		env.indieauth.fetch = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ access_token: 'token-xyz', token_type: 'Bearer', scope: 'create', me: bad_me }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		);
+
+		await expect(handle_callback({ code: 'c', state: 's' }, client_id, redirect_uri, env)).rejects.toMatchObject({
+			code: 'me_mismatch',
+		});
+		expect(await read_token(env.tokenStore)).toBeNull();
+	});
+
 	it('throws when token endpoint returns 4xx', async () => {
 		env.sessionStorage.setItem('outpost.auth.state', 's');
 		env.sessionStorage.setItem('outpost.auth.verifier', 'v');

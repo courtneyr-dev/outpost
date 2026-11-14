@@ -132,6 +132,7 @@ describe('AboutTab', () => {
 		onRetry: () => undefined,
 		onReauth: () => undefined,
 		onSignOut: () => undefined,
+		queueOwner: null,
 		preferences: {
 			mode: 'system' as const,
 			source: 'outpost' as const,
@@ -190,13 +191,15 @@ describe('AboutTab', () => {
 		]);
 	});
 
-	it('offers sign-out in Connection and says what it removes', () => {
+	it('offers sign-out in Connection and says what it removes', async () => {
 		const onSignOut = vi.fn();
 		const root = mount(<AboutTab {...props} onSignOut={onSignOut} />);
 		const button = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Sign out of this device') as HTMLButtonElement;
-		expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent).toContain('unsent drafts');
+		const help = document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent ?? '';
+		expect(help).toContain('unsent drafts');
+		expect(help).toContain('queued posts');
 		button.click();
-		expect(onSignOut).toHaveBeenCalledTimes(1);
+		await vi.waitFor(() => expect(onSignOut).toHaveBeenCalledTimes(1));
 	});
 
 	it('its preferences do not collide with the sheet when both are in the page', () => {
