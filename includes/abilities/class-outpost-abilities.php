@@ -15,7 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Abilities {
 
+	use Outpost_Bearer_Auth;
+
 	private const CATEGORY = 'outpost';
+
+	/** Token scopes the matching read routes accept. */
+	private const READ_SCOPES = array( 'create', 'update', 'read' );
 
 	/**
 	 * Hook category and ability registration into the Abilities API lifecycle.
@@ -240,16 +245,22 @@ final class Outpost_Abilities {
 	}
 
 	/**
-	 * Check the shared edit_posts capability for local reads.
+	 * Check the gate the matching read routes apply: edit_posts, plus the
+	 * credential check every Outpost route makes (a cookie session needs a
+	 * valid REST nonce; a token needs create, update or read scope). Core's
+	 * Abilities REST controller calls only this callback, so it can't be
+	 * weaker than the routes (F5-01). A PHP caller with no cookie session
+	 * and no token keeps the capability check alone.
 	 *
 	 * @return bool
 	 */
 	public static function can_read_outpost(): bool {
-		return current_user_can( 'edit_posts' );
+		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( new WP_REST_Request( 'GET' ), self::READ_SCOPES );
 	}
 
 	/**
-	 * Check per-post access for the share-status reader.
+	 * Check per-post access for the share-status reader: the read gate the
+	 * status route applies, plus edit_post on that post.
 	 *
 	 * @param array<string, mixed> $input Validated ability input.
 	 * @return bool
@@ -264,7 +275,7 @@ final class Outpost_Abilities {
 			return false;
 		}
 
-		return current_user_can( 'edit_post', $post_id );
+		return self::can_read_outpost() && current_user_can( 'edit_post', $post_id );
 	}
 
 	/**
