@@ -3,8 +3,8 @@
  * Outpost_IOS_Shortcut_REST_Controller
  *
  * REST endpoint for the iOS Shortcut bridge: POST a JSON body
- * `{ url, shared_text? }` with a Bearer token, get back a JSON
- * response `{ redirect_url, source_id, mode }`. The iOS Shortcut
+ * `{ url, shared_text? }` signed in with a WordPress Application Password,
+ * get back a JSON response `{ redirect_url, source_id, mode }`. The iOS Shortcut
  * uses the redirect_url to navigate Safari to the composer.
  *
  * AUTH
@@ -32,6 +32,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_IOS_Shortcut_REST_Controller {
+
+	use Outpost_Bearer_Auth;
 
 	/**
 	 * Hook registration. Called from outpost_init at REST init time.
@@ -88,13 +90,17 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 	}
 
 	/**
-	 * Permission gate. By the time this runs, the token authenticator
-	 * has set the current user if the Bearer token resolved.
+	 * Permission gate. WordPress core has already authenticated the
+	 * request; the Shortcut arrives with its application password over
+	 * HTTP Basic. A cookie session must also carry a valid REST nonce,
+	 * checked here rather than left to core alone, and a bearer token
+	 * needs the `create` scope (T10-S4-14).
 	 *
+	 * @param \WP_REST_Request $request REST request.
 	 * @return bool|\WP_Error
 	 */
-	public static function permission_check() {
-		if ( ! is_user_logged_in() ) {
+	public static function permission_check( \WP_REST_Request $request ) {
+		if ( ! is_user_logged_in() || ! self::bearer_has_scope( $request, array( 'create' ) ) ) {
 			return new \WP_Error(
 				'outpost_ios_shortcut_unauthorized',
 				__( 'Authentication required.', 'outpost-mobile-publishing' ),
