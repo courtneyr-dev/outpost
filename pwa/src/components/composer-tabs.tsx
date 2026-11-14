@@ -39,6 +39,7 @@ import {
 	type SharedPhotos,
 } from '../lib/share-inbox';
 import { ShareReview, type WaitingShare } from './share-review';
+import { canonical_account } from '../lib/account-identity';
 import { useAppearance } from '../lib/use-appearance';
 import type { AppearanceEnvironment } from '../lib/appearance';
 import { AppHeader } from './app-header';
@@ -644,6 +645,8 @@ export function ComposerTabs({
 						await clear_token(tokenStore);
 						window.location.reload();
 					}}
+					queueOwner={canonical_account(token.me)}
+					{...(queueEnv ? { queueEnv } : {})}
 					onSignOut={(): void => {
 						void sign_out(tokenStore);
 					}}
@@ -748,6 +751,7 @@ export function ComposerTabs({
 				<div hidden={deciding}>
 					<div class="outpost-composer__header">
 						<QueueBadge
+							owner={canonical_account(token.me)}
 							{...(micropubEnv ? { micropubEnv } : {})}
 							{...(queueEnv ? { queueEnv } : {})}
 						/>

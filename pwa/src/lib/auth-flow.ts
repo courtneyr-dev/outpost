@@ -24,6 +24,7 @@
  *     shouldn't validate today's callback.
  */
 
+import { canonical_account } from './account-identity';
 import {
 	discover_endpoints,
 	generate_pkce,
@@ -254,6 +255,19 @@ export async function handle_callback(
 					') than the one you signed in with (' +
 					original_me +
 					'). Refusing to store the token.',
+				'me_mismatch',
+			);
+		}
+
+		// The token's account must have one exact identity (T10-S3-07): the
+		// offline queue binds each post to it. A `me` with user info, or one
+		// that isn't an absolute http(s) URL, has none, so the token isn't
+		// kept. This is in addition to the origin check above.
+		if (canonical_account(response.me) === null) {
+			throw new AuthFlowError(
+				'Authorization server returned an identity (' +
+					response.me +
+					') that is not an absolute http(s) URL without user info. Refusing to store the token.',
 				'me_mismatch',
 			);
 		}
