@@ -72,9 +72,16 @@ final class Outpost_Abilities {
 	 */
 	public static function leave_request( $response, $handler, $request ) {
 		unset( $handler );
-		$index = $request instanceof WP_REST_Request ? array_search( $request, self::$requests, true ) : false;
-		if ( false !== $index ) {
-			array_splice( self::$requests, (int) $index );
+		if ( ! $request instanceof WP_REST_Request ) {
+			return $response;
+		}
+		// The last frame for this request: the same object can be handled
+		// again while it's still being handled (re-entrant dispatch).
+		for ( $index = count( self::$requests ) - 1; $index >= 0; $index-- ) {
+			if ( self::$requests[ $index ] === $request ) {
+				array_splice( self::$requests, $index );
+				break;
+			}
 		}
 		return $response;
 	}
