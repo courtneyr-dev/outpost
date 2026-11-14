@@ -325,6 +325,28 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * The translation catalog carries nothing from the removed Test provider (T10-S5-03).
+	 *
+	 * A stale POT kept the provider's source path and its "Test (sample data)"
+	 * string after the class was removed.
+	 */
+	public function test_the_translation_catalog_has_no_removed_fixture_strings(): void {
+		$root = dirname( __DIR__, 2 );
+		$pots = glob( $root . '/languages/*.pot' );
+		$this->assertNotEmpty( $pots, 'The plugin ships a POT file.' );
+		$offenders = array();
+		foreach ( (array) $pots as $pot ) {
+			$catalog = (string) file_get_contents( $pot );
+			foreach ( array( 'class-outpost-fetch-recent-test-provider.php', 'class-outpost-mock-server-filter.php', 'Test (sample data)', 'class-ios-shortcut-token' ) as $needle ) {
+				if ( false !== strpos( $catalog, $needle ) ) {
+					$offenders[] = basename( $pot ) . ': ' . $needle;
+				}
+			}
+		}
+		$this->assertSame( array(), $offenders );
+	}
+
+	/**
 	 * The legacy Shortcut token sign-in and the old /post/shortcut controller never ship (T10-S5-01).
 	 *
 	 * The Shortcut signs in with a scoped core application password. The old
