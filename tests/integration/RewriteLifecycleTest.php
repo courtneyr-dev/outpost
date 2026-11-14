@@ -120,6 +120,62 @@ final class RewriteLifecycleTest extends TestCase {
 		$wp_rewrite->flush_rules( false );
 	}
 
+	/**
+	 * Resolve a path the way WordPress does for a front-end request.
+	 *
+	 * @return array{rule: string, vars: array<string, mixed>}
+	 */
+	private function resolve( string $path ): array {
+		global $wp;
+		$saved_uri              = $_SERVER['REQUEST_URI'] ?? null;
+		$saved_path_info        = $_SERVER['PATH_INFO'] ?? null;
+		$_SERVER['REQUEST_URI'] = $path;
+		unset( $_SERVER['PATH_INFO'] );
+		$wp->parse_request();
+		$out = array(
+			'rule' => (string) $wp->matched_rule,
+			'vars' => (array) $wp->query_vars,
+		);
+		null === $saved_uri ? $_SERVER['REQUEST_URI'] = '' : $_SERVER['REQUEST_URI'] = $saved_uri;
+		if ( null !== $saved_path_info ) {
+			$_SERVER['PATH_INFO'] = $saved_path_info;
+		}
+		return $out;
+	}
+
+	/** Assert /post/ and /post/sw no longer resolve to Outpost or to the home page. */
+	private function assert_paths_left_outpost( string $when ): void {
+		foreach ( array( '/post/', '/post/sw' ) as $path ) {
+			$resolved = $this->resolve( $path );
+			$this->assertArrayNotHasKey( Outpost_Route_Handler::QUERY_VAR, $resolved['vars'], "$when: $path doesn't resolve to Outpost." );
+			$this->assertArrayNotHasKey( $resolved['rule'], Outpost_Route_Handler::rules(), "$when: $path matches no Outpost rule." );
+			$this->assertNotSame( array(), $resolved['vars'], "$when: $path doesn't resolve to the home page." );
+		}
+	}
+
+	/**
+	 * Control: before any lifecycle change, /post/ resolves to the composer.
+	 */
+	public function test_control_post_resolves_to_the_composer(): void {
+		$resolved = $this->resolve( '/post/' );
+
+		$this->assertSame( 'composer', $resolved['vars'][ Outpost_Route_Handler::QUERY_VAR ] ?? null );
+	}
+
+	/**
+	 * After deactivation and after uninstall, /post/ and /post/sw resolve to neither Outpost nor the home page.
+	 */
+	public function test_paths_leave_outpost_after_deactivation_and_uninstall(): void {
+		outpost_deactivate( false );
+		$this->assert_paths_left_outpost( 'After deactivation' );
+
+		outpost_activate();
+		$this->assertSame( 'composer', $this->resolve( '/post/' )['vars'][ Outpost_Route_Handler::QUERY_VAR ] ?? null, 'Activation restores the composer route.' );
+
+		Outpost_Uninstaller::run();
+		$this->assert_paths_left_outpost( 'After uninstall' );
+	}
+
 	private function user_with_shortcut_password(): int {
 		$id            = (int) wp_insert_user(
 			array(
