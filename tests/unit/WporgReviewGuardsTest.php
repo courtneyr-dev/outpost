@@ -172,6 +172,30 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * T10-S4-08: every build/ file the WordPress.org zip carries is tracked at
+	 * the source revision, so the zip doesn't depend on whatever a local
+	 * build left in an ignored path. The zip list is npm's packlist, the one
+	 * bin/package-wporg.mjs packs.
+	 */
+	public function test_every_packaged_build_file_is_tracked(): void {
+		$root = dirname( __DIR__, 2 );
+		if ( ! is_dir( $root . '/.git' ) && ! is_file( $root . '/.git' ) ) {
+			$this->markTestSkipped( 'Needs a git checkout to list tracked files.' );
+		}
+		exec( 'cd ' . escapeshellarg( $root ) . ' && npm pack --dry-run --json --ignore-scripts 2>/dev/null', $out, $code ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		$pack = json_decode( implode( "\n", $out ), true );
+		if ( 0 !== $code || ! is_array( $pack ) || ! isset( $pack[0]['files'] ) ) {
+			$this->markTestIncomplete( 'npm unavailable; the release zip list was not checked.' );
+		}
+		exec( 'cd ' . escapeshellarg( $root ) . ' && git ls-files build', $tracked ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+
+		$packaged_build = array_values( array_filter( array_column( $pack[0]['files'], 'path' ), static fn( $p ) => 0 === strpos( (string) $p, 'build/' ) ) );
+		$this->assertNotEmpty( $packaged_build, 'The zip carries build files.' );
+		$this->assertContains( 'build/index-rtl.css', $packaged_build, 'The RTL sidebar stylesheet ships.' );
+		$this->assertSame( array(), array_values( array_diff( $packaged_build, $tracked ) ), 'Every packaged build file is tracked.' );
+	}
+
+	/**
 	 * Tracked files left after the .distignore rules, via rsync's own matcher.
 	 *
 	 * @return array<int, string>
