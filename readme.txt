@@ -36,6 +36,10 @@ Optional companions: Post Kinds for IndieWeb (more post kinds and media lookups)
 
 Some managed hosts strip the Authorization header that Micropub sign-in needs. The documentation lists the fixes.
 
+= Does it work when WordPress is in a subdirectory? =
+
+Not yet. The composer lives at `/post/` and calls `/wp-json/` from the root of your domain, so Outpost needs WordPress at that root and any permalink setting except Plain.
+
 = Does it work offline? =
 
 Yes. A post made offline waits on the device and sends when you reconnect, signed in as the same account.
