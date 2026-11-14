@@ -289,22 +289,73 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	}
 
 	/**
-	 * The same request handled twice (re-entrant dispatch) keeps the outer frame after the inner one leaves (Q-01).
+	 * Dispatch one request object to a route whose handler dispatches the same object again.
+	 *
+	 * @param bool $inner_throws Whether the inner (second) handling throws; the outer handler catches it.
+	 * @return array{inner_left: ?bool, caught: string}
+	 */
+	private function reentrant_dispatch( bool $inner_throws ): array {
+		$depth = 0;
+		$seen  = array(
+			'inner_left' => null,
+			'caught'     => '',
+		);
+		$request = new WP_REST_Request( 'POST', '/outpost-test/v1/reentrant' );
+		$request->set_body_params( array( 'access_token' => 'unverified-0000' ) );
+		rest_get_server(); // Fires rest_api_init before the test route registers.
+		register_rest_route(
+			'outpost-test/v1',
+			'/reentrant',
+			array(
+				'methods'             => 'POST',
+				'callback'            => static function ( WP_REST_Request $handled ) use ( &$depth, &$seen, $inner_throws ) {
+					++$depth;
+					if ( $depth > 1 ) {
+						if ( $inner_throws ) {
+							throw new \RuntimeException( 'inner handling failed' );
+						}
+						return array();
+					}
+					try {
+						rest_get_server()->dispatch( $handled );
+					} catch ( \RuntimeException $caught ) {
+						$seen['caught'] = $caught->getMessage();
+					}
+					// Still inside the outer handling: its frame must carry the body token.
+					$seen['inner_left'] = Outpost_Abilities::can_read_outpost();
+					return array();
+				},
+				'permission_callback' => '__return_true',
+			),
+			true
+		);
+		rest_get_server()->dispatch( $request );
+		return $seen;
+	}
+
+	/**
+	 * A request handled twice (re-entrant dispatch) keeps its outer frame after the inner handling ends (Q-01).
 	 */
 	public function test_a_reentrant_request_keeps_its_outer_frame(): void {
 		wp_set_current_user( $this->editor_id );
-		$request = new WP_REST_Request( 'POST', '/outpost-test/v1/ability-gate' );
-		$request->set_body_params( array( 'access_token' => 'unverified-0000' ) );
 
-		Outpost_Abilities::enter_request( null, array(), $request );
-		Outpost_Abilities::enter_request( null, array(), $request );
-		Outpost_Abilities::leave_request( null, array(), $request );
-		try {
-			$this->assertFalse( Outpost_Abilities::can_read_outpost(), 'The outer frame still carries the body token.' );
-		} finally {
-			Outpost_Abilities::leave_request( null, array(), $request );
-		}
-		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'Both frames are gone afterwards.' );
+		$seen = $this->reentrant_dispatch( false );
+
+		$this->assertFalse( $seen['inner_left'], 'After the inner handling, the outer check still sees the body token.' );
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'After the dispatch, a plain PHP call sees no leftover request.' );
+	}
+
+	/**
+	 * A re-entrant inner handling that throws, caught by the outer handler, leaves nothing behind (Q-01 follow-up).
+	 */
+	public function test_a_reentrant_inner_throw_leaves_no_request_behind(): void {
+		wp_set_current_user( $this->editor_id );
+
+		$seen = $this->reentrant_dispatch( true );
+
+		$this->assertSame( 'inner handling failed', $seen['caught'], 'Precondition: the inner handling threw and was caught.' );
+		$this->assertFalse( $seen['inner_left'], 'The outer check still sees the body token.' );
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'After the dispatch, a plain PHP call sees no leftover request.' );
 	}
 
 	/**
