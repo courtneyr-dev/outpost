@@ -325,6 +325,32 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * Shipped JavaScript names no source map (T10-S5-04).
+	 *
+	 * The package leaves `.map` files out, so a `sourceMappingURL` comment
+	 * points browsers at a file that isn't there. Builds keep their maps
+	 * for debugging as hidden maps.
+	 */
+	public function test_shipped_javascript_names_no_source_map(): void {
+		$root      = dirname( __DIR__, 2 );
+		$offenders = array();
+		$seen      = 0;
+		foreach ( array( $root . '/build', $root . '/assets' ) as $dir ) {
+			$it = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) );
+			foreach ( $it as $file ) {
+				if ( $file instanceof \SplFileInfo && 'js' === $file->getExtension() ) {
+					++$seen;
+					if ( false !== strpos( (string) file_get_contents( $file->getPathname() ), 'sourceMappingURL' ) ) {
+						$offenders[] = substr( $file->getPathname(), strlen( $root ) + 1 );
+					}
+				}
+			}
+		}
+		$this->assertGreaterThan( 0, $seen, 'Control: the scan found shipped JavaScript.' );
+		$this->assertSame( array(), $offenders );
+	}
+
+	/**
 	 * The translation catalog carries nothing from the removed Test provider (T10-S5-03).
 	 *
 	 * A stale POT kept the provider's source path and its "Test (sample data)"
