@@ -196,7 +196,7 @@ final class Outpost_Uninstaller {
 	 * password needs network activation), without running activation hooks.
 	 *
 	 * @param string $plugin_basename Plugin basename, e.g. outpost-mobile-publishing/outpost.php.
-	 * @return bool Whether Outpost is saved as active.
+	 * @return bool Whether Outpost is saved as active afterward.
 	 */
 	private static function reactivate( string $plugin_basename ): bool {
 		if ( '' === $plugin_basename ) {
@@ -204,7 +204,15 @@ final class Outpost_Uninstaller {
 		}
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		$result = activate_plugin( $plugin_basename, '', is_multisite(), true );
-		return ! is_wp_error( $result );
+		if ( is_wp_error( $result ) ) {
+			return false;
+		}
+		// Trust only the saved state: a failed option write would leave the
+		// next request without Outpost loaded (T10-S4-27 v1.2).
+		if ( is_multisite() ) {
+			return is_plugin_active_for_network( $plugin_basename );
+		}
+		return in_array( $plugin_basename, (array) get_option( 'active_plugins', array() ), true );
 	}
 
 	/**
