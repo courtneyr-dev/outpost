@@ -36,6 +36,9 @@ final class AbilitiesCredentialGateTest extends TestCase {
 
 	private int $post_id = 0;
 
+	/** @var array<int, int> Every user a test created. */
+	private array $created = array();
+
 	/** @var mixed */
 	private $saved_auth_cookie = null;
 
@@ -70,13 +73,14 @@ final class AbilitiesCredentialGateTest extends TestCase {
 		wp_delete_post( $this->post_id, true );
 		require_once ABSPATH . 'wp-admin/includes/user.php';
 		delete_transient( 'outpost_config_rl_u_' . $this->editor_id );
-		wp_delete_user( $this->editor_id );
-		wp_delete_user( $this->author_id );
+		foreach ( $this->created as $id ) {
+			wp_delete_user( $id );
+		}
 		parent::tearDown();
 	}
 
 	private function user( string $role ): int {
-		return (int) wp_insert_user(
+		$id              = (int) wp_insert_user(
 			array(
 				'user_login' => 'f501_' . $role . '_' . uniqid(),
 				'user_pass'  => wp_generate_password( 24, true ),
@@ -84,6 +88,8 @@ final class AbilitiesCredentialGateTest extends TestCase {
 				'role'       => $role,
 			)
 		);
+		$this->created[] = $id;
+		return $id;
 	}
 
 	/** Resolve a bearer token for the editor the way core does before dispatch. */
@@ -128,15 +134,25 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	}
 
 	/**
-	 * An update-scoped token can edit another author's published post without edit_posts; share status still needs edit_posts.
+	 * A user who can edit this post but lacks edit_posts can't read its share status, like the route.
+	 *
+	 * Over HTTP an IndieAuth `update` token is such a user (its scope
+	 * carries edit_others_posts and edit_published_posts, not edit_posts);
+	 * the in-process fixture doesn't reproduce IndieAuth's REST-time
+	 * capability map, so a role with the same capabilities stands in.
 	 */
 	public function test_share_status_needs_edit_posts_like_the_route(): void {
-		$this->arrive_with_token( array( 'update' ) );
+		add_role( 'f501_reviser', 'F5-01 reviser', array( 'read' => true, 'edit_others_posts' => true, 'edit_published_posts' => true ) );
+		try {
+			wp_set_current_user( $this->user( 'f501_reviser' ) );
 
-		$this->assertTrue( current_user_can( 'edit_post', $this->post_id ), 'Precondition: IndieAuth grants edit_post on this post.' );
-		$this->assertFalse( current_user_can( 'edit_posts' ), 'Precondition: but not edit_posts.' );
-		$this->assertGreaterThanOrEqual( 401, $this->route_status( '/outpost/v1/manual-share/status/' . $this->post_id ), 'Control: the route refuses.' );
-		$this->assertFalse( Outpost_Abilities::can_get_share_status( array( 'post_id' => $this->post_id ) ) );
+			$this->assertTrue( current_user_can( 'edit_post', $this->post_id ), 'Precondition: the user can edit this post.' );
+			$this->assertFalse( current_user_can( 'edit_posts' ), 'Precondition: but lacks edit_posts.' );
+			$this->assertGreaterThanOrEqual( 401, $this->route_status( '/outpost/v1/manual-share/status/' . $this->post_id ), 'Control: the route refuses.' );
+			$this->assertFalse( Outpost_Abilities::can_get_share_status( array( 'post_id' => $this->post_id ) ) );
+		} finally {
+			remove_role( 'f501_reviser' );
+		}
 	}
 
 	/** @return array<string, array{0: ?string}> */
