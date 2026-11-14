@@ -182,13 +182,12 @@ final class Outpost_Composite_Inbound {
 			$meta['sources'][ $source['id'] ] = $row;
 			if ( ! is_wp_error( $row['result'] ) ) {
 				$enriched_results[ $source['id'] ] = $row['result'];
-			} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-				error_log(
+			} else {
+				Outpost_Debug_Log::write(
 					sprintf(
-						'Outpost composite enricher %s failed: %s',
-						$source['id'],
-						$row['result']->get_error_message()
+						'composite enricher %s failed: %s',
+						sanitize_key( (string) $source['id'] ),
+						Outpost_Debug_Log::error_code( $row['result'] )
 					)
 				);
 			}

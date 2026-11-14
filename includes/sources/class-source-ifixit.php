@@ -131,9 +131,8 @@ final class Outpost_Source_Ifixit extends Outpost_Source_Base {
 		if ( ! is_string( $filtered ) ) {
 			return $default;
 		}
-		if ( '' === trim( $filtered ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-			error_log( 'Outpost: outpost_ifixit_attribution_html returned empty; iFixit content is CC BY-NC-SA and attribution removal may violate the license.' );
+		if ( '' === trim( $filtered ) ) {
+			Outpost_Debug_Log::write( 'outpost_ifixit_attribution_html returned empty; iFixit content is CC BY-NC-SA and attribution removal may violate the license.' );
 		}
 		return $filtered;
 	}

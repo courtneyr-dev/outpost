@@ -56,6 +56,7 @@ define( 'OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE', 'rss-chat-routing/rss-chat-routi
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-debug-log.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
 // Before every class that uses it: Outpost_OAuth_Controller (below) and the
 // REST endpoints further down.
