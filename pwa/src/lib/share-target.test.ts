@@ -192,6 +192,24 @@ describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
 		expect(hold_share_for_review().shares).toEqual([{ tab: 'note', content: 'ok' }]);
 	});
 
+	it('drops a share whose tab is not a composer mode (#323)', async () => {
+		const { hold_share_for_review } = await import('./share-target');
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'checkin', content: 'old value' }));
+		sessionStorage.setItem('outpost.share_review', JSON.stringify({ tab: 'about', content: 'no' }));
+		sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'reply', url: 'https://example.test/' }));
+		expect(hold_share_for_review().shares).toEqual([{ tab: 'reply', url: 'https://example.test/' }]);
+	});
+
+	it('peek returns nothing for a stash whose tab is not a composer mode (#323)', async () => {
+		const { peek_share_target } = await import('./share-target');
+		for (const tab of ['checkin', '', 42, null]) {
+			sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab, content: 'x' }));
+			expect(peek_share_target()).toBeNull();
+		}
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'life', content: 'x' }));
+		expect(peek_share_target()).toEqual({ tab: 'life', content: 'x' });
+	});
+
 	it('release hands the earliest share to the modes and clears both slots', async () => {
 		const { hold_share_for_review, release_held_share, stash_share_target, peek_share_target } = await import('./share-target');
 		stash_share_target({ tab: 'note', content: 'first' });
