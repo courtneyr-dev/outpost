@@ -17,7 +17,7 @@
  *
  * Other accounts' posts and locked older ones survive every path.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
@@ -39,8 +39,8 @@ let real: IDBFactory;
 let steps: string[];
 let token_fails: boolean;
 let queue_writes_fail: boolean;
-let clear_sign_in: ReturnType<typeof vi.fn>;
-let finish_sign_out: ReturnType<typeof vi.fn>;
+let clear_sign_in: Mock<() => Promise<void>>;
+let finish_sign_out: Mock<() => void>;
 
 /** The real queue database, recording read-write transactions and failing them on demand. */
 function queue_env(): OfflineQueueEnvironment {
