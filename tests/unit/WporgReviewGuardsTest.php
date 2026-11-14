@@ -140,6 +140,49 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertSame( '1.0.27', $tag[1], 'No version other than 1.0.27.' );
 	}
 
+	/**
+	 * T10-S4-03 (L6-10): the iOS Shortcut installer link ships, and the
+	 * developer README beside it does not. Checked against the actual
+	 * .distignore rules by building the package file list the same way the
+	 * release does (tracked files filtered through rsync --exclude-from).
+	 */
+	public function test_the_shortcut_installer_ships_without_its_developer_readme(): void {
+		$root = dirname( __DIR__, 2 );
+		if ( ! is_dir( $root . '/.git' ) && ! is_file( $root . '/.git' ) ) {
+			$this->markTestSkipped( 'Needs a git checkout to list tracked files.' );
+		}
+		$files = self::packaged_files( $root );
+
+		$this->assertContains( 'assets/ios-shortcut-base-link.txt', $files, 'The installer link the settings page reads ships.' );
+		$this->assertNotContains( 'assets/ios-shortcut-base-link.README.md', $files, 'The developer README does not ship.' );
+	}
+
+	/**
+	 * Tracked files left after the .distignore rules, via rsync's own matcher.
+	 *
+	 * @return array<int, string>
+	 */
+	private static function packaged_files( string $root ): array {
+		$tmp = sys_get_temp_dir() . '/outpost-pkg-' . uniqid();
+		mkdir( $tmp );
+		// Copy the tracked files first, then filter the copy: rsync's
+		// --files-from ignores exclude rules on macOS (openrsync).
+		$cmd = 'cd ' . escapeshellarg( $root ) . ' && mkdir ' . escapeshellarg( $tmp . '/src' ) . ' ' . escapeshellarg( $tmp . '/pkg' )
+			. ' && git ls-files -z | tar --null -T - -cf - | tar -xf - -C ' . escapeshellarg( $tmp . '/src' )
+			. ' && rsync -a --exclude-from=.distignore ' . escapeshellarg( $tmp . '/src/' ) . ' ' . escapeshellarg( $tmp . '/pkg/' ) . ' 2>&1';
+		exec( $cmd, $out, $code ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		if ( 0 !== $code ) {
+			self::markTestSkipped( 'rsync or git unavailable: ' . implode( ' ', $out ) );
+		}
+		$files = array();
+		$it    = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $tmp . '/pkg', \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $it as $file ) {
+			$files[] = substr( (string) $file, strlen( $tmp . '/pkg' ) + 1 );
+		}
+		exec( 'rm -r ' . escapeshellarg( $tmp ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		return $files;
+	}
+
 	public function test_input_legibility_sources(): void {
 		$root       = dirname( __DIR__, 2 );
 		$controller = (string) file_get_contents( $root . '/includes/sources/class-share-target-controller.php' );
