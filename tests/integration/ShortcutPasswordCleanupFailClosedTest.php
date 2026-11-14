@@ -35,6 +35,12 @@ final class ShortcutPasswordCleanupFailClosedTest extends TestCase {
 	/** @var array<int, int> User ids whose application-password writes fail. */
 	private array $failing = array();
 
+	/** @var mixed Stored active_plugins before a test changed it. */
+	private $saved_active = null;
+
+	/** @var mixed The bootstrap's option_active_plugins filters, while lifted. */
+	private $saved_active_filters = null;
+
 	protected function setUp(): void {
 		parent::setUp();
 		if ( ! class_exists( 'WP_Application_Passwords' ) || ! function_exists( 'outpost_deactivate' ) ) {
@@ -58,6 +64,12 @@ final class ShortcutPasswordCleanupFailClosedTest extends TestCase {
 			wp_delete_user( $id );
 		}
 		delete_option( 'outpost_settings' );
+		if ( null !== $this->saved_active ) {
+			update_option( 'active_plugins', $this->saved_active );
+		}
+		if ( null !== $this->saved_active_filters ) {
+			$GLOBALS['wp_filter']['option_active_plugins'] = $this->saved_active_filters;
+		}
 		parent::tearDown();
 	}
 
@@ -96,11 +108,61 @@ final class ShortcutPasswordCleanupFailClosedTest extends TestCase {
 		return $id;
 	}
 
+	/**
+	 * When Outpost can't be turned back on (here its required plugins are
+	 * inactive), uninstall still stops before deleting any data and says the
+	 * password isn't limited and must be revoked by hand.
+	 */
+	public function test_uninstall_says_so_when_it_cannot_reactivate(): void {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$basename = basename( dirname( __DIR__, 2 ) ) . '/outpost.php';
+		$this->lift_active_plugins_filter();
+		$this->saved_active = get_option( 'active_plugins' );
+		update_option( 'active_plugins', array() );
+		$fail          = $this->user_with_passwords();
+		$this->failing = array( $fail );
+		update_option( 'outpost_settings', array( 'kept' => '1' ) );
+
+		try {
+			\Outpost_Uninstaller::run( $basename );
+			$this->fail( 'Uninstall must stop while a Shortcut password survives.' );
+		} catch ( \OverflowException $stopped ) {
+			$this->assertStringContainsString( 'could not turn itself back on', $stopped->getMessage() );
+			$this->assertStringContainsString( 'Revoke it', $stopped->getMessage() );
+		}
+		$this->assertNotContains( $basename, $this->stored_active_plugins() );
+		$this->assertSame( array( 'kept' => '1' ), get_option( 'outpost_settings' ), 'No plugin data is deleted.' );
+	}
+
+	/**
+	 * Remove the bootstrap's option_active_plugins filters until tearDown.
+	 */
+	private function lift_active_plugins_filter(): void {
+		$this->saved_active_filters = $GLOBALS['wp_filter']['option_active_plugins'] ?? null;
+		unset( $GLOBALS['wp_filter']['option_active_plugins'] );
+	}
+
+	/**
+	 * The stored active_plugins value. The integration bootstrap filters
+	 * option_active_plugins to always include Outpost, so the raw row is
+	 * what the next request would read.
+	 *
+	 * @return array<int, string>
+	 */
+	private function stored_active_plugins(): array {
+		global $wpdb;
+		$raw = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", 'active_plugins' ) );
+		return array_values( (array) maybe_unserialize( (string) $raw ) );
+	}
+
 	/** @return array<int, string> */
 	private function names( int $user_id ): array {
 		return array_column( WP_Application_Passwords::get_user_application_passwords( $user_id ), 'name' );
 	}
 
+	/**
+	 * Cleanup reports success only when no outpost password is left.
+	 */
 	public function test_cleanup_reports_success_only_when_no_outpost_password_is_left(): void {
 		$ok   = $this->user_with_passwords();
 		$fail = $this->user_with_passwords();
@@ -153,22 +215,42 @@ final class ShortcutPasswordCleanupFailClosedTest extends TestCase {
 		$this->assertSame( array( 'Mobile app' ), $this->names( $id ) );
 	}
 
-	public function test_uninstall_stops_before_deleting_plugin_data_when_a_password_survives(): void {
+	/**
+	 * WordPress runs uninstall after deactivation, without loading Outpost,
+	 * so keeping the files can't keep the password scoped (final delta
+	 * review D-01). A failed cleanup reactivates Outpost, so the next request
+	 * loads the route rule again, and stops before deleting any plugin data.
+	 */
+	public function test_uninstall_reactivates_and_stops_when_a_password_survives(): void {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$basename = basename( dirname( __DIR__, 2 ) ) . '/outpost.php';
+		// The bootstrap filters active_plugins to always include Outpost,
+		// which would make reactivation a no-op here; lift it for this test.
+		$this->lift_active_plugins_filter();
+		// Outpost's required plugins are active on a real site.
+		$this->saved_active = get_option( 'active_plugins' );
+		update_option( 'active_plugins', array( 'indieauth/indieauth.php', 'micropub/micropub.php' ) );
+		deactivate_plugins( $basename, true );
+		$this->assertNotContains( $basename, $this->stored_active_plugins(), 'Control: uninstall starts with Outpost inactive.' );
 		$fail          = $this->user_with_passwords();
 		$this->failing = array( $fail );
 		update_option( 'outpost_settings', array( 'kept' => '1' ) );
 
 		try {
-			\Outpost_Uninstaller::run();
+			\Outpost_Uninstaller::run( $basename );
 			$this->fail( 'Uninstall must stop while a Shortcut password survives.' );
 		} catch ( \OverflowException $stopped ) {
-			$this->assertStringStartsWith( 'wp_die: ', $stopped->getMessage() );
+			$this->assertStringContainsString( 'turned itself back on', $stopped->getMessage() );
+		} finally {
+			$active = in_array( $basename, $this->stored_active_plugins(), true );
+			deactivate_plugins( $basename, true );
 		}
+		$this->assertTrue( $active, 'Outpost is saved as active again, so its route rule loads on the next request.' );
 		$this->assertSame( array( 'kept' => '1' ), get_option( 'outpost_settings' ), 'No plugin data is deleted.' );
 		$this->assertNotNull( Outpost_IOS_Shortcut_App_Password::find( $fail ) );
 
 		$this->failing = array();
-		\Outpost_Uninstaller::run();
+		\Outpost_Uninstaller::run( $basename );
 		$this->assertFalse( get_option( 'outpost_settings' ), 'A clean retry uninstalls.' );
 		$this->assertSame( array( 'Mobile app' ), $this->names( $fail ) );
 	}
