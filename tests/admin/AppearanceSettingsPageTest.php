@@ -325,10 +325,103 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 		$this->assertStringContainsString( '<body class="outpost-mode-night">', $html );
 	}
 
+	public function test_build_preview_html_draws_the_composer_tab_group(): void {
+		// #324: the composer's tabs are a two-row button group marked with
+		// aria-current (1.0.27, #316); the preview draws the same group.
+		$resolved = Outpost_Token_Resolver::resolve( $this->current_user_id, 'day' );
+		$html     = Outpost_Appearance_Settings_Page::build_preview_html( $resolved, 'day' );
+		$this->assertStringContainsString( '<div class="outpost-tablist-wrap"><div role="group" aria-label="Composer modes" class="outpost-tablist">', $html );
+		$this->assertStringNotContainsString( 'aria-selected', $html );
+		$this->assertStringNotContainsString( 'outpost-preview-tabs', $html );
+		preg_match_all( '/<button type="button" class="outpost-tab"( aria-current="true")?>([^<]+)<\/button>/', $html, $m );
+		$this->assertSame( array( 'Post', 'Reply', 'Photo', 'Doing', 'Life', 'Recipe', 'About' ), $m[2], 'The composer\'s seven tabs, in its order.' );
+		$this->assertSame( array( '', '', '', ' aria-current="true"', '', '', '' ), $m[1], 'Doing is the one current tab.' );
+	}
+
+	/**
+	 * @return array<string,string> "[@media prelude|]selector" => normalized declarations.
+	 */
+	private static function css_rules( string $css, string $at = '' ): array {
+		$css   = (string) preg_replace( '#/\*.*?\*/#s', '', $css );
+		$rules = array();
+		$len   = strlen( $css );
+		$i     = 0;
+		while ( $i < $len ) {
+			$open = strpos( $css, '{', $i );
+			if ( false === $open ) {
+				break;
+			}
+			$prelude = trim( substr( $css, $i, $open - $i ) );
+			$depth   = 1;
+			$j       = $open + 1;
+			while ( $j < $len && $depth > 0 ) {
+				$depth += ( '{' === $css[ $j ] ) ? 1 : ( ( '}' === $css[ $j ] ) ? -1 : 0 );
+				++$j;
+			}
+			$body = substr( $css, $open + 1, $j - $open - 2 );
+			if ( str_starts_with( $prelude, '@' ) ) {
+				$rules += self::css_rules( $body, preg_replace( '/\s+/', ' ', $prelude ) . '|' );
+			} else {
+				$decls = implode( '; ', array_filter( array_map( static fn( $d ) => (string) preg_replace( '/\s+/', ' ', trim( $d ) ), explode( ';', $body ) ) ) );
+				foreach ( array_map( 'trim', explode( ',', $prelude ) ) as $selector ) {
+					$rules[ $at . $selector ] = $decls;
+				}
+			}
+			$i = $j;
+		}
+		return $rules;
+	}
+
+	public function test_preview_tab_rules_are_the_composer_rules(): void {
+		// #324: the preview's tab styling is structure.css's, unchanged, so
+		// the two can't drift apart again.
+		$resolved = Outpost_Token_Resolver::resolve( $this->current_user_id, 'day' );
+		$html     = Outpost_Appearance_Settings_Page::build_preview_html( $resolved, 'day' );
+		preg_match( '/<style id=["\']outpost-preview-static-day-inline-css["\']>(.*?)<\/style>/s', $html, $m );
+		$preview  = self::css_rules( $m[1] ?? '' );
+		$composer = self::css_rules( (string) file_get_contents( dirname( __DIR__, 2 ) . '/pwa/src/styles/structure.css' ) );
+		$expected = array(
+			'.outpost-tablist-wrap',
+			'.outpost-tablist',
+			'.outpost-tab',
+			'.outpost-tab:focus',
+			'.outpost-tab[aria-current="true"]',
+			'.outpost-tab:not([aria-current="true"])',
+			'.outpost-mode-day .outpost-tab:not(.outpost-tab--plain)',
+			'.outpost-mode-night .outpost-tab:not(.outpost-tab--plain)',
+			'@media (forced-colors: active)|.outpost-tab[aria-current="true"]',
+		);
+		foreach ( $expected as $selector ) {
+			$this->assertArrayHasKey( $selector, $preview, "The preview styles {$selector}." );
+			$this->assertArrayHasKey( $selector, $composer, "structure.css still has {$selector}." );
+			$this->assertSame( $composer[ $selector ], $preview[ $selector ], "{$selector} matches structure.css." );
+		}
+	}
+
+	public function test_preview_token_block_carries_the_component_tokens_for_its_mode(): void {
+		// The tab rules paint from component tokens; the preview gets the
+		// same resolved values /post/ prints, for whichever mode it shows.
+		foreach ( array( 'day', 'night' ) as $mode ) {
+			$resolved = Outpost_Token_Resolver::resolve( $this->current_user_id, $mode );
+			$html     = Outpost_Appearance_Settings_Page::build_preview_html( $resolved, $mode );
+			preg_match( '/<style id=["\']outpost-preview-tokens-' . $mode . '-inline-css["\']>(.*?)<\/style>/s', $html, $m );
+			foreach ( array( 'tab-fg', 'tab-fg-active', 'tab-bg-active', 'tab-indicator', 'card-border' ) as $token ) {
+				$this->assertNotEmpty( $resolved['components'][ $token ] ?? '', "{$mode} resolves {$token}." );
+				$this->assertStringContainsString( "--outpost-{$token}: " . $resolved['components'][ $token ] . ';', $m[1] ?? '', "{$mode} preview declares {$token}." );
+			}
+		}
+	}
+
+	public function test_preview_script_rewrites_component_tokens_with_the_mode(): void {
+		// The live script swaps in the night baseline; it has to carry that
+		// baseline's component tokens too or Night loses its tab paint.
+		$this->assertStringContainsString( 'resolved.components', Outpost_Appearance_Settings_Page::preview_script() );
+	}
+
 	public function test_build_preview_html_includes_all_subset_components(): void {
 		$resolved = Outpost_Token_Resolver::resolve( $this->current_user_id, 'day' );
 		$html     = Outpost_Appearance_Settings_Page::build_preview_html( $resolved, 'day' );
-		$this->assertStringContainsString( 'class="outpost-preview-tabs"', $html );
+		$this->assertStringContainsString( 'class="outpost-tablist"', $html );
 		$this->assertStringContainsString( 'class="outpost-preview-heading"', $html );
 		$this->assertStringContainsString( 'class="outpost-preview-input"', $html );
 		$this->assertStringContainsString( 'class="outpost-preview-radios"', $html );
