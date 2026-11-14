@@ -22,8 +22,12 @@ if ( ! class_exists( 'WP_Application_Passwords' ) ) {
 		/** @var array<int, array<int, array<string, mixed>>> */
 		public static array $store = array();
 
+		/** When true, deletions fail and change nothing (a database write that didn't land). */
+		public static bool $fail_deletes = false;
+
 		public static function reset(): void {
-			self::$store = array();
+			self::$store        = array();
+			self::$fail_deletes = false;
 		}
 
 		/** @return array<int, array<string, mixed>> */
@@ -45,6 +49,9 @@ if ( ! class_exists( 'WP_Application_Passwords' ) ) {
 		}
 
 		public static function delete_application_password( $user_id, $uuid ): bool {
+			if ( self::$fail_deletes ) {
+				return false;
+			}
 			foreach ( self::$store[ (int) $user_id ] ?? array() as $i => $item ) {
 				if ( $item['uuid'] === $uuid ) {
 					unset( self::$store[ (int) $user_id ][ $i ] );

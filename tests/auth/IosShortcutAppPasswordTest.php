@@ -195,6 +195,27 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
+	 * T10-S4-26 (re-review 3): a deletion that fails must not mark the sweep
+	 * done, or the password left behind would never be retried.
+	 */
+	public function test_a_failed_deletion_leaves_the_sweep_to_retry(): void {
+		$this->multisite                         = true;
+		WP_Application_Passwords::$store[7]      = array( $this->outpost_item() );
+		WP_Application_Passwords::$fail_deletes  = true;
+
+		Outpost_IOS_Shortcut_App_Password::sweep_unscoped();
+
+		$this->assertCount( 1, WP_Application_Passwords::$store[7], 'Control: the deletion failed.' );
+		$this->assertArrayNotHasKey( Outpost_IOS_Shortcut_App_Password::UNSCOPED_SWEPT_OPTION, $this->site_options, 'Not marked done.' );
+
+		WP_Application_Passwords::$fail_deletes = false;
+		Outpost_IOS_Shortcut_App_Password::sweep_unscoped();
+
+		$this->assertSame( array(), WP_Application_Passwords::$store[7], 'The next request retries and succeeds.' );
+		$this->assertSame( '1', $this->site_options[ Outpost_IOS_Shortcut_App_Password::UNSCOPED_SWEPT_OPTION ] ?? null );
+	}
+
+	/**
 	 * @return array<string, array{0: bool, 1: array<string, int>}>
 	 */
 	public function scoped_installs(): array {
