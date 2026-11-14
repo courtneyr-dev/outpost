@@ -113,6 +113,8 @@ final class WporgReviewGuardsTest extends TestCase {
 			'npm run build:wp',
 			'THIRD-PARTY-LICENSES.txt',
 			'github.com/courtneyr-dev/outpost',
+			// T10-S4-05 (F-23): the paths are root-relative, so say so.
+			'= Does it work when WordPress is in a subdirectory? =',
 		) as $needle ) {
 			$this->assertStringContainsString( $needle, $readme, "readme.txt keeps: $needle" );
 		}
