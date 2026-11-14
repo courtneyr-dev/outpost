@@ -107,9 +107,8 @@ final class Outpost_Source_Detector {
 		$text  = isset( $payload['text'] ) && is_string( $payload['text'] ) ? trim( $payload['text'] ) : '';
 		$title = isset( $payload['title'] ) && is_string( $payload['title'] ) ? trim( $payload['title'] ) : '';
 
-		if ( '' !== $url && self::is_http_url( $url ) ) {
-			return $url;
-		}
+		// Candidates in priority order; every one, wherever it was found, must
+		// pass the URL-only validator before it is returned (T10-S3-13 v1.1).
 		// Some iOS apps (Kindle, Books, podcast clients) bundle the
 		// shared content as a quote + title + URL all in the share-sheet
 		// text payload. iOS Shortcut authors typically wire a single
@@ -117,23 +116,23 @@ final class Outpost_Source_Detector {
 		// `url` field — so the entire text blob lands here. Fall through
 		// to URL extraction from the `url` field's content when the
 		// field isn't a clean URL on its own.
+		$candidates = array();
 		if ( '' !== $url ) {
-			$found = self::find_url_in_text( $url );
-			if ( null !== $found ) {
-				return $found;
-			}
-		}
-		if ( '' !== $text && self::is_http_url( $text ) ) {
-			return $text;
+			$candidates[] = $url;
+			$candidates[] = self::find_url_in_text( $url );
 		}
 		if ( '' !== $text ) {
-			$found = self::find_url_in_text( $text );
-			if ( null !== $found ) {
-				return $found;
-			}
+			$candidates[] = $text;
+			$candidates[] = self::find_url_in_text( $text );
 		}
-		if ( '' !== $title && self::is_http_url( $title ) ) {
-			return $title;
+		if ( '' !== $title ) {
+			$candidates[] = $title;
+		}
+		foreach ( $candidates as $candidate ) {
+			$valid = null === $candidate ? '' : self::sanitize_shared_url( $candidate );
+			if ( '' !== $valid ) {
+				return $valid;
+			}
 		}
 		return null;
 	}
@@ -166,18 +165,18 @@ final class Outpost_Source_Detector {
 	}
 
 	/**
-	 * Clean a shared `url` field (T10-S3-13, F-14).
+	 * Validate a shared URL (T10-S3-13 v1.1, F-14). URL-only: returns a
+	 * validated http(s) URL or ''.
 	 *
-	 * The value must be a string within URL_MAX_LENGTH. One token (no
-	 * whitespace) is a URL and is validated as one: no control bytes, angle
-	 * brackets, quotes, backslashes, or HTML entities; an http(s) scheme and
-	 * a host; then esc_url_raw() with an http/https allowlist. Anything that
-	 * fails is ''. A value with whitespace is a text blob (iOS apps put a
-	 * quote plus the link in this field): it is cleaned as text, and
-	 * extract_url_from_payload() finds and validates the link inside it.
-	 * wp_kses() never sanitizes a URL.
+	 * The value must be one string token within URL_MAX_LENGTH with no
+	 * whitespace, control bytes, angle brackets, quotes, backslashes, or HTML
+	 * entities, an http(s) scheme, and a host; then it goes through
+	 * esc_url_raw() with an http/https allowlist. A value with markup
+	 * appended is malformed and is not trimmed into a valid prefix. wp_kses()
+	 * never sanitizes a URL. For the share payload's `url` field, which may
+	 * hold prose, use sanitize_shared_url_field().
 	 *
-	 * @param mixed $value Unslashed field value.
+	 * @param mixed $value Unslashed value.
 	 * @return string
 	 */
 	public static function sanitize_shared_url( mixed $value ): string {
@@ -185,11 +184,8 @@ final class Outpost_Source_Detector {
 			return '';
 		}
 		$trimmed = trim( $value );
-		if ( '' === $trimmed ) {
+		if ( '' === $trimmed || 1 === preg_match( '/\s/', $trimmed ) ) {
 			return '';
-		}
-		if ( 1 === preg_match( '/\s/', $trimmed ) ) {
-			return self::sanitize_shared_text( $value );
 		}
 		if ( 1 === preg_match( '/[\x00-\x1F\x7F<>"\'`\\\\]/', $trimmed ) ) {
 			return '';
@@ -202,6 +198,28 @@ final class Outpost_Source_Detector {
 		}
 		$clean = esc_url_raw( $trimmed, array( 'http', 'https' ) );
 		return ( '' !== $clean && self::is_http_url( $clean ) ) ? $clean : '';
+	}
+
+	/**
+	 * Clean the share payload's `url` field, which share sheets and iOS
+	 * Shortcuts sometimes fill with prose (a quote plus the link) instead of a
+	 * bare URL. Returns the validated URL when the field is one; for prose
+	 * (a value with whitespace) the prose cleaned as text, so
+	 * extract_url_from_payload() can find the link in it and validate that
+	 * candidate with sanitize_shared_url() before any use; otherwise ''.
+	 *
+	 * @param mixed $value Unslashed field value.
+	 * @return string
+	 */
+	public static function sanitize_shared_url_field( mixed $value ): string {
+		$url = self::sanitize_shared_url( $value );
+		if ( '' !== $url ) {
+			return $url;
+		}
+		if ( is_string( $value ) && 1 === preg_match( '/\s/', trim( $value ) ) ) {
+			return self::sanitize_shared_text( $value );
+		}
+		return '';
 	}
 
 	/**
@@ -243,10 +261,21 @@ final class Outpost_Source_Detector {
 		// enough to catch URLs embedded in arbitrary text. We don't
 		// need a perfect URL parser here; the candidate gets
 		// re-validated via wp_parse_url + is_http_url before use.
-		if ( 1 === preg_match( '~https?://[A-Za-z0-9._/?:%&=+\-\[\]@!,;\']+~i', $text, $match ) ) {
-			$candidate = rtrim( $match[0], '.,;:!?)' );
-			if ( self::is_http_url( $candidate ) ) {
-				return $candidate;
+		if ( preg_match_all( '~https?://[A-Za-z0-9._/?:%&=+\-\[\]@!,;\']+~i', $text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			foreach ( $matches[0] as $match ) {
+				// A link must end at a real boundary: the end of the text,
+				// whitespace, or closing quotes or brackets followed by one of
+				// those or sentence punctuation. A link that runs on into other
+				// characters (`#`, `<`, `">`) is malformed and is skipped, never
+				// cut back to a valid-looking prefix (T10-S3-13 v1.1).
+				$after = substr( $text, (int) $match[1] + strlen( (string) $match[0] ) );
+				if ( '' !== $after && 1 !== preg_match( '/^(?:\s|["\x{201D}\x{2019})\]}]+(?:$|[\s.,;:!?]))/u', $after ) ) {
+					continue;
+				}
+				$candidate = rtrim( (string) $match[0], '.,;:!?)' );
+				if ( self::is_http_url( $candidate ) ) {
+					return $candidate;
+				}
 			}
 		}
 		return null;

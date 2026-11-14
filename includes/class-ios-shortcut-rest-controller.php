@@ -58,12 +58,11 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 						// payload. iOS Shortcut authors typically wire
 						// Shortcut Input into a single field (the `url`
 						// field), so a multi-line text blob lands here
-						// instead of a clean URL. esc_url_raw empties a
-						// blob, so sanitize_shared_url only applies it to
-						// one bare URL and otherwise keeps the text;
-						// Outpost_Source_Detector::extract_url_from_payload
-						// regex-extracts the embedded URL and runs full
-						// is_http_url validation before use.
+						// instead of a clean URL. sanitize_shared_url_field
+						// returns a validated URL or that prose (T10-S3-13
+						// v1.1); Outpost_Source_Detector::extract_url_from_payload
+						// extracts the embedded link and validates it with
+						// the URL-only sanitize_shared_url before use.
 						//
 						// None of the three args use sanitize_text_field
 						// or sanitize_textarea_field: both delete %XX
@@ -71,7 +70,7 @@ final class Outpost_IOS_Shortcut_REST_Controller {
 						// sanitize_callback also replaces core's type
 						// check, so an array can arrive here; the shared
 						// sanitizers return '' for one.
-						'sanitize_callback' => array( 'Outpost_Source_Detector', 'sanitize_shared_url' ),
+						'sanitize_callback' => array( 'Outpost_Source_Detector', 'sanitize_shared_url_field' ),
 					),
 					'shared_text' => array(
 						'type'              => 'string',

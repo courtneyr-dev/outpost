@@ -86,14 +86,14 @@ final class Outpost_Share_Target_Controller {
 	 */
 	private static function read_payload(): array {
 		// Each field is read once as an unslashed string and handed straight to
-		// its sanitizer (T10-S3-13, F-14): sanitize_shared_text() for the free
-		// text, sanitize_shared_url() for the link, which validates a URL as a
-		// URL rather than cleaning it as text. The Shortcut endpoints use the
-		// same two.
+		// its sanitizer (T10-S3-13 v1.1, F-14): sanitize_shared_text() for the
+		// free text, sanitize_shared_url_field() for the url field (a validated
+		// URL, or legacy prose whose link extract_url_from_payload() validates
+		// with the URL-only sanitize_shared_url()). The Shortcut uses the same.
 		return array(
 			'title' => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'title' ) ),
 			'text'  => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'text' ) ),
-			'url'   => Outpost_Source_Detector::sanitize_shared_url( self::read_field( 'url' ) ),
+			'url'   => Outpost_Source_Detector::sanitize_shared_url_field( self::read_field( 'url' ) ),
 		);
 	}
 
