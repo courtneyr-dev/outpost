@@ -110,9 +110,9 @@ final class Outpost_Request_Headers {
 	 * @param string $key `$_GET` key.
 	 */
 	public static function query_key( string $key ): string {
+		// sanitize_key() returns '' for an array or object, with no warning.
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
-		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
-		return is_string( $value ) || is_int( $value ) ? sanitize_key( (string) $value ) : '';
+		return isset( $_GET[ $key ] ) ? sanitize_key( wp_unslash( $_GET[ $key ] ) ) : '';
 	}
 
 	/**
@@ -138,15 +138,10 @@ final class Outpost_Request_Headers {
 	 * @param int    $max_length Longest value accepted; longer values are refused.
 	 */
 	public static function query_text( string $key, int $max_length = 200 ): string {
+		// sanitize_text_field() returns '' for an array or object, with no warning.
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
-		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
-		if ( is_int( $value ) ) {
-			$value = (string) $value;
-		}
-		if ( ! is_string( $value ) || strlen( $value ) > $max_length ) {
-			return '';
-		}
-		return sanitize_text_field( $value );
+		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		return strlen( $value ) > $max_length ? '' : $value;
 	}
 
 	/**

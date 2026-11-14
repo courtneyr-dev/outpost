@@ -90,9 +90,10 @@ final class Outpost_Settings_Handler {
 
 		// "Remove the saved …" checkboxes (T10-S3-11): explicit deletion only.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$clear = isset( $_POST['outpost_settings_clear'] ) && is_array( $_POST['outpost_settings_clear'] )
-			? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['outpost_settings_clear'] ) ) )
+		$clear_in = isset( $_POST['outpost_settings_clear'] ) && is_array( $_POST['outpost_settings_clear'] )
+			? array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings_clear'] ) )
 			: array();
+		$clear    = array_map( 'sanitize_key', array_keys( $clear_in ) );
 
 		self::save_submission( $tab_id, $submitted, $clear );
 
