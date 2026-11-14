@@ -41,17 +41,20 @@
  * before this fix; `claim()` and `save()` both strip it the moment such a
  * row is next read and written back, so it doesn't keep re-persisting.
  *
- * Replay and the signed-in site: an entry only ever sends under a token
- * for the site it was queued for. Replay refuses, non-retryably and before
- * any request, an entry whose `me` origin differs from the stored token's
- * `me` (compared with `me_origins_match` from auth-flow.ts), so one
- * account's token never goes to another account's site. It also refuses
- * an entry with no `me` at all (queued by a build older than 1.0.16):
- * with nothing to compare, the stored token could belong to anyone.
+ * Ownership (T10-S3-07): every entry records `owner`, the canonical
+ * identity (account-identity.ts) of the account that queued it. Two paths on
+ * one site are two accounts. Replay, listing, dismissal, and removal act only
+ * on entries whose owner is exactly the signed-in account: `flush()` reads
+ * the token once, skips every other entry before claiming it, and sends with
+ * that same token, so another account's entry is never claimed, retried,
+ * uploaded, discovered, sent, or changed. An entry with a missing, malformed,
+ * or non-canonical owner (every entry queued before this version) is locked:
+ * it never replays and stays as it is. `list_for_owner()` reports other
+ * entries only as a count.
  *
- * Signing out leaves the queue as it is. `clear_token()` removes only the
- * token, so posts waiting when a token expires send on the first replay
- * after the next sign-in to the same site.
+ * Signing out leaves the queue as it is unless the person chooses to remove
+ * their own queued posts (`remove_owned_entries()`). Posts waiting when a
+ * token expires send on the first replay after the same account signs in.
  */
 
 import {
@@ -64,8 +67,8 @@ import {
 	type MicropubEnvironment,
 } from './micropub';
 import { recall_endpoints, remember_endpoints } from './endpoint-cache';
-import { read_token, type TokenStoreEnvironment } from './token-store';
-import { me_origins_match } from './auth-flow';
+import { read_token, type StoredToken, type TokenStoreEnvironment } from './token-store';
+import { canonical_account } from './account-identity';
 
 const DB_NAME = 'outpost-queue';
 const DB_VERSION = 1;
@@ -105,6 +108,12 @@ export interface QueueEntry {
 	micropubEndpoint: string | null;
 	/** Signed-in "me" URL the replay discovers endpoints from. Absent on 1.0.15 entries. */
 	me?: string;
+	/**
+	 * Canonical identity of the account that queued this entry
+	 * (canonical_account(me) at enqueue). Absent on entries queued before
+	 * 1.0.27; those never replay.
+	 */
+	owner?: string;
 	/** Photos for this post, uploaded at replay when `url` is missing. */
 	media?: QueuedMedia[];
 	mediaEndpoint?: string | null;
@@ -232,11 +241,13 @@ export async function enqueue(
 	input: QueueEnqueueInput,
 	env: OfflineQueueEnvironment = default_env,
 ): Promise<number> {
+	const owner = canonical_account(input.me);
 	const value: Omit<QueueEntry, 'id'> = {
 		source: input.source,
 		properties: input.properties,
 		micropubEndpoint: input.micropubEndpoint,
 		...(input.me !== undefined ? { me: input.me } : {}),
+		...(owner !== null ? { owner } : {}),
 		...(input.media !== undefined ? { media: input.media } : {}),
 		...(input.mediaEndpoint !== undefined ? { mediaEndpoint: input.mediaEndpoint } : {}),
 		createdAt: Date.now(),
@@ -248,6 +259,86 @@ export async function enqueue(
 	});
 	notify_queue_changed();
 	return id;
+}
+
+/**
+ * The exact owner recorded on an entry, or null when it has none or it isn't
+ * a canonical identity. A null owner locks the entry.
+ */
+export function owner_of(entry: { owner?: unknown }): string | null {
+	const owner = entry.owner;
+	return typeof owner === 'string' && canonical_account(owner) === owner ? owner : null;
+}
+
+/** Whether an entry belongs to exactly this account (never true for a null account). */
+function owned_by(entry: { owner?: unknown }, account: string | null): boolean {
+	return account !== null && owner_of(entry) === account;
+}
+
+/**
+ * The signed-in account's entries, oldest first, and a count of everything
+ * else on the device (other accounts' entries and locked ones). The count is
+ * all the UI may show about entries that aren't the person's own.
+ */
+export async function list_for_owner(
+	account: string | null,
+	env: OfflineQueueEnvironment = default_env,
+): Promise<{ own: QueueEntry[]; others: number }> {
+	const all = await list(env);
+	const own = all.filter((entry) => owned_by(entry, account));
+	return { own, others: all.length - own.length };
+}
+
+/**
+ * Dismiss one entry, only when it belongs to `account`. The check and the
+ * delete share one transaction. Resolves whether anything was removed.
+ */
+export async function dismiss_owned(
+	id: number,
+	account: string | null,
+	env: OfflineQueueEnvironment = default_env,
+): Promise<boolean> {
+	if (account === null) return false;
+	const removed = await in_transaction<boolean>(env, 'readwrite', 'dismiss', false, (store, set) => {
+		const request = store.get(id);
+		request.onsuccess = (): void => {
+			const raw = request.result as { owner?: unknown } | undefined;
+			if (raw && owned_by(raw, account)) {
+				store.delete(id);
+				set(true);
+			}
+		};
+	});
+	if (removed) notify_queue_changed();
+	return removed;
+}
+
+/**
+ * "Remove my queued posts and sign out": delete every entry owned by
+ * `account` in one transaction, leaving other accounts' entries and locked
+ * ones. Resolves how many were removed; rejects when storage fails, so the
+ * caller doesn't claim a deletion that didn't happen.
+ */
+export async function remove_owned_entries(
+	account: string | null,
+	env: OfflineQueueEnvironment = default_env,
+): Promise<number> {
+	if (account === null) return 0;
+	let removed = 0;
+	await in_transaction<null>(env, 'readwrite', 'remove_owned', null, (store) => {
+		const cursor_request = store.openCursor();
+		cursor_request.onsuccess = (): void => {
+			const cursor = cursor_request.result;
+			if (!cursor) return;
+			if (owned_by(cursor.value as { owner?: unknown }, account)) {
+				cursor.delete();
+				removed += 1;
+			}
+			cursor.continue();
+		};
+	});
+	if (removed > 0) notify_queue_changed();
+	return removed;
 }
 
 /**
@@ -301,6 +392,28 @@ async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<vo
 }
 
 /**
+ * Remove the plaintext `accessToken` field a pre-1.0.22 row may still carry
+ * (Task H5), whoever owns the row and even when it is locked. This is the
+ * only write flush() makes to a row it doesn't replay, and it changes
+ * nothing else on the row. Rows without the field aren't written.
+ */
+async function scrub_legacy_tokens(env: OfflineQueueEnvironment): Promise<void> {
+	await in_transaction<null>(env, 'readwrite', 'scrub', null, (store) => {
+		const cursor_request = store.openCursor();
+		cursor_request.onsuccess = (): void => {
+			const cursor = cursor_request.result;
+			if (!cursor) return;
+			const value = cursor.value as Record<string, unknown>;
+			if (Object.prototype.hasOwnProperty.call(value, 'accessToken')) {
+				const { accessToken: _drop, ...rest } = value;
+				cursor.update(rest);
+			}
+			cursor.continue();
+		};
+	});
+}
+
+/**
  * Take the replay lease on one entry. Resolves null when the entry is gone
  * (another tab already posted it) or another tab holds an unexpired lease.
  * The read and the write share one readwrite transaction, which is what
@@ -312,13 +425,16 @@ async function save(entry: QueueEntry, env: OfflineQueueEnvironment): Promise<vo
 async function claim(
 	id: number,
 	now: number,
+	account: string,
 	env: OfflineQueueEnvironment,
 ): Promise<QueueEntry | null> {
 	return in_transaction<QueueEntry | null>(env, 'readwrite', 'claim', null, (store, set) => {
 		const request = store.get(id);
 		request.onsuccess = (): void => {
 			const raw = request.result as (Omit<QueueEntry, 'id'> & { accessToken?: unknown }) | undefined;
-			if (!raw || (raw.claimedUntil ?? 0) > now) return;
+			// Ownership is checked again inside the claiming transaction, so
+			// an entry is never written unless it is this account's.
+			if (!raw || !owned_by(raw, account) || (raw.claimedUntil ?? 0) > now) return;
 			const { accessToken: _drop, ...value } = raw;
 			const claimed = { ...value, claimedUntil: now + CLAIM_LEASE_MS };
 			store.put(claimed, id);
@@ -335,11 +451,15 @@ export interface FlushOptions {
 }
 
 /**
- * Replay every queued entry this tab can claim, removing each on success
- * and recording attempts/lastError on failure. Returns the entries still
- * queued after the pass — empty array means the queue drained. Entries
- * another tab is replaying are skipped and appear in the result until that
- * tab removes them.
+ * Replay every queued entry of the signed-in account that this tab can
+ * claim, removing each on success and recording attempts/lastError on
+ * failure. Returns that account's entries still queued after the pass —
+ * empty array means its queue drained. Entries another tab is replaying are
+ * skipped and appear in the result until that tab removes them.
+ *
+ * Reads the token once. With no token, or a token whose `me` isn't a
+ * canonical identity, nothing is replayed and nothing is written. Entries
+ * owned by anyone else, and locked entries, are never claimed or touched.
  *
  * Replays in oldest-first order so the user's posts land in the order
  * they were attempted.
@@ -350,11 +470,16 @@ export async function flush(
 	options: FlushOptions = {},
 ): Promise<QueueEntry[]> {
 	const now = options.now ?? Date.now;
+	await scrub_legacy_tokens(env);
+	const token = await read_token(options.tokenStore);
+	const account = token ? canonical_account(token.me) : null;
+	if (!token || account === null) return [];
 	for (const listed of await list(env)) {
-		const entry = await claim(listed.id, now(), env);
+		if (!owned_by(listed, account)) continue;
+		const entry = await claim(listed.id, now(), account, env);
 		if (!entry) continue;
 		try {
-			await replay(entry, micropubEnv, env, now, options.tokenStore);
+			await replay(entry, token, micropubEnv, env, now);
 		} catch (err) {
 			await save(
 				{
@@ -371,7 +496,7 @@ export async function flush(
 		}
 		await remove(entry.id, env);
 	}
-	return list(env);
+	return (await list_for_owner(account, env)).own;
 }
 
 /**
@@ -381,40 +506,22 @@ export async function flush(
  */
 async function replay(
 	entry: QueueEntry,
+	token: StoredToken,
 	micropubEnv: MicropubEnvironment | undefined,
 	env: OfflineQueueEnvironment,
 	now: () => number,
-	tokenStoreEnv?: TokenStoreEnvironment,
 ): Promise<void> {
 	const renew = (): Promise<void> =>
 		save({ ...entry, claimedUntil: now() + CLAIM_LEASE_MS }, env);
 
-	// An entry with no `me` can't be matched to the signed-in site, so it
-	// never sends under whatever token is stored.
+	// flush() matched this entry's owner to the token before claiming it.
 	if (!entry.me) {
 		throw new OfflineQueueError(
-			'queue replay: queued by an older version with no site recorded; re-create this post',
+			'queue replay: this post has no site recorded to send it to; re-create this post',
 			'wrong_account',
 		);
 	}
-	const stored_token = await read_token(tokenStoreEnv);
-	if (!stored_token) {
-		throw new OfflineQueueError(
-			'queue replay: no token in the encrypted store — sign in again to send this post',
-			'no_token',
-		);
-	}
-	// Refuse to send someone else's token to this entry's site.
-	if (stored_token.me && !me_origins_match(entry.me, stored_token.me)) {
-		throw new OfflineQueueError(
-			'queue replay: signed in as a different site than ' +
-				entry.me +
-				', where this post was queued — it stays queued; once you are signed in to that ' +
-				'site, Retry all now or the next reconnect sends it, or dismiss it',
-			'wrong_account',
-		);
-	}
-	const accessToken = stored_token.accessToken;
+	const accessToken = token.accessToken;
 
 	let endpoint = entry.micropubEndpoint;
 	if (!endpoint) {

@@ -494,11 +494,21 @@ final class AppearanceSettingsPageTest extends \WP_Mock\Tools\TestCase {
 		$this->assertStringContainsString( 'Appearance settings saved', $html );
 	}
 
-	public function test_render_emits_error_notice_on_query_param(): void {
+	public function test_render_emits_error_notice_without_reflecting_query_text(): void {
+		// T10-S3-13 (F-11): the error text comes from this user's save, not the URL.
 		$_GET['notice']  = 'error';
-		$_GET['message'] = 'Invalid color';
+		$_GET['message'] = 'Text from a link';
 		$html            = $this->render();
+		$this->assertStringNotContainsString( 'Text from a link', $html );
+		$this->assertStringContainsString( 'Save failed.', $html );
+	}
+
+	public function test_render_shows_the_saved_error_message_once(): void {
+		$_GET['notice'] = 'error';
+		$this->transients[ 'outpost_appearance_notice_' . $this->current_user_id ] = 'Invalid color';
+		$html = $this->render();
 		$this->assertStringContainsString( 'Invalid color', $html );
+		$this->assertArrayNotHasKey( 'outpost_appearance_notice_' . $this->current_user_id, $this->transients );
 	}
 
 	public function test_render_ignores_unknown_notice(): void {

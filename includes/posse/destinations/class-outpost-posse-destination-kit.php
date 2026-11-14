@@ -62,7 +62,7 @@ final class Outpost_POSSE_Destination_Kit extends Outpost_POSSE_Destination_Base
 
 		$payload = array(
 			'api_secret'  => $settings['api_secret'],
-			'subject'     => (string) $post->post_title,
+			'subject'     => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 			'content'     => Outpost_POSSE_Content_Transformer::to_html_with_canonical( $post_id ),
 			'description' => sprintf(
 				/* translators: %s: WordPress post permalink */

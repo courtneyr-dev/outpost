@@ -15,7 +15,7 @@ The first `wp-env start` pulls a few hundred MB of Docker images (PHP, MySQL, Wo
 
 `.wp-env.json` at the repo root configures:
 
-- **WordPress core:** `6.7`, pinned in `.wp-env.json`. This is the version the integration suite runs against, not the newest version Outpost supports: `readme.txt` declares `Tested up to: 7.1`.
+- **WordPress core:** `7.1.4`, pinned in `.wp-env.json`. This is the version the integration suite runs against; `readme.txt` declares `Tested up to: 7.1`, and `Requires at least: 6.5` is not exercised at runtime.
 - **Plugins installed:**
   - `.` — Outpost itself, mapped from the working tree
   - IndieAuth (from WordPress.org) — required dependency per the IndieAuth-first chain

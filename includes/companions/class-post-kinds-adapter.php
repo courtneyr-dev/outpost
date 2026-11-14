@@ -76,6 +76,25 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 	}
 
 	/**
+	 * The title Outpost may send to another service for a post.
+	 *
+	 * Post Kinds stores a generated check-in title ("Checked in at <venue>")
+	 * in post_title and prints "Check-in, <date>" in its place when the
+	 * location is hidden. `pkiw_get_safe_title()` (PKIW 1.9.0+) returns the
+	 * title the site prints, as raw text. Without it there is no title
+	 * privacy rule, so the raw stored title is the same value.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return string Raw (not texturized) title.
+	 */
+	public static function safe_title( \WP_Post $post ): string {
+		if ( function_exists( 'pkiw_get_safe_title' ) ) {
+			return (string) pkiw_get_safe_title( (int) $post->ID );
+		}
+		return (string) $post->post_title;
+	}
+
+	/**
 	 * Mood vocabulary resolved by Post Kinds, for server-rendered surfaces.
 	 *
 	 * Post Kinds owns the mood labels and the site's spelling setting;

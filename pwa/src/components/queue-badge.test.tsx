@@ -17,7 +17,7 @@ beforeEach(async () => {
 	// replay() reads the token fresh from token-store.ts; seed the default
 	// (fake-indexeddb-polyfilled) store so a queued entry's replay can reach
 	// the mock fetch in these tests instead of failing with no_token.
-	await write_token({ accessToken: 'tk', tokenType: 'Bearer', scope: '', me: '' });
+	await write_token({ accessToken: 'tk', tokenType: 'Bearer', scope: '', me: 'https://example.test/' });
 });
 
 afterEach(() => {
@@ -53,7 +53,7 @@ function badge(): HTMLButtonElement | null {
 
 describe('QueueBadge', () => {
 	it('shows a post queued after mount, without a reload', async () => {
-		render(<QueueBadge queueEnv={queueEnv} micropubEnv={offline} />, root);
+		render(<QueueBadge owner="https://example.test/" queueEnv={queueEnv} micropubEnv={offline} />, root);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		expect(badge()).toBeNull();
 
@@ -70,7 +70,7 @@ describe('QueueBadge', () => {
 
 	it('hides when another writer removes the last entry', async () => {
 		const id = await enqueue(note('only'), queueEnv);
-		render(<QueueBadge queueEnv={queueEnv} micropubEnv={offline} />, root);
+		render(<QueueBadge owner="https://example.test/" queueEnv={queueEnv} micropubEnv={offline} />, root);
 		await vi.waitFor(() => expect(badge()).not.toBeNull());
 
 		await remove(id, queueEnv);
@@ -86,7 +86,7 @@ describe('QueueBadge', () => {
 			posts += 1;
 			return created();
 		});
-		render(<QueueBadge queueEnv={queueEnv} micropubEnv={env} />, root);
+		render(<QueueBadge owner="https://example.test/" queueEnv={queueEnv} micropubEnv={env} />, root);
 		await vi.waitFor(() => expect(badge()).not.toBeNull());
 
 		reachable = true;
@@ -104,7 +104,7 @@ describe('QueueBadge', () => {
 			posts += 1;
 			return posts === 1 ? new Response('down', { status: 500 }) : created();
 		});
-		render(<QueueBadge queueEnv={queueEnv} micropubEnv={env} />, root);
+		render(<QueueBadge owner="https://example.test/" queueEnv={queueEnv} micropubEnv={env} />, root);
 
 		await vi.waitFor(() => expect(posts).toBe(1));
 		await vi.waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
@@ -129,10 +129,53 @@ describe('QueueBadge', () => {
 			posts += 1;
 			return new Response('bad', { status: 400 });
 		});
-		render(<QueueBadge queueEnv={queueEnv} micropubEnv={env} />, root);
+		render(<QueueBadge owner="https://example.test/" queueEnv={queueEnv} micropubEnv={env} />, root);
 		await vi.waitFor(async () => expect((await list(queueEnv))[0]?.retryable).toBe(false));
 		await vi.advanceTimersByTimeAsync(QUEUE_RETRY_DELAYS_MS.reduce((a, b) => a + b, 0));
 		expect(posts).toBe(1);
 		expect(badge()).not.toBeNull();
+	});
+});
+
+describe('QueueBadge on a shared device (T10-S3-07)', () => {
+	const ALICE = 'https://example.test/alice/';
+	const BOB = 'https://example.test/bob/';
+
+	function alice_note(content: string): Parameters<typeof enqueue>[0] {
+		return { source: 'note', properties: { content }, micropubEndpoint: 'https://example.test/mp', me: ALICE };
+	}
+
+	it('shows Bob only a count of Alice’s queued posts, never their content, and sends nothing', async () => {
+		await enqueue(alice_note('Alice private draft one'), queueEnv);
+		await enqueue(alice_note('Alice private draft two'), queueEnv);
+		await write_token({ accessToken: 'bob-token', tokenType: 'Bearer', scope: '', me: BOB });
+		const before = await list(queueEnv);
+		let requests = 0;
+		const counting = site(() => {
+			requests += 1;
+			return created();
+		});
+
+		render(<QueueBadge owner="https://example.test/bob" queueEnv={queueEnv} micropubEnv={counting} />, root);
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		expect(badge()).toBeNull();
+		expect(root.querySelector('.outpost-queue-others')?.textContent).toBe(
+			'2 queued posts on this device belong to another account or an older version of Outpost. They stay here and aren’t shown.',
+		);
+		expect(root.textContent).not.toContain('Alice');
+		expect(requests).toBe(0);
+		expect(await list(queueEnv)).toEqual(before);
+	});
+
+	it('shows Alice her own queued posts', async () => {
+		await enqueue(alice_note('Alice private draft one'), queueEnv);
+		await write_token({ accessToken: 'alice-token', tokenType: 'Bearer', scope: '', me: ALICE });
+
+		render(<QueueBadge owner="https://example.test/alice" queueEnv={queueEnv} micropubEnv={offline} />, root);
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		expect(badge()?.textContent).toContain('1');
+		expect(root.querySelector('.outpost-queue-others')).toBeNull();
 	});
 });

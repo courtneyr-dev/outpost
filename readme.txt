@@ -14,409 +14,108 @@ Post notes, replies, photos, and life-tracking entries to your WordPress site fr
 
 == Description ==
 
-Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress, built for IndieWeb POSSE workflows (Publish on your Own Site, Syndicate Elsewhere). Open `/post` on your phone, write a note or reply, and the post publishes to your own site through the Micropub API. Syndication chips send the same post to Mastodon, Bluesky, the Fediverse, or wherever else you've configured — no Jetpack, no app store, no third-party account.
+Outpost is a mobile composer for WordPress, installed as a Progressive Web App at `/post`. Write a note, reply, photo, recipe, or life-tracking entry on your phone; it publishes to your own site through the Micropub API, and syndication chips send it on to the destinations your site has configured.
 
-**Who it's for:** WordPress site owners who want fast mobile posting on their own domain — micro-bloggers, POSSE practitioners, and life-loggers tracking what they listen to, watch, and read.
+* Modes: Post (note to article), Reply and its kinds, Doing (listen, watch, read, and more), Life, Photo (alt text required), and Recipe.
+* Installs to your home screen, keeps unsent text on the device, and queues posts made offline for the account that wrote them.
+* Accepts shares from Android's share sheet and an Apple Shortcut; shared content waits until you choose Use or Discard.
 
-**Composer modes** — every kind the Post Kinds companion registers is postable from the composer:
+Documentation: [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io/outpost/).
 
-* **Post** — Note, Status, Aside, Quote, and Article (long-form with a title). Voice-input ready.
-* **Reply / Like / Favorite / Repost / Bookmark / RSVP / Follow / Wishlist / Tag / Acquisition / Issue** — paste a URL (or use a bookmarklet from any page), add your response, post.
-* **Doing: Listen / Watch / Read / Play / Game / Jam / Checkin / Eat / Drink / Exercise / Craft / Event / Review / Video / Audio** — log a life-tracking entry. With the Post Kinds companion active, the "Look it up" search fills in title, creator, and cover art from MusicBrainz, TMDB, Open Library, Foursquare, or RAWG. Any Doing entry except Video can carry a photo.
-* **Life: Mood / Weather / Sleep / Trip / Itinerary / Question** — quick personal-state entries with an optional note.
-* **Photo** — upload from your camera roll, with a required alt text field. The first photo on any post becomes its featured image.
-* **Recipe** — title, ingredients, steps, and an optional photo, published as an h-recipe.
+= Abilities =
 
-The composer opens to a Home screen with a card for each mode, or to the start screen you pick in Preferences. Sharing to Outpost still opens the mode that fits what you shared.
-
-The composer is a real PWA: it installs to your iOS or Android home screen, keeps unsent text on your device through a reload or a fresh sign-in, queues posts made offline, and accepts pages from the share sheet — Android's Web Share Target once it's installed as an app, and an Apple Shortcut on iOS. A shared link opens a Reply, shared text a Note, a shared photo the Photo tab.
-
-POSSE-first: every syndication destination configured on your site is enabled by default for every new post. Tap a chip to skip it.
-
-**What can go wrong:** Outpost needs the IndieAuth and Micropub plugins — without them, wp-admin shows a notice and `/post` shows a setup prompt instead of the composer. Some managed hosts strip the Authorization header that Micropub sign-in depends on (see FAQ).
-
-Long-form documentation — installation, settings, common tasks, troubleshooting, privacy — lives at [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io/outpost/).
-
-== Requirements ==
-
-WordPress 6.5 or newer, PHP 8.2 or newer.
-
-== Abilities ==
-
-Outpost registers these public, read-only abilities when WordPress provides the Abilities API. Switch options for abilities that can write default to off; read abilities have no switch.
-
-* `outpost/get-syndicate-targets` — Capability: `edit_posts`. Switch: none (read ability).
-* `outpost/get-share-status` — Capability: `edit_post` for an existing post. Switch: none (read ability).
-* `outpost/get-composer-config` — Capability: `edit_posts`. Switch: none (read ability).
-
-= Required plugins =
-
-Outpost publishes through the IndieWeb's own standards rather than a proprietary service, so it needs the two plugins that provide them. Both are free on WordPress.org, and Outpost tells you which one is missing:
-
-* [IndieAuth](https://wordpress.org/plugins/indieauth/) — signs you in to the composer with your own domain. Install this one first: Micropub requires it too.
-* [Micropub](https://wordpress.org/plugins/micropub/) — the endpoint that receives what the composer publishes.
-
-= Recommended =
-
-Not required, but Outpost is better with them, and it detects them the moment you activate one:
-
-* [Post Kinds for IndieWeb in Block Themes](https://wordpress.org/plugins/post-kinds-for-indieweb-in-block-themes/) — powers the "Look it up" media search and classifies every composer entry as its proper post kind, so a listen, a check-in or a recipe arrives as that kind rather than a generic note. It also reads standard.site records behind the pages you cite in replies, likes, and bookmarks — no account needed — and, with ATmosphere, decides which kinds publish as standard.site documents on the AT Protocol.
-* [Webmention](https://wordpress.org/plugins/webmention/) — lets the replies, likes and reposts you send be received by the sites you send them to, and shows theirs on your posts. It also carries the request that asks Bridgy to publish a post and brings back the replies Bridgy and rss.chat send home; Outpost itself sends and receives no webmentions.
-* [Syndication Links](https://wordpress.org/plugins/syndication-links/) — your configured destinations become the composer's syndication chips.
-
-= Works with =
-
-Active-only enhancements. Nothing here changes what Outpost can publish; each adds a field or a chip when present:
-
-* [Post Formats for Block Themes](https://wordpress.org/plugins/post-formats-for-block-themes/) — post format selector, plus automatic format inference from what you posted.
-* [Link Extension for XFN](https://wordpress.org/plugins/link-extension-for-xfn/) — XFN relationship picker on reply targets.
-* [ActivityPub](https://wordpress.org/plugins/activitypub/) — the Fediverse appears as a syndication chip.
-* [Bridgy](https://brid.gy/) — its publish endpoints appear as syndication chips.
-* [Yoast SEO](https://wordpress.org/plugins/wordpress-seo/) — focus keyphrase and meta description fields in the composer's More panel.
-* [Accessibility Checker](https://wordpress.org/plugins/accessibility-checker/) — flags accessibility problems on what you post.
-* [RSS Chat Routing](https://github.com/courtneyr-dev/rss-chat-routing) — rss.chat is a chat network built on RSS: your site publishes a post to it, people reply there, and the replies come back to your post as comments. This companion chooses which posts go (by default post format, default Post Kind, or per post) and, when active, adds a per-post "Send to rss.chat" choice — site default, include, or exclude — to the composer's More panel, so you can opt a post in or out from the app.
-* [ATmosphere](https://wordpress.org/plugins/atmosphere/) — publishes each post to the AT Protocol: a Bluesky post or thread linking back to your site, plus the full article stored on your AT Protocol account as a standard.site document. Bluesky replies, likes, and reposts come back as comments. Outpost adds no chip for it — posts from the composer cross-post like any other published post; opt a post out from the block editor sidebar, and leave the "Bluesky via Bridgy" chip off when ATmosphere is connected so the same post doesn't reach Bluesky twice. With Post Kinds active, Post Kinds decides which kinds publish by default and derives readable titles for untitled ones.
+With the Abilities API, Outpost registers three read-only abilities: `outpost/get-syndicate-targets` and `outpost/get-composer-config` (`edit_posts`) and `outpost/get-share-status` (`edit_post`).
 
 == Installation ==
 
-1. Install and activate the IndieAuth plugin from the WordPress.org plugin directory.
-2. Install and activate the Micropub plugin from the WordPress.org plugin directory.
-3. Install and activate Outpost. While Outpost is not yet listed on WordPress.org, install it from the `main` branch of [its GitHub repository](https://github.com/courtneyr-dev/outpost): clone it into `wp-content/plugins/`, or choose Code → Download ZIP and upload it via Plugins → Add New Plugin → Upload Plugin. The [installation guide](https://courtneyr-dev.github.io/outpost/installation/) has both paths.
-4. In wp-admin, open the **Outpost** menu: it links to the composer, generates bookmarklets, and walks through installing the app on your phone.
-5. Open `/post` on your phone, sign in with your site address (IndieAuth), and tap "Add to Home Screen" to install the PWA.
+1. Install and activate the IndieAuth and Micropub plugins (WordPress asks for them).
+2. Install and activate Outpost.
+3. Open `yoursite.com/post` on your phone, sign in with your site address, and add it to your home screen.
 
-If you skip step 1, the Micropub plugin refuses to register its endpoints; Outpost surfaces this as an admin notice with an install link.
+Optional companions: Post Kinds for IndieWeb (more post kinds and media lookups), Syndication Links, Post Formats for Block Themes, Link Extension for XFN, and Yoast SEO.
 
 == Frequently Asked Questions ==
 
-= Do I need other plugins? =
+= Sign-in fails on my host =
 
-Yes, two: IndieAuth (sign-in) and Micropub (publishing endpoint), both free on WordPress.org. Everything else is optional — companions such as Post Kinds, Syndication Links, and ActivityPub are detected at runtime and add features when active.
+Some managed hosts strip the Authorization header that Micropub sign-in needs. The documentation lists the fixes.
 
-= Is Outpost on WordPress.org yet? =
+= Does it work when WordPress is in a subdirectory? =
 
-Not yet — until it's listed, install from GitHub per the Installation section.
+Not yet. The composer lives at `/post/` and calls `/wp-json/` from the root of your domain, so Outpost needs WordPress at that root and any permalink setting except Plain.
 
-= Where do the settings live? =
+= Does it work offline? =
 
-In wp-admin: the **Outpost** menu holds the bookmarklet generator, phone install steps, and composer defaults; **Outpost → Settings** holds destination API keys; **Outpost → Appearance** sets your style source (Outpost Default or Use Site Theme), Light, Dark, or System, and token overrides; **Outpost → OAuth Connections** connects life-tracking services; and **Settings → Outpost iOS Shortcut** sets up share-sheet posting from an iPhone.
-
-= Does it work on managed hosts? =
-
-Mostly, with one known pitfall: some managed hosts strip the Authorization header that Micropub sign-in depends on. Outpost ships workarounds for the cases found so far (GoDaddy), but if sign-in loops or posting fails with an auth error, see the [troubleshooting guide](https://courtneyr-dev.github.io/outpost/troubleshooting/).
-
-= Does Outpost work offline? =
-
-Yes, for composing. Posts written offline queue in your browser's IndexedDB, unencrypted, and submit when the connection returns. Sign-in tokens are encrypted (AES-GCM) in the browser. A queued post keeps no copy of your token: it sends with your current sign-in, only to the site it was queued for, and signing out leaves it in the queue. Unsent drafts are kept in the browser's localStorage, also unencrypted, and clear when you post or sign out.
-
-= What sends data where? =
-
-Posts go to your own site through Micropub. Every other connection is listed, service by service, in the External services section below, and in more detail in the [privacy and data doc](https://courtneyr-dev.github.io/outpost/privacy-and-data/).
-
-= Does Outpost require Jetpack? =
-
-No. Outpost uses Micropub and IndieAuth for everything Jetpack normally provides on mobile.
-
-= Can I change the /post URL? =
-
-Not currently. The composer is served at the fixed `/post` path.
-
-= How do the bookmarklets work? =
-
-The Outpost admin page generates four bookmarklets (Reply, Like, Repost, and Bookmark), each embedded with your site's URL. Drag one to your bookmark bar (or long-press on mobile); click it while viewing any page to open the composer with that page's URL pre-filled. Pattern adapted from IndieWeb Press This (Pfefferle, Shanske, Barrett).
-
-= How do I post from my phone's share sheet? =
-
-On Android (and desktop Chrome or Edge), install Outpost as an app and it appears in the share sheet on its own; a shared link opens a Reply, shared text a Note, a title plus text an Article, and a shared photo opens the Photo tab with the picture attached.
-
-iOS Safari doesn't support share targets, so on iPhone or iPad build a Shortcut in the Shortcuts app. It opens the composer so you can review first and needs no token. (The ready-made Shortcut on Settings → Outpost iOS Shortcut isn't published yet in 1.0.24.) The steps:
-
-1. Open the Shortcuts app and tap + for a new Shortcut.
-2. In the first action, tap Nowhere and choose Share Sheet; set the types to URLs and Text.
-3. Add the Open URLs action (not Share, which only reopens the share sheet). Set its URL to https://your-site.example/post/share-target?url= and insert Shortcut Input at the end.
-4. Rename it Post to Outpost.
-5. Share any page from Safari and pick Post to Outpost — the composer opens on Reply with that link.
-6. To keep it near the top of the share sheet, scroll to the bottom of the sheet, tap Edit Actions…, tap the green + next to Post to Outpost to add it to Favorites, drag it to the top, and tap Done.
-
-Photos get a second Shortcut, because the share sheet only offers a Shortcut that accepts what you're sharing: the same steps, but keep Images as the type and set Open URLs to https://your-site.example/post/?mode=photo with nothing after it. Name it Photo to Outpost. Sharing a photo then opens the composer on the Photo tab; pick the picture there and add alt text.
-
-The composer's About tab has the same steps with your site's address filled in, and the full walkthrough is at https://courtneyr-dev.github.io/outpost/common-tasks/.
-
-= Does Outpost replace the block editor for long-form? =
-
-No. The Article variant publishes a titled post through Micropub like every other mode, but Outpost is built for fast, phone-sized posts — the block editor remains the right tool for serious long-form work, and anything posted from Outpost can be reopened there.
-
-= Does Outpost create pages or custom post types? =
-
-No. Outpost writes standard posts only — not pages, custom post types, or comments (a Reply is a post on your own site that links to the page you're replying to). Routing Micropub posts to a custom post type is a filter on the Micropub plugin, not an Outpost setting.
-
-= Does Outpost support standard.site and the AT Protocol? =
-
-Yes, through companions. With Post Kinds for IndieWeb in Block Themes, the pages you cite in replies, likes, and bookmarks are checked for a standard.site record and the author's own title, description, and tags are shown — no account needed. Add the ATmosphere plugin and, once it's connected and cross-posting is on, your posts publish as standard.site documents on the AT Protocol and appear on Bluesky, with Post Kinds deciding which kinds publish by default (public content and logs) and which stay opt-in (likes, check-ins, moods, and other private signals).
+Yes. A post made offline waits on the device and sends when you reconnect, signed in as the same account.
 
 == External services ==
 
-Outpost publishes to your own WordPress site through the Micropub plugin. It contacts the services below only for the specific feature named; nothing is sent until you use that feature. Each entry lists what is sent, when, and the service's terms and privacy policy.
+Outpost publishes to your own site. It contacts a service below only for the feature named, and only when you use it. Recognizing a pasted link's host happens on your server and contacts nothing.
 
-Outpost also recognizes links you share from many sites (YouTube, Reddit, TikTok, Instagram, Pinterest, Spotify, Medium and others) by matching the link's address against patterns on your own site. That recognition never contacts those sites; only the services listed below are ever sent a request.
+Syndication (only for chips you leave on; the post's URL or content is sent):
 
-= Syndication (per post, only for chips you leave enabled) =
+* Telegraph: off unless the `outpost_telegraph_enabled` option is set; then each published post (never a password-protected one) goes to api.telegra.ph, which makes a public copy, and the first use stores a Telegraph account token on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy)
+* Beehiiv (api.beehiiv.com): [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy)
+* Buttondown (api.buttondown.email): [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy)
+* Kit (api.convertkit.com; the broadcast's app.kit.com URL is saved on the post, never requested): [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy)
+* write.as: [Guidelines](https://write.as/guidelines), [Privacy](https://write.as/privacy)
 
-* **Bridgy / Bridgy Fed** — when a Bridgy destination chip is enabled on a post, your site sends a webmention containing that post's URL to the Bridgy endpoint you configured: **brid.gy** (Flickr, GitHub, Reddit), **bsky.brid.gy** (Bluesky), or **fed.brid.gy** (the fediverse). Bridgy then reads the public post from your site and republishes it to the connected network. [About, terms, and privacy](https://brid.gy/about).
-* **Telegraph (a Telegram service)** — off, and there is no settings screen for it yet; it stays off unless a site owner deliberately sets the `outpost_telegraph_enabled` option. While it is on, each post you publish is sent to api.telegra.ph, which creates a public copy of it at a telegra.ph address. Password-protected posts are never sent. The first use creates a Telegraph account token, which is stored on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy).
-* **Beehiiv** — newsletter destination; when configured with an API key and enabled on a post, the post's content is sent to api.beehiiv.com. [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy).
-* **Buttondown** — newsletter destination; sends the post's content to api.buttondown.email when enabled. [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy).
-* **Kit (formerly ConvertKit)** — newsletter destination; sends the post's content to api.convertkit.com when enabled, and records the resulting broadcast’s app.kit.com URL on the post (that URL is stored and displayed, never requested). [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy).
-* **write.as** — blog destination; sends the post's content to the write.as API when enabled. [Platform guidelines](https://write.as/guidelines), [Privacy](https://write.as/privacy).
+Bridgy chips (brid.gy, bsky.brid.gy, fed.brid.gy) only add a syndication target to the post your site's Micropub endpoint receives; Outpost sends nothing to Bridgy. A webmention plugin on your site may notify Bridgy, as that plugin discloses.
 
-= Reply context and link previews =
+Previews (only the URL you pasted is sent):
 
-* **The page you link to** — when you paste a URL into a reply, like, repost, bookmark, or similar mode, your site fetches that page (and, where available, its feed or oEmbed endpoint) once to build the preview (title, image, summary). Only the URL you pasted and endpoints it advertises are requested, from whatever site it points to.
-* **Recognized link hosts** — to pick the right post kind and read the right fields, Outpost matches a pasted link against a built-in list of host patterns (Bandcamp, Bluesky, Goodreads, iFixit, Last.fm, Mastodon, Mataroa, Medium, Pinterest, Pretalx, Readwise, Reddit, Snipd, Substack, TikTok, Twitch, Apple Music, Apple Podcasts, Amazon, Bear Blog, and others). Matching happens entirely on your own server and sends nothing anywhere: the only request is the one to the page you pasted, described above. Hosts named in the plugin for this purpose are not services Outpost contacts.
-* **Named oEmbed providers** — for four hosts, Outpost skips discovery and requests a known oEmbed endpoint directly, sending only the URL you pasted. This happens once per pasted link, and only for that host:
-    * **Vimeo** — vimeo.com/api/oembed.json. [Terms](https://vimeo.com/terms), [Privacy](https://vimeo.com/privacy).
-    * **YouTube** — www.youtube.com/oembed. [Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy).
-    * **Spotify** — open.spotify.com/oembed. [Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/).
-    * **SoundCloud** — soundcloud.com/oembed. [Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy).
-* **Media lookups** — the "Look it up" search contacts no service directly from Outpost. It hands the query to the Post Kinds for IndieWeb in Block Themes companion plugin when that plugin is active, and the companion's own listing documents its lookup services.
+* The page you link to, and any feed or oEmbed endpoint it advertises.
+* oEmbed for Vimeo ([Terms](https://vimeo.com/terms), [Privacy](https://vimeo.com/privacy)), YouTube ([Terms](https://www.youtube.com/t/terms), [Privacy](https://policies.google.com/privacy)), Spotify ([Terms](https://www.spotify.com/legal/end-user-agreement/), [Privacy](https://www.spotify.com/legal/privacy-policy/)), and SoundCloud ([Terms](https://soundcloud.com/terms-of-use), [Privacy](https://soundcloud.com/pages/privacy)).
+* Media lookups, through the Post Kinds companion: your search text goes to TMDB ([Terms](https://www.themoviedb.org/api-terms-of-use), [Privacy](https://www.themoviedb.org/privacy-policy)), Open Library ([Terms and privacy](https://archive.org/about/terms.php)), MusicBrainz and Cover Art Archive ([Terms](https://musicbrainz.org/doc/About/Data_License), [Privacy](https://metabrainz.org/privacy)), RAWG ([Terms](https://rawg.io/terms), [Privacy](https://rawg.io/privacy_policy)), BoardGameGeek ([Terms](https://boardgamegeek.com/terms), [Privacy](https://boardgamegeek.com/privacy)), or Foursquare ([Terms](https://foursquare.com/legal/terms), [Privacy](https://foursquare.com/legal/privacy)). Your browser loads cover images from those services' image hosts, which see your IP address.
+* Nominatim (nominatim.openstreetmap.org): your place search. [Usage policy](https://operations.osmfoundation.org/policies/nominatim/), [Privacy](https://wiki.osmfoundation.org/wiki/Privacy_Policy)
 
-= Geocoding =
+Connected accounts (only after you connect one; an encrypted token is stored on your site and sent to that service when you connect, disconnect, fetch recent activity in the block editor, or preview a Notion page you cite):
 
-* **Nominatim (OpenStreetMap Foundation)** — the check-in location search sends your search text to nominatim.openstreetmap.org to find matching places, only when you search for a location. [Usage policy](https://operations.osmfoundation.org/policies/nominatim/), [Privacy](https://wiki.osmfoundation.org/wiki/Privacy_Policy).
+* Notion (api.notion.com): [Terms and privacy](https://www.notion.com/terms)
+* Oura (cloud.ouraring.com, api.ouraring.com): [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy)
+* WHOOP (api.prod.whoop.com): [API terms](https://developer.whoop.com/api-terms-of-use/), [Privacy](https://www.whoop.com/privacy/)
+* Polar (flow.polar.com, polarremote.com, www.polaraccesslink.com): [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice)
+* Ride With GPS (ridewithgps.com): [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy)
+* Ravelry (www.ravelry.com, api.ravelry.com): [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy)
 
-= Connected life-tracking accounts (only after you connect them under Outpost → OAuth Connections) =
+Manual share (your site sends nothing; tapping a chip opens the service in your browser or app with the post's link and text, and for Pinterest its image URL):
 
-Connecting an account sends you to that service's sign-in page to authorize Outpost, then stores an encrypted token on your site. Afterwards, Outpost contacts the service's API only when you connect or disconnect it, or when you fetch your recent activity to prefill a post — sending the stored token and, for a page citation, the item URL you are viewing. The hosts contacted for each service:
+* Facebook ([Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/)), X ([Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy)), Threads ([Terms](https://help.instagram.com/769983657850450), [Privacy](https://help.instagram.com/515230437301944)), Pinterest ([Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy)), Reddit ([Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy)), LinkedIn ([Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy)), Instagram ([Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy)), TikTok ([Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en)), Flickr ([Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy))
+* The iOS Shortcut installer links to www.icloud.com/shortcuts/ and opens only when you tap it. [Terms](https://www.apple.com/legal/internet-services/icloud/), [Privacy](https://www.apple.com/legal/privacy/)
 
-* **Notion** — api.notion.com (authorize, token exchange, and reading a page you cite). [Terms and privacy](https://www.notion.com/terms).
-* **Oura** — cloud.ouraring.com (authorize) and api.ouraring.com (token, verify, recent activity). [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy).
-* **WHOOP** — api.prod.whoop.com (authorize, token, verify, revoke, recent activity). [API terms of use](https://developer.whoop.com/api-terms-of-use/), [API privacy and security terms](https://developer.whoop.com/api-terms-of-use/#6-whoop-privacy-and-security), [Privacy policy](https://www.whoop.com/privacy/).
-* **Polar (Flow / AccessLink)** — flow.polar.com (authorize), polarremote.com (token, revoke), and www.polaraccesslink.com (register, verify, recent activity). [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice).
-* **Ride With GPS** — ridewithgps.com (authorize, token, and one call to confirm the connection is live). [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy).
-* **Ravelry** — www.ravelry.com (authorize, token) and api.ravelry.com (one call to confirm the connection is live). [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy).
-
-= Manual share (opens the service in your browser, only when you tap its chip) =
-
-These destinations have no posting API Outpost can use, so sharing to them is a handoff rather than a connection: tapping the chip opens the service's own share page (or its app, on a phone) with your post's link and text already filled in, and you finish the post there. **Your site never contacts these services** — no request is made from your server, and nothing is sent unless you tap the chip. What travels is what the share URL carries: your post's URL, its text, and for Pinterest the image URL.
-
-* **Facebook** — www.facebook.com/sharer.php. [Terms](https://www.facebook.com/terms.php), [Privacy](https://www.facebook.com/privacy/policy/).
-* **X** — twitter.com/intent/tweet. [Terms](https://x.com/en/tos), [Privacy](https://x.com/en/privacy).
-* **Threads** — www.threads.net/intent/post. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
-* **Pinterest** — www.pinterest.com/pin/create/button/. [Terms](https://policy.pinterest.com/en/terms-of-service), [Privacy](https://policy.pinterest.com/en/privacy-policy).
-* **Reddit** — www.reddit.com/submit. [Terms](https://redditinc.com/policies/user-agreement), [Privacy](https://www.reddit.com/policies/privacy-policy).
-* **LinkedIn** — the LinkedIn app, or www.linkedin.com to finish by hand. [Terms](https://www.linkedin.com/legal/user-agreement), [Privacy](https://www.linkedin.com/legal/privacy-policy).
-* **Instagram** and **Instagram Stories** — the Instagram app on your phone; your photo is handed to it through the share sheet. [Terms](https://help.instagram.com/581066165581870), [Privacy](https://privacycenter.instagram.com/policy).
-* **TikTok** — the TikTok app on your phone. [Terms](https://www.tiktok.com/legal/page/row/terms-of-service/en), [Privacy](https://www.tiktok.com/legal/page/row/privacy-policy/en).
-* **Flickr** — the Flickr app, or flickr.com to finish by hand. [Terms](https://www.flickr.com/help/terms), [Privacy](https://www.flickr.com/help/privacy).
-
-= Links Outpost hands you (no request from your server) =
-
-* **iCloud Shortcuts** — the iOS Shortcut installer link on the Outpost settings screen points at www.icloud.com/shortcuts/. Your site never contacts iCloud; the link opens in your browser only when you tap it. [Terms](https://www.apple.com/legal/internet-services/icloud/), [Privacy](https://www.apple.com/legal/privacy/).
-
-= Inbound only (no data sent) =
-
-* **IndieAuth sign-in** — authentication happens between your browser and your own site's IndieAuth endpoint (from the required IndieAuth plugin). Outpost sends nothing to third parties to sign you in.
+Sign-in happens between your browser and your own site's IndieAuth endpoint; nothing goes to a third party.
 
 == Source Code ==
 
-The composer interface ships as compiled JavaScript in `build/pwa/`. Its human-readable source is the `pwa/src/` directory (TypeScript + Preact) in the public development repository: [github.com/courtneyr-dev/outpost](https://github.com/courtneyr-dev/outpost). The repository also carries the full PHP source, the test suites, and the build tooling.
-
-To rebuild the compiled assets from source: `npm install`, then `npm run build` (Node 20.10 or newer). Vite writes the production bundle to `build/pwa/`, and the shipped bundle is the unmodified output of that build for this version.
+Source, tests, and build tooling: [github.com/courtneyr-dev/outpost](https://github.com/courtneyr-dev/outpost). The composer (`build/pwa/`) is built from `pwa/src/` (TypeScript and Preact); the block-editor sidebar (`build/index.js`, `build/index.css`, `build/index-rtl.css`) from `src/`. Rebuild with Node 20.10 or newer: `npm install`, then `npm run build:all` (runs `npm run build:wp` and `npm run build`). Preact (MIT License, Copyright (c) 2015-present Jason Miller) is included; its license is in `THIRD-PARTY-LICENSES.txt`.
 
 == Screenshots ==
 
-1. The composer sign-in screen at /post on a phone — enter your site address to authorize the device via IndieAuth.
-2. The Outpost admin page with per-variant bookmarklets, the composer link, and phone install steps.
-3. OAuth Connections — connect life-tracking providers such as Notion, Polar Flow, Oura, Ride With GPS, Ravelry, and WHOOP.
-4. Appearance settings — Light, Dark, or System and per-token color overrides, with automatic contrast adjustment.
-5. The Outpost iOS Shortcut Bridge — site URL, per-user token, and connection status for share-sheet posting from iPhone.
-6. Note mode on a phone, signed in — write a note and pick syndication targets before posting.
-7. The composer offline — posts made without a connection wait in the queue until you reconnect.
+1. Signing in to the composer at /post on a phone.
+2. The Outpost admin page with bookmarklets and install steps.
+3. OAuth Connections for life-tracking accounts.
+4. Appearance settings.
+5. The iOS Shortcut Bridge settings.
+6. Note mode with syndication chips.
+7. The offline queue.
 
 == Credits ==
 
-Outpost evolves from prior IndieWeb work for WordPress.
-
-* IndieWeb Press This by Matthias Pfefferle, David Shanske, and Ryan Barrett — the bookmarklet pattern Outpost extends.
-* Micropub plugin by David Shanske — the server endpoint Outpost depends on.
-* IndieAuth plugin by Matthias Pfefferle and David Shanske — authentication.
-* Bridgy by Ryan Barrett — round-trip syndication service.
-
-The IndieWeb WordPress community built the foundation Outpost sits on top of.
+Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett), the Micropub and IndieAuth plugins (David Shanske, Matthias Pfefferle), Bridgy (Ryan Barrett), and Preact (Jason Miller and contributors).
 
 == Changelog ==
 
 = 1.0.27 =
-* Added: three read-only WordPress abilities for syndication targets, share status and composer settings.
-* Changed: the seven composer modes use two rows of native buttons, so every mode stays visible and reachable with Tab.
-* Fixed: More options opens and closes even when a page optimizer blocks Outpost's stylesheet.
-* Fixed: publish errors appear beside the Publish button, and Outpost accepts photos up to 50 MB before resizing them.
-* Fixed: a post keeps the default category Outpost sets without also keeping WordPress's fallback category.
+* Security: the iOS Shortcut uses an application password limited to its endpoint and deleted on deactivation; upgrading deletes old Shortcut tokens.
+* Security, from the WordPress.org review: shared content waits for Use or Discard, cookie REST requests need a valid nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, and saved API keys never render.
+* Removed: /post/shortcut and the sample fetch provider.
+* Added: three read-only abilities.
+* Changed: composer modes are two rows of buttons.
+* Fixed: More options without Outpost's stylesheet, publish error placement, a 50 MB photo cap, and WordPress's fallback category.
 
-= 1.0.26 =
-* Security: Outpost no longer switches the current user. Every REST permission check uses the user WordPress already resolved, plus the token's scope, and a token in a JSON body authenticates nothing, as the Micropub spec says.
-* Security: the composer's preview, settings and appearance requests send the access token form-encoded without cookies, the same way geocode, media lookup and moods already did.
-* Fixed: place search ignores malformed geocoder responses (invalid JSON, very deep or over 1 MB) and keeps only places with valid coordinates.
-* Fixed: a URL shared to Outpost is sanitized before Outpost reads it, and the web app manifest escapes its JSON for HTML.
-
-= 1.0.25 =
-* New: Outpost opens to a Home screen with a card for each kind of post, and every tab ends with a ← Home link. Going Home keeps everything you've typed or attached, and Home marks a tab that holds an unsent draft.
-* New: choose the screen Outpost opens to (Home, any tab, or About) under Preferences › Default start screen. It's saved to your site, so it follows you to every device. Sharing to Outpost still opens the tab your content belongs in.
-* New: About is organized into Connection, Preferences, Help and documentation, and Project, with Reset preferences, a Sharing and shortcuts guide link, and version and credits.
-* Changed: Doing and Reply show every type as compact tiles, Post's five styles fit in one row of icon tiles, and every form ends with a full-width publish button that names any required field still empty.
-* Changed: the header fits on one row on most phones, and the selected Light / Dark / System option no longer uses the publish button's orange.
-* Changed: Sign out moved from the Post form to About › Connection, and the composer's settings sheet is now called Preferences.
-* Fixed: uninstalling now removes the style choice and its schema marker that 1.0.24 added.
-* Fixed: two preference changes made in quick succession both save.
-
-= 1.0.24 =
-* New: the Outpost Default design, in light and dark. Each person picks Outpost Default or Use Site Theme in the composer's Settings sheet or on Outpost → Appearance, separately from Light, Dark, or System.
-* New: a header with the Outpost signpost, the connected site, a Light / Dark / System shortcut, and a settings button.
-* New: About starts with your site, connection state, Micropub and IndieAuth status, and the plugin version.
-* New: unsent text survives a reload and a fresh sign-in. Drafts reopen only for the same signed-in site, never post on their own, and clear after you publish or sign out.
-* Changed: people who used Outpost before 1.0.24 keep Use Site Theme until they choose otherwise. New installs start on Outpost Default and System.
-* Changed: Use Site Theme now reaches the installed app, and its colors are checked against WCAG 2.2 AA contrast.
-* Fixed: composer text no longer falls back to the browser's serif font.
-* Fixed: saving the appearance mode you already had no longer returns an error.
-* Fixed: closing a drawer no longer leaves keyboard focus inside it.
-
-= 1.0.23 =
-* Fixed: several color combinations that were hard to read — the over-limit character counter and the offline-queue error message in dark ("night") mode, the focus outline on light backgrounds, white text on an orange background on result buttons (location and media lookups), field borders in dark mode, and tab text on the washi-tape strip in dark mode.
-* Fixed: status and error messages under each composer form (Note, Reply, Photo, Doing, Life, Recipe) now announce reliably to screen readers, including iOS VoiceOver, instead of sometimes going unannounced.
-* Fixed: the Like/Repost/Bookmark/RSVP-style sub-mode picker works correctly with a screen reader again; the visible option label had been replaced by different text.
-* Fixed: links that open in a new tab now say so, and the "posted to" link no longer reads out the raw web address to a screen reader.
-* Fixed: the bookmarklet drag/copy instructions are announced without hiding the bookmarklet's own name.
-* Fixed: opening "More options" from a different composer tab no longer confuses assistive tech about which panel is which.
-* Fixed: a newly-added photo no longer gets a placeholder description read aloud before you've written your own alt text.
-* Fixed: in "day" appearance mode, the round radio-button artwork sizes correctly instead of shrinking the whole option row.
-* Improved: the composer now has a screen-reader heading, and the browser tab title updates with the mode you're using.
-
-= 1.0.22 =
-* Security: posts waiting in the offline queue no longer keep a copy of your sign-in token. They send with your current sign-in, and only to the site they were queued for. Signing out keeps them in the queue.
-* Security: apps that post through Outpost's endpoints with an IndieAuth token need the create or update permission to make changes. Tokens with only the draft permission, and tokens IndieAuth didn't issue, are refused.
-* Security: the connected-services (OAuth) routes refuse requests made with an app token. They work from the logged-in WordPress admin only.
-* Security: the older iOS Shortcut address, /post/shortcut, is closed. The Shortcut's REST address, /wp-json/outpost/v1/shortcut, is the supported path.
-* Security: password-protected posts are never sent to Telegraph.
-* Security: link previews connect only to the address Outpost checked, so a DNS answer that changes mid-request can't point the fetch at another address.
-* Fixed: the connection banner no longer says "You're offline" or "Data Saver is on" while you're online.
-
-= 1.0.21 =
-* Security: the composer settings endpoint no longer answers a logged-in browser request that arrives without WordPress's REST security token, in the case where another plugin's earlier error stopped WordPress from checking that token. A cross-site page could otherwise read the site's companion-plugin status and composer settings by riding the logged-in cookie. The endpoint is read-only and the data is low-value, but the check is now correct. Sign-in with an access token, which the app uses, is unaffected.
-
-= 1.0.20 =
-* Fixed: a link shared from Android keeps its percent-encoded characters. Android puts the link in the share text, often inside a sentence such as "Check this out https://example.com/caf%C3%A9", and Outpost removed those characters before it found the link. The title field and a quote plus a link in the address field had the same fault.
-* Fixed: the iOS Shortcut bridge, on both its addresses, keeps percent-encoded characters in the shared address, text, and title.
-* Fixed: share text with a "<" before the link, such as "I <3 this https://example.com/?a=1&b=2", no longer changes the "&" in that link to "&amp;".
-
-= 1.0.19 =
-* Fixed: a link shared to Outpost keeps its percent-encoded characters. An address such as /caf%C3%A9 or ?q=hello%20world used to reach the composer with those characters removed, so the wrong page opened.
-* Security: the iOS Shortcut token resolves its user through WordPress's determine_current_user filter, the same one application passwords use, and WordPress sets the user. The token still works on the Shortcut route only.
-* Security: the connected-services (OAuth) callback no longer switches the request's user. Credentials are saved for the account that started the connection, by id.
-* Security: every request header Outpost reads is sanitized, and a token sent in a request body is read through the WordPress REST request instead of the raw body.
-* Changed: the web app manifest prints with default JSON escaping.
-
-= 1.0.18 =
-* Fixed: the mood suggestions request sends its token only in the request body and no longer adds a timestamp to the address, matching the source. The shipped app file also drops an unused copy of the previous app build.
-
-= 1.0.17 =
-* New: with Post Kinds for IndieWeb 1.8.2 or later, Life > Mood suggests the site's mood labels as you type, in the spelling chosen under Post Kinds' "Mood label spelling" setting. You can still type any mood, and what you type or pick is posted as written. Older Post Kinds versions keep the plain text field.
-
-= 1.0.16 =
-* Fixed: a post written in a composer opened without a connection now waits in the offline queue in every tab of the composer. It used to fail with discovery_failed and keep nothing. Photos wait with the post and upload when the connection returns.
-* Fixed: the queued-posts badge updates as soon as a post is queued, in every open tab, and two open tabs no longer publish the same queued post twice.
-* Fixed: a queued post that hits a server error retries on its own instead of waiting for the next time the browser goes offline and back online.
-* Fixed: the "Couldn't reach your site" notice clears on its own once the connection returns and offers Try again. It used to stay until a reload, and its only button signed you out.
-* Fixed: a composer opened offline keeps the site's light or dark preference.
-
-= 1.0.14 =
-* Fixed: photo captions now appear under the photo. 1.0.13 saved them to the image in your media library, but WordPress only shows a caption that was typed into the block itself, so nothing appeared on the post. Captions written in Outpost, or edited later in the media library, now show wherever the image does. A caption you typed directly into a block still wins.
-
-= 1.0.13 =
-* Added: a caption for each photo, separate from its alt text and from the post title. Alt text says what an image is for someone who cannot see it; a caption is the line everyone reads under the photo. Captions are optional, start empty, and are saved as the image's caption in your media library, so the block editor and your theme both read the same value.
-
-= 1.0.12 =
-* Security: the composer sent your Micropub access token in the query string when it looked up the media endpoint and your syndication targets, on every host and every time. Query strings are written to server access logs, to any proxy or CDN in front of the site, and into cache keys, so a live token with permission to post was being recorded in places it should never appear. The token now travels in the Authorization header, and only falls back to the query string after a 401, which is what a host that strips that header looks like. Found in internal review.
-* Security: the Micropub bridges wrote a post's featured image, place name, categories, post format, focus keyphrase, and XFN values without checking that the acting user could edit that post. The bridges run on update as well as create, and the Micropub plugin resolves the target post from a URL in the request while checking only a site-wide capability, so an Author could set those values on posts and pages belonging to Editors and Administrators. The bridges now check edit_post on the target before writing anything. Found in internal review.
-* Security: creating a new category through Micropub now requires manage_categories. Any user who could post was able to create terms in the site's primary taxonomy, which WordPress otherwise reserves. Assigning existing categories is unchanged.
-* Security: POSSE syndication now checks that the user who triggered a post's transition to published can edit it. The check authorized the post's author rather than the acting user, so someone who could flip another author's post into published could syndicate content they could not edit. Scheduled posts and WP-CLI, which have no acting user, are unaffected.
-* Security: Telegraph syndication is now off unless the `outpost_telegraph_enabled` option is set. Its publish hook was registered unconditionally, so with the plugin merely active, publishing any post sent that post to api.telegra.ph — which creates a public copy of it — and the first publish also registered a Telegraph account carrying the site's name and address. There was no setting to turn it off and no chip to enable, contrary to what this readme described. Consent is now checked both where the hook is registered and inside the handler. Found in internal review.
-* Fixed: if OUTPOST_ENCRYPTION_KEY was defined in wp-config.php but was not exactly 32 raw bytes — what happens when the base64 string is pasted without base64_decode() — Outpost ignored it and used the key stored in the database, while the notice warning that the key is in the database was suppressed because the constant was defined. The site owner who took the trouble to move the key got no signal that it had not moved. The notice now reports the wrong-length constant and says how to fix it.
-* Security: seven REST endpoints accepted a request that carried a logged-in cookie and any non-empty access_token in the body, without the REST nonce WordPress requires for cookie authentication. Token validation was delegated to the determine_current_user filter, which is core's whole user-resolution chain, so the cookie validators on it re-authenticated the session core had deliberately dropped. Token resolution now runs with the cookie and application-password validators unhooked, so only a real token can authenticate. Found in internal review.
-* Security: the preview fetcher's address guard classified IPv6 addresses from their text form, so an internal address written in its expanded form (0:0:0:0:0:ffff:127.0.0.1) was not recognized as the internal address its compressed form (::ffff:127.0.0.1) already blocked. Any user who can write a post could make the site fetch a loopback, private, or cloud-metadata address and read the response. Addresses are now classified from their packed bytes, so every spelling of an address gets one verdict. Found in internal review.
-* Changed: "Tested up to" is declared only in readme.txt. It was also present in the plugin header, where it is not a supported field and can override the readme value.
-* Removed: the unused Apple Music enrichment path. It shipped an iTunes Lookup API call that no code reached, so the plugin no longer contacts Apple at all.
-* Removed: the Sefaria and SuttaCentral link sources. Outpost no longer recognizes those hosts or suggests a Quote post for them; pasted links from either site are handled by the generic page reader like any other URL.
-* Removed: three classes that shipped without a runtime path — the Ravelry and Ride With GPS URL-paste sources, whose authenticated preview branch was never built, and a duplicate RSS inbound extractor superseded by the one the source registry dispatches. Pasted Ravelry and Ride With GPS links keep the generic page preview they already had.
-* Changed: External services documents the Kit broadcast URL recorded on a post and the iCloud Shortcuts installer link, and explains that the built-in list of recognized link hosts is matched locally and contacts nothing.
-* Changed: the WHOOP entry links the API terms of use and their privacy and security section, both on developer.whoop.com, alongside the privacy policy itself. whoop.com refuses automated clients, so the policy link cannot be machine-checked; the developer-site links can be.
-* Fixed: the PWA web app manifest pointed its five icons at /wp-content/plugins/outpost/, the folder name used before the plugin was renamed. On any install the icons 404'd, so the install prompt and home-screen icon fell back to a generic placeholder. The manifest now builds those URLs from the plugin's own location.
-* Fixed: the Playground blueprint activated outpost/outpost.php, a path that no longer exists after the rename.
-
-= 1.0.11 =
-* Added: Default categories and Default tags in Composer defaults. The composer's More options open with them pre-selected, and a post that names no category gets them instead of WordPress's own default category. Leave them empty to keep the old behavior.
-
-= 1.0.10 =
-* Fixed: sharing a photo from the phone's share sheet lands on the Photo tab. The Web Share Target now accepts image files (Android and desktop Chrome/Edge): the picture stays on the device and the composer opens with it attached. The iOS directions add a second Shortcut, Photo to Outpost, that opens the Photo tab.
-
-= 1.0.9 =
-* Fixed: liking or replying to an X or Mastodon URL could fail with "Unknown mp-syndicate-to targets" because the suggested Bridgy chip sent a hard-coded brid.gy uid the site's Micropub endpoint never advertised. The chip now resolves to one of the endpoint's own syndication targets and stays hidden when there is none.
-* Changed: the share-sheet directions add a step for moving Post to Outpost near the top of the iOS share sheet through Edit Actions.
-
-= 1.0.8 =
-* Changed: the About tab's share-sheet directions name the two iOS Shortcut traps (tap Nowhere → Share Sheet; add Open URLs, not Share), add a test step, and link to the full walkthrough; the About tab now links to the documentation site.
-
-= 1.0.7 =
-* Fixed: the wp-admin sidebar showed two identical "Outpost" menus; the settings screen now sits under the single Outpost menu as "Settings" (its URL is unchanged).
-
-= 1.0.6 =
-* New: the About tab now explains how to add Outpost to your device's share sheet — the automatic Web Share Target on Android (once installed as an app) and a Shortcut-based setup for iPhone/iPad, where iOS Safari doesn't support share targets.
-
-= 1.0.5 =
-* Fixed: on managed-WP hosts that strip the Authorization header, the composer's More-options surface (Yoast keyphrase, categories, tags, XFN) failed to load with a "sign-in may have expired" notice even after re-authenticating. The composer-config request now carries its token in the request body and is authenticated by that token, so it works on those hosts. The token no longer travels in the URL.
-
-= 1.0.4 =
-* New: attach a photo to any Doing kind except video and to Recipe posts; the first photo becomes the featured image.
-* Security: REST route scoping keys on the route WordPress resolves, closing a nonce-protection gap on the composer-config path; preview fetches refuse link-local, CGNAT, and IPv6-internal targets and re-check every redirect; fetched preview HTML is sanitized with a wp_kses allowlist; Outpost's own routes render only from a matched rewrite rule; the Notion page cache is scoped per user; Micropub bridges write only to attachments the author can edit.
-* Fixed: photo alt text is no longer lost on Micropub posts; the shipped app bundle matches the source; uninstall removes all Outpost data and nothing else.
-* Changed: the External services list matches the source.
-
-= 1.0.3 =
-* Security hardening: enforce the 2048-character URL length cap on the preview and share/shortcut URL validators, matching the manual-share path and the plugin's documented input contract.
-
-= 1.0.2 =
-* Security: hardened iOS Shortcut token scope enforcement. The token, which is scoped to the share endpoint, could be accepted on other REST routes because scope was decided from the raw request URI rather than the route WordPress resolves. Now keyed on the resolved route. Found in internal security review.
-
-= 1.0.1 =
-* Security: the composer-config REST endpoint now requires the `edit_posts` capability. Logged-in users without it (Subscribers) could previously read composer configuration and companion-plugin status. Flagged by the WordPress.org plugin review team.
-* Fix: the pending-syndication reminder now raises a block-editor notice; it previously rendered only inside the editor's hidden no-JS container, so block-editor users never saw it.
-
-= 1.0.0 =
-* First stable release, prepared for the WordPress.org plugin directory.
-* PWA composer at `/post` with Note, Reply, Like, Repost, Bookmark, RSVP, Follow, Listen, Watch, Read, Checkin, Play, Photo, and Article modes.
-* One-tap POSSE syndication chips, including Bridgy, Telegraph, and newsletter destinations (Beehiiv, Buttondown, Kit, write.as).
-* Offline draft queue, home-screen install, share-sheet posting (Android Web Share Target; iOS via Shortcut).
-* OAuth connections for life-tracking services (Notion, Oura, WHOOP, Polar, Ride With GPS, Ravelry) with libsodium-encrypted credential storage.
-* Bookmarklet generator, appearance token editor with live preview, and companion-plugin detection.
-
-= 0.1.0 =
-* Initial scaffold. Plugin bootstrap, requirements check, Micropub status admin notice.
+Earlier versions: see CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
 
 = 1.0.27 =
-Mode tabs are now two rows of buttons (arrow keys no longer switch modes); posts no longer keep WordPress's fallback category next to the Outpost default.
-
-= 1.0.26 =
-Security hardening from the WordPress.org plugin review. No settings change.
-
-= 1.0.25 =
-Outpost now opens to a Home screen. To open straight to Post as before, choose Post under Preferences › Default start screen.
-
-= 1.0.24 =
-New Outpost Default design and drafts that survive a reload. If you used Outpost before this update, you keep your site's theme colors until you choose otherwise.
-
-= 1.0.22 =
-Security release. Apps that post through Outpost's endpoints with an IndieAuth token need the create or update permission. Posts queued offline before this update send with your current sign-in.
-
-= 1.0.0 =
-First stable release.
+If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut. Mode tabs are now two rows of buttons.

@@ -190,10 +190,7 @@ abstract class Outpost_OAuth_Provider_Base {
 	 */
 	final protected function parse_token_response( $response ) {
 		if ( is_wp_error( $response ) ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-				error_log( 'Outpost OAuth token transport error: ' . $response->get_error_message() );
-			}
+			Outpost_Debug_Log::write( sprintf( 'OAuth %s token exchange failed: transport error %s', $this->id(), Outpost_Debug_Log::error_code( $response ) ) );
 			return new \WP_Error(
 				'outpost_oauth_token_transport',
 				$response->get_error_message()
@@ -201,9 +198,9 @@ abstract class Outpost_OAuth_Provider_Base {
 		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		$body   = (string) wp_remote_retrieve_body( $response );
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ( $status < 200 || $status >= 300 ) ) {
-			/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-			error_log( sprintf( 'Outpost OAuth token exchange failed: HTTP %d body=%s', $status, $body ) );
+		if ( $status < 200 || $status >= 300 ) {
+			// Status only: the body can carry provider error detail or tokens.
+			Outpost_Debug_Log::write( sprintf( 'OAuth %s token exchange failed: HTTP %d', $this->id(), $status ) );
 		}
 		$decoded = json_decode( $body, true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $decoded ) ) {
@@ -252,9 +249,8 @@ abstract class Outpost_OAuth_Provider_Base {
 						),
 					)
 				);
-				if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-					error_log( sprintf( 'Outpost OAuth revocation failed for %s: %s', $this->id(), $response->get_error_message() ) );
+				if ( is_wp_error( $response ) ) {
+					Outpost_Debug_Log::write( sprintf( 'OAuth %s revocation failed: %s', $this->id(), Outpost_Debug_Log::error_code( $response ) ) );
 				}
 			}
 		}

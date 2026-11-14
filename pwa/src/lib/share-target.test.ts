@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { parse_dispatch_params, parse_share_target } from './share-target';
 
 /**
@@ -149,5 +149,56 @@ describe('parse_dispatch_params — shared photos', () => {
 			tab: 'note',
 			variant: 'note',
 		});
+	});
+});
+
+describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
+	beforeEach(() => sessionStorage.clear());
+
+	it('holds a first share, then a second as the new share, across reloads', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'first' });
+		expect(hold_share_for_review()).toEqual({ shares: [{ tab: 'note', content: 'first' }], refused: false });
+		stash_share_target({ tab: 'reply', url: 'https://example.test/' });
+		const held = hold_share_for_review();
+		expect(held.shares.map((s) => s.tab)).toEqual(['note', 'reply']);
+		// A reload with no new share keeps both, in order.
+		expect(hold_share_for_review()).toEqual(held);
+		expect(sessionStorage.getItem('outpost.share_target')).toBeNull();
+	});
+
+	it('refuses a third share without replacing either', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		for (const content of ['one', 'two', 'three']) {
+			stash_share_target({ tab: 'note', content });
+			hold_share_for_review();
+		}
+		stash_share_target({ tab: 'note', content: 'four' });
+		const held = hold_share_for_review();
+		expect(held.refused).toBe(true);
+		expect(held.shares.map((s) => s.content)).toEqual(['one', 'two']);
+	});
+
+	it('refuses a photo share the service worker could not keep', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'photo', sharedPhotos: true, shareRefused: true });
+		expect(hold_share_for_review()).toEqual({ shares: [], refused: true });
+	});
+
+	it('drops an unreadable slot instead of failing', async () => {
+		const { hold_share_for_review } = await import('./share-target');
+		sessionStorage.setItem('outpost.share_review', '{not json');
+		sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'note', content: 'ok' }));
+		expect(hold_share_for_review().shares).toEqual([{ tab: 'note', content: 'ok' }]);
+	});
+
+	it('release hands the earliest share to the modes and clears both slots', async () => {
+		const { hold_share_for_review, release_held_share, stash_share_target, peek_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'first' });
+		hold_share_for_review();
+		expect(release_held_share()).toEqual({ tab: 'note', content: 'first' });
+		expect(peek_share_target()).toEqual({ tab: 'note', content: 'first' });
+		expect(sessionStorage.getItem('outpost.share_review')).toBeNull();
+		expect(sessionStorage.getItem('outpost.share_review_candidate')).toBeNull();
 	});
 });

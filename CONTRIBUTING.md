@@ -39,7 +39,7 @@ composer install && npm install
 
 ## Run Outpost locally
 
-`.wp-env.json` defines a local WordPress 6.7 site with Outpost (mapped from your working tree), IndieAuth, and Micropub active.
+`.wp-env.json` defines a local WordPress 7.1.4 site with Outpost (mapped from your working tree), IndieAuth, and Micropub active.
 
 ```bash
 npm run wp-env:start    # site at http://localhost:8888 (sign in as admin / password)

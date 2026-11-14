@@ -88,7 +88,7 @@ final class Outpost_Appearance_REST_Controller {
 	/**
 	 * @return bool|\WP_Error
 	 */
-	public static function permission_check( ?\WP_REST_Request $request = null ) {
+	public static function permission_check( \WP_REST_Request $request ) {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error(
 				'outpost_appearance_unauthorized',
@@ -96,19 +96,20 @@ final class Outpost_Appearance_REST_Controller {
 				array( 'status' => 401 )
 			);
 		}
+		// Credential before capability, and it fails early: a cookie session
+		// needs a valid REST nonce, and a token needs a scope that lets it act
+		// for the user.
+		if ( ! self::bearer_has_scope( $request, array( 'create', 'draft', 'update', 'profile' ) ) ) {
+			return new \WP_Error(
+				'outpost_appearance_scope',
+				__( 'This sign-in does not allow changing appearance preferences.', 'outpost-mobile-publishing' ),
+				array( 'status' => 403 )
+			);
+		}
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new \WP_Error(
 				'outpost_appearance_forbidden',
 				__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ),
-				array( 'status' => 403 )
-			);
-		}
-		// A token needs a scope that lets it act for the user. A read-only
-		// token fails the edit_posts check above before reaching this.
-		if ( null !== $request && ! self::bearer_has_scope( $request, array( 'create', 'draft', 'update', 'profile' ) ) ) {
-			return new \WP_Error(
-				'outpost_appearance_scope',
-				__( 'This sign-in does not allow changing appearance preferences.', 'outpost-mobile-publishing' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -223,6 +224,15 @@ final class Outpost_Appearance_REST_Controller {
 				'outpost_appearance_no_user',
 				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
+			);
+		}
+		// The route and the settings page check this too; the method is
+		// public, so it doesn't rely on its callers (T10-S4-06).
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new \WP_Error(
+				'outpost_appearance_forbidden',
+				__( 'You are not allowed to change appearance settings.', 'outpost-mobile-publishing' ),
+				array( 'status' => 403 )
 			);
 		}
 

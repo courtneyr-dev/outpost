@@ -43,6 +43,9 @@ final class Outpost_Source_Detector {
 	 * contract (CLAUDE.md Security Hot Spots) and the manual-share writeback cap. */
 	private const URL_MAX_LENGTH = 2048;
 
+	/** Most characters kept from shared title or text (T10-S4-16). */
+	public const TEXT_MAX_LENGTH = 4000;
+
 	/**
 	 * Per-request memoization of `find_for_url` results, keyed on
 	 * `lowercased-host + path`. Sources are filterable per-request
@@ -107,9 +110,8 @@ final class Outpost_Source_Detector {
 		$text  = isset( $payload['text'] ) && is_string( $payload['text'] ) ? trim( $payload['text'] ) : '';
 		$title = isset( $payload['title'] ) && is_string( $payload['title'] ) ? trim( $payload['title'] ) : '';
 
-		if ( '' !== $url && self::is_http_url( $url ) ) {
-			return $url;
-		}
+		// Candidates in priority order; every one, wherever it was found, must
+		// pass the URL-only validator before it is returned (T10-S3-13 v1.1).
 		// Some iOS apps (Kindle, Books, podcast clients) bundle the
 		// shared content as a quote + title + URL all in the share-sheet
 		// text payload. iOS Shortcut authors typically wire a single
@@ -117,23 +119,23 @@ final class Outpost_Source_Detector {
 		// `url` field — so the entire text blob lands here. Fall through
 		// to URL extraction from the `url` field's content when the
 		// field isn't a clean URL on its own.
+		$candidates = array();
 		if ( '' !== $url ) {
-			$found = self::find_url_in_text( $url );
-			if ( null !== $found ) {
-				return $found;
-			}
-		}
-		if ( '' !== $text && self::is_http_url( $text ) ) {
-			return $text;
+			$candidates[] = $url;
+			$candidates[] = self::find_url_in_text( $url );
 		}
 		if ( '' !== $text ) {
-			$found = self::find_url_in_text( $text );
-			if ( null !== $found ) {
-				return $found;
-			}
+			$candidates[] = $text;
+			$candidates[] = self::find_url_in_text( $text );
 		}
-		if ( '' !== $title && self::is_http_url( $title ) ) {
-			return $title;
+		if ( '' !== $title ) {
+			$candidates[] = $title;
+		}
+		foreach ( $candidates as $candidate ) {
+			$valid = null === $candidate ? '' : self::sanitize_shared_url( $candidate );
+			if ( '' !== $valid ) {
+				return $valid;
+			}
 		}
 		return null;
 	}
@@ -162,25 +164,68 @@ final class Outpost_Source_Detector {
 		// tag; `&lt;` and `&gt;` stay encoded.
 		$value = str_replace( array( '&amp;', '&#039;', '&quot;' ), array( '&', "'", '"' ), $value );
 		$value = (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $value );
-		return trim( (string) preg_replace( '/ {2,}/', ' ', $value ) );
+		$value = trim( (string) preg_replace( '/ {2,}/', ' ', $value ) );
+		// The text rides into the composer redirect URL; keep it bounded
+		// (T10-S4-16). The service worker applies the same limit.
+		return mb_substr( $value, 0, self::TEXT_MAX_LENGTH );
 	}
 
 	/**
-	 * Clean a shared `url` field. One bare http(s) URL goes through
-	 * esc_url_raw(); a text blob stays text, because esc_url_raw() empties it
-	 * and iOS apps put a quote plus the link in this field —
-	 * extract_url_from_payload() finds the link inside it.
+	 * Validate a shared URL (T10-S3-13 v1.1, F-14). URL-only: returns a
+	 * validated http(s) URL or ''.
+	 *
+	 * The value must be one string token within URL_MAX_LENGTH with no
+	 * whitespace, control bytes, angle brackets, quotes, backslashes, or HTML
+	 * entities, an http(s) scheme, and a host; then it goes through
+	 * esc_url_raw() with an http/https allowlist. A value with markup
+	 * appended is malformed and is not trimmed into a valid prefix. wp_kses()
+	 * never sanitizes a URL. For the share payload's `url` field, which may
+	 * hold prose, use sanitize_shared_url_field().
+	 *
+	 * @param mixed $value Unslashed value.
+	 * @return string
+	 */
+	public static function sanitize_shared_url( mixed $value ): string {
+		if ( ! is_string( $value ) || strlen( $value ) > self::URL_MAX_LENGTH ) {
+			return '';
+		}
+		$trimmed = trim( $value );
+		if ( '' === $trimmed || 1 === preg_match( '/\s/', $trimmed ) ) {
+			return '';
+		}
+		if ( 1 === preg_match( '/[\x00-\x1F\x7F<>"\'`\\\\]/', $trimmed ) ) {
+			return '';
+		}
+		if ( 1 === preg_match( '/&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i', $trimmed ) ) {
+			return '';
+		}
+		if ( ! self::is_http_url( $trimmed ) ) {
+			return '';
+		}
+		$clean = esc_url_raw( $trimmed, array( 'http', 'https' ) );
+		return ( '' !== $clean && self::is_http_url( $clean ) ) ? $clean : '';
+	}
+
+	/**
+	 * Clean the share payload's `url` field, which share sheets and iOS
+	 * Shortcuts sometimes fill with prose (a quote plus the link) instead of a
+	 * bare URL. Returns the validated URL when the field is one; for prose
+	 * (a value with whitespace) the prose cleaned as text, so
+	 * extract_url_from_payload() can find the link in it and validate that
+	 * candidate with sanitize_shared_url() before any use; otherwise ''.
 	 *
 	 * @param mixed $value Unslashed field value.
 	 * @return string
 	 */
-	public static function sanitize_shared_url( mixed $value ): string {
-		$as_text = self::sanitize_shared_text( $value );
-		if ( 1 !== preg_match( '#^https?://\S+$#i', $as_text ) ) {
-			return $as_text;
+	public static function sanitize_shared_url_field( mixed $value ): string {
+		$url = self::sanitize_shared_url( $value );
+		if ( '' !== $url ) {
+			return $url;
 		}
-		$as_url = esc_url_raw( $as_text, array( 'http', 'https' ) );
-		return '' !== $as_url ? $as_url : $as_text;
+		if ( is_string( $value ) && 1 === preg_match( '/\s/', trim( $value ) ) ) {
+			return self::sanitize_shared_text( $value );
+		}
+		return '';
 	}
 
 	/**
@@ -222,10 +267,21 @@ final class Outpost_Source_Detector {
 		// enough to catch URLs embedded in arbitrary text. We don't
 		// need a perfect URL parser here; the candidate gets
 		// re-validated via wp_parse_url + is_http_url before use.
-		if ( 1 === preg_match( '~https?://[A-Za-z0-9._/?:%&=+\-\[\]@!,;\']+~i', $text, $match ) ) {
-			$candidate = rtrim( $match[0], '.,;:!?)' );
-			if ( self::is_http_url( $candidate ) ) {
-				return $candidate;
+		if ( preg_match_all( '~https?://[A-Za-z0-9._/?:%&=+\-\[\]@!,;\']+~i', $text, $matches, PREG_OFFSET_CAPTURE ) ) {
+			foreach ( $matches[0] as $match ) {
+				// A link must end at a real boundary: the end of the text,
+				// whitespace, or closing quotes or brackets followed by one of
+				// those or sentence punctuation. A link that runs on into other
+				// characters (`#`, `<`, `">`) is malformed and is skipped, never
+				// cut back to a valid-looking prefix (T10-S3-13 v1.1).
+				$after = substr( $text, (int) $match[1] + strlen( (string) $match[0] ) );
+				if ( '' !== $after && 1 !== preg_match( '/^(?:\s|["\x{201D}\x{2019})\]}]+(?:$|[\s.,;:!?]))/u', $after ) ) {
+					continue;
+				}
+				$candidate = rtrim( (string) $match[0], '.,;:!?)' );
+				if ( self::is_http_url( $candidate ) ) {
+					return $candidate;
+				}
 			}
 		}
 		return null;
@@ -244,7 +300,6 @@ final class Outpost_Source_Detector {
 	 *         'mode_default'  => string|null,        // present for picker
 	 *         'source_id'     => string,
 	 *         'redirect_url'  => string,             // /post/?mode=... or /post/?picker=...
-	 *         'prefill_token' => string|null,        // hash for B2 transient lookup
 	 *     ]
 	 *
 	 * @param string             $url     The URL to dispatch.
@@ -291,10 +346,8 @@ final class Outpost_Source_Detector {
 	}
 
 	/**
-	 * Build the auto-route decision for an unambiguous source. The
-	 * caller (Share_Target_Controller / Shortcut_Controller) is
-	 * responsible for enqueueing the B2 preview transient associated
-	 * with `prefill_token` before issuing the redirect.
+	 * Build the auto-route decision for an unambiguous source. Pure: the
+	 * caller only redirects; nothing is stored or fetched on the server.
 	 *
 	 * @param Outpost_Source_Base $source Matched source.
 	 * @param string              $url    Source URL.
@@ -304,22 +357,19 @@ final class Outpost_Source_Detector {
 		$caps      = $source->capabilities();
 		$mode      = $source->mode_for_url( $url );
 		$source_id = isset( $caps['id'] ) && is_string( $caps['id'] ) ? $caps['id'] : 'unknown';
-		$token     = self::prefill_token( $url );
 
 		$query_args = array(
-			'mode'       => $mode,
-			'source'     => $source_id,
-			'url'        => $url,
-			'cached_for' => $token,
+			'mode'   => $mode,
+			'source' => $source_id,
+			'url'    => $url,
 		);
 		return array(
-			'route_type'    => 'auto',
-			'mode'          => $mode,
-			'mode_options'  => null,
-			'mode_default'  => null,
-			'source_id'     => $source_id,
-			'redirect_url'  => self::build_composer_url( $query_args ),
-			'prefill_token' => $token,
+			'route_type'   => 'auto',
+			'mode'         => $mode,
+			'mode_options' => null,
+			'mode_default' => null,
+			'source_id'    => $source_id,
+			'redirect_url' => self::build_composer_url( $query_args ),
 		);
 	}
 
@@ -343,13 +393,12 @@ final class Outpost_Source_Detector {
 			'url'     => $url,
 		);
 		return array(
-			'route_type'    => 'picker',
-			'mode'          => null,
-			'mode_options'  => $info['mode_options'],
-			'mode_default'  => $info['mode_default'],
-			'source_id'     => $info['id'],
-			'redirect_url'  => self::build_composer_url( $query_args ),
-			'prefill_token' => null, // No preview enqueue on picker dispatch.
+			'route_type'   => 'picker',
+			'mode'         => null,
+			'mode_options' => $info['mode_options'],
+			'mode_default' => $info['mode_default'],
+			'source_id'    => $info['id'],
+			'redirect_url' => self::build_composer_url( $query_args ),
 		);
 	}
 
@@ -401,17 +450,5 @@ final class Outpost_Source_Detector {
 			return $base;
 		}
 		return $base . '?' . implode( '&', $pairs );
-	}
-
-	/**
-	 * Hash a URL into a stable token used as the B2 preview cache key.
-	 * Short hash — eight hex chars — is plenty for the per-user
-	 * 5-minute transient namespace and keeps the redirect URL short.
-	 *
-	 * @param string $url Source URL.
-	 * @return string
-	 */
-	public static function prefill_token( string $url ): string {
-		return substr( md5( $url ), 0, 16 );
 	}
 }

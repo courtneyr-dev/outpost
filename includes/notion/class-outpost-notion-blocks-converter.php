@@ -102,9 +102,8 @@ final class Outpost_Notion_Blocks_Converter {
 				return self::notion_text_block( 'paragraph', $text );
 			case 'core/heading':
 				$level = isset( $block['attrs']['level'] ) ? (int) $block['attrs']['level'] : 2;
-				if ( $level >= 4 && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-					error_log( 'Outpost Notion converter: heading level ' . $level . ' collapses to heading_3 (Notion has only 3 levels).' );
+				if ( $level >= 4 ) {
+					Outpost_Debug_Log::write( 'Notion converter: heading level ' . $level . ' collapses to heading_3 (Notion has only 3 levels).' );
 				}
 				$type = ( 1 === $level ) ? 'heading_1' : ( ( 2 === $level ) ? 'heading_2' : 'heading_3' );
 				return self::notion_text_block( $type, trim( wp_strip_all_tags( $html ) ) );
@@ -139,10 +138,7 @@ final class Outpost_Notion_Blocks_Converter {
 				if ( '' === $text ) {
 					return null;
 				}
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-					error_log( 'Outpost Notion converter: unsupported WP block "' . $name . '" passed through as paragraph.' );
-				}
+				Outpost_Debug_Log::write( 'Notion converter: unsupported WP block "' . $name . '" passed through as paragraph.' );
 				return self::notion_text_block( 'paragraph', $text );
 		}
 	}
@@ -237,10 +233,7 @@ final class Outpost_Notion_Blocks_Converter {
 				}
 				return '<!-- wp:image --><figure class="wp-block-image"><img src="' . esc_url( $src ) . '" alt=""/></figure><!-- /wp:image -->';
 			default:
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-					error_log( 'Outpost Notion converter: unsupported Notion type "' . $type . '" passed through as empty paragraph.' );
-				}
+				Outpost_Debug_Log::write( 'Notion converter: unsupported Notion type "' . $type . '" passed through as empty paragraph.' );
 				return '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->';
 		}
 	}

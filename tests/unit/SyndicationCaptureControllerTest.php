@@ -461,17 +461,20 @@ final class SyndicationCaptureControllerTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * No valid nonce and no credential: the capability check decides alone,
-	 * as it did before H6.
+	 * T10-S3-02: a cookie session with an invalid nonce and no other
+	 * credential is refused by Outpost itself, whatever the capability check
+	 * says. Before T10 this case fell through to the capability check alone,
+	 * which relied on core's rest_cookie_check_errors() having run.
 	 */
-	public function test_permission_keeps_the_capability_result_for_cookie_session_with_invalid_nonce_and_no_credential(): void {
+	public function test_permission_refuses_cookie_session_with_invalid_nonce_and_no_credential(): void {
 		$this->arrive_as_cookie_session( false );
 
-		$this->assertTrue(
-			Outpost_Syndication_Capture_Controller::check_permission(
-				new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
-			)
+		$result = Outpost_Syndication_Capture_Controller::check_permission(
+			new \WP_REST_Request( 'POST', '/outpost/v1/manual-share/capture' )
 		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	/**

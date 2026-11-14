@@ -53,7 +53,7 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	const route = detect_route(window.location.pathname);
 
 	// F6: when the share-target dispatcher 303-redirects to the composer
-	// with dispatch params (?mode=, ?picker=, ?source=, ?cached_for=,
+	// with dispatch params (?mode=, ?picker=, ?source=,
 	// ?url=, etc.), parse them into a ShareTargetData stash so the
 	// composer's existing mode-mount logic picks the right tab + variant
 	// + pre-fill. Falls through silently on direct /post/ navigation.

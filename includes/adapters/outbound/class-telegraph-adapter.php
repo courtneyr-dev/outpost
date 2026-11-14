@@ -194,7 +194,7 @@ final class Outpost_Telegraph_Adapter {
 				'timeout' => 10,
 				'body'    => array(
 					'access_token'   => $token,
-					'title'          => (string) $post->post_title,
+					'title'          => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 					'author_name'    => $author_name,
 					'author_url'     => $author_url,
 					'content'        => wp_json_encode( $dom ),
