@@ -7,10 +7,15 @@
  * is Outpost code. If deleting that password fails and deactivation or
  * uninstall still goes ahead, the surviving password works on every route
  * core accepts application passwords for. Cleanup now enumerates again after
- * deleting and reports whether any Outpost password is left; deactivation
- * and uninstall stop with wp_die() when one is. WordPress persists
- * `active_plugins` after the deactivation hooks and deletes plugin files
- * after uninstall.php, so stopping there keeps Outpost, and the rule, loaded.
+ * deleting and reports whether any Outpost password is left.
+ *
+ * - Deactivation stops with wp_die() when one is left: WordPress saves the
+ *   plugin as inactive only after the deactivation hooks, so Outpost and its
+ *   rule stay loaded.
+ * - Uninstall starts with Outpost already inactive and not loaded, so keeping
+ *   the files alone doesn't restore the rule. A failed cleanup reactivates
+ *   Outpost, confirms the activation was saved, and then stops; when it
+ *   can't, it says the password must be revoked by hand.
  *
  * A failed deletion is injected with core's `update_user_metadata`
  * short-circuit for `_application_passwords`, so the delete call returns
@@ -132,6 +137,33 @@ final class ShortcutPasswordCleanupFailClosedTest extends TestCase {
 		}
 		$this->assertNotContains( $basename, $this->stored_active_plugins() );
 		$this->assertSame( array( 'kept' => '1' ), get_option( 'outpost_settings' ), 'No plugin data is deleted.' );
+	}
+
+	/**
+	 * A reactivation that doesn't get saved must not be reported as one:
+	 * with the active_plugins write blocked, uninstall says the password isn't
+	 * limited (T10-S4-27 v1.2, final patch review).
+	 */
+	public function test_uninstall_reports_an_unsaved_reactivation_as_failed(): void {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$basename = basename( dirname( __DIR__, 2 ) ) . '/outpost.php';
+		$this->lift_active_plugins_filter();
+		$this->saved_active = get_option( 'active_plugins' );
+		update_option( 'active_plugins', array( 'indieauth/indieauth.php', 'micropub/micropub.php' ) );
+		$fail          = $this->user_with_passwords();
+		$this->failing = array( $fail );
+		$block         = static fn( $value, $old ) => $old;
+		add_filter( 'pre_update_option_active_plugins', $block, 10, 2 );
+
+		try {
+			\Outpost_Uninstaller::run( $basename );
+			$this->fail( 'Uninstall must stop while a Shortcut password survives.' );
+		} catch ( \OverflowException $stopped ) {
+			$this->assertStringContainsString( 'could not turn itself back on', $stopped->getMessage() );
+		} finally {
+			remove_filter( 'pre_update_option_active_plugins', $block, 10 );
+		}
+		$this->assertNotContains( $basename, $this->stored_active_plugins(), 'Control: the activation was not saved.' );
 	}
 
 	/**
