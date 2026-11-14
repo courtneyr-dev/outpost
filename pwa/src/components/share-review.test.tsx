@@ -196,6 +196,11 @@ async function arrive(c: ModeCase): Promise<void> {
 	}
 	mount();
 	await wait(30);
+	// A photo share's text and file names come from the IndexedDB share
+	// inbox, read after mount; until that read lands the review shows only
+	// its heading and "Use shared content" does nothing. Waiting a fixed
+	// delay raced it in CI.
+	if (c.photo) await vi.waitFor(() => expect(region()?.textContent).toContain('shared.jpg'), { timeout: 5000 });
 }
 
 describe.each(CASES)('$mode share waits for "Use shared content"', (c) => {
@@ -260,7 +265,6 @@ describe.each(CASES)('$mode share waits for "Use shared content"', (c) => {
 		await arrive(c);
 		// "Use shared content" waits until the photo records are read (it says
 		// "Still reading" before that), so click only once the file is listed.
-		if (c.photo) await vi.waitFor(() => expect(region()?.textContent).toContain('shared.jpg'), { timeout: 5000 });
 
 		const outside = reachable().filter(
 			(el) => !el.closest('[data-outpost-share-review]') && (el as HTMLInputElement).name !== 'outpost-header-mode',
