@@ -221,6 +221,37 @@ final class WporgReviewGuardsTest extends TestCase {
 		return $files;
 	}
 
+	/**
+	 * T10-S4-12 (Phase 4 A-02): no superglobal value is cast with (string)
+	 * before sanitizing. On PHP 8 an array-shaped field cast that way raises
+	 * "Array to string conversion" and becomes the text 'Array'; core's
+	 * sanitize_key() and sanitize_text_field() already return '' for arrays.
+	 * The two reads in handlers the coordinator kept unchanged (encryption-key
+	 * dismissal, OAuth status notice) are listed and stay for its decision.
+	 */
+	public function test_no_superglobal_is_string_cast_before_sanitizing(): void {
+		$root    = dirname( __DIR__, 2 );
+		$allowed = array(
+			'includes/admin/class-outpost-encryption-key-notice.php' => 1,
+			'includes/admin/class-outpost-oauth-settings-page.php'   => 2,
+		);
+		$found   = array();
+		$it      = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/includes', \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $it as $file ) {
+			if ( 'php' !== $file->getExtension() ) {
+				continue;
+			}
+			$rel   = substr( (string) $file, strlen( $root ) + 1 );
+			$count = preg_match_all( '/\(string\)\s*\$_(POST|GET|REQUEST|COOKIE)\[/', (string) file_get_contents( (string) $file ) );
+			if ( $count > 0 ) {
+				$found[ $rel ] = $count;
+			}
+		}
+		ksort( $found );
+		ksort( $allowed );
+		$this->assertSame( $allowed, $found, 'Only the coordinator-held reads keep a (string) cast.' );
+	}
+
 	public function test_input_legibility_sources(): void {
 		$root       = dirname( __DIR__, 2 );
 		$controller = (string) file_get_contents( $root . '/includes/sources/class-share-target-controller.php' );
