@@ -63,7 +63,7 @@ final class Outpost_POSSE_Destination_Beehiiv extends Outpost_POSSE_Destination_
 		$endpoint = sprintf( self::API_ENDPOINT_TEMPLATE, rawurlencode( $settings['publication_id'] ) );
 
 		$payload = array(
-			'subject'      => (string) $post->post_title,
+			'subject'      => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 			'body_content' => Outpost_POSSE_Content_Transformer::to_html_with_canonical( $post_id ),
 			'status'       => 'confirmed',
 		);

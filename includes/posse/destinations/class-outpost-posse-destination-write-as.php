@@ -64,7 +64,7 @@ final class Outpost_POSSE_Destination_WriteAs extends Outpost_POSSE_Destination_
 			: sprintf( self::API_ENDPOINT_COLLECTION, rawurlencode( $settings['collection'] ) );
 
 		$payload = array(
-			'title' => (string) $post->post_title,
+			'title' => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 			'body'  => Outpost_POSSE_Content_Transformer::to_markdown_with_canonical( $post_id ),
 		);
 

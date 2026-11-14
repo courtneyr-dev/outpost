@@ -233,9 +233,9 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 		if ( ! $post instanceof WP_Post ) {
 			return '';
 		}
-		$source = ! empty( $post->post_title ) && '' !== trim( $post->post_title )
-			? (string) $post->post_title
-			: (string) $post->post_content;
+		// The caption leaves the site, so it uses the title the site prints.
+		$title  = Outpost_Post_Kinds_Adapter::safe_title( $post );
+		$source = '' !== trim( $title ) ? $title : (string) $post->post_content;
 		return trim( wp_strip_all_tags( $source ) );
 	}
 
