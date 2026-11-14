@@ -142,9 +142,10 @@ final class WporgReviewGuardsTest extends TestCase {
 
 	/**
 	 * T10-S4-03 (L6-10): the iOS Shortcut installer link ships, and the
-	 * developer README beside it does not. Checked against the actual
-	 * .distignore rules by building the package file list the same way the
-	 * release does (tracked files filtered through rsync --exclude-from).
+	 * developer README beside it does not. Checked against both package paths: the .distignore rules
+	 * (tracked files filtered through rsync --exclude-from, as the site deploy
+	 * does) and package.json's `files` list (npm's packlist, as the
+	 * WordPress.org zip does).
 	 */
 	public function test_the_shortcut_installer_ships_without_its_developer_readme(): void {
 		$root = dirname( __DIR__, 2 );
@@ -155,6 +156,17 @@ final class WporgReviewGuardsTest extends TestCase {
 
 		$this->assertContains( 'assets/ios-shortcut-base-link.txt', $files, 'The installer link the settings page reads ships.' );
 		$this->assertNotContains( 'assets/ios-shortcut-base-link.README.md', $files, 'The developer README does not ship.' );
+
+		// The WordPress.org zip is built by bin/package-wporg.mjs from
+		// package.json's `files` list (npm's packlist), not from .distignore.
+		exec( 'cd ' . escapeshellarg( $root ) . ' && npm pack --dry-run --json --ignore-scripts 2>/dev/null', $out, $code ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		$pack = json_decode( implode( "\n", $out ), true );
+		if ( 0 !== $code || ! is_array( $pack ) || ! isset( $pack[0]['files'] ) ) {
+			$this->markTestIncomplete( 'npm unavailable; the release zip list was not checked.' );
+		}
+		$zip = array_column( $pack[0]['files'], 'path' );
+		$this->assertContains( 'assets/ios-shortcut-base-link.txt', $zip, 'The release zip carries the installer link.' );
+		$this->assertNotContains( 'assets/ios-shortcut-base-link.README.md', $zip, 'The release zip leaves out the developer README.' );
 	}
 
 	/**
