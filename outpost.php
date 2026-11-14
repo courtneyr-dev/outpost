@@ -890,16 +890,25 @@ add_action(
  * Deactivation hook. Deletes the iOS Shortcut's application passwords: the
  * rule that limits them to the Shortcut route is Outpost code, so a password
  * left behind would work on every route core accepts application passwords
- * for (T10-S4-09). The person's other application passwords stay. Then
+ * for (T10-S4-09). If one survives, it stops instead (T10-S4-27). The
+ * person's other application passwords stay. Then
  * flushes rewrite rules so /post/* rules are dropped from the cache. The
  * rules themselves don't need explicit removal — they're regenerated on
  * every `init` and naturally disappear when this plugin is inactive.
  *
  * @since 0.1.0
+ *
+ * @param bool $network_wide Whether this is a network deactivation.
  */
-function outpost_deactivate(): void {
+function outpost_deactivate( bool $network_wide = false ): void {
+	unset( $network_wide ); // Application passwords are network-wide either way.
 	require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-uninstaller.php';
-	Outpost_Uninstaller::delete_shortcut_application_passwords();
+	// WordPress saves the plugin as inactive only after this hook returns,
+	// so stopping here keeps Outpost and its route rule loaded (T10-S4-27).
+	if ( ! Outpost_Uninstaller::delete_shortcut_application_passwords() ) {
+		Outpost_Uninstaller::stop_for_surviving_password( __( 'Deactivation', 'outpost-mobile-publishing' ) );
+		return;
+	}
 	flush_rewrite_rules();
 }
 register_deactivation_hook( __FILE__, 'outpost_deactivate' );

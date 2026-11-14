@@ -98,8 +98,13 @@ final class Outpost_Uninstaller {
 	 */
 	public static function run(): void {
 		// Application passwords live in network-wide user meta, so they are
-		// removed once, not per site.
-		self::delete_shortcut_application_passwords();
+		// removed once, not per site. If one survives, stop before deleting
+		// anything else: WordPress removes the plugin files only after this
+		// returns, and those files hold the rule that keeps it scoped.
+		if ( ! self::delete_shortcut_application_passwords() ) {
+			self::stop_for_surviving_password( __( 'Uninstall', 'outpost-mobile-publishing' ) );
+			return;
+		}
 
 		if ( is_multisite() ) {
 			delete_site_option( 'outpost_ios_shortcut_unscoped_swept' );
@@ -123,11 +128,62 @@ final class Outpost_Uninstaller {
 	/**
 	 * Delete the iOS Shortcut application passwords Outpost created, for every
 	 * user who has one, and leave every other application password alone.
+	 *
+	 * Returns whether none is left (T10-S4-27): after deleting, it reads every
+	 * user's passwords again rather than trusting the delete calls, because a
+	 * password that outlives Outpost's route rule works everywhere.
 	 */
-	public static function delete_shortcut_application_passwords(): void {
+	public static function delete_shortcut_application_passwords(): bool {
 		if ( ! class_exists( 'WP_Application_Passwords' ) ) {
-			return;
+			return true;
 		}
+		foreach ( self::users_with_application_passwords() as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( $user_id ) as $item ) {
+				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) && isset( $item['uuid'] ) ) {
+					WP_Application_Passwords::delete_application_password( $user_id, (string) $item['uuid'] );
+				}
+			}
+		}
+		foreach ( self::users_with_application_passwords() as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( $user_id ) as $item ) {
+				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) ) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Stop with an explanation when a Shortcut application password survived
+	 * cleanup. Deactivation and uninstall call this, so WordPress keeps Outpost
+	 * active and its files in place while the password still needs its rule.
+	 *
+	 * @param string $action What was stopped, already translated.
+	 */
+	public static function stop_for_surviving_password( string $action ): void {
+		wp_die(
+			esc_html(
+				sprintf(
+					/* translators: %s: "Deactivation" or "Uninstall". */
+					__( '%s stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays installed and active and that password stays limited to the Shortcut. Try again.', 'outpost-mobile-publishing' ),
+					$action
+				)
+			),
+			esc_html__( 'Outpost is still active', 'outpost-mobile-publishing' ),
+			array(
+				'response'  => 500,
+				'back_link' => true,
+			)
+		);
+	}
+
+	/**
+	 * Every user id with at least one application password, network-wide.
+	 *
+	 * @return array<int, int>
+	 */
+	private static function users_with_application_passwords(): array {
 		$user_ids = get_users(
 			array(
 				'blog_id'  => 0,
@@ -135,13 +191,7 @@ final class Outpost_Uninstaller {
 				'fields'   => 'ID',
 			)
 		);
-		foreach ( (array) $user_ids as $user_id ) {
-			foreach ( WP_Application_Passwords::get_user_application_passwords( (int) $user_id ) as $item ) {
-				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) && isset( $item['uuid'] ) ) {
-					WP_Application_Passwords::delete_application_password( (int) $user_id, (string) $item['uuid'] );
-				}
-			}
-		}
+		return array_map( 'intval', (array) $user_ids );
 	}
 
 	/**
