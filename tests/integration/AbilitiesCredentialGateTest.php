@@ -148,7 +148,9 @@ final class AbilitiesCredentialGateTest extends TestCase {
 
 			$this->assertTrue( current_user_can( 'edit_post', $this->post_id ), 'Precondition: the user can edit this post.' );
 			$this->assertFalse( current_user_can( 'edit_posts' ), 'Precondition: but lacks edit_posts.' );
-			$this->assertGreaterThanOrEqual( 401, $this->route_status( '/outpost/v1/manual-share/status/' . $this->post_id ), 'Control: the route refuses.' );
+			$refused = rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/manual-share/status/' . $this->post_id ) );
+			$this->assertSame( 401, $refused->get_status(), 'Control: the route refuses a user without edit_posts.' );
+			$this->assertSame( 'rest_forbidden', $refused->get_data()['code'] ?? null );
 			$this->assertFalse( Outpost_Abilities::can_get_share_status( array( 'post_id' => $this->post_id ) ) );
 		} finally {
 			remove_role( 'f501_reviser' );
@@ -186,6 +188,42 @@ final class AbilitiesCredentialGateTest extends TestCase {
 
 		$this->assertTrue( Outpost_Abilities::can_read_outpost() );
 		$this->assertTrue( Outpost_Abilities::can_get_share_status( array( 'post_id' => $this->post_id ) ) );
+	}
+
+	/**
+	 * Core's Abilities REST controller calls the permission callback while it
+	 * dispatches its own route; a test route with the same callback stands in.
+	 */
+	private function dispatch_ability_stand_in( array $body ): \WP_REST_Response {
+		register_rest_route(
+			'outpost-test/v1',
+			'/ability-gate',
+			array(
+				'methods'             => 'POST',
+				'callback'            => static function () {
+					return array( 'read' => true );
+				},
+				'permission_callback' => array( Outpost_Abilities::class, 'can_read_outpost' ),
+			)
+		);
+		$request = new WP_REST_Request( 'POST', '/outpost-test/v1/ability-gate' );
+		$request->set_body_params( $body );
+		return rest_get_server()->dispatch( $request );
+	}
+
+	/**
+	 * An unverified token in the request body is refused, like the route refuses it (F5-01 residual).
+	 */
+	public function test_an_unverified_body_token_is_refused_like_the_route(): void {
+		wp_set_current_user( $this->editor_id );
+		$route = new WP_REST_Request( 'POST', '/outpost/v1/composer-config' );
+		$route->set_body_params( array( 'access_token' => 'unverified-0000' ) );
+		$refused = rest_get_server()->dispatch( $route );
+		$this->assertSame( 403, $refused->get_status(), 'Control: the route sees the body token and refuses.' );
+
+		$this->assertSame( 403, $this->dispatch_ability_stand_in( array( 'access_token' => 'unverified-0000' ) )->get_status() );
+		$this->assertSame( 200, $this->dispatch_ability_stand_in( array() )->get_status(), 'Without a token the same user passes.' );
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'After the dispatch, a plain PHP call sees no leftover request.' );
 	}
 
 	/**

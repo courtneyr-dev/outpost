@@ -182,7 +182,8 @@ final class AbilitiesPayloadAuthTest extends TestCase {
 		$this->assertNotInstanceOf( \WP_Error::class, $auth, 'The third-party filter answered first.' );
 		$response = $server->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
 
-		$this->assertGreaterThanOrEqual( 401, $response->get_status() );
+		$this->assertSame( 403, $response->get_status(), 'The editor is logged in, so the refusal is 403.' );
+		$this->assertSame( 'rest_forbidden', $response->get_data()['code'] ?? null );
 		$this->assertArrayNotHasKey( 'companions', (array) $response->get_data() );
 		$this->assertSame( $rows_before, $this->config_rate_limit_rows() );
 	}

@@ -65,19 +65,101 @@ final class NetworkRewriteCleanupTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
-	 * The deactivation hook calls the cleanup only for a network-wide deactivation on multisite.
+	 * Mock what outpost_deactivate() reaches. The unit suite's in-memory
+	 * WP_Application_Passwords stands in for core; user 5 holds a Shortcut
+	 * password, which the cleanup deletes unless `$fail` makes deletes fail.
+	 *
+	 * @param bool  $multisite Whether the site is a network.
+	 * @param array $deleted   Collects "site:option" for each deletion.
+	 * @param bool  $fail      Whether the Shortcut password deletion fails.
 	 */
-	public function test_deactivation_runs_the_network_cleanup_for_network_wide_only(): void {
-		$source = (string) file_get_contents( dirname( __DIR__, 2 ) . '/outpost.php' );
-		$start  = (int) strpos( $source, 'function outpost_deactivate(' );
-		$body   = substr( $source, $start, (int) strpos( $source, "register_deactivation_hook( __FILE__, 'outpost_deactivate' );" ) - $start );
+	private function mock_deactivation( bool $multisite, array &$deleted, bool $fail = false ): void {
+		\WP_Application_Passwords::reset();
+		\WP_Application_Passwords::create_new_application_password( 5, array( 'name' => 'Outpost iOS Shortcut', 'app_id' => 'eb290b80-79b0-4104-b470-4d6188280ccc' ) );
+		\WP_Application_Passwords::$fail_deletes = $fail;
+		WP_Mock::userFunction( 'get_users' )->andReturn( array( 5 ) );
+		$current = 1;
+		if ( ! $fail ) {
+			WP_Mock::userFunction( 'flush_rewrite_rules' )->once();
+		}
+		WP_Mock::userFunction( 'is_multisite' )->andReturn( $multisite );
+		WP_Mock::userFunction( 'get_current_blog_id' )->andReturnUsing( static function () use ( &$current ) {
+			return $current;
+		} );
+		WP_Mock::userFunction( 'get_sites' )->andReturn( array( 1, 2 ) );
+		WP_Mock::userFunction( 'switch_to_blog' )->andReturnUsing( static function ( int $id ) use ( &$current ): bool {
+			$current = $id;
+			return true;
+		} );
+		WP_Mock::userFunction( 'restore_current_blog' )->andReturnUsing( static function () use ( &$current ): bool {
+			$current = 1;
+			return true;
+		} );
+		WP_Mock::userFunction( 'delete_option' )->andReturnUsing( static function ( string $name ) use ( &$deleted, &$current ): bool {
+			$deleted[] = $current . ':' . $name;
+			return true;
+		} );
+	}
 
-		$this->assertStringNotContainsString( 'unset( $network_wide )', $body );
-		$this->assertMatchesRegularExpression( '/if \( \$network_wide && is_multisite\(\) \) \{\s*Outpost_Uninstaller::delete_rewrite_rules_on_other_sites\(\);/', $body );
-		$this->assertLessThan(
-			(int) strpos( $body, 'delete_rewrite_rules_on_other_sites' ),
-			(int) strpos( $body, 'stop_deactivation' ),
-			'The cleanup runs only after the Shortcut password cleanup succeeded.'
+	/**
+	 * A network-wide deactivation on multisite clears the other sites' tables.
+	 */
+	public function test_network_deactivation_clears_the_other_sites(): void {
+		$deleted = array();
+		$this->mock_deactivation( true, $deleted );
+
+		outpost_deactivate( true );
+
+		$this->assertSame( array( '2:rewrite_rules' ), $deleted );
+	}
+
+	/**
+	 * A single-site deactivation, or a per-site one on multisite, touches no other site.
+	 *
+	 * @dataProvider local_deactivations
+	 */
+	public function test_other_deactivations_touch_no_other_site( bool $multisite, bool $network_wide ): void {
+		$deleted = array();
+		$this->mock_deactivation( $multisite, $deleted );
+
+		outpost_deactivate( $network_wide );
+
+		$this->assertSame( array(), $deleted );
+	}
+
+	/**
+	 * A network deactivation stopped by a surviving Shortcut password touches no site.
+	 */
+	public function test_a_stopped_network_deactivation_touches_no_site(): void {
+		$deleted = array();
+		$this->mock_deactivation( true, $deleted, true );
+		WP_Mock::userFunction( 'flush_rewrite_rules' )->never();
+		WP_Mock::userFunction( 'wp_die' )->once()->andReturnUsing(
+			static function (): void {
+				throw new \OverflowException( 'wp_die' );
+			}
+		);
+
+		try {
+			outpost_deactivate( true );
+			$this->fail( 'Deactivation must stop while a Shortcut password survives.' );
+		} catch ( \OverflowException $stopped ) {
+			$this->assertSame( 'wp_die', $stopped->getMessage() );
+		}
+		$this->assertSame( array(), $deleted );
+	}
+
+	public function tearDown(): void {
+		\WP_Application_Passwords::reset();
+		parent::tearDown();
+	}
+
+	/** @return array<string, array{bool, bool}> */
+	public function local_deactivations(): array {
+		return array(
+			'single site'              => array( false, false ),
+			'single site, flag set'    => array( false, true ),
+			'multisite, one site only' => array( true, false ),
 		);
 	}
 }
