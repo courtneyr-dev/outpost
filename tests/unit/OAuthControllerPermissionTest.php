@@ -87,8 +87,11 @@ final class OAuthControllerPermissionTest extends TestCase {
 		);
 	}
 
-	public function test_leaves_a_request_with_no_credential_to_the_capability_check(): void {
-		$this->assertTrue(
+	public function test_refuses_a_logged_in_request_that_is_not_a_cookie_session(): void {
+		// An application password (or any non-cookie credential) arrives
+		// logged in with no REST cookie session; these routes are wp-admin
+		// actions only (T10-S4-11).
+		$this->assertFalse(
 			Outpost_OAuth_Controller::permission_check( new \WP_REST_Request( 'GET', '/outpost/v1/oauth/notion/start' ) )
 		);
 	}
