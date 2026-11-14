@@ -33,6 +33,9 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 	/** @var array<string, int> */
 	private array $sitewide = array();
 
+	/** @var array<string, mixed> */
+	private array $site_options = array();
+
 	public function setUp(): void {
 		WP_Mock::setUp();
 		WP_Application_Passwords::reset();
@@ -43,9 +46,17 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 		$this->sitewide     = array();
 		WP_Mock::passthruFunction( '__' );
 		WP_Mock::userFunction( 'is_multisite' )->andReturnUsing( fn (): bool => $this->multisite );
+		$this->site_options = array();
 		WP_Mock::userFunction( 'get_site_option' )->andReturnUsing(
-			fn ( $name, $fallback = false ) => 'active_sitewide_plugins' === $name ? $this->sitewide : $fallback
+			fn ( $name, $fallback = false ) => 'active_sitewide_plugins' === $name ? $this->sitewide : ( $this->site_options[ $name ] ?? $fallback )
 		);
+		WP_Mock::userFunction( 'update_site_option' )->andReturnUsing(
+			function ( $name, $value ): bool {
+				$this->site_options[ $name ] = $value;
+				return true;
+			}
+		);
+		WP_Mock::userFunction( 'get_users' )->andReturnUsing( static fn (): array => array_keys( WP_Application_Passwords::$store ) );
 		if ( ! defined( 'OUTPOST_PLUGIN_BASENAME' ) ) {
 			define( 'OUTPOST_PLUGIN_BASENAME', 'outpost-mobile-publishing/outpost.php' );
 		}
@@ -85,7 +96,10 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 		// T10-S4-13 (Phase 4 C-06): the one-time purge runs on the first
 		// request after upgrade, not only after someone opens wp-admin.
 		$this->assertSame(
-			array( array( Outpost_IOS_Shortcut_App_Password::class, 'purge_legacy_tokens' ) ),
+			array(
+				array( Outpost_IOS_Shortcut_App_Password::class, 'purge_legacy_tokens' ),
+				array( Outpost_IOS_Shortcut_App_Password::class, 'sweep_unscoped' ),
+			),
 			array_column( outpost_test_actions_for( 'init' ), 'callback' )
 		);
 		$this->assertSame( array(), outpost_test_actions_for( 'admin_init' ), 'No admin-only purge path.' );
@@ -157,6 +171,52 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $created );
 		$this->assertSame( 'outpost_shortcut_password_network', $created->get_error_code() );
 		$this->assertSame( array(), WP_Application_Passwords::$store[7] ?? array(), 'No password is created.' );
+	}
+
+	/**
+	 * T10-S4-24 (re-review 2): a password created before the network guard
+	 * existed would stay unscoped on a per-site-activated network. A one-time
+	 * network-wide sweep removes Outpost's passwords there and leaves other
+	 * application passwords alone.
+	 */
+	public function test_a_per_site_network_sweeps_existing_shortcut_passwords_once(): void {
+		$this->multisite                    = true;
+		WP_Application_Passwords::$store[7] = array( $this->outpost_item(), array( 'uuid' => 'mobile-app', 'app_id' => '' ) );
+		WP_Application_Passwords::$store[8] = array( array( 'uuid' => 'u8', 'app_id' => Outpost_IOS_Shortcut_App_Password::APP_ID ) );
+
+		Outpost_IOS_Shortcut_App_Password::sweep_unscoped();
+
+		$this->assertSame( array( 'mobile-app' ), array_column( WP_Application_Passwords::$store[7], 'uuid' ) );
+		$this->assertSame( array(), WP_Application_Passwords::$store[8] );
+
+		WP_Application_Passwords::$store[9] = array( array( 'uuid' => 'u9', 'app_id' => Outpost_IOS_Shortcut_App_Password::APP_ID ) );
+		Outpost_IOS_Shortcut_App_Password::sweep_unscoped();
+		$this->assertCount( 1, WP_Application_Passwords::$store[9], 'The sweep runs once per network.' );
+	}
+
+	/**
+	 * @return array<string, array{0: bool, 1: array<string, int>}>
+	 */
+	public function scoped_installs(): array {
+		return array(
+			'single site'          => array( false, array() ),
+			'network-activated'    => array( true, array( 'outpost-mobile-publishing/outpost.php' => 1 ) ),
+		);
+	}
+
+	/**
+	 * @dataProvider scoped_installs
+	 *
+	 * @param array<string, int> $sitewide Network-active plugins.
+	 */
+	public function test_a_scoped_install_sweeps_nothing( bool $multisite, array $sitewide ): void {
+		$this->multisite                    = $multisite;
+		$this->sitewide                     = $sitewide;
+		WP_Application_Passwords::$store[7] = array( $this->outpost_item() );
+
+		Outpost_IOS_Shortcut_App_Password::sweep_unscoped();
+
+		$this->assertCount( 1, WP_Application_Passwords::$store[7] );
 	}
 
 	public function test_network_activation_on_multisite_offers_the_password(): void {
