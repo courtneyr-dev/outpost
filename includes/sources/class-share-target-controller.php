@@ -92,34 +92,31 @@ final class Outpost_Share_Target_Controller {
 	 * @return array{title:string, text:string, url:string}
 	 */
 	private static function read_payload(): array {
-		// Each field is read once as an unslashed string and handed straight to
-		// its sanitizer (T10-S3-13 v1.1, F-14): sanitize_shared_text() for the
-		// free text, sanitize_shared_url_field() for the url field (a validated
-		// URL, or legacy prose whose link extract_url_from_payload() validates
-		// with the URL-only sanitize_shared_url()). The Shortcut uses the same.
-		return array(
-			'title' => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'title' ) ),
-			'text'  => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'text' ) ),
-			'url'   => Outpost_Source_Detector::sanitize_shared_url_field( self::read_field( 'url' ) ),
-		);
-	}
-
-	/**
-	 * One share field, POST first then GET, unslashed. Anything but a string
-	 * (an array-shaped `?url[]=`, say) reads as '' with no warning. The value
-	 * is not yet sanitized; read_payload() passes it to its sanitizer at once.
-	 *
-	 * @param string $name Field name.
-	 */
-	private static function read_field( string $name ): string {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Web Share Target spec: nonces don't apply to OS-initiated share intents; the type-checked string is sanitized by the caller.
-		$posted = isset( $_POST[ $name ] ) ? wp_unslash( $_POST[ $name ] ) : null;
-		if ( is_string( $posted ) && '' !== $posted ) {
-			return $posted;
-		}
-		$query = isset( $_GET[ $name ] ) ? wp_unslash( $_GET[ $name ] ) : null;
+		// Each field is sanitized in the expression that reads it: POST when it
+		// holds a non-empty string, otherwise GET. sanitize_shared_text() cleans
+		// the free text; sanitize_shared_url_field() keeps a validated URL, or
+		// legacy prose whose link extract_url_from_payload() validates with the
+		// URL-only sanitize_shared_url() (T10-S3-13 v1.1, F-14). Both return ''
+		// for anything but a string, such as an array-shaped `?url[]=`. Core's
+		// sanitizers don't fit here: sanitize_text_field() drops percent
+		// escapes, and the KSES filter encodes the `&` a URL query needs.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Web Share Target spec: nonces don't apply to OS-initiated share intents.
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in the same expression by Outpost_Source_Detector::sanitize_shared_text() or ::sanitize_shared_url_field().
+		$title = isset( $_POST['title'] ) && is_string( $_POST['title'] ) && '' !== $_POST['title']
+			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['title'] ) )
+			: ( isset( $_GET['title'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['title'] ) ) : '' );
+		$text  = isset( $_POST['text'] ) && is_string( $_POST['text'] ) && '' !== $_POST['text']
+			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['text'] ) )
+			: ( isset( $_GET['text'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['text'] ) ) : '' );
+		$url   = isset( $_POST['url'] ) && is_string( $_POST['url'] ) && '' !== $_POST['url']
+			? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_POST['url'] ) )
+			: ( isset( $_GET['url'] ) ? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_GET['url'] ) ) : '' );
 		// phpcs:enable
-		return is_string( $query ) ? $query : '';
+		return array(
+			'title' => $title,
+			'text'  => $text,
+			'url'   => $url,
+		);
 	}
 
 	/**

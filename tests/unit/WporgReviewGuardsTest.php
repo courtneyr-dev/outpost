@@ -558,6 +558,49 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * T9 (2026-09-14): "Data that is input ... must be sanitized as soon as
+	 * possible." Every `wp_unslash( $_GET|$_POST|$_REQUEST[...] )` is the
+	 * argument of a sanitizer in the same expression, either called directly
+	 * (`sanitize_key( wp_unslash( $_GET['tab'] ) )`) or mapped
+	 * (`array_map( 'sanitize_text_field', wp_unslash( $_POST['x'] ) )`). No
+	 * helper hands an unsanitized request value back to its caller.
+	 */
+	public function test_every_request_read_is_sanitized_where_it_is_read(): void {
+		$sanitizer = static fn( string $name ): bool => 1 === preg_match( '/^(sanitize_\w+|esc_url_raw|absint|rest_sanitize_boolean|wp_kses\w*)$/', $name );
+		$unwrapped = array();
+		$reads     = 0;
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			foreach ( $tokens as $i => $token ) {
+				if ( ! is_array( $token ) || T_STRING !== $token[0] || 'wp_unslash' !== $token[1] ) {
+					continue;
+				}
+				// The first variable inside the call, past an optional (array) cast.
+				$j = $i + 2;
+				if ( is_array( $tokens[ $j ] ?? null ) && T_ARRAY_CAST === $tokens[ $j ][0] ) {
+					++$j;
+				}
+				if ( ! in_array( self::text( $tokens[ $j ] ?? '' ), array( '$_GET', '$_POST', '$_REQUEST' ), true ) ) {
+					continue;
+				}
+				++$reads;
+				$prev = self::text( $tokens[ $i - 1 ] ?? '' );
+				$ok   = false;
+				if ( '(' === $prev ) {
+					$ok = $sanitizer( self::text( $tokens[ $i - 2 ] ?? '' ) );
+				} elseif ( ',' === $prev ) {
+					$ok = $sanitizer( trim( self::text( $tokens[ $i - 2 ] ?? '' ), '\'"' ) )
+						&& 'array_map' === self::text( $tokens[ $i - 4 ] ?? '' );
+				}
+				if ( ! $ok ) {
+					$unwrapped[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertGreaterThan( 10, $reads, 'The scan must see the plugin\'s request reads.' );
+		$this->assertSame( array(), $unwrapped, 'Sanitize each request value in the expression that reads it.' );
+	}
+
+	/**
 	 * T10 (2026-11-13): share intake (share-target route and iOS Shortcut)
 	 * keeps no server-side state. The removed prefill transient had no
 	 * reader, so nothing may write `outpost_prefill_*` or carry its helpers.
