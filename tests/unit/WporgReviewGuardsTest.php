@@ -76,6 +76,30 @@ final class WporgReviewGuardsTest extends TestCase {
 	 * gated on WP_DEBUG === true, and no log call is handed a response body,
 	 * a raw error message, error data, headers, or a credential.
 	 */
+	/**
+	 * T10-S3-13: share intake never uses wp_kses() as URL sanitization, and
+	 * the affected handlers read query values through the narrow helpers
+	 * instead of comparing or casting raw $_GET values.
+	 */
+	public function test_input_legibility_sources(): void {
+		$root       = dirname( __DIR__, 2 );
+		$controller = (string) file_get_contents( $root . '/includes/sources/class-share-target-controller.php' );
+		$this->assertStringNotContainsString( 'wp_kses(', $controller, 'Share intake reads fields; it does not sanitize them with wp_kses().' );
+
+		$detector = (string) file_get_contents( $root . '/includes/sources/class-source-detector.php' );
+		$this->assertSame( 1, preg_match( '/function sanitize_shared_url\(.*?\n\t}\n/s', $detector, $m ) );
+		$this->assertStringNotContainsString( 'wp_kses', $m[0], 'The URL path never goes through wp_kses().' );
+
+		foreach ( array(
+			'includes/settings/class-outpost-settings-page.php',
+			'includes/class-pending-syndication-notice.php',
+			'includes/admin/class-appearance-settings-page.php',
+		) as $rel ) {
+			$source = (string) file_get_contents( $root . '/' . $rel );
+			$this->assertSame( 0, preg_match( '/\$_GET\[/', $source ), "$rel reads the query through Outpost_Request_Headers." );
+		}
+	}
+
 	public function test_logging_goes_through_the_debug_gate_with_bounded_fields(): void {
 		$root      = dirname( __DIR__, 2 );
 		$files     = array_merge( array( $root . '/outpost.php', $root . '/uninstall.php' ), $this->php_files( $root . '/includes' ) );

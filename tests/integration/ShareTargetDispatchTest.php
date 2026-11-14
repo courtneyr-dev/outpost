@@ -443,21 +443,27 @@ final class ShareTargetDispatchTest extends TestCase {
 	}
 
 	/**
-	 * wp.org review 2026-09-14: against real core sanitizers, markup and
-	 * quotes appended to a shared url field never reach the composer, and
-	 * the encoded link survives.
+	 * wp.org review 2026-09-14, tightened by T10-S3-13 (F-14): a url field
+	 * with markup appended is a malformed URL. It is denied, not repaired by
+	 * stripping tags, so nothing from it reaches the composer.
 	 */
-	public function test_hostile_url_field_is_sanitized_before_dispatch(): void {
+	public function test_hostile_url_field_is_denied_before_dispatch(): void {
 		$location = $this->dispatch_share_target_post(
 			array( 'url' => 'https://example.com/a%20b"><script>alert(1)</script>' )
 		);
 
-		$this->assertNotNull( $location, 'A share with a link still redirects to the composer.' );
+		$this->assertNull( $location, 'A malformed url field is not share data.' );
+		$this->assertSame( array(), $this->captured_redirects );
+	}
+
+	/**
+	 * The encoded link survives when the url field is a clean URL.
+	 */
+	public function test_a_clean_encoded_url_field_survives_dispatch(): void {
+		$location = $this->dispatch_share_target_post( array( 'url' => 'https://example.com/a%20b' ) );
+
+		$this->assertNotNull( $location );
 		parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $query );
-		$carried = implode( ' ', array_filter( $query, 'is_string' ) );
-		$this->assertStringNotContainsString( '<', $carried );
-		$this->assertStringNotContainsString( '"', $carried );
-		$this->assertStringNotContainsString( 'script', $carried );
-		$this->assertStringContainsString( 'https://example.com/a%20b', $carried );
+		$this->assertStringContainsString( 'https://example.com/a%20b', implode( ' ', array_filter( $query, 'is_string' ) ) );
 	}
 }
