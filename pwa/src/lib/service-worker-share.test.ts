@@ -237,7 +237,9 @@ describe('service worker share intake (T10-S3-05)', () => {
 		passthrough = [];
 		await dispatch(share([image('over.png', MAX_PHOTO_BYTES + 1)]));
 		expect(await inbox()).toBeUndefined();
-	});
+		// Two 50 MB bodies through the worker and fake IndexedDB: about 1.5 s
+		// locally, 6.4 s on a CI runner, so allow more than the 5 s default.
+	}, 30_000);
 
 	it('accepts exactly the file-count limit', async () => {
 		await dispatch(share(Array.from({ length: 10 }, (_, i) => image(`p${String(i)}.png`))));
