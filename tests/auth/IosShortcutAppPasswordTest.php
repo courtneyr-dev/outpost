@@ -68,10 +68,13 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 			array( array( Outpost_IOS_Shortcut_App_Password::class, 'restrict_to_shortcut_route' ) ),
 			array_column( outpost_test_actions_for( 'wp_authenticate_application_password_errors' ), 'callback' )
 		);
+		// T10-S4-13 (Phase 4 C-06): the one-time purge runs on the first
+		// request after upgrade, not only after someone opens wp-admin.
 		$this->assertSame(
 			array( array( Outpost_IOS_Shortcut_App_Password::class, 'purge_legacy_tokens' ) ),
-			array_column( outpost_test_actions_for( 'admin_init' ), 'callback' )
+			array_column( outpost_test_actions_for( 'init' ), 'callback' )
 		);
+		$this->assertSame( array(), outpost_test_actions_for( 'admin_init' ), 'No admin-only purge path.' );
 		$this->assertFalse(
 			method_exists( Outpost_IOS_Shortcut_App_Password::class, 'determine_current_user' ),
 			'Outpost must not resolve users itself.'
