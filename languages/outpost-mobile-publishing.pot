@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-14T05:15:44+00:00\n"
+"POT-Creation-Date: 2026-11-14T05:29:23+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -39,38 +39,38 @@ msgstr ""
 msgid "https://courtneyr.dev"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:44
+#: includes/abilities/class-outpost-abilities.php:86
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
 #: includes/class-admin-page.php:208
 msgid "Outpost"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:45
+#: includes/abilities/class-outpost-abilities.php:87
 msgid "Read publishing and syndication information from Outpost."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:70
+#: includes/abilities/class-outpost-abilities.php:112
 msgid "Get syndication targets"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:71
+#: includes/abilities/class-outpost-abilities.php:113
 msgid "Returns the available syndication targets for an optional composer mode."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:108
+#: includes/abilities/class-outpost-abilities.php:150
 msgid "Get share status"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:109
+#: includes/abilities/class-outpost-abilities.php:151
 msgid "Returns the manual-share status and log for one post."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:149
+#: includes/abilities/class-outpost-abilities.php:191
 msgid "Get composer configuration"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:150
+#: includes/abilities/class-outpost-abilities.php:192
 msgid "Returns the local configuration used by the Outpost composer."
 msgstr ""
 
