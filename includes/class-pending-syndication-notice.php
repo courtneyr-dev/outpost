@@ -114,14 +114,22 @@ final class Outpost_Pending_Syndication_Notice {
 			return;
 		}
 
-		wp_add_inline_script(
-			Outpost_Sidebar_Assets::HANDLE,
-			sprintf(
-				'window.%s = %s;',
-				self::PAYLOAD_GLOBAL,
-				wp_json_encode( $payload )
-			),
-			'before'
+		wp_add_inline_script( Outpost_Sidebar_Assets::HANDLE, self::inline_payload( $payload ), 'before' );
+	}
+
+	/**
+	 * The inline script that hands the payload to the editor bundle. The
+	 * JSON is hex-escaped so no `<!--`, `<script`, or `</script>` sequence
+	 * from a filtered label or a translation can appear inside the
+	 * <script> element (T10-S4-07); the same flags as the PWA manifest.
+	 *
+	 * @param array<string, mixed> $payload Payload from editor_notice_payload().
+	 */
+	public static function inline_payload( array $payload ): string {
+		return sprintf(
+			'window.%s = %s;',
+			self::PAYLOAD_GLOBAL,
+			wp_json_encode( $payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT )
 		);
 	}
 
