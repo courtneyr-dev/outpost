@@ -832,7 +832,10 @@ async function read_bounded_form(request) {
 		if (done) break;
 		total += value.byteLength;
 		if (total > SHARE_MAX_BODY_BYTES) {
-			await reader.cancel();
+			// Don't wait for the cancel: this body is one branch of the
+			// clone's tee, and cancelling it can wait on the other branch,
+			// which only the pass-through fetch reads (T10-S4-23).
+			reader.cancel().catch(() => {});
 			return null;
 		}
 		chunks.push(value);
