@@ -258,6 +258,9 @@ describe.each(CASES)('$mode share waits for "Use shared content"', (c) => {
 
 	it('shows only the decision while it is open, then returns focus to the tab', async () => {
 		await arrive(c);
+		// "Use shared content" waits until the photo records are read (it says
+		// "Still reading" before that), so click only once the file is listed.
+		if (c.photo) await vi.waitFor(() => expect(region()?.textContent).toContain('shared.jpg'), { timeout: 5000 });
 
 		const outside = reachable().filter(
 			(el) => !el.closest('[data-outpost-share-review]') && (el as HTMLInputElement).name !== 'outpost-header-mode',
