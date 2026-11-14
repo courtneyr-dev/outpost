@@ -42,14 +42,14 @@ Expected: page reloads to the login screen. Reloading `/post/` again still shows
 
 ---
 
-## B. Tab framework and keyboard access
+## B. Mode buttons and keyboard access
 
-**B1. All seven tabs render** `[auto]`
-Expected tabs in order: Post, Reply, Photo, Doing, Life, Recipe, About. The strip has `role="tablist"` with label "Composer modes"; exactly one tab has `aria-selected="true"` (Post, by default).
+**B1. All seven mode buttons render** `[auto]`
+Expected buttons in order: Post, Reply, Photo, Doing, Life, Recipe, About. The two-row container has `role="group"` with the accessible name "Composer modes"; exactly one button has `aria-current="true"` (Post, by default).
 
-**B2. Arrow-key navigation with wrap-around** `[auto]`
-Focus the active tab. Press ArrowRight repeatedly.
-Expected: focus AND selection move together (automatic activation), each panel swaps in, and after the last tab (About) focus wraps to the first (Post). ArrowLeft from Post wraps to About. Home jumps to Post, End jumps to About.
+**B2. Native button keyboard behavior** `[auto]`
+Tab through the Composer modes group, pressing Enter or Space on each button.
+Expected: Tab reaches all seven buttons in order; Enter and Space select the focused mode; exactly one button has `aria-current="true"`; and ArrowLeft, ArrowRight, ArrowUp, and ArrowDown do not move focus or change the selected mode.
 
 **B3. Panel state survives tab switches** `[auto]`
 Type `UX-TEST state check` into the Post tab textarea. Switch to Reply, then back to Post.

@@ -67,11 +67,11 @@ function mount(): void {
 }
 
 function tabs(): HTMLButtonElement[] {
-	return Array.from(root.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
+	return Array.from(root.querySelectorAll('.outpost-tab')) as HTMLButtonElement[];
 }
 
 function panels(): HTMLDivElement[] {
-	return Array.from(root.querySelectorAll('[role="tabpanel"]')) as HTMLDivElement[];
+	return Array.from(root.querySelectorAll('.outpost-mode-panel')) as HTMLDivElement[];
 }
 
 function press_key(target: HTMLElement, key: string): void {
@@ -88,116 +88,86 @@ async function flush(): Promise<void> {
 }
 
 describe('ComposerTabs', () => {
-	it('renders seven tabs with the expected labels', () => {
+	it('renders the seven composer modes as a named group of buttons', () => {
 		mount();
-		const labels = tabs().map((t) => t.textContent);
-		expect(labels).toEqual(['Post', 'Reply', 'Photo', 'Doing', 'Life', 'Recipe', 'About']);
+		const group = root.querySelector('[role="group"][aria-label="Composer modes"]');
+		const buttons = Array.from(group?.querySelectorAll('button') ?? []);
+
+		expect(buttons).toHaveLength(7);
+		expect(buttons.map((button) => button.textContent)).toEqual([
+			'Post',
+			'Reply',
+			'Photo',
+			'Doing',
+			'Life',
+			'Recipe',
+			'About',
+		]);
+		expect(root.querySelector('[role="tab"]')).toBeNull();
+		expect(root.querySelector('[role="tablist"]')).toBeNull();
+		expect(root.querySelector('[role="tabpanel"]')).toBeNull();
 	});
 
-	it('selects Note by default', () => {
+	it('marks only Post as current by default', () => {
 		mount();
-		const [note, ...rest] = tabs();
-		expect(note?.getAttribute('aria-selected')).toBe('true');
-		expect(note?.tabIndex).toBe(0);
-		for (const tab of rest) {
-			expect(tab.getAttribute('aria-selected')).toBe('false');
-			expect(tab.tabIndex).toBe(-1);
+		expect(tabs()[0]?.getAttribute('aria-current')).toBe('true');
+		expect(tabs().filter((button) => button.hasAttribute('aria-current'))).toHaveLength(1);
+	});
+
+	it('connects every native button to an existing mounted panel', () => {
+		mount();
+		expect(panels()).toHaveLength(7);
+		for (const button of tabs()) {
+			expect(button.tagName).toBe('BUTTON');
+			expect(button.type).toBe('button');
+			expect(button.hasAttribute('tabindex')).toBe(false);
+			const panel_id = button.getAttribute('aria-controls');
+			expect(panel_id).toBeTruthy();
+			expect(root.querySelector(`#${panel_id ?? ''}`)).not.toBeNull();
 		}
 	});
 
-	it('shows only the active panel; hides the others', () => {
+	it('clicking Photo makes it the only current mode and leaves focus on its button', async () => {
 		mount();
-		const all = panels();
-		expect(all[0]?.hasAttribute('hidden')).toBe(false); // Note
-		for (let i = 1; i < all.length; i++) {
-			expect(all[i]?.hasAttribute('hidden')).toBe(true);
+		const photo = tabs()[2]!;
+		photo.focus();
+		photo.click();
+		await flush();
+
+		expect(photo.getAttribute('aria-current')).toBe('true');
+		expect(tabs().filter((button) => button.hasAttribute('aria-current'))).toEqual([photo]);
+		expect(panels().filter((panel) => !panel.hasAttribute('hidden')).map((panel) => panel.id)).toEqual([
+			'outpost-panel-photo',
+		]);
+		expect(panels().filter((panel) => panel.hasAttribute('hidden'))).toHaveLength(6);
+		expect(document.activeElement).toBe(photo);
+	});
+
+	it('does not change selection for tab-pattern navigation keys', async () => {
+		mount();
+		for (const key of ['ArrowRight', 'ArrowLeft', 'Home', 'End']) {
+			press_key(tabs()[0]!, key);
 		}
+		await flush();
+		expect(tabs()[0]?.getAttribute('aria-current')).toBe('true');
+		expect(tabs().filter((button) => button.hasAttribute('aria-current'))).toHaveLength(1);
 	});
 
-	it('updates aria-controls/aria-labelledby pairing per tab+panel', () => {
+	it('preserves typed Post text while switching to Photo and back', async () => {
 		mount();
-		const all_tabs = tabs();
-		const all_panels = panels();
-		expect(all_tabs.length).toBe(all_panels.length);
-		for (let i = 0; i < all_tabs.length; i++) {
-			const tab = all_tabs[i]!;
-			const panel = all_panels[i]!;
-			expect(tab.getAttribute('aria-controls')).toBe(panel.id);
-			expect(panel.getAttribute('aria-labelledby')).toBe(tab.id);
-		}
-	});
+		const content = root.querySelector('#outpost-note-content') as HTMLTextAreaElement;
+		content.value = 'Draft text that must survive';
+		content.dispatchEvent(new Event('input', { bubbles: true }));
+		await flush();
 
-	it('changes selection on tab click', async () => {
-		mount();
-		const reply = tabs()[1]!;
-		reply.click();
+		tabs()[2]!.click();
 		await flush();
-		expect(tabs()[1]?.getAttribute('aria-selected')).toBe('true');
-		expect(tabs()[1]?.tabIndex).toBe(0);
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('false');
-		expect(panels()[1]?.hasAttribute('hidden')).toBe(false);
-		expect(panels()[0]?.hasAttribute('hidden')).toBe(true);
-	});
+		tabs()[0]!.click();
+		await flush();
 
-	it('moves selection right with ArrowRight', async () => {
-		mount();
-		press_key(tabs()[0]!, 'ArrowRight');
-		await flush();
-		expect(tabs()[1]?.getAttribute('aria-selected')).toBe('true');
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('false');
-	});
-
-	it('moves selection left with ArrowLeft', async () => {
-		mount();
-		press_key(tabs()[0]!, 'ArrowRight');
-		await flush();
-		press_key(tabs()[1]!, 'ArrowLeft');
-		await flush();
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
-	});
-
-	it('wraps from last tab back to first with ArrowRight', async () => {
-		mount();
-		press_key(tabs()[0]!, 'End');
-		await flush();
-		const last = tabs().length - 1;
-		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
-		press_key(tabs()[last]!, 'ArrowRight');
-		await flush();
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
-	});
-
-	it('wraps from first tab back to last with ArrowLeft', async () => {
-		mount();
-		press_key(tabs()[0]!, 'ArrowLeft');
-		await flush();
-		const last = tabs().length - 1;
-		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
-	});
-
-	it('jumps to first tab with Home', async () => {
-		mount();
-		tabs()[3]!.click();
-		await flush();
-		press_key(tabs()[3]!, 'Home');
-		await flush();
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
-	});
-
-	it('jumps to last tab with End', async () => {
-		mount();
-		press_key(tabs()[0]!, 'End');
-		await flush();
-		const last = tabs().length - 1;
-		expect(tabs()[last]?.getAttribute('aria-selected')).toBe('true');
-	});
-
-	it('ignores keys other than arrows / Home / End', async () => {
-		mount();
-		press_key(tabs()[0]!, 'a');
-		press_key(tabs()[0]!, 'Enter');
-		await flush();
-		expect(tabs()[0]?.getAttribute('aria-selected')).toBe('true');
+		expect((root.querySelector('#outpost-note-content') as HTMLTextAreaElement).value).toBe(
+			'Draft text that must survive',
+		);
 	});
 });
 
@@ -482,7 +452,7 @@ describe('ComposerTabs: Home and the start screen', () => {
 			expect(tablist_wrap().hidden).toBe(false);
 			expect(visible_panels()).toEqual([`outpost-panel-${mode}`]);
 			const tab = root.querySelector(`#outpost-tab-${mode}`);
-			expect(tab?.getAttribute('aria-selected')).toBe('true');
+			expect(tab?.getAttribute('aria-current')).toBe('true');
 			expect(document.activeElement).toBe(tab);
 		}
 	});
@@ -583,7 +553,7 @@ describe('ComposerTabs: Home and the start screen', () => {
 		await flush();
 		await vi.waitFor(() => expect(document.body.classList.contains('outpost-mode-night')).toBe(true));
 		expect(visible_panels()).toEqual(['outpost-panel-about']);
-		expect(root.querySelector('#outpost-tab-about')?.getAttribute('aria-selected')).toBe('true');
+		expect(root.querySelector('#outpost-tab-about')?.getAttribute('aria-current')).toBe('true');
 		expect(document.body.classList.contains('outpost-mode-night')).toBe(true);
 		expect(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}').start).toBe('recipe');
 	});

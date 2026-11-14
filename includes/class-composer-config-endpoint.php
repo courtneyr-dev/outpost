@@ -317,6 +317,34 @@ final class Outpost_Composer_Config_Endpoint {
 			return $response;
 		}
 
+		$response = new WP_REST_Response( self::build_payload(), 200 );
+		// Composer-config is per-user (term lists, companion status). Forbid
+		// edge caches (GoDaddy / Varnish / nginx FastCGI) from serving one
+		// user's response to another. Bearer auth already makes the response
+		// per-request, but explicit headers cost nothing.
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		return $response;
+	}
+
+	/**
+	 * Build the composer configuration payload without touching rate limits.
+	 *
+	 * @return array{
+	 *     companions: array<string, string>,
+	 *     postFormats: array<int, string>|null,
+	 *     xfnRels: array<int, string>,
+	 *     existingCategories: array<int, array{slug: string, name: string}>,
+	 *     existingTags: array<int, array{slug: string, name: string}>,
+	 *     bridgyHostMap: array<string, array{name: string, uid: string}>,
+	 *     siteSettings: array{
+	 *         bridgyAutoSuggest: bool,
+	 *         defaultPostVariant: string,
+	 *         defaultCategories: array<int, string>,
+	 *         defaultTags: array<int, string>
+	 *     }
+	 * }
+	 */
+	public static function build_payload(): array {
 		$companions = array(
 			'post-kinds'            => Outpost_Companion_Detector::is_post_kinds_active(),
 			'post-formats'          => Outpost_Companion_Detector::is_post_formats_active(),
@@ -344,31 +372,22 @@ final class Outpost_Composer_Config_Endpoint {
 			? Outpost_Settings::get()
 			: array();
 
-		$response = new WP_REST_Response(
-			array(
-				'companions'         => $companions,
-				'postFormats'        => $post_formats,
-				'xfnRels'            => self::XFN_RELS,
-				'existingCategories' => self::list_terms( 'category' ),
-				'existingTags'       => self::list_terms( 'post_tag' ),
-				'bridgyHostMap'      => is_array( $bridgy_map ) ? $bridgy_map : self::DEFAULT_BRIDGY_HOST_MAP,
-				'siteSettings'       => array(
-					'bridgyAutoSuggest'  => ! empty( $settings_payload['bridgy_auto_suggest'] ),
-					'defaultPostVariant' => isset( $settings_payload['default_post_variant'] )
-						? (string) $settings_payload['default_post_variant']
-						: 'article',
-					'defaultCategories'  => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_category_names() : array(),
-					'defaultTags'        => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_tag_names() : array(),
-				),
+		return array(
+			'companions'         => $companions,
+			'postFormats'        => $post_formats,
+			'xfnRels'            => self::XFN_RELS,
+			'existingCategories' => self::list_terms( 'category' ),
+			'existingTags'       => self::list_terms( 'post_tag' ),
+			'bridgyHostMap'      => is_array( $bridgy_map ) ? $bridgy_map : self::DEFAULT_BRIDGY_HOST_MAP,
+			'siteSettings'       => array(
+				'bridgyAutoSuggest'  => ! empty( $settings_payload['bridgy_auto_suggest'] ),
+				'defaultPostVariant' => isset( $settings_payload['default_post_variant'] )
+					? (string) $settings_payload['default_post_variant']
+					: 'article',
+				'defaultCategories'  => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_category_names() : array(),
+				'defaultTags'        => class_exists( 'Outpost_Settings' ) ? Outpost_Settings::default_tag_names() : array(),
 			),
-			200
 		);
-		// Composer-config is per-user (term lists, companion status). Forbid
-		// edge caches (GoDaddy / Varnish / nginx FastCGI) from serving one
-		// user's response to another. Bearer auth already makes the response
-		// per-request, but explicit headers cost nothing.
-		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
-		return $response;
 	}
 
 	/**

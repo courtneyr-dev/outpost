@@ -24,7 +24,7 @@ const ALLOWED_MIME_PREFIXES = ['image/jpeg', 'image/png', 'image/webp', 'image/g
  * intake (includes/class-pwa-shell.php) to the same types and size cap.
  */
 export const SUPPORTED_IMAGE_TYPES: readonly string[] = ALLOWED_MIME_PREFIXES;
-export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 50 * 1024 * 1024;
 
 export class PhotoError extends Error {
 	constructor(
@@ -41,7 +41,7 @@ export interface ProcessOptions {
 	maxDimension?: number;
 	/** JPEG quality 0–1 (default 0.9). */
 	quality?: number;
-	/** Hard size cap in bytes (default 10 MB). */
+	/** Hard size cap in bytes (default 50 MB). */
 	maxBytes?: number;
 }
 

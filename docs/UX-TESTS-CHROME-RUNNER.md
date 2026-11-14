@@ -54,8 +54,10 @@ GROUND RULES
    downstream is meaningful after that.
 7. Check the browser console after each section and note any uncaught
    errors for L5.
-8. Keyboard tests (B2, B4): use real key presses (Tab, ArrowRight,
-   ArrowLeft, Home, End), not clicks.
+8. Keyboard tests (B2, B4): use real key presses, not clicks. For B2,
+   Tab to all seven buttons in the "Composer modes" group, select with
+   Enter and Space, confirm exactly one has `aria-current="true"`, and
+   confirm arrow keys don't move focus or change the selected mode.
 9. Mobile layout test (L1): resize the window to ~390px wide, sweep every
    tab for horizontal scroll, then restore the window size.
 

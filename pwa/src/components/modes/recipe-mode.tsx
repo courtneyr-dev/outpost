@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
 	MicropubError,
 	type HEntryProperties,
@@ -23,6 +23,7 @@ import { peek_share_target, consume_share_target } from '../../lib/share-target'
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -114,6 +115,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 	const [duration_minutes, setDurationMinutes] = useState(draft_text(draft?.fields.duration));
 	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
@@ -434,11 +437,45 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. Always
-				    mounted; only the text content changes (empty when there's nothing to
-				    say). `--empty` collapses the box instead of `hidden`, which would pull
-				    the region out of the accessibility tree between announcements. */}
+				<DraftStatus state={saved_draft.state} />
+
+				{composerConfig && (
+					<Drawer
+						open={more_open}
+						onClose={(): void => setMoreOpen(false)}
+						title="More options"
+						idPrefix="outpost-recipe"
+					>
+						<MorePanel
+							token={token}
+							composerConfig={composerConfig}
+							values={more_values}
+							onChange={setMoreValues}
+							micropubEndpoint={endpoint}
+							{...(micropubEnv ? { micropubEnv } : {})}
+							xfnTargetUrl={null}
+							disabled={submitting}
+							idPrefix="outpost-recipe"
+						/>
+					</Drawer>
+				)}
+
+				{composerConfig && (
+					<div class="outpost-form-actions">
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => setMoreOpen(true)}
+							disabled={submitting}
+						>
+							More options
+						</button>
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
 				<div
+					ref={error_ref}
 					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
 					role="alert"
 					aria-live="assertive"
@@ -475,42 +512,6 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						''
 					)}
 				</p>
-
-				<DraftStatus state={saved_draft.state} />
-
-				{composerConfig && (
-					<Drawer
-						open={more_open}
-						onClose={(): void => setMoreOpen(false)}
-						title="More options"
-						idPrefix="outpost-recipe"
-					>
-						<MorePanel
-							token={token}
-							composerConfig={composerConfig}
-							values={more_values}
-							onChange={setMoreValues}
-							micropubEndpoint={endpoint}
-							{...(micropubEnv ? { micropubEnv } : {})}
-							xfnTargetUrl={null}
-							disabled={submitting}
-							idPrefix="outpost-recipe"
-						/>
-					</Drawer>
-				)}
-
-				{composerConfig && (
-					<div class="outpost-form-actions">
-						<button
-							class="outpost-button outpost-button--secondary"
-							type="button"
-							onClick={(): void => setMoreOpen(true)}
-							disabled={submitting}
-						>
-							More options
-						</button>
-					</div>
-				)}
 
 				<PublishButton
 					idPrefix="outpost-recipe"

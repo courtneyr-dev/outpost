@@ -176,14 +176,14 @@ describe('service worker share intake (T10-S3-05)', () => {
 	});
 
 	it('drops a file over the per-file limit before reading it', async () => {
-		const response = await dispatch(share([huge_image('big.png', 11 * MB), image('ok.png')]));
+		const response = await dispatch(share([huge_image('big.png', MAX_PHOTO_BYTES + 1), image('ok.png')]));
 
 		expect(response?.status).toBe(303);
 		expect((await inbox())?.files.map((f) => f.name)).toEqual(['ok.png']);
 	});
 
 	it('parks nothing when only over-limit files were shared', async () => {
-		await dispatch(share([huge_image('big.png', 11 * MB)]));
+		await dispatch(share([huge_image('big.png', MAX_PHOTO_BYTES + 1)]));
 
 		expect(await inbox()).toBeUndefined();
 		expect(passthrough.length).toBe(1);
@@ -227,9 +227,16 @@ describe('service worker share intake (T10-S3-05)', () => {
 	});
 
 	it('accepts a file of exactly the per-file limit and drops one byte over', async () => {
-		await dispatch(share([image('at-limit.png', 10 * MB), image('over.png', 10 * MB + 1)]));
-
+		// The per-file limit is the composer's own cap (50 MB since #322), which
+		// equals the total limit, so the two sizes are shared separately.
+		await dispatch(share([image('at-limit.png', MAX_PHOTO_BYTES)]));
 		expect((await inbox())?.files.map((f) => f.name)).toEqual(['at-limit.png']);
+
+		globalThis.indexedDB = new IDBFactory();
+		load_worker();
+		passthrough = [];
+		await dispatch(share([image('over.png', MAX_PHOTO_BYTES + 1)]));
+		expect(await inbox()).toBeUndefined();
 	});
 
 	it('accepts exactly the file-count limit', async () => {

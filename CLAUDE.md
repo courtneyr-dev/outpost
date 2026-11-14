@@ -248,7 +248,7 @@ Micropub client + note form. Per-post endpoint discovery; form-encoded `h=entry`
 
 ## Session C0 — Locked Decisions (shipped)
 
-WAI-ARIA tab framework with Note as the first real mode. Roving tabindex, automatic activation, wrap-around arrow keys; all panels render eagerly and toggle via `hidden` so form state survives tab switches; mode files live at `pwa/src/components/modes/*-mode.tsx`; 40 KB gzipped bundle ceiling through Phase C; conditional-spread pattern for optional props under `exactOptionalPropertyTypes`. Full decisions: [docs/decisions/session-c0.md](docs/decisions/session-c0.md).
+WAI-ARIA tabs shipped with Note as the first real mode; in 1.0.27 the tab strip became a two-row native button group with `aria-current`, and the arrow-key model retired. All panels still render eagerly and toggle via `hidden` so form state survives mode switches; mode files live at `pwa/src/components/modes/*-mode.tsx`; 40 KB gzipped bundle ceiling through Phase C; conditional-spread pattern for optional props under `exactOptionalPropertyTypes`. Full decisions: [docs/decisions/session-c0.md](docs/decisions/session-c0.md) and [docs/decisions/session-wave-o.md](docs/decisions/session-wave-o.md).
 
 ## Session B2 + C1 — Locked Decisions (shipped)
 

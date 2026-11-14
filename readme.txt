@@ -22,6 +22,10 @@ Outpost is a mobile composer for WordPress, installed as a Progressive Web App a
 
 Documentation: [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io/outpost/).
 
+= Abilities =
+
+With the Abilities API, Outpost registers three read-only abilities: `outpost/get-syndicate-targets` and `outpost/get-composer-config` (`edit_posts`) and `outpost/get-share-status` (`edit_post`).
+
 == Installation ==
 
 1. Install and activate the IndieAuth and Micropub plugins (WordPress asks for them).
@@ -102,13 +106,16 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 == Changelog ==
 
 = 1.0.27 =
-* Security: the iOS Shortcut uses a WordPress application password limited to its endpoint (on multisite, Outpost must be network-activated), and deactivating Outpost deletes it; old Shortcut tokens are deleted on upgrade.
-* Security: changes from the WordPress.org review. Shared content waits for Use or Discard. Cookie REST requests need a valid nonce. Connected-account data reaches only first-party sessions and the Outpost app. Offline posts stay with the account that queued them. Link previews refuse more internal address ranges and cap responses at 5 MiB. Logging is debug-only and secret-free. Stored API keys never appear in settings forms.
-* Removed: the /post/shortcut address and the built-in sample fetch provider.
+* Security: the iOS Shortcut uses an application password limited to its endpoint and deleted on deactivation; upgrading deletes old Shortcut tokens.
+* Security, from the WordPress.org review: shared content waits for Use or Discard, cookie REST requests need a valid nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, and saved API keys never render.
+* Removed: /post/shortcut and the sample fetch provider.
+* Added: three read-only abilities.
+* Changed: composer modes are two rows of buttons.
+* Fixed: More options without Outpost's stylesheet, publish error placement, a 50 MB photo cap, and WordPress's fallback category.
 
 Earlier versions: see CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
 
 = 1.0.27 =
-If you use the ready-made iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut and paste it into the Shortcut.
+If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut. Mode tabs are now two rows of buttons.

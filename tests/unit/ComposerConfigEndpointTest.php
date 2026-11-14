@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Outpost\Tests\Unit;
 
 use Outpost_Composer_Config_Endpoint;
+use Outpost_Abilities;
 use WP_Mock;
 
 final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
@@ -22,6 +23,10 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		// Outpost_Request_Headers sanitizes every $_SERVER read.
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
+		// WP_Mock filtersWithAnyArgs leak workaround (CLAUDE.md A2 #8).
+		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
+		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
+		$prop->setValue( null, array() );
 	}
 
 	public function tearDown(): void {
@@ -194,6 +199,38 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 			->andReturn( array( array( 'aside', 42, null, 'image' ) ) );
 		$result = $this->invoke_private( 'resolve_post_formats', array( 'active' ) );
 		$this->assertEquals( array( 'aside', 'image' ), $result );
+	}
+
+	public function test_rest_response_is_identical_to_builder_payload(): void {
+		$this->mock_config_dependencies();
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 7 );
+		WP_Mock::userFunction( 'get_transient' )->andReturn( false );
+		WP_Mock::userFunction( 'set_transient' )->once()->andReturn( true );
+
+		$response = Outpost_Composer_Config_Endpoint::handle();
+
+		$this->assertSame( Outpost_Composer_Config_Endpoint::build_payload(), $response->get_data() );
+	}
+
+	public function test_composer_config_ability_does_not_touch_rate_limit_transient(): void {
+		$this->mock_config_dependencies();
+		WP_Mock::userFunction( 'get_transient' )->never();
+		WP_Mock::userFunction( 'set_transient' )->never();
+
+		$payload = Outpost_Abilities::execute_get_composer_config( array() );
+
+		$this->assertArrayHasKey( 'companions', $payload );
+		$this->assertArrayHasKey( 'siteSettings', $payload );
+	}
+
+	private function mock_config_dependencies(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+		WP_Mock::userFunction( 'taxonomy_exists' )->andReturn( false );
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
+			static fn ( string $name, $default = false ) => $default
+		);
+		WP_Mock::onFilter( 'outpost_bridgy_host_map' )->withAnyArgs()->reply( array() );
 	}
 	// --- No authentication override (1.0.27) --------------------------------
 

@@ -760,7 +760,7 @@ const SHARE_INBOX_KEY = 'pending';
 const SHARE_INBOX_CANDIDATE_KEY = 'candidate';
 const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 // Same per-file cap the composer applies before upload (pwa/src/lib/photo.ts).
-const SHARE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const SHARE_MAX_FILE_BYTES = 50 * 1024 * 1024;
 const SHARE_MAX_FILES = 10;
 const SHARE_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 // Room for the title, text, and multipart framing on top of the photos.

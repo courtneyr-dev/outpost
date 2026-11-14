@@ -129,6 +129,19 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertContains( 'activitypub', $ids );
 	}
 
+	public function test_rest_response_is_identical_to_builder_payload(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+
+		$response = Outpost_Syndicate_Targets_Endpoint::handle_request(
+			$this->make_request( 'photo' )
+		);
+
+		$this->assertSame(
+			Outpost_Syndicate_Targets_Endpoint::build_payload( 'photo' ),
+			$response->get_data()
+		);
+	}
+
 	public function test_handle_request_with_unknown_mode_fails_open(): void {
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
 

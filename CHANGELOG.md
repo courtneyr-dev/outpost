@@ -33,6 +33,20 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `outpost.php` declares `Requires Plugins: indieauth, micropub`, so core enforces the dependencies.
 - The preview fetcher's `curl_setopt( CURLOPT_RESOLVE )` DNS pin carries an inline `phpcs:ignore` with its reason, and `phpcs.xml.dist` no longer excludes the sniff for that file, so `composer lint` matches Plugin Check.
 - readme: External services covers the media-lookup services and cover-image hosts; the Threads terms link points at the Threads Terms of Use; Source Code documents `src/` and `npm run build:wp`; Preact's MIT license ships in `THIRD-PARTY-LICENSES.txt`.
+- The seven composer modes use two rows of native buttons instead of a scrolling tab strip (#316).
+- More options opens and closes even when a page optimizer blocks Outpost's stylesheet (#317).
+- Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (#318).
+- Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (#319).
+- The service worker's share intake accepts photos up to the same 50 MB per-file cap as the composer; the 50 MB total and the bounded body read are unchanged.
+
+### Added
+
+- Added three public, read-only WordPress abilities: `outpost/get-syndicate-targets`, `outpost/get-share-status`, and `outpost/get-composer-config`. They reuse the REST payload builders without applying REST permission filters, bearer-token scopes, or the composer-config route's rate-limit transient (#321).
+
+### Fixed
+
+- Keyboard focus rings follow night and system modes.
+- Opening More options no longer locks page scroll when the stylesheet is blocked.
 
 ## [1.0.26] - 2026-11-10
 
