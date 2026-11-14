@@ -43,6 +43,9 @@ final class Outpost_Source_Detector {
 	 * contract (CLAUDE.md Security Hot Spots) and the manual-share writeback cap. */
 	private const URL_MAX_LENGTH = 2048;
 
+	/** Most characters kept from shared title or text (T10-S4-16). */
+	public const TEXT_MAX_LENGTH = 4000;
+
 	/**
 	 * Per-request memoization of `find_for_url` results, keyed on
 	 * `lowercased-host + path`. Sources are filterable per-request
@@ -161,7 +164,10 @@ final class Outpost_Source_Detector {
 		// tag; `&lt;` and `&gt;` stay encoded.
 		$value = str_replace( array( '&amp;', '&#039;', '&quot;' ), array( '&', "'", '"' ), $value );
 		$value = (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $value );
-		return trim( (string) preg_replace( '/ {2,}/', ' ', $value ) );
+		$value = trim( (string) preg_replace( '/ {2,}/', ' ', $value ) );
+		// The text rides into the composer redirect URL; keep it bounded
+		// (T10-S4-16). The service worker applies the same limit.
+		return mb_substr( $value, 0, self::TEXT_MAX_LENGTH );
 	}
 
 	/**

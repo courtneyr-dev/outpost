@@ -745,8 +745,10 @@ function is_share_target_request(url) {
 //
 // The share may come from any app or page, so every field and file is
 // untrusted: only image types the composer can upload (pwa/src/lib/photo.ts),
-// within the limits below, are parked, and sizes are checked before any
-// bytes are read. Parked photos wait for the person: the composer shows them
+// within the limits below, are parked. A body that declares a length over the
+// intake limit passes through unread; otherwise the per-file, count, and total
+// limits apply once the browser has parsed the multipart body, and shared
+// title and text are cut to SHARE_MAX_TEXT_CHARS. Parked photos wait for the person: the composer shows them
 // for review and nothing is used until they choose. The inbox holds the
 // waiting share (`pending`) and at most one newer share (`candidate`) while
 // the person decides between them; neither is ever overwritten, and a third
@@ -761,6 +763,10 @@ const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif',
 const SHARE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const SHARE_MAX_FILES = 10;
 const SHARE_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+// Room for the title, text, and multipart framing on top of the photos.
+const SHARE_MAX_BODY_BYTES = SHARE_MAX_TOTAL_BYTES + 1024 * 1024;
+// Same bound the PHP dispatcher applies (Outpost_Source_Detector::TEXT_MAX_LENGTH).
+const SHARE_MAX_TEXT_CHARS = 4000;
 
 function open_share_inbox() {
 	return new Promise((resolve, reject) => {
@@ -811,6 +817,10 @@ async function handle_share_post(event) {
 	// Clone before reading: formData() consumes the body, and a share with
 	// no photo still has to reach the server as the original POST.
 	const passthrough = event.request.clone();
+	const declared = Number(event.request.headers.get('content-length'));
+	if (Number.isFinite(declared) && declared > SHARE_MAX_BODY_BYTES) {
+		return fetch(passthrough);
+	}
 	let form;
 	try {
 		form = await event.request.formData();
@@ -840,8 +850,8 @@ async function handle_share_post(event) {
 		})));
 		const slot = await park_shared_photos({
 			files: records,
-			title: String(form.get('title') || ''),
-			text: String(form.get('text') || ''),
+			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
+			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
 		});
 		// The composer shows what is waiting for review; `refused` tells it
