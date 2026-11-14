@@ -94,6 +94,32 @@ final class Outpost_Uninstaller {
 	private const CRON_HOOKS = array( 'outpost_posse_dispatch' );
 
 	/**
+	 * Delete the stored rewrite table on every site but the current one.
+	 *
+	 * A network deactivation runs Outpost's deactivation hook once, on the
+	 * current site, which flushes its own table. Each other site rebuilds
+	 * its table on its next request, now without Outpost (F5-02).
+	 */
+	public static function delete_rewrite_rules_on_other_sites(): void {
+		$current  = (int) get_current_blog_id();
+		$site_ids = get_sites(
+			array(
+				'fields'        => 'ids',
+				'number'        => 0,
+				'no_found_rows' => true,
+			)
+		);
+		foreach ( (array) $site_ids as $site_id ) {
+			if ( $current === (int) $site_id ) {
+				continue;
+			}
+			switch_to_blog( (int) $site_id );
+			delete_option( 'rewrite_rules' );
+			restore_current_blog();
+		}
+	}
+
+	/**
 	 * Run the full uninstall — every site on multisite, otherwise the one site.
 	 */
 	public static function run( string $plugin_basename = '' ): void {

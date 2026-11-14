@@ -899,14 +899,15 @@ add_action(
  * person's other application passwords stay. Then removes Outpost's
  * rewrite rules and flushes: this hook runs while the rules registered at
  * `init` are still in place, so a flush alone would write them back into
- * the stored table (T10-S5-02).
+ * the stored table (T10-S5-02). A network deactivation also clears every
+ * other site's stored table (F5-02).
  *
  * @since 0.1.0
  *
  * @param bool $network_wide Whether this is a network deactivation.
  */
 function outpost_deactivate( bool $network_wide = false ): void {
-	unset( $network_wide ); // Application passwords are network-wide either way.
+	// Application passwords are network-wide, so the cleanup is the same for both scopes.
 	require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-uninstaller.php';
 	// WordPress saves the plugin as inactive only after this hook returns,
 	// so stopping here keeps Outpost and its route rule loaded (T10-S4-27).
@@ -916,5 +917,8 @@ function outpost_deactivate( bool $network_wide = false ): void {
 	}
 	Outpost_Route_Handler::unregister_rewrite_rules();
 	flush_rewrite_rules();
+	if ( $network_wide && is_multisite() ) {
+		Outpost_Uninstaller::delete_rewrite_rules_on_other_sites();
+	}
 }
 register_deactivation_hook( __FILE__, 'outpost_deactivate' );
