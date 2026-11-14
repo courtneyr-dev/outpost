@@ -14,7 +14,8 @@
     "LICENSE",
     "THIRD-PARTY-LICENSES.txt",
     "!**/.gitkeep",
-    "!build/pwa/**/*.map"
+    "!build/pwa/**/*.map",
+    "!assets/ios-shortcut-base-link.README.md"
   ],
   "description": "Mobile-first Progressive Web App composer for IndieWeb POSSE workflows.",
   "author": "Courtney Robertson <https://courtneyr.dev>",
