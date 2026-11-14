@@ -41,8 +41,16 @@ export interface SiteSettings {
 	defaultTags?: string[];
 }
 
+/** Post Kinds features the server reports beyond the companion being active. */
+export interface PostKindsCapabilities {
+	/** The installed Post Kinds builds the comic card from a `read-of` entry. */
+	comics: boolean;
+}
+
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
+	/** Absent on servers (and cached configs) older than outpost#243. */
+	postKinds?: PostKindsCapabilities;
 	postFormats: string[] | null;
 	xfnRels: string[];
 	existingCategories: TermSuggestion[];
@@ -164,7 +172,13 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!Array.isArray(v.existingTags)) return false;
 	if (!v.bridgyHostMap || typeof v.bridgyHostMap !== 'object') return false;
 	if (!v.siteSettings || typeof v.siteSettings !== 'object') return false;
+	if ('postKinds' in v && !is_post_kinds_capabilities(v.postKinds)) return false;
 	return true;
+}
+
+function is_post_kinds_capabilities(value: unknown): value is PostKindsCapabilities {
+	if (!value || typeof value !== 'object') return false;
+	return typeof (value as Record<string, unknown>).comics === 'boolean';
 }
 
 /**
@@ -183,6 +197,7 @@ export type PostKindSlug =
 	| 'listen'
 	| 'watch'
 	| 'read'
+	| 'comics'
 	| 'event'
 	| 'photo'
 	| 'video'

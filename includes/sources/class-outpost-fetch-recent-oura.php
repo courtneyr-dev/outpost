@@ -283,8 +283,69 @@ final class Outpost_Fetch_Recent_Oura {
 					'_outpost_oura_sleep_score'   => (string) $score,
 				),
 				'syndication_source_url' => null,
+			) + self::post_kinds_sleep_parts( $total_s, $bedtime ),
+		);
+	}
+
+	/** Post Kinds' sleep card block. */
+	private const SLEEP_CARD = 'post-kinds-indieweb/sleep-card';
+
+	/**
+	 * With Post Kinds' sleep card registered (#260): the card, the sleep
+	 * kind term keyed by the taxonomy's REST base, and noon of the night as
+	 * the post date. The picker inserts these instead of the paragraph.
+	 *
+	 * The bedtime only picks the night and never leaves the server: the
+	 * card gets the duration alone, and the date is noon, the time Post
+	 * Kinds gives every sleep post.
+	 *
+	 * @return array<string,mixed> Empty without Post Kinds.
+	 */
+	private static function post_kinds_sleep_parts( int $total_s, string $bedtime ): array {
+		if ( ! class_exists( 'WP_Block_Type_Registry' ) || ! WP_Block_Type_Registry::get_instance()->is_registered( self::SLEEP_CARD ) ) {
+			return array();
+		}
+		$attributes = array();
+		if ( $total_s > 0 ) {
+			$attributes['durationMinutes'] = (int) round( $total_s / 60 );
+		}
+		$parts = array(
+			'blocks' => array(
+				array(
+					'name'       => self::SLEEP_CARD,
+					'attributes' => $attributes,
+				),
 			),
 		);
+
+		$taxonomy = get_taxonomy( 'kind' );
+		$term     = $taxonomy instanceof WP_Taxonomy ? get_term_by( 'slug', 'sleep', 'kind' ) : false;
+		if ( $taxonomy instanceof WP_Taxonomy && $term instanceof WP_Term ) {
+			$base           = is_string( $taxonomy->rest_base ) && '' !== $taxonomy->rest_base ? $taxonomy->rest_base : 'kind';
+			$parts['terms'] = array( $base => array( (int) $term->term_id ) );
+		}
+
+		$night = self::night_of( $bedtime );
+		if ( null !== $night ) {
+			$parts['date'] = $night . 'T12:00:00';
+		}
+		return $parts;
+	}
+
+	/**
+	 * The night a bedtime belongs to, as Y-m-d: the date twelve hours
+	 * earlier in the site timezone, the rule Post Kinds files sleep by.
+	 */
+	private static function night_of( string $bedtime ): ?string {
+		if ( '' === $bedtime ) {
+			return null;
+		}
+		try {
+			$at = new DateTimeImmutable( $bedtime );
+		} catch ( Exception $e ) {
+			return null;
+		}
+		return $at->setTimezone( wp_timezone() )->modify( '-12 hours' )->format( 'Y-m-d' );
 	}
 
 	/**

@@ -23,15 +23,19 @@ jest.mock( '@wordpress/components', () => ( {
 	CardBody: ( { children } ) => <div>{ children }</div>,
 } ) );
 
+const mockInsertBlocks = jest.fn();
+const mockEditPost = jest.fn();
 jest.mock( '@wordpress/data', () => ( {
 	dispatch: jest.fn( () => ( {
-		insertBlocks: jest.fn(),
-		editPost: jest.fn(),
+		insertBlocks: mockInsertBlocks,
+		editPost: mockEditPost,
 	} ) ),
 } ) );
 
+const mockGetBlockType = jest.fn();
 jest.mock( '@wordpress/blocks', () => ( {
 	createBlock: jest.fn( ( name, attrs ) => ( { name, attrs } ) ),
+	getBlockType: ( ...args ) => mockGetBlockType( ...args ),
 } ) );
 
 jest.mock( '@wordpress/api-fetch', () => jest.fn() );
@@ -143,5 +147,80 @@ describe( 'FetchRecentPickerModal', () => {
 		);
 
 		expect( await findByText( /No recent items available/i ) ).toBeInTheDocument();
+	} );
+
+	describe( 'inserting a pick', () => {
+		const sleep = {
+			id: 'oura-sleep-1',
+			title: 'Sleep',
+			subtitle: '7.7 hours',
+			fetched_at: '2026-11-13T05:40:00+00:00',
+			post_payload: {
+				content: '<p>Sleep</p>',
+				post_meta: { _outpost_oura_sleep_day: '2026-11-13' },
+				blocks: [
+					{
+						name: 'post-kinds-indieweb/sleep-card',
+						attributes: { durationMinutes: 462 },
+					},
+				],
+				terms: { kind: [ 5 ] },
+				date: '2026-11-12T12:00:00',
+			},
+		};
+
+		async function pick( item ) {
+			apiFetch.mockResolvedValue( { provider_id: 'oura', items: [ item ] } );
+			const onClose = jest.fn();
+			const { findByText } = render(
+				<FetchRecentPickerModal providerId="oura" providerLabel="Oura" onClose={ onClose } />
+			);
+			( await findByText( item.title ) ).click();
+			return onClose;
+		}
+
+		beforeEach( () => {
+			mockInsertBlocks.mockReset();
+			mockEditPost.mockReset();
+			mockGetBlockType.mockReset();
+		} );
+
+		it( 'inserts the server-built blocks and sets their kind and date (#260)', async () => {
+			mockGetBlockType.mockImplementation( ( name ) =>
+				name === 'post-kinds-indieweb/sleep-card' ? { name } : undefined
+			);
+			const onClose = await pick( sleep );
+			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
+				{ name: 'post-kinds-indieweb/sleep-card', attrs: { durationMinutes: 462 } },
+			] );
+			expect( mockEditPost ).toHaveBeenCalledWith( {
+				meta: { _outpost_oura_sleep_day: '2026-11-13' },
+				kind: [ 5 ],
+				date: '2026-11-12T12:00:00',
+			} );
+			expect( onClose ).toHaveBeenCalled();
+		} );
+
+		it( 'falls back to the paragraph when the editor lacks a block type', async () => {
+			mockGetBlockType.mockReturnValue( undefined );
+			await pick( sleep );
+			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
+				{ name: 'core/paragraph', attrs: { content: '<p>Sleep</p>' } },
+			] );
+			expect( mockEditPost ).toHaveBeenCalledWith( {
+				meta: { _outpost_oura_sleep_day: '2026-11-13' },
+			} );
+		} );
+
+		it( 'keeps the paragraph for a payload without blocks', async () => {
+			await pick( {
+				...sleep,
+				post_payload: { content: '<p>Run</p>', post_meta: {} },
+			} );
+			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
+				{ name: 'core/paragraph', attrs: { content: '<p>Run</p>' } },
+			] );
+			expect( mockEditPost ).not.toHaveBeenCalled();
+		} );
 	} );
 } );
