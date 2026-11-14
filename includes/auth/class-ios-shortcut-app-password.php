@@ -82,12 +82,31 @@ final class Outpost_IOS_Shortcut_App_Password {
 	}
 
 	/**
+	 * Whether this install can scope the Shortcut password safely
+	 * (T10-S4-20). Application passwords are network-wide on multisite, but
+	 * the rule that limits this one to the Shortcut route runs only where
+	 * Outpost is active, so a per-site activation would leave it unscoped on
+	 * the other sites. Single sites always qualify; a network qualifies only
+	 * when Outpost is network-activated.
+	 */
+	public static function network_allows(): bool {
+		if ( ! is_multisite() ) {
+			return true;
+		}
+		$active = get_site_option( 'active_sitewide_plugins', array() );
+		return is_array( $active ) && defined( 'OUTPOST_PLUGIN_BASENAME' ) && isset( $active[ OUTPOST_PLUGIN_BASENAME ] );
+	}
+
+	/**
 	 * Whether core lets this user create Application Passwords (HTTPS, or a
 	 * local environment, and not disabled by a filter).
 	 *
 	 * @param int $user_id User id.
 	 */
 	public static function is_available( int $user_id ): bool {
+		if ( ! self::network_allows() ) {
+			return false;
+		}
 		$user = get_userdata( $user_id );
 		return $user instanceof \WP_User && wp_is_application_passwords_available_for_user( $user );
 	}
@@ -114,6 +133,12 @@ final class Outpost_IOS_Shortcut_App_Password {
 	 * @return string|\WP_Error The new password in plain text (shown once), or an error.
 	 */
 	public static function create( int $user_id ) {
+		if ( ! self::network_allows() ) {
+			return new \WP_Error(
+				'outpost_shortcut_password_network',
+				__( 'On a multisite network, the Shortcut password needs Outpost network-activated.', 'outpost-mobile-publishing' )
+			);
+		}
 		if ( ! self::is_available( $user_id ) ) {
 			return new \WP_Error(
 				'outpost_shortcut_password_unavailable',

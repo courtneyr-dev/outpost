@@ -102,7 +102,7 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 == Changelog ==
 
 = 1.0.27 =
-* Security: the iOS Shortcut uses a WordPress application password limited to its endpoint, and deactivating Outpost deletes it; old Shortcut tokens are deleted on upgrade.
+* Security: the iOS Shortcut uses a WordPress application password limited to its endpoint (on multisite, Outpost must be network-activated), and deactivating Outpost deletes it; old Shortcut tokens are deleted on upgrade.
 * Security: changes from the WordPress.org review. Shared content waits for Use or Discard. Cookie REST requests need a valid nonce. Connected-account data reaches only first-party sessions and the Outpost app. Offline posts stay with the account that queued them. Link previews refuse more internal address ranges and cap responses at 5 MiB. Logging is debug-only and secret-free. Stored API keys never appear in settings forms.
 * Removed: the /post/shortcut address and the built-in sample fetch provider.
 

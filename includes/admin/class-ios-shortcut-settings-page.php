@@ -229,6 +229,12 @@ final class Outpost_IOS_Shortcut_Settings_Page {
 	 * @param array<string, mixed>|null $item      Current Outpost Shortcut password record.
 	 */
 	private static function render_password_cell( bool $available, ?array $item ): void {
+		if ( ! $available && ! Outpost_IOS_Shortcut_App_Password::network_allows() ) {
+			?>
+			<p><em><?php esc_html_e( 'On a multisite network, the Shortcut password needs Outpost network-activated, so the rule that limits it to the Shortcut works on every site.', 'outpost-mobile-publishing' ); ?></em></p>
+			<?php
+			return;
+		}
 		if ( ! $available ) {
 			?>
 			<p><em><?php esc_html_e( 'WordPress application passwords are not available on this site. They need HTTPS (or a local development environment), and a security plugin may have turned them off.', 'outpost-mobile-publishing' ); ?></em></p>
