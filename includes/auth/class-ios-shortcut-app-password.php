@@ -54,7 +54,7 @@ final class Outpost_IOS_Shortcut_App_Password {
 	 */
 	public static function register(): void {
 		add_action( 'wp_authenticate_application_password_errors', array( __CLASS__, 'restrict_to_shortcut_route' ), 10, 3 );
-		add_action( 'admin_init', array( __CLASS__, 'purge_legacy_tokens' ) );
+		add_action( 'init', array( __CLASS__, 'purge_legacy_tokens' ) );
 	}
 
 	/**
