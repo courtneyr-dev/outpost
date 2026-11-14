@@ -106,25 +106,16 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 == Changelog ==
 
 = 1.0.28 =
-* Security: posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as use the title the site prints, so a hidden check-in location stays private.
-* Added: a Comic type under Doing when Post Kinds can build comic cards.
-* Added: with Post Kinds, the Oura and Polar pickers insert sleep and exercise cards that keep clock times private.
-* Fixed: page optimizers no longer break the composer, an unknown shared tab no longer opens a blank screen, and the Appearance preview matches the composer's tabs.
-
-= 1.0.27 =
-* Security: the iOS Shortcut uses an application password limited to its endpoint and deleted on deactivation; upgrading deletes old Shortcut tokens.
-* Security, from the WordPress.org review: shared content waits for Use or Discard, cookie REST requests need a valid nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, and saved API keys never render.
-* Removed: /post/shortcut and the sample fetch provider.
-* Added: three read-only abilities.
+* Security: the iOS Shortcut uses an application password limited to its endpoint; upgrading deletes old tokens.
+* Security: shared content waits for Use or Discard, cookie REST requests need a nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, saved API keys never render, and syndicated posts keep check-in locations hidden.
+* Added: three read-only abilities, a Comic type, and Post Kinds cards from Oura and Polar.
 * Changed: composer modes are two rows of buttons.
-* Fixed: More options without Outpost's stylesheet, publish error placement, a 50 MB photo cap, and WordPress's fallback category.
+* Fixed: page optimizers, More options without its stylesheet, publish errors, photo size, the fallback category, shared tabs, and the Appearance preview.
+* Removed: /post/shortcut and the sample fetch provider.
 
-Earlier versions: see CHANGELOG.md in the source repository.
+Earlier versions: CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
 
 = 1.0.28 =
-Keeps hidden check-in locations out of posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as, and fixes the composer on sites running a page optimizer.
-
-= 1.0.27 =
-If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut. Mode tabs are now two rows of buttons.
+If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut.
