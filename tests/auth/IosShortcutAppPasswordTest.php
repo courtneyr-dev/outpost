@@ -28,13 +28,27 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 	/** @var string[] */
 	private array $deleted_meta = array();
 
+	private bool $multisite = false;
+
+	/** @var array<string, int> */
+	private array $sitewide = array();
+
 	public function setUp(): void {
 		WP_Mock::setUp();
 		WP_Application_Passwords::reset();
 		$this->options      = array();
 		$this->deleted_meta = array();
 		$GLOBALS['wp']      = (object) array( 'query_vars' => array() );
+		$this->multisite    = false;
+		$this->sitewide     = array();
 		WP_Mock::passthruFunction( '__' );
+		WP_Mock::userFunction( 'is_multisite' )->andReturnUsing( fn (): bool => $this->multisite );
+		WP_Mock::userFunction( 'get_site_option' )->andReturnUsing(
+			fn ( $name, $fallback = false ) => 'active_sitewide_plugins' === $name ? $this->sitewide : $fallback
+		);
+		if ( ! defined( 'OUTPOST_PLUGIN_BASENAME' ) ) {
+			define( 'OUTPOST_PLUGIN_BASENAME', 'outpost-mobile-publishing/outpost.php' );
+		}
 	}
 
 	public function tearDown(): void {
@@ -126,6 +140,37 @@ final class IosShortcutAppPasswordTest extends \WP_Mock\Tools\TestCase {
 			)
 		);
 		$this->assertFalse( $error->has_errors(), 'A password the person made for another app must keep working everywhere.' );
+	}
+
+	/**
+	 * T10-S4-20 (re-review R-03): on multisite the password is network-wide,
+	 * but the rule that limits it runs only where Outpost is active. With
+	 * per-site activation no deactivation choice is safe, so the password is
+	 * offered only when Outpost is network-activated.
+	 */
+	public function test_per_site_activation_on_multisite_offers_no_password(): void {
+		$this->given_available( true );
+		$this->multisite = true;
+
+		$this->assertFalse( Outpost_IOS_Shortcut_App_Password::is_available( 7 ) );
+		$created = Outpost_IOS_Shortcut_App_Password::create( 7 );
+		$this->assertInstanceOf( \WP_Error::class, $created );
+		$this->assertSame( 'outpost_shortcut_password_network', $created->get_error_code() );
+		$this->assertSame( array(), WP_Application_Passwords::$store[7] ?? array(), 'No password is created.' );
+	}
+
+	public function test_network_activation_on_multisite_offers_the_password(): void {
+		$this->given_available( true );
+		$this->multisite = true;
+		$this->sitewide  = array( OUTPOST_PLUGIN_BASENAME => 1 );
+
+		$this->assertTrue( Outpost_IOS_Shortcut_App_Password::is_available( 7 ) );
+	}
+
+	public function test_a_single_site_offers_the_password(): void {
+		$this->given_available( true );
+
+		$this->assertTrue( Outpost_IOS_Shortcut_App_Password::is_available( 7 ) );
 	}
 
 	public function test_create_replaces_only_outposts_password(): void {
