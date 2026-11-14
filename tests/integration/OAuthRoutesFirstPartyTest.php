@@ -67,13 +67,13 @@ final class OAuthRoutesFirstPartyTest extends TestCase {
 		);
 		\Outpost_Encryption_Key_Resolver::resolve();
 		Outpost_Credentials_Store::set( 'oura', array( 'access_token' => 'SYNTHETIC-OURA-TOKEN' ), $this->admin_id );
-		add_action( 'setted_transient', array( $this, 'record_transient' ) );
+		add_action( 'set_transient', array( $this, 'record_transient' ) ); // 'setted_transient' is deprecated since WordPress 6.8.
 		add_filter( 'pre_http_request', array( $this, 'record_outbound' ), 0, 3 );
 		rest_get_server();
 	}
 
 	protected function tearDown(): void {
-		remove_action( 'setted_transient', array( $this, 'record_transient' ) );
+		remove_action( 'set_transient', array( $this, 'record_transient' ) );
 		remove_filter( 'pre_http_request', array( $this, 'record_outbound' ), 0 );
 		$_SERVER                                      = $this->saved_server;
 		$_REQUEST                                     = $this->saved_request;
