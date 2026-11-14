@@ -39,6 +39,9 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	/** @var array<int, int> Every user a test created. */
 	private array $created = array();
 
+	/** How many times the stand-in route's callback ran. */
+	private int $stand_in_calls = 0;
+
 	/** @var mixed */
 	private $saved_auth_cookie = null;
 
@@ -200,7 +203,8 @@ final class AbilitiesCredentialGateTest extends TestCase {
 			'/ability-gate',
 			array(
 				'methods'             => 'POST',
-				'callback'            => static function () {
+				'callback'            => function () {
+					++$this->stand_in_calls;
 					return array( 'read' => true );
 				},
 				'permission_callback' => array( Outpost_Abilities::class, 'can_read_outpost' ),
@@ -222,8 +226,66 @@ final class AbilitiesCredentialGateTest extends TestCase {
 		$this->assertSame( 403, $refused->get_status(), 'Control: the route sees the body token and refuses.' );
 
 		$this->assertSame( 403, $this->dispatch_ability_stand_in( array( 'access_token' => 'unverified-0000' ) )->get_status() );
+		$this->assertSame( 0, $this->stand_in_calls, 'The refused request never reaches the protected callback.' );
 		$this->assertSame( 200, $this->dispatch_ability_stand_in( array() )->get_status(), 'Without a token the same user passes.' );
+		$this->assertSame( 1, $this->stand_in_calls );
 		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'After the dispatch, a plain PHP call sees no leftover request.' );
+	}
+
+	/**
+	 * Core's Allow header rechecks the permission after dispatch; it sees the same body token (R-02).
+	 */
+	public function test_the_allow_header_recheck_sees_the_body_token(): void {
+		wp_set_current_user( $this->editor_id );
+		$request = new WP_REST_Request( 'POST', '/outpost-test/v1/ability-gate' );
+		$request->set_body_params( array( 'access_token' => 'unverified-0000' ) );
+		$response = $this->dispatch_ability_stand_in( array( 'access_token' => 'unverified-0000' ) );
+		$this->assertSame( 403, $response->get_status() );
+
+		$response = apply_filters( 'rest_post_dispatch', rest_ensure_response( $response ), rest_get_server(), $request );
+
+		$this->assertStringNotContainsString( 'POST', (string) ( $response->get_headers()['Allow'] ?? '' ), 'The refused method is not advertised as allowed.' );
+	}
+
+	/**
+	 * A nested request that throws, caught by its caller, leaves nothing behind (R-01).
+	 */
+	public function test_a_caught_nested_throw_leaves_no_request_behind(): void {
+		wp_set_current_user( $this->editor_id );
+		register_rest_route(
+			'outpost-test/v1',
+			'/throws',
+			array(
+				'methods'             => 'POST',
+				'callback'            => static function () {
+					throw new \RuntimeException( 'inner handler failed' );
+				},
+				'permission_callback' => '__return_true',
+			)
+		);
+		register_rest_route(
+			'outpost-test/v1',
+			'/outer',
+			array(
+				'methods'             => 'GET',
+				'callback'            => static function () {
+					$inner = new WP_REST_Request( 'POST', '/outpost-test/v1/throws' );
+					$inner->set_body_params( array( 'access_token' => 'unverified-0000' ) );
+					try {
+						rest_get_server()->dispatch( $inner );
+					} catch ( \RuntimeException $caught ) {
+						return array( 'caught' => $caught->getMessage() );
+					}
+					return array( 'caught' => '' );
+				},
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		$outer = rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/outpost-test/v1/outer' ) );
+		$this->assertSame( 'inner handler failed', $outer->get_data()['caught'] ?? null, 'Precondition: the inner handler threw and was caught.' );
+
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'A plain PHP call afterwards sees no leftover body token.' );
 	}
 
 	/**
