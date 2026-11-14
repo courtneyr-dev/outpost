@@ -292,7 +292,7 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	 * Dispatch one request object to a route whose handler dispatches the same object again.
 	 *
 	 * @param bool $inner_throws Whether the inner (second) handling throws; the outer handler catches it.
-	 * @return array{inner_left: ?bool, caught: string}
+	 * @return array{inner_left: ?bool, caught: string, request: WP_REST_Request}
 	 */
 	private function reentrant_dispatch( bool $inner_throws ): array {
 		$depth = 0;
@@ -330,6 +330,7 @@ final class AbilitiesCredentialGateTest extends TestCase {
 			true
 		);
 		rest_get_server()->dispatch( $request );
+		$seen['request'] = $request;
 		return $seen;
 	}
 
@@ -346,16 +347,25 @@ final class AbilitiesCredentialGateTest extends TestCase {
 	}
 
 	/**
-	 * A re-entrant inner handling that throws, caught by the outer handler, leaves nothing behind (Q-01 follow-up).
+	 * A re-entrant inner handling that throws, caught by the outer handler, fails closed (Q-01 follow-up).
+	 *
+	 * The throw skips the inner frame's leave, so the outer frame's leave
+	 * removes the inner one and the outer frame stays tracked, the same way
+	 * core's own dispatching stack keeps the request after a throw. A frame
+	 * left behind can only add a body token to a later check, so the later
+	 * check can only refuse, never allow more.
 	 */
-	public function test_a_reentrant_inner_throw_leaves_no_request_behind(): void {
+	public function test_a_reentrant_inner_throw_fails_closed(): void {
 		wp_set_current_user( $this->editor_id );
 
 		$seen = $this->reentrant_dispatch( true );
 
 		$this->assertSame( 'inner handling failed', $seen['caught'], 'Precondition: the inner handling threw and was caught.' );
 		$this->assertFalse( $seen['inner_left'], 'The outer check still sees the body token.' );
-		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'After the dispatch, a plain PHP call sees no leftover request.' );
+		$this->assertFalse( Outpost_Abilities::can_read_outpost(), 'A frame left behind refuses; it never grants.' );
+
+		Outpost_Abilities::leave_request( null, array(), $seen['request'] );
+		$this->assertTrue( Outpost_Abilities::can_read_outpost(), 'Once the frame is gone, the plain PHP call passes again.' );
 	}
 
 	/**
