@@ -36,6 +36,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Share_Target_Controller {
 
+	/** Most bytes of the encoded note-redirect query (T10-S4-18). */
+	public const NOTE_QUERY_MAX_BYTES = 6000;
+
+	/** Most encoded bytes of the shared title in that query. */
+	private const NOTE_TITLE_MAX_BYTES = 1000;
+
+
 	/**
 	 * Handle the inbound share-target request. Called from
 	 * Outpost_Route_Handler::dispatch() when the route matches
@@ -157,6 +164,33 @@ final class Outpost_Share_Target_Controller {
 	}
 
 	/**
+	 * The longest whole-character prefix of $value whose rawurlencode()
+	 * form fits in $max_bytes.
+	 *
+	 * @param string $value     Text to shorten.
+	 * @param int    $max_bytes Encoded-byte limit.
+	 */
+	private static function fit_encoded( string $value, int $max_bytes ): string {
+		if ( $max_bytes <= 0 ) {
+			return '';
+		}
+		if ( strlen( rawurlencode( $value ) ) <= $max_bytes ) {
+			return $value;
+		}
+		$low  = 0;
+		$high = mb_strlen( $value );
+		while ( $low < $high ) {
+			$mid = intdiv( $low + $high + 1, 2 );
+			if ( strlen( rawurlencode( mb_substr( $value, 0, $mid ) ) ) <= $max_bytes ) {
+				$low = $mid;
+			} else {
+				$high = $mid - 1;
+			}
+		}
+		return mb_substr( $value, 0, $low );
+	}
+
+	/**
 	 * Build a redirect URL for the share-text-only flow (Note mode
 	 * with title + text pre-filled, no source URL).
 	 *
@@ -167,11 +201,16 @@ final class Outpost_Share_Target_Controller {
 		$args = array(
 			'mode' => 'note',
 		);
+		// One encoded-byte budget for the whole query (T10-S4-18): the title
+		// gets at most NOTE_TITLE_MAX_BYTES, the text the rest, each cut at
+		// a whole character so the composer gets valid UTF-8.
+		$budget = self::NOTE_QUERY_MAX_BYTES - strlen( 'mode=note&title=&text=' );
 		if ( ! empty( $payload['title'] ) ) {
-			$args['title'] = $payload['title'];
+			$args['title'] = self::fit_encoded( (string) $payload['title'], min( self::NOTE_TITLE_MAX_BYTES, $budget ) );
+			$budget       -= strlen( rawurlencode( $args['title'] ) );
 		}
 		if ( ! empty( $payload['text'] ) ) {
-			$args['text'] = $payload['text'];
+			$args['text'] = self::fit_encoded( (string) $payload['text'], $budget );
 		}
 		$query = array();
 		foreach ( $args as $key => $value ) {
