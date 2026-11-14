@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-14T04:55:14+00:00\n"
+"POT-Creation-Date: 2026-11-14T05:15:44+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -39,38 +39,38 @@ msgstr ""
 msgid "https://courtneyr.dev"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:39
+#: includes/abilities/class-outpost-abilities.php:44
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
 #: includes/class-admin-page.php:208
 msgid "Outpost"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:40
+#: includes/abilities/class-outpost-abilities.php:45
 msgid "Read publishing and syndication information from Outpost."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:65
+#: includes/abilities/class-outpost-abilities.php:70
 msgid "Get syndication targets"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:66
+#: includes/abilities/class-outpost-abilities.php:71
 msgid "Returns the available syndication targets for an optional composer mode."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:103
+#: includes/abilities/class-outpost-abilities.php:108
 msgid "Get share status"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:104
+#: includes/abilities/class-outpost-abilities.php:109
 msgid "Returns the manual-share status and log for one post."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:144
+#: includes/abilities/class-outpost-abilities.php:149
 msgid "Get composer configuration"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:145
+#: includes/abilities/class-outpost-abilities.php:150
 msgid "Returns the local configuration used by the Outpost composer."
 msgstr ""
 
@@ -908,23 +908,23 @@ msgstr ""
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:166
+#: includes/class-outpost-uninstaller.php:192
 msgid "Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:167
+#: includes/class-outpost-uninstaller.php:193
 msgid "Outpost is still active"
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:182
+#: includes/class-outpost-uninstaller.php:208
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:183
+#: includes/class-outpost-uninstaller.php:209
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:186
+#: includes/class-outpost-uninstaller.php:212
 msgid "Outpost uninstall stopped"
 msgstr ""
 

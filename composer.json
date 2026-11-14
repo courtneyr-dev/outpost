@@ -57,7 +57,7 @@
     "test:coverage": "phpunit --coverage-html coverage/php",
     "audit": "composer audit",
     "security": "@audit",
-    "i18n:make-pot": "wp i18n make-pot . languages/outpost-mobile-publishing.pot --domain=outpost-mobile-publishing --slug=outpost-mobile-publishing --exclude=build,pwa,src,tests,bin,docs,node_modules,vendor",
+    "i18n:make-pot": "sh bin/make-pot.sh",
     "check": [
       "@lint",
       "@lint:section5",
