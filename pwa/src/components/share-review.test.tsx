@@ -428,7 +428,17 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 		if (candidate) sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify(candidate));
 		inbox_env = { indexedDB: undefined };
 		mount();
-		await wait(30);
+		await vi.waitFor(() => expect(region()).not.toBeNull());
+		// The mount reads the share inbox once; with no IndexedDB and a photo
+		// held, that read ends by announcing UNREADABLE. Decide only after it,
+		// as a person would, so its late result can't race the choice.
+		if ([earlier, candidate].some((share) => share?.sharedPhotos)) {
+			await vi.waitFor(() => expect(status_line()).toBe(UNREADABLE));
+		}
+	}
+
+	function status_line(): string {
+		return region()?.querySelector('[role="status"]')?.textContent ?? '';
 	}
 
 	function slots(): Array<string | null> {
@@ -471,6 +481,7 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 
 		click(action);
 		await wait(40);
+		await vi.waitFor(() => expect(status_line()).toBe(expected));
 
 		expect(region()).not.toBeNull();
 		expect(slots()).toEqual(before_slots);
@@ -485,14 +496,13 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 		await waiting(PHOTO);
 		click('Use shared content');
 		await wait(40);
-		expect(region()?.querySelector('[role="status"]')?.textContent).toBe(UNREADABLE);
+		await vi.waitFor(() => expect(status_line()).toBe(UNREADABLE));
 	});
 
 	it('announces the failed-update outcome when a choice must change stored photos', async () => {
 		await waiting(PHOTO);
 		click('Discard shared content');
-		await wait(40);
-		expect(region()?.querySelector('[role="status"]')?.textContent).toBe(NOT_APPLIED);
+		await vi.waitFor(() => expect(status_line()).toBe(NOT_APPLIED));
 	});
 
 	it('text-only decisions still work without IndexedDB', async () => {
@@ -515,7 +525,7 @@ describe('focus after a conflict choice (T10-S3-05 v1.3)', () => {
 		await stash_shared_photos({ files: [photo('newer.jpg')], title: 'Newer', text: '', received: 2 }, inbox_env, 'candidate');
 		stash_share_target({ tab: 'photo', sharedPhotos: true });
 		mount();
-		await wait(30);
+		await vi.waitFor(() => expect(button('Keep earlier share')).not.toBeNull());
 	}
 
 	it.each(['Keep earlier share', 'Use new share'])('"%s" moves focus to Use shared content once the single review exists', async (action) => {
@@ -534,7 +544,7 @@ describe('focus after a conflict choice (T10-S3-05 v1.3)', () => {
 		await wait(30);
 		stash_share_target({ tab: 'note', content: 'Second shared words' });
 		remount();
-		await wait(30);
+		await vi.waitFor(() => expect(button('Keep earlier share')).not.toBeNull());
 		button('Keep earlier share')?.focus();
 		click('Keep earlier share');
 		await vi.waitFor(() => expect((document.activeElement?.textContent ?? '').trim()).toBe('Use shared content'));

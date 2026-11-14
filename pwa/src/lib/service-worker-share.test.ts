@@ -126,6 +126,8 @@ async function inbox(slot = 'pending'): Promise<{ title: string; files: { name: 
 }
 
 describe('service worker share intake (T10-S3-05)', () => {
+	// Several tests push 50 MB or more through the worker and fake IndexedDB:
+	// about 1.5 s here, over 5 s on a loaded CI runner, so they get 30 s.
 	beforeEach(() => {
 		globalThis.indexedDB = new IDBFactory();
 		passthrough = [];
@@ -180,14 +182,14 @@ describe('service worker share intake (T10-S3-05)', () => {
 
 		expect(response?.status).toBe(303);
 		expect((await inbox())?.files.map((f) => f.name)).toEqual(['ok.png']);
-	});
+	}, 30_000);
 
 	it('parks nothing when only over-limit files were shared', async () => {
 		await dispatch(share([huge_image('big.png', MAX_PHOTO_BYTES + 1)]));
 
 		expect(await inbox()).toBeUndefined();
 		expect(passthrough.length).toBe(1);
-	});
+	}, 30_000);
 
 	it('parks nothing when the share is over the total size limit', async () => {
 		const files = Array.from({ length: 6 }, (_, i) => huge_image(`p${i}.png`, 9 * MB));
@@ -195,7 +197,7 @@ describe('service worker share intake (T10-S3-05)', () => {
 
 		expect(await inbox()).toBeUndefined();
 		expect(passthrough.length).toBe(1);
-	});
+	}, 30_000);
 
 	it('parks nothing when the share has too many files', async () => {
 		const files = Array.from({ length: 11 }, (_, i) => image(`p${i}.png`));
@@ -237,8 +239,6 @@ describe('service worker share intake (T10-S3-05)', () => {
 		passthrough = [];
 		await dispatch(share([image('over.png', MAX_PHOTO_BYTES + 1)]));
 		expect(await inbox()).toBeUndefined();
-		// Two 50 MB bodies through the worker and fake IndexedDB: about 1.5 s
-		// locally, 6.4 s on a CI runner, so allow more than the 5 s default.
 	}, 30_000);
 
 	it('accepts exactly the file-count limit', async () => {
@@ -257,7 +257,7 @@ describe('service worker share intake (T10-S3-05)', () => {
 		await dispatch(share([...Array.from({ length: 5 }, (_, i) => image(`t${String(i)}.png`, 10 * MB)), image('extra.png', 1)]));
 		expect(await inbox()).toBeUndefined();
 		expect(passthrough.length).toBe(1);
-	});
+	}, 30_000);
 });
 
 describe('share intake bounds before and after parsing (T10-S4-16)', () => {
