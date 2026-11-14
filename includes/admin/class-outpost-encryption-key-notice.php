@@ -127,7 +127,8 @@ final class Outpost_Encryption_Key_Notice {
 			return;
 		}
 		check_admin_referer( self::DISMISS_NONCE_ACTION );
-		$reason  = sanitize_key( wp_unslash( (string) $_GET[ self::DISMISS_QUERY_KEY ] ) );
+		// '' for an array-shaped value, with no warning (T10-S4-28).
+		$reason  = Outpost_Request_Headers::query_key( self::DISMISS_QUERY_KEY );
 		$user_id = get_current_user_id();
 		if ( $user_id > 0 && in_array( $reason, array( 'database', 'constant_length' ), true ) ) {
 			update_user_meta( $user_id, self::DISMISSAL_META_PREFIX . $reason, '1' );

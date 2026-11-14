@@ -129,13 +129,19 @@ final class Outpost_OAuth_Settings_Page {
 	 * exchange_failed / etc.) as an admin notice on the settings page.
 	 */
 	private static function maybe_render_status_notice(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only OAuth callback redirect; status param is sanitized + matched against allowlist below.
-		$status = isset( $_GET['outpost_oauth_status'] ) ? sanitize_key( wp_unslash( (string) $_GET['outpost_oauth_status'] ) ) : '';
+		// Read-only values from the OAuth callback redirect; '' for an
+		// array-shaped value, with no warning (T10-S4-28).
+		$status = Outpost_Request_Headers::query_key( 'outpost_oauth_status' );
 		if ( '' === $status ) {
 			return;
 		}
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only OAuth callback redirect; provider id is sanitized to a key.
-		$provider = isset( $_GET['outpost_oauth_provider'] ) ? sanitize_key( wp_unslash( (string) $_GET['outpost_oauth_provider'] ) ) : '';
+		// Name only a registered provider, by its own label. An unknown id
+		// identifies no provider event, so it gets no notice.
+		$provider_obj = Outpost_OAuth_Controller::get_provider( Outpost_Request_Headers::query_key( 'outpost_oauth_provider' ) );
+		if ( null === $provider_obj ) {
+			return;
+		}
+		$provider = $provider_obj->label();
 
 		switch ( $status ) {
 			case 'connected':
