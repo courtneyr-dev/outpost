@@ -20,8 +20,12 @@ import { list_for_owner, remove_owned_entries, type OfflineQueueEnvironment } fr
  * - the sign-in can't be cleared → nothing else happens; still signed in;
  * - the posts can't be removed after the sign-in is gone → the person is
  *   told they're signed out but the posts are still here, and can retry the
- *   removal (with the account identity captured at the start; no token is
- *   needed or recreated) or finish signing out and keep them.
+ *   removal or finish signing out and keep them. No token is needed or
+ *   recreated for the retry.
+ *
+ * The account identity is captured when the choice opens and carried through
+ * Remove and every retry, so a rerender with a different `owner` prop can't
+ * change which posts an open sign-out removes.
  */
 export interface SignOutControlProps {
 	/** Canonical identity of the signed-in account. */
@@ -41,7 +45,8 @@ const PARTIAL =
 
 type Phase =
 	| { kind: 'idle' }
-	| { kind: 'choose'; queued: number }
+	/** `owner` is captured here, so a rerender can't change which posts Remove deletes. */
+	| { kind: 'choose'; queued: number; owner: string }
 	/** Signed out, but this account's posts are still queued. */
 	| { kind: 'partial'; owner: string };
 
@@ -95,7 +100,7 @@ export function SignOutControl({ owner, queueEnv, clearSignIn, finishSignOut }: 
 				if (await cleared()) finishSignOut();
 				return;
 			}
-			setPhase({ kind: 'choose', queued: count });
+			setPhase({ kind: 'choose', queued: count, owner });
 			requestAnimationFrame(() => prompt.current?.focus());
 		});
 
@@ -111,10 +116,8 @@ export function SignOutControl({ owner, queueEnv, clearSignIn, finishSignOut }: 
 		finishSignOut();
 	};
 
-	const remove_and_sign_out = (): Promise<void> =>
+	const remove_and_sign_out = (account: string): Promise<void> =>
 		run(async () => {
-			const account = owner;
-			if (account === null) return;
 			if (!(await cleared())) return;
 			await remove_queued(account);
 		});
@@ -158,7 +161,7 @@ export function SignOutControl({ owner, queueEnv, clearSignIn, finishSignOut }: 
 							class="outpost-button outpost-button--secondary"
 							disabled={busy}
 							onClick={(): void => {
-								void remove_and_sign_out();
+								void remove_and_sign_out(phase.owner);
 							}}
 						>
 							Remove my queued posts and sign out
