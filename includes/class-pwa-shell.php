@@ -745,10 +745,10 @@ function is_share_target_request(url) {
 //
 // The share may come from any app or page, so every field and file is
 // untrusted: only image types the composer can upload (pwa/src/lib/photo.ts),
-// within the limits below, are parked. A body that declares a length over the
-// intake limit passes through unread; otherwise the per-file, count, and total
-// limits apply once the browser has parsed the multipart body, and shared
-// title and text are cut to SHARE_MAX_TEXT_CHARS. Parked photos wait for the person: the composer shows them
+// within the limits below, are parked. The body is read as a stream and
+// never past SHARE_MAX_BODY_BYTES: a larger share passes through unparsed.
+// The per-file, count, and total limits then apply to the parsed parts, and
+// shared title and text are cut to SHARE_MAX_TEXT_CHARS. Parked photos wait for the person: the composer shows them
 // for review and nothing is used until they choose. The inbox holds the
 // waiting share (`pending`) and at most one newer share (`candidate`) while
 // the person decides between them; neither is ever overwritten, and a third
@@ -813,18 +813,45 @@ async function park_shared_photos(payload) {
 	}
 }
 
+// The share's form fields, read without ever holding more than
+// SHARE_MAX_BODY_BYTES (T10-S4-19). Resolves null when the body declares or
+// streams past that limit; rejects when it can't be read or parsed.
+async function read_bounded_form(request) {
+	const declared = request.headers.get('content-length');
+	if (declared !== null && (!/^[0-9]+$/.test(declared) || Number(declared) > SHARE_MAX_BODY_BYTES)) {
+		return null;
+	}
+	if (!request.body) {
+		throw new Error('no body');
+	}
+	const reader = request.body.getReader();
+	const chunks = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > SHARE_MAX_BODY_BYTES) {
+			await reader.cancel();
+			return null;
+		}
+		chunks.push(value);
+	}
+	const type = request.headers.get('content-type') || '';
+	return new Response(new Blob(chunks), { headers: { 'content-type': type } }).formData();
+}
+
 async function handle_share_post(event) {
-	// Clone before reading: formData() consumes the body, and a share with
+	// Clone before reading: reading consumes the body, and a share with
 	// no photo still has to reach the server as the original POST.
 	const passthrough = event.request.clone();
-	const declared = Number(event.request.headers.get('content-length'));
-	if (Number.isFinite(declared) && declared > SHARE_MAX_BODY_BYTES) {
-		return fetch(passthrough);
-	}
 	let form;
 	try {
-		form = await event.request.formData();
+		form = await read_bounded_form(event.request);
 	} catch (_err) {
+		return fetch(passthrough);
+	}
+	if (form === null) {
 		return fetch(passthrough);
 	}
 	const photos = form.getAll('photos').filter((entry) =>
