@@ -25,6 +25,9 @@ final class ShortcutRoutePermissionTest extends TestCase {
 	/** @var array<string, mixed> */
 	private array $saved_server = array();
 
+	/** @var array<string, mixed> */
+	private array $saved_request = array();
+
 	/** @var mixed */
 	private $saved_auth_cookie = null;
 
@@ -37,6 +40,7 @@ final class ShortcutRoutePermissionTest extends TestCase {
 			$this->markTestSkipped( 'Skipped under unit bootstrap.' );
 		}
 		$this->saved_server       = $_SERVER;
+		$this->saved_request      = $_REQUEST;
 		$this->saved_auth_cookie  = $GLOBALS['wp_rest_auth_cookie'] ?? null;
 		$this->saved_app_password = $GLOBALS['wp_rest_application_password_uuid'] ?? null;
 		$this->editor_id          = (int) wp_insert_user(
@@ -52,6 +56,7 @@ final class ShortcutRoutePermissionTest extends TestCase {
 
 	protected function tearDown(): void {
 		$_SERVER                                      = $this->saved_server;
+		$_REQUEST                                     = $this->saved_request;
 		$GLOBALS['wp_rest_auth_cookie']               = $this->saved_auth_cookie;
 		$GLOBALS['wp_rest_application_password_uuid'] = $this->saved_app_password;
 		wp_set_current_user( 0 );
@@ -62,11 +67,16 @@ final class ShortcutRoutePermissionTest extends TestCase {
 		parent::tearDown();
 	}
 
-	private function post(): int {
+	private function response(): \WP_REST_Response {
+		unset( $_REQUEST['_wpnonce'] );
 		$request = new \WP_REST_Request( 'POST', '/outpost/v1/shortcut' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_body( (string) wp_json_encode( array( 'url' => 'https://example.org/article' ) ) );
-		return rest_do_request( $request )->get_status();
+		return rest_do_request( $request );
+	}
+
+	private function post(): int {
+		return $this->response()->get_status();
 	}
 
 	public function test_the_shortcut_application_password_still_works(): void {
@@ -93,6 +103,8 @@ final class ShortcutRoutePermissionTest extends TestCase {
 		$GLOBALS['wp_rest_auth_cookie'] = true;
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['HTTP_X_WP_NONCE'] );
 
-		$this->assertContains( $this->post(), array( 401, 403 ) );
+		$response = $this->response();
+		$this->assertSame( 401, $response->get_status() );
+		$this->assertSame( 'outpost_ios_shortcut_unauthorized', $response->get_data()['code'] ?? null, 'Refused by the route itself, not a later step.' );
 	}
 }
