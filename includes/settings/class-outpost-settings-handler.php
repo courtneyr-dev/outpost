@@ -76,7 +76,7 @@ final class Outpost_Settings_Handler {
 		}
 
 		$nonce = isset( $_POST[ self::NONCE_FIELD ] )
-			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_FIELD ] ) )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_FIELD ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::nonce_action( $tab_id ) ) ) {
 			wp_die( esc_html__( 'Security check failed. Please reload and try again.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );

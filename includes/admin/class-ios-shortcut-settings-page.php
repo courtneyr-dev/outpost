@@ -94,7 +94,7 @@ final class Outpost_IOS_Shortcut_Settings_Page {
 		}
 		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
 
-		$action  = isset( $_POST[ self::ACTION_FIELD ] ) ? sanitize_key( wp_unslash( (string) $_POST[ self::ACTION_FIELD ] ) ) : '';
+		$action  = isset( $_POST[ self::ACTION_FIELD ] ) ? sanitize_key( wp_unslash( $_POST[ self::ACTION_FIELD ] ) ) : '';
 		$user_id = get_current_user_id();
 
 		if ( 'create' === $action ) {

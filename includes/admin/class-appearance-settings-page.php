@@ -163,8 +163,8 @@ final class Outpost_Appearance_Settings_Page {
 		self::guard_post_request();
 
 		$user_id   = (int) get_current_user_id();
-		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( (string) $_POST['mode_preference'] ) ) : '';
-		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( (string) $_POST['style_source'] ) ) : '';
+		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( $_POST['mode_preference'] ) ) : '';
+		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( $_POST['style_source'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
 			? array_keys( array_filter( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) ) )
@@ -214,7 +214,7 @@ final class Outpost_Appearance_Settings_Page {
 
 	private static function guard_post_request(): void {
 		$nonce = isset( $_POST[ self::NONCE_NAME ] )
-			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_NAME ] ) )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );

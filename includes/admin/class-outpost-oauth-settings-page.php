@@ -196,7 +196,7 @@ final class Outpost_OAuth_Settings_Page {
 			wp_die( esc_html__( 'You do not have permission to disconnect OAuth providers.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'outpost_oauth_disconnect', '_outpost_disconnect_nonce' );
-		$provider_id = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( (string) $_POST['provider'] ) ) : '';
+		$provider_id = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( $_POST['provider'] ) ) : '';
 
 		$provider = Outpost_OAuth_Controller::get_provider( $provider_id );
 		if ( null !== $provider ) {
