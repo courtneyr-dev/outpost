@@ -104,8 +104,10 @@ final class SettingsFieldsTest extends TestCase {
 		);
 		$html = ob_get_clean();
 
+		// T10-S3-11: a password input never carries a value, whatever is passed.
 		$this->assertStringContainsString( 'type="password"', $html );
-		$this->assertStringContainsString( 'value="secret-value"', $html );
+		$this->assertStringNotContainsString( 'value=', $html );
+		$this->assertStringNotContainsString( 'secret-value', $html );
 	}
 
 	public function test_render_checkbox_marks_checked_when_truthy(): void {
