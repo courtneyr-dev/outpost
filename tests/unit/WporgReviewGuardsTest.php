@@ -81,6 +81,56 @@ final class WporgReviewGuardsTest extends TestCase {
 	 * the affected handlers read query values through the narrow helpers
 	 * instead of comparing or casting raw $_GET values.
 	 */
+	/**
+	 * T10-S3-12 (F-16): the WordPress.org readme stays under 10,000 bytes and
+	 * keeps the header, the external-service disclosures, the source and build
+	 * instructions, and the third-party license note. Older changelog entries
+	 * live in CHANGELOG.md, which the package excludes.
+	 */
+	public function test_readme_is_small_and_keeps_what_review_needs(): void {
+		$root   = dirname( __DIR__, 2 );
+		$readme = (string) file_get_contents( $root . '/readme.txt' );
+		$this->assertLessThan( 10000, strlen( $readme ), 'readme.txt must stay under 10,000 bytes.' );
+
+		foreach ( array(
+			'=== Outpost Mobile Publishing ===',
+			'Contributors:',
+			'Tags:',
+			'Tested up to:',
+			'Stable tag:        1.0.27',
+			'License:           GPLv2 or later',
+			'Requires at least:',
+			'Requires PHP:',
+			'Requires Plugins:  indieauth, micropub',
+			'== Installation ==',
+			'== External services ==',
+			'== Source Code ==',
+			'== Changelog ==',
+			'= 1.0.27 =',
+			'`pwa/src/`',
+			'`src/`',
+			'npm run build:all',
+			'npm run build:wp',
+			'THIRD-PARTY-LICENSES.txt',
+			'github.com/courtneyr-dev/outpost',
+		) as $needle ) {
+			$this->assertStringContainsString( $needle, $readme, "readme.txt keeps: $needle" );
+		}
+		foreach ( array(
+			'brid.gy', 'api.telegra.ph', 'api.beehiiv.com', 'api.buttondown.email', 'api.convertkit.com', 'write.as',
+			'Vimeo', 'YouTube', 'Spotify', 'SoundCloud', 'TMDB', 'Open Library', 'MusicBrainz', 'RAWG', 'BoardGameGeek', 'Foursquare',
+			'nominatim.openstreetmap.org', 'api.notion.com', 'api.ouraring.com', 'api.prod.whoop.com', 'www.polaraccesslink.com',
+			'ridewithgps.com', 'api.ravelry.com', 'Facebook', 'Threads', 'Pinterest', 'Reddit', 'LinkedIn', 'Instagram', 'TikTok',
+			'Flickr', 'www.icloud.com/shortcuts/',
+		) as $service ) {
+			$this->assertStringContainsString( $service, $readme, "External services discloses $service." );
+		}
+		$this->assertFileExists( $root . '/CHANGELOG.md' );
+		$this->assertMatchesRegularExpression( '/^CHANGELOG\.md$/m', (string) file_get_contents( $root . '/.distignore' ), 'CHANGELOG.md is not packaged.' );
+		$this->assertSame( 1, preg_match( '/^Stable tag:\s*(\S+)\s*$/m', $readme, $tag ) );
+		$this->assertSame( '1.0.27', $tag[1], 'No version other than 1.0.27.' );
+	}
+
 	public function test_input_legibility_sources(): void {
 		$root       = dirname( __DIR__, 2 );
 		$controller = (string) file_get_contents( $root . '/includes/sources/class-share-target-controller.php' );
