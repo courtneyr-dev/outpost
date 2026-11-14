@@ -101,16 +101,17 @@ final class Outpost_Share_Target_Controller {
 		// sanitizers don't fit here: sanitize_text_field() drops percent
 		// escapes, and the KSES filter encodes the `&` a URL query needs.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Web Share Target spec: nonces don't apply to OS-initiated share intents.
-		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in the same expression by Outpost_Source_Detector::sanitize_shared_text() or ::sanitize_shared_url_field().
+		// Plugin Check doesn't know these two sanitizers, so each read below
+		// carries its own InputNotSanitized ignore naming the one that runs.
 		$title = isset( $_POST['title'] ) && is_string( $_POST['title'] ) && '' !== $_POST['title']
-			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['title'] ) )
-			: ( isset( $_GET['title'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['title'] ) ) : '' );
+			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['title'] ) ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_text().
+			: ( isset( $_GET['title'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['title'] ) ) : '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_text().
 		$text  = isset( $_POST['text'] ) && is_string( $_POST['text'] ) && '' !== $_POST['text']
-			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['text'] ) )
-			: ( isset( $_GET['text'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['text'] ) ) : '' );
+			? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_POST['text'] ) ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_text().
+			: ( isset( $_GET['text'] ) ? Outpost_Source_Detector::sanitize_shared_text( wp_unslash( $_GET['text'] ) ) : '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_text().
 		$url   = isset( $_POST['url'] ) && is_string( $_POST['url'] ) && '' !== $_POST['url']
-			? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_POST['url'] ) )
-			: ( isset( $_GET['url'] ) ? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_GET['url'] ) ) : '' );
+			? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_POST['url'] ) ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_url_field().
+			: ( isset( $_GET['url'] ) ? Outpost_Source_Detector::sanitize_shared_url_field( wp_unslash( $_GET['url'] ) ) : '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized by sanitize_shared_url_field().
 		// phpcs:enable
 		return array(
 			'title' => $title,

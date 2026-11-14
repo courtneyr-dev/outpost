@@ -601,6 +601,48 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * P-2 (2026-11-14): Plugin Check 2.2.0 reports Outpost's own share-field
+	 * sanitizers as InputNotSanitized warnings (evidence log 26). No block
+	 * `phpcs:disable` may cover that sniff: it would also silence a read
+	 * added inside the block later. Each suppression is a per-line
+	 * `phpcs:ignore` that names the sanitize_shared_*() call on its own line.
+	 */
+	public function test_input_not_sanitized_is_never_block_disabled(): void {
+		$disabled = array();
+		$unnamed  = array();
+		$ignores  = 0;
+		$root = dirname( __DIR__, 2 );
+		// shipped_tokens() drops comments, so read the same files with them.
+		foreach ( array_keys( self::shipped_tokens() ) as $file ) {
+			$tokens = token_get_all( (string) file_get_contents( $root . '/' . $file ) );
+			foreach ( $tokens as $token ) {
+				if ( ! is_array( $token ) || T_COMMENT !== $token[0] || 1 !== preg_match( '/phpcs:\w+[^\n]*InputNotSanitized/', $token[1] ) ) {
+					continue;
+				}
+				if ( false !== strpos( $token[1], 'phpcs:disable' ) ) {
+					$disabled[] = $file . ':' . $token[2];
+					continue;
+				}
+				++$ignores;
+				// The code this ignore covers: every token on the comment's own line.
+				$line = '';
+				foreach ( $tokens as $other ) {
+					if ( is_array( $other ) && $other[2] === $token[2] && T_COMMENT !== $other[0] ) {
+						$line .= $other[1];
+					}
+				}
+				$named = preg_match( '/(sanitize_shared_[a-z_]+)\(\)/', $token[1], $m ) ? $m[1] : '';
+				if ( '' === $named || false === strpos( $line, '::' . $named ) ) {
+					$unnamed[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertSame( array(), $disabled, 'Suppress InputNotSanitized per line, never for a block.' );
+		$this->assertSame( array(), $unnamed, 'Each InputNotSanitized ignore sits on a sanitize_shared_*() read and names it.' );
+		$this->assertSame( 6, $ignores, 'The six share-field reads (title, text, url; POST and GET) carry one ignore each.' );
+	}
+
+	/**
 	 * T10 (2026-11-13): share intake (share-target route and iOS Shortcut)
 	 * keeps no server-side state. The removed prefill transient had no
 	 * reader, so nothing may write `outpost_prefill_*` or carry its helpers.
