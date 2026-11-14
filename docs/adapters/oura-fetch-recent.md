@@ -59,6 +59,16 @@ post_meta:
 
 Sleep is `note` rather than `workout` because sleep is observational, not an active session.
 
+With Post Kinds active (its `post-kinds-indieweb/sleep-card` block registered), the payload adds what the picker inserts in place of the paragraph:
+
+```
+blocks: [ { name: "post-kinds-indieweb/sleep-card", attributes: { durationMinutes: 434 } } ]
+terms:  { kind: [ <id of the sleep term> ] }
+date:   "2026-05-03T12:00:00"
+```
+
+`date` is noon of the night the sleep began, in the site timezone: the bedtime minus twelve hours, the rule Post Kinds files sleep posts by. The bedtime picks the night and nothing else; no clock time goes into the card, the content or post meta, and Post Kinds keeps sleep posts at noon. `terms` is left out when the site has no `sleep` term yet, and Post Kinds files the post by its first card on save. The picker falls back to the paragraph when the editor doesn't have the block type.
+
 ## No icon URL
 
 Oura's v2 API doesn't expose generic activity icons. The default item renderer (PR #57) skips the icon space when `icon_url` is null.
