@@ -7,72 +7,126 @@ import { list_for_owner, remove_owned_entries, type OfflineQueueEnvironment } fr
  * When the signed-in account has posts waiting in the offline queue, the
  * person chooses first: keep them on this device (they send after the same
  * account signs in again) or remove them. Removing deletes only this
- * account's posts; posts other accounts or older versions left on the
- * device stay either way. With nothing queued, signing out works as before.
- * If the queue can't be read or changed, the person stays signed in and the
- * status line says so; it never claims a removal that didn't happen.
+ * account's posts; posts other accounts or older versions left on the device
+ * stay either way. With nothing queued, signing out works as before.
+ *
+ * Order (v1.1): the sign-in lives in one IndexedDB database and the queue in
+ * another, so the two can't change in one transaction. The sign-in is always
+ * cleared first and queued posts are removed only after that succeeded, so
+ * retained work is never deleted while a credential that could publish it is
+ * still on the device. Each step's outcome is reported before the page
+ * reloads:
+ *
+ * - the sign-in can't be cleared → nothing else happens; still signed in;
+ * - the posts can't be removed after the sign-in is gone → the person is
+ *   told they're signed out but the posts are still here, and can retry the
+ *   removal (with the account identity captured at the start; no token is
+ *   needed or recreated) or finish signing out and keep them.
  */
 export interface SignOutControlProps {
 	/** Canonical identity of the signed-in account. */
 	owner: string | null;
 	queueEnv?: OfflineQueueEnvironment;
-	/** Clears the sign-in and reloads (lib/sign-out.ts in the app). */
-	onSignOut: () => void | Promise<void>;
+	/** Remove the sign-in (lib/sign-out.ts clear_sign_in); rejects when the token store fails. */
+	clearSignIn: () => Promise<void>;
+	/** Forget drafts and the appearance copy, then reload (lib/sign-out.ts finish_sign_out). */
+	finishSignOut: () => void;
 }
 
 const CHECK_FAILED = 'Couldn’t check this device for queued posts, so you’re still signed in. Try again.';
-const REMOVE_FAILED =
-	'Couldn’t remove your queued posts, so nothing was removed and you’re still signed in. Try again.';
+const SIGN_IN_NOT_CLEARED =
+	'Couldn’t remove the sign-in from this device, so you’re still signed in and nothing was removed. Try again.';
+const PARTIAL =
+	'You’re signed out of this device, but your queued posts couldn’t be removed and are still here. Try removing them again, or finish signing out and keep them.';
 
-export function SignOutControl({ owner, queueEnv, onSignOut }: SignOutControlProps) {
-	// Number of this account's queued posts once the person has to choose.
-	const [queued, setQueued] = useState<number | null>(null);
+type Phase =
+	| { kind: 'idle' }
+	| { kind: 'choose'; queued: number }
+	/** Signed out, but this account's posts are still queued. */
+	| { kind: 'partial'; owner: string };
+
+export function SignOutControl({ owner, queueEnv, clearSignIn, finishSignOut }: SignOutControlProps) {
+	const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
 	const [status, setStatus] = useState('');
 	const [busy, setBusy] = useState(false);
 	const prompt = useRef<HTMLParagraphElement | null>(null);
 
-	const start = async (): Promise<void> => {
-		setStatus('');
-		if (owner === null) {
-			// No account identity, so no queued post can be this account's.
-			await onSignOut();
-			return;
-		}
-		let count: number;
+	/** Clear the sign-in; on failure say so and resolve false. */
+	const cleared = async (): Promise<boolean> => {
 		try {
-			count = (await list_for_owner(owner, queueEnv)).own.length;
+			await clearSignIn();
+			return true;
 		} catch (_err) {
-			setStatus(CHECK_FAILED);
-			return;
+			setStatus(SIGN_IN_NOT_CLEARED);
+			return false;
 		}
-		if (count === 0) {
-			await onSignOut();
-			return;
-		}
-		setQueued(count);
-		requestAnimationFrame(() => prompt.current?.focus());
 	};
 
-	const remove_and_sign_out = async (): Promise<void> => {
+	const run = async (step: () => Promise<void>): Promise<void> => {
 		setBusy(true);
 		setStatus('');
 		try {
-			await remove_owned_entries(owner, queueEnv);
-		} catch (_err) {
+			await step();
+		} finally {
 			setBusy(false);
-			setStatus(REMOVE_FAILED);
+		}
+	};
+
+	const sign_out_keeping_queue = (): Promise<void> =>
+		run(async () => {
+			if (await cleared()) finishSignOut();
+		});
+
+	const start = (): Promise<void> =>
+		run(async () => {
+			if (owner === null) {
+				// No account identity, so no queued post can be this account's.
+				if (await cleared()) finishSignOut();
+				return;
+			}
+			let count: number;
+			try {
+				count = (await list_for_owner(owner, queueEnv)).own.length;
+			} catch (_err) {
+				setStatus(CHECK_FAILED);
+				return;
+			}
+			if (count === 0) {
+				if (await cleared()) finishSignOut();
+				return;
+			}
+			setPhase({ kind: 'choose', queued: count });
+			requestAnimationFrame(() => prompt.current?.focus());
+		});
+
+	/** Delete the captured account's posts; the sign-in is already gone. */
+	const remove_queued = async (account: string): Promise<void> => {
+		try {
+			await remove_owned_entries(account, queueEnv);
+		} catch (_err) {
+			setPhase({ kind: 'partial', owner: account });
+			setStatus(PARTIAL);
 			return;
 		}
-		await onSignOut();
+		finishSignOut();
 	};
+
+	const remove_and_sign_out = (): Promise<void> =>
+		run(async () => {
+			const account = owner;
+			if (account === null) return;
+			if (!(await cleared())) return;
+			await remove_queued(account);
+		});
 
 	return (
 		<>
-			{queued === null ? (
+			{phase.kind === 'idle' ? (
 				<div class="outpost-form-actions">
 					<button
 						type="button"
 						class="outpost-button outpost-button--secondary"
+						disabled={busy}
 						onClick={(): void => {
 							void start();
 						}}
@@ -81,12 +135,12 @@ export function SignOutControl({ owner, queueEnv, onSignOut }: SignOutControlPro
 						Sign out of this device
 					</button>
 				</div>
-			) : (
+			) : phase.kind === 'choose' ? (
 				<div role="group" aria-labelledby="outpost-signout-queued">
 					<p id="outpost-signout-queued" ref={prompt} tabIndex={-1}>
-						{queued === 1
+						{phase.queued === 1
 							? 'You have 1 queued post on this device that hasn’t been sent.'
-							: `You have ${String(queued)} queued posts on this device that haven’t been sent.`}
+							: `You have ${String(phase.queued)} queued posts on this device that haven’t been sent.`}
 					</p>
 					<div class="outpost-form-actions">
 						<button
@@ -94,7 +148,7 @@ export function SignOutControl({ owner, queueEnv, onSignOut }: SignOutControlPro
 							class="outpost-button outpost-button--secondary"
 							disabled={busy}
 							onClick={(): void => {
-								void onSignOut();
+								void sign_out_keeping_queue();
 							}}
 						>
 							Keep queued posts on this device
@@ -110,6 +164,27 @@ export function SignOutControl({ owner, queueEnv, onSignOut }: SignOutControlPro
 							Remove my queued posts and sign out
 						</button>
 					</div>
+				</div>
+			) : (
+				<div class="outpost-form-actions">
+					<button
+						type="button"
+						class="outpost-button outpost-button--secondary"
+						disabled={busy}
+						onClick={(): void => {
+							void run(() => remove_queued(phase.owner));
+						}}
+					>
+						Try removing my queued posts again
+					</button>
+					<button
+						type="button"
+						class="outpost-button outpost-button--secondary"
+						disabled={busy}
+						onClick={finishSignOut}
+					>
+						Finish signing out
+					</button>
 				</div>
 			)}
 			<p class="outpost-status" role="status" aria-live="polite">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Fragment, type JSX } from 'preact';
 import { clear_token, type StoredToken, type TokenStoreEnvironment } from '../lib/token-store';
-import { sign_out } from '../lib/sign-out';
+import { clear_sign_in, finish_sign_out } from '../lib/sign-out';
 import { START_SCREEN_WAIT_MS, initial_screen } from '../lib/start-screen';
 import type { StartScreen } from '../lib/appearance';
 import type { MicropubEnvironment } from '../lib/micropub';
@@ -647,9 +647,8 @@ export function ComposerTabs({
 					}}
 					queueOwner={canonical_account(token.me)}
 					{...(queueEnv ? { queueEnv } : {})}
-					onSignOut={(): void => {
-						void sign_out(tokenStore);
-					}}
+					onClearSignIn={(): Promise<void> => clear_sign_in(tokenStore)}
+					onFinishSignOut={finish_sign_out}
 					preferences={preferences}
 				/>
 			),

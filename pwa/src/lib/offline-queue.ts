@@ -241,12 +241,13 @@ export async function enqueue(
 	input: QueueEnqueueInput,
 	env: OfflineQueueEnvironment = default_env,
 ): Promise<number> {
+	const owner = canonical_account(input.me);
 	const value: Omit<QueueEntry, 'id'> = {
 		source: input.source,
 		properties: input.properties,
 		micropubEndpoint: input.micropubEndpoint,
 		...(input.me !== undefined ? { me: input.me } : {}),
-		...(owner_from(input.me) !== null ? { owner: owner_from(input.me) as string } : {}),
+		...(owner !== null ? { owner } : {}),
 		...(input.media !== undefined ? { media: input.media } : {}),
 		...(input.mediaEndpoint !== undefined ? { mediaEndpoint: input.mediaEndpoint } : {}),
 		createdAt: Date.now(),
@@ -258,10 +259,6 @@ export async function enqueue(
 	});
 	notify_queue_changed();
 	return id;
-}
-
-function owner_from(me: string | undefined): string | null {
-	return canonical_account(me);
 }
 
 /**
