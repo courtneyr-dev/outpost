@@ -297,6 +297,34 @@ describe('share intake bounds before and after parsing (T10-S4-16)', () => {
 		expect(await inbox()).toBeUndefined();
 	});
 
+	it('passes an open oversized stream through without waiting on it (T10-S4-23)', async () => {
+		const chunk = new Uint8Array(1024 * 1024);
+		let sent = 0;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller): void {
+				// Emits past the limit, then stays open: no close() is ever called.
+				if (sent <= policy.total + 2 * MB) {
+					sent += chunk.byteLength;
+					controller.enqueue(chunk);
+				}
+			},
+		});
+		const request = new Request(ORIGIN + '/post/share-target', {
+			method: 'POST',
+			body,
+			headers: { 'content-type': 'multipart/form-data; boundary=x' },
+			duplex: 'half',
+		} as RequestInit);
+
+		const outcome = await Promise.race([
+			dispatch(request).then(() => 'passed through'),
+			new Promise<string>((resolve) => setTimeout(() => resolve('stalled'), 3000)),
+		]);
+
+		expect(outcome).toBe('passed through');
+		expect(passthrough.length).toBe(1);
+	});
+
 	it('stores at most 4,000 characters of shared title and text', async () => {
 		await dispatch(share([image('a.png')], { title: 'T'.repeat(5000), text: 'x'.repeat(9000) }));
 
