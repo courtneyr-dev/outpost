@@ -663,10 +663,16 @@ const PRECACHE_URLS = [
 	PLUGIN_URL + 'assets/icons/outpost-icon-maskable.svg',
 ];
 
+// Precache without cookies. The shell is sent no-store because a
+// cookie-identified response carries that person's appearance choice, and
+// the Cache API stores whatever it gets; the credential-less shell keeps the
+// composer opening offline without keeping one person's shell (T10-S4-04).
+const PRECACHE_REQUESTS = PRECACHE_URLS.map((url) => new Request(url, { credentials: 'omit' }));
+
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(CACHE_NAME)
-			.then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {
+			.then((cache) => cache.addAll(PRECACHE_REQUESTS).catch(() => {
 				// Best-effort precache. If a single URL 404s on first install
 				// (e.g. token CSS not yet deployed) we don't want the whole
 				// install to fail — the fetch handler will fill the cache
