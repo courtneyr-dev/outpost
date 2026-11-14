@@ -207,9 +207,17 @@ final class Outpost_IOS_Shortcut_App_Password {
 				'fields'   => 'ID',
 			)
 		);
+		$left     = false;
 		foreach ( (array) $user_ids as $user_id ) {
 			self::revoke( (int) $user_id );
+			if ( null !== self::find( (int) $user_id ) ) {
+				$left = true;
+			}
 		}
-		update_site_option( self::UNSCOPED_SWEPT_OPTION, '1' );
+		// Mark the sweep done only when no Outpost password is left, so a
+		// deletion that didn't land is retried on the next request.
+		if ( ! $left ) {
+			update_site_option( self::UNSCOPED_SWEPT_OPTION, '1' );
+		}
 	}
 }
