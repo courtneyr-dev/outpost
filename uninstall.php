@@ -28,4 +28,4 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 require_once __DIR__ . '/includes/class-outpost-uninstaller.php';
 
-Outpost_Uninstaller::run();
+Outpost_Uninstaller::run( WP_UNINSTALL_PLUGIN );

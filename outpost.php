@@ -906,7 +906,7 @@ function outpost_deactivate( bool $network_wide = false ): void {
 	// WordPress saves the plugin as inactive only after this hook returns,
 	// so stopping here keeps Outpost and its route rule loaded (T10-S4-27).
 	if ( ! Outpost_Uninstaller::delete_shortcut_application_passwords() ) {
-		Outpost_Uninstaller::stop_for_surviving_password( __( 'Deactivation', 'outpost-mobile-publishing' ) );
+		Outpost_Uninstaller::stop_deactivation();
 		return;
 	}
 	flush_rewrite_rules();

@@ -96,13 +96,15 @@ final class Outpost_Uninstaller {
 	/**
 	 * Run the full uninstall — every site on multisite, otherwise the one site.
 	 */
-	public static function run(): void {
+	public static function run( string $plugin_basename = '' ): void {
 		// Application passwords live in network-wide user meta, so they are
 		// removed once, not per site. If one survives, stop before deleting
-		// anything else: WordPress removes the plugin files only after this
-		// returns, and those files hold the rule that keeps it scoped.
+		// anything else. Uninstall runs after deactivation and without
+		// loading Outpost, so keeping the files alone can't keep the password
+		// scoped: turn Outpost back on, so the next request loads its route
+		// rule, and then stop (T10-S4-27, final delta review D-01).
 		if ( ! self::delete_shortcut_application_passwords() ) {
-			self::stop_for_surviving_password( __( 'Uninstall', 'outpost-mobile-publishing' ) );
+			self::stop_uninstall( self::reactivate( $plugin_basename ) );
 			return;
 		}
 
@@ -155,27 +157,54 @@ final class Outpost_Uninstaller {
 	}
 
 	/**
-	 * Stop with an explanation when a Shortcut application password survived
-	 * cleanup. Deactivation and uninstall call this, so WordPress keeps Outpost
-	 * active and its files in place while the password still needs its rule.
-	 *
-	 * @param string $action What was stopped, already translated.
+	 * Stop deactivation when a Shortcut application password survived
+	 * cleanup. WordPress saves the plugin as inactive only after the
+	 * deactivation hooks, so Outpost and its route rule stay loaded.
 	 */
-	public static function stop_for_surviving_password( string $action ): void {
+	public static function stop_deactivation(): void {
 		wp_die(
-			esc_html(
-				sprintf(
-					/* translators: %s: "Deactivation" or "Uninstall". */
-					__( '%s stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays installed and active and that password stays limited to the Shortcut. Try again.', 'outpost-mobile-publishing' ),
-					$action
-				)
-			),
+			esc_html__( 'Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again.', 'outpost-mobile-publishing' ),
 			esc_html__( 'Outpost is still active', 'outpost-mobile-publishing' ),
 			array(
 				'response'  => 500,
 				'back_link' => true,
 			)
 		);
+	}
+
+	/**
+	 * Stop uninstall when a Shortcut application password survived cleanup.
+	 *
+	 * @param bool $reactivated Whether Outpost was turned back on.
+	 */
+	private static function stop_uninstall( bool $reactivated ): void {
+		$message = $reactivated
+			? __( 'Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords.', 'outpost-mobile-publishing' )
+			: __( 'Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again.', 'outpost-mobile-publishing' );
+		wp_die(
+			esc_html( $message ),
+			esc_html__( 'Outpost uninstall stopped', 'outpost-mobile-publishing' ),
+			array(
+				'response'  => 500,
+				'back_link' => true,
+			)
+		);
+	}
+
+	/**
+	 * Turn Outpost back on, network-wide on multisite (where the Shortcut
+	 * password needs network activation), without running activation hooks.
+	 *
+	 * @param string $plugin_basename Plugin basename, e.g. outpost-mobile-publishing/outpost.php.
+	 * @return bool Whether Outpost is saved as active.
+	 */
+	private static function reactivate( string $plugin_basename ): bool {
+		if ( '' === $plugin_basename ) {
+			return false;
+		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$result = activate_plugin( $plugin_basename, '', is_multisite(), true );
+		return ! is_wp_error( $result );
 	}
 
 	/**
