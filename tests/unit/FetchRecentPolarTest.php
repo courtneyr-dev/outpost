@@ -132,8 +132,8 @@ final class FetchRecentPolarTest extends TestCase {
 			static function () {
 				return array(
 					'exercises' => array(
-						'https://www.polaraccesslink.com/v3/exercises/ex-1',
-						'https://www.polaraccesslink.com/v3/exercises/ex-2',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-1',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-2',
 					),
 				);
 			}
@@ -150,7 +150,7 @@ final class FetchRecentPolarTest extends TestCase {
 			static function () {
 				return array(
 					'exercises' => array(
-						array( 'url' => 'https://www.polaraccesslink.com/v3/exercises/ex-3' ),
+						array( 'url' => 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3' ),
 					),
 				);
 			}
@@ -160,6 +160,24 @@ final class FetchRecentPolarTest extends TestCase {
 
 		$this->assertCount( 1, $urls );
 		$this->assertStringContainsString( 'ex-3', $urls[0] );
+	}
+
+	public function test_list_transaction_exercises_drops_urls_outside_this_transaction(): void {
+		Outpost_Fetch_Recent_Polar::set_http_resolver_for_tests(
+			static function () {
+				return array(
+					'exercises' => array(
+						'https://attacker.example/v3/users/7/exercise-transactions/txn-1/exercises/ex-1',
+						'https://www.polaraccesslink.com/v3/users/8/exercise-transactions/txn-1/exercises/ex-2',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3',
+					),
+				);
+			}
+		);
+
+		$urls = Outpost_Fetch_Recent_Polar::list_transaction_exercises( 'fixture-token', 7, 'txn-1' );
+
+		$this->assertSame( array( 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3' ), $urls );
 	}
 
 	public function test_fetch_items_does_not_commit_transaction(): void {
@@ -172,9 +190,9 @@ final class FetchRecentPolarTest extends TestCase {
 				if ( 'POST' === $method && str_contains( $url, '/exercise-transactions' ) ) {
 					return array( 'transaction-id' => 'txn-test' );
 				}
-				if ( 'GET' === $method && str_contains( $url, '/exercise-transactions/txn-test' ) ) {
+				if ( 'GET' === $method && str_ends_with( $url, '/exercise-transactions/txn-test' ) ) {
 					return array(
-						'exercises' => array( 'https://www.polaraccesslink.com/v3/exercises/ex-9' ),
+						'exercises' => array( 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-test/exercises/ex-9' ),
 					);
 				}
 				if ( 'GET' === $method && str_contains( $url, '/exercises/ex-9' ) ) {
@@ -205,11 +223,11 @@ final class FetchRecentPolarTest extends TestCase {
 				if ( 'POST' === $method ) {
 					return array( 'transaction-id' => 'txn-1' );
 				}
-				if ( str_contains( $url, '/exercise-transactions/txn-1' ) ) {
+				if ( str_ends_with( $url, '/exercise-transactions/txn-1' ) ) {
 					return array(
 						'exercises' => array(
-							'https://www.polaraccesslink.com/v3/exercises/a',
-							'https://www.polaraccesslink.com/v3/exercises/b',
+							'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/a',
+							'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/b',
 						),
 					);
 				}
