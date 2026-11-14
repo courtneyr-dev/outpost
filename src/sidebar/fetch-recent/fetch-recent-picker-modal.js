@@ -3,8 +3,8 @@
  *
  * Opens when the user taps "Add from {provider}" in the sidebar.
  * Fetches /outpost/v1/fetch-recent/<provider_id>, renders the items,
- * and inserts the chosen item's payload into the editor as a paragraph
- * block.
+ * and inserts the chosen item's payload into the editor: the blocks it
+ * names when the editor has them registered, else a paragraph.
  *
  * Loading / error / not-connected / items states are mutually
  * exclusive and decided per-render from {loading, error, response}
@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Modal, Button, Spinner, Notice } from '@wordpress/components';
 import { dispatch } from '@wordpress/data';
-import { createBlock } from '@wordpress/blocks';
+import { createBlock, getBlockType } from '@wordpress/blocks';
 import apiFetch from '@wordpress/api-fetch';
 import { applyFilters } from '@wordpress/hooks';
 import { __, sprintf } from '@wordpress/i18n';
@@ -67,14 +67,40 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 			if ( ! item || ! item.post_payload ) {
 				return;
 			}
-			const block = createBlock( 'core/paragraph', {
-				content: item.post_payload.content || '',
-			} );
-			dispatch( 'core/block-editor' ).insertBlocks( [ block ] );
+			const payload = item.post_payload;
 
-			const meta = ( item.post_payload && item.post_payload.post_meta ) || {};
-			if ( meta && Object.keys( meta ).length > 0 ) {
-				dispatch( 'core/editor' ).editPost( { meta } );
+			// A provider can send blocks a companion plugin registers, such
+			// as Post Kinds' sleep card (#260). They go in only when the
+			// editor knows every one; otherwise the paragraph does.
+			const wanted = Array.isArray( payload.blocks ) ? payload.blocks : [];
+			const known =
+				wanted.length > 0 &&
+				wanted.every(
+					( block ) => block && typeof block.name === 'string' && getBlockType( block.name )
+				);
+			const blocks = known
+				? wanted.map( ( block ) => createBlock( block.name, block.attributes || {} ) )
+				: [ createBlock( 'core/paragraph', { content: payload.content || '' } ) ];
+			dispatch( 'core/block-editor' ).insertBlocks( blocks );
+
+			const edits = {};
+			if ( known ) {
+				// Term ids keyed by taxonomy REST base, and the post date.
+				Object.entries( payload.terms || {} ).forEach( ( [ base, ids ] ) => {
+					if ( Array.isArray( ids ) && ids.every( ( id ) => Number.isInteger( id ) && id > 0 ) ) {
+						edits[ base ] = ids;
+					}
+				} );
+				if ( typeof payload.date === 'string' && payload.date ) {
+					edits.date = payload.date;
+				}
+			}
+			const meta = payload.post_meta || {};
+			if ( Object.keys( meta ).length > 0 ) {
+				edits.meta = meta;
+			}
+			if ( Object.keys( edits ).length > 0 ) {
+				dispatch( 'core/editor' ).editPost( edits );
 			}
 
 			onClose();
