@@ -22,6 +22,8 @@ use Outpost_Source_Registry;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
 
+require_once dirname( __DIR__ ) . '/fixtures/source-test-fakes.php';
+
 final class IosShortcutRestControllerTest extends TestCase {
 
 	public function setUp(): void {
@@ -31,8 +33,8 @@ final class IosShortcutRestControllerTest extends TestCase {
 
 		CoreSanitizerMocks::register();
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 7 );
-		WP_Mock::userFunction( 'set_transient' )->andReturn( true );
-		WP_Mock::userFunction( 'get_user_meta' )->andReturn( '2026-09-01T00:00:00+00:00' );
+		// T10-S3-01: Shortcut intake keeps no server-side state.
+		WP_Mock::userFunction( 'set_transient' )->never();
 		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://site.test' );
 		WP_Mock::userFunction( 'wp_parse_url' )->andReturnUsing( static fn( $url ) => parse_url( $url ) );
 		WP_Mock::userFunction( 'apply_filters' )->andReturnUsing( static fn( $hook, $value ) => $value );
@@ -148,5 +150,35 @@ final class IosShortcutRestControllerTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $response );
 		$this->assertSame( 'outpost_ios_shortcut_no_url', $response->get_error_code() );
 		$this->assertSame( array(), CoreSanitizerMocks::$esc_url_raw_calls, 'esc_url_raw() must never see a non-string.' );
+	}
+
+	/**
+	 * T10-S3-01: an auto-routed (unambiguous) Shortcut share returns its
+	 * composer redirect and writes nothing on the server: no transient, no
+	 * preview request. setUp() makes set_transient() a never() expectation.
+	 */
+	public function test_auto_routed_share_writes_no_server_state(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
+		WP_Mock::userFunction( 'wp_remote_post' )->never();
+		WP_Mock::userFunction( 'wp_safe_remote_post' )->never();
+		Outpost_Source_Registry::register(
+			new \Outpost_F5TestSource_Stub(
+				array(
+					'id'            => 'fake-auto',
+					'host_patterns' => array( 'example.com' ),
+					'ambiguity'     => 'unambiguous',
+					'mode'          => 'listen',
+				)
+			)
+		);
+
+		$response = $this->dispatch( array( 'url' => 'https://example.com/track/1' ) );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$data = $response->get_data();
+		$this->assertSame( 'auto', $data['route_type'] );
+		$this->assertStringContainsString( 'mode=listen', (string) $data['redirect_url'] );
+		$this->assertStringNotContainsString( 'cached_for=', (string) $data['redirect_url'], 'No server-side cache exists for the composer to look up.' );
 	}
 }

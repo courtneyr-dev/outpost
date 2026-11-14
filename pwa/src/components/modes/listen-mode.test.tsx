@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render } from 'preact';
 import { ListenMode } from './listen-mode';
 import type { StoredToken } from '../../lib/token-store';
 import type { MicropubEnvironment } from '../../lib/micropub';
 import type { MediaLookupEnvironment } from '../../lib/media-lookup';
+import { fetch_source_preview, type PreviewEnvironment } from '../../lib/preview';
+import { stash_share_target } from '../../lib/share-target';
+
+// T10-S3-03: count every source-preview call, whichever environment it uses.
+vi.mock('../../lib/preview', async (importOriginal) => {
+	const mod = await importOriginal<typeof import('../../lib/preview')>();
+	return { ...mod, fetch_source_preview: vi.fn(mod.fetch_source_preview) };
+});
 
 const mock_token: StoredToken = {
 	accessToken: 'test-token',
@@ -257,5 +265,91 @@ describe('ListenMode media lookup wiring', () => {
 
 		expect(posted_bodies.length).toBe(1);
 		expect(posted_bodies[0]).toContain('photo=');
+	});
+});
+
+describe('ListenMode share intake waits for the person (T10-S3-03)', () => {
+	let preview_calls: string[];
+
+	function preview_env(): PreviewEnvironment {
+		return {
+			fetch: async (input: RequestInfo | URL): Promise<Response> => {
+				preview_calls.push(String(input));
+				return new Response(
+					JSON.stringify({ extracted: { 'p-name': 'Shared Track Title', 'p-author': 'Shared Artist' } }),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				);
+			},
+		};
+	}
+
+	function mount_with_preview(): void {
+		render(
+			<ListenMode token={mock_token} micropubEnv={make_env()} previewEnv={preview_env()} />,
+			root,
+		);
+	}
+
+	function fill_button(): HTMLButtonElement | null {
+		const found = Array.from(root.querySelectorAll('button')).find((b) =>
+			/fill in details/i.test(b.textContent ?? ''),
+		);
+		return (found ?? null) as HTMLButtonElement | null;
+	}
+
+	beforeEach(() => {
+		preview_calls = [];
+		sessionStorage.clear();
+		vi.mocked(fetch_source_preview).mockClear();
+	});
+
+	it('prefills the URL from a share but sends no preview request on arrival', async () => {
+		stash_share_target({
+			tab: 'listen',
+			doingVariant: 'listen',
+			url: 'https://open.spotify.com/track/0000000000000000000000',
+			sourceId: 'spotify',
+		});
+		mount_with_preview();
+		await flush(3);
+
+		expect(input_for('outpost-listen-target').value).toBe(
+			'https://open.spotify.com/track/0000000000000000000000',
+		);
+		expect(vi.mocked(fetch_source_preview)).not.toHaveBeenCalled();
+		expect(preview_calls.length).toBe(0);
+		expect(fill_button()).not.toBeNull();
+	});
+
+	it('sends exactly one preview request after the person asks for details', async () => {
+		stash_share_target({
+			tab: 'listen',
+			doingVariant: 'listen',
+			url: 'https://open.spotify.com/track/0000000000000000000000',
+			sourceId: 'spotify',
+		});
+		mount_with_preview();
+		await flush(2);
+
+		fill_button()?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await flush(4);
+
+		expect(vi.mocked(fetch_source_preview)).toHaveBeenCalledTimes(1);
+		expect(preview_calls.length).toBe(1);
+		expect(preview_calls[0]).toContain('/outpost/v1/preview');
+		expect(input_for('outpost-listen-watch-title').value).toBe('Shared Track Title');
+	});
+
+	it('offers no source fetch when the share carried no source', async () => {
+		stash_share_target({
+			tab: 'listen',
+			doingVariant: 'listen',
+			url: 'https://example.test/track',
+		});
+		mount_with_preview();
+		await flush(3);
+
+		expect(vi.mocked(fetch_source_preview)).not.toHaveBeenCalled();
+		expect(fill_button()).toBeNull();
 	});
 });

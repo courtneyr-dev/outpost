@@ -12,6 +12,8 @@
 /styles/src
 /.wordpress-org
 /scripts
+# Developer note beside the Shortcut installer link; the .txt ships (T10-S4-03).
+/assets/ios-shortcut-base-link.README.md
 
 # Build artifacts. package.json's `files` allowlist already excludes these
 # from the zip; this is the belt to that pair of braces.

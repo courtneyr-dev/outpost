@@ -73,10 +73,13 @@ export interface ShareTargetData {
 	url?: string;
 	/** Source adapter id (e.g. 'spotify', 'youtube') — informational, may drive future routing decisions. */
 	sourceId?: string;
-	/** Cached preview transient token from F6 dispatcher; lets the mode component fetch parsed metadata via /preview. */
-	cachedFor?: string;
 	/** Photo tab only — the service worker parked shared image files in the share inbox for PhotoMode to drain. */
 	sharedPhotos?: boolean;
+	/**
+	 * Photo tab only — another photo share arrived while two were already
+	 * waiting, so the service worker didn't keep it.
+	 */
+	shareRefused?: boolean;
 }
 
 const REPLY_VARIANT_VALUES: ReplyVariant[] = [
@@ -121,6 +124,10 @@ const LIFE_VARIANT_VALUES: LifeVariant[] = [
 ];
 
 const KEY = 'outpost.share_target';
+/** Where a share waits for the person's decision (see hold_share_for_review). */
+const HELD_KEY = 'outpost.share_review';
+/** A second share that arrived while the first still waited. */
+const CANDIDATE_KEY = 'outpost.share_review_candidate';
 
 function safe_session_get(key: string): string | null {
 	try {
@@ -148,7 +155,7 @@ function safe_session_remove(key: string): void {
 
 /**
  * Parse F6 dispatcher query params landed on the composer route
- * (/post/?mode=...&picker=...&default=...&source=...&cached_for=...&url=...).
+ * (/post/?mode=...&picker=...&default=...&source=...&url=...).
  *
  * Returns null when no F6-shaped params are present — caller should
  * fall through to the legacy `parse_share_target` for the
@@ -160,10 +167,6 @@ function safe_session_remove(key: string): void {
  *   - `picker=reply` + `default=X`  → tab: reply with X as initial variant
  *   - `mode=photo&shared=photos`    → tab: photo, with the shared pictures
  *                                     waiting in the share inbox (share-inbox.ts)
- *
- * The `cached_for` token is preserved in sessionStorage alongside
- * the dispatch data so the composer can read the pre-fill transient
- * once it mounts.
  */
 export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const params = new URLSearchParams(search);
@@ -174,8 +177,8 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 	const text = (params.get('text') ?? '').trim();
 	const title = (params.get('title') ?? '').trim();
 	const source_id = (params.get('source') ?? '').trim();
-	const cached_for = (params.get('cached_for') ?? '').trim();
 	const shared = (params.get('shared') ?? '').trim();
+	const refused = (params.get('refused') ?? '').trim() === '1';
 
 	if (!mode && !picker) {
 		return null;
@@ -199,7 +202,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -212,21 +214,21 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
 	// Photo tab: photo + gallery (gallery routes through the same component).
 	// `shared=photos` is the service worker saying it parked the shared
-	// files in the inbox; PhotoMode drains them on mount.
+	// files in the inbox; ComposerTabs holds them for review, and PhotoMode
+	// drains them only after the person chooses Use.
 	if (mode === 'photo' || mode === 'gallery') {
 		return {
 			tab: 'photo',
 			...(shared === 'photos' ? { sharedPhotos: true } : {}),
+			...(shared === 'photos' && refused ? { shareRefused: true } : {}),
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -237,7 +239,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			lifeVariant: mode as LifeVariant,
 			...(text ? { content: text } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -249,7 +250,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -263,7 +263,6 @@ export function parse_dispatch_params(search: string): ShareTargetData | null {
 			...(text ? { content: text } : {}),
 			...(url ? { url } : {}),
 			...(source_id ? { sourceId: source_id } : {}),
-			...(cached_for ? { cachedFor: cached_for } : {}),
 		};
 	}
 
@@ -370,4 +369,83 @@ export function peek_share_target(): ShareTargetData | null {
 	} catch (_err) {
 		return null;
 	}
+}
+
+/** Shares waiting for a decision, earliest first (at most two). */
+export interface HeldShares {
+	shares: ShareTargetData[];
+	/** A share arrived while two were already waiting and wasn't kept. */
+	refused: boolean;
+}
+
+function parse_held(raw: string | null): ShareTargetData | null {
+	if (!raw) return null;
+	try {
+		const data = JSON.parse(raw) as ShareTargetData;
+		return data && typeof data === 'object' && typeof data.tab === 'string' ? data : null;
+	} catch (_err) {
+		return null;
+	}
+}
+
+/**
+ * Write the waiting shares back to their two session slots, earliest first.
+ * Anything past two is dropped; callers refuse a third share before this.
+ */
+export function set_held_shares(shares: ShareTargetData[]): void {
+	const [earlier, candidate] = shares;
+	if (earlier) safe_session_set(HELD_KEY, JSON.stringify(earlier));
+	else safe_session_remove(HELD_KEY);
+	if (candidate) safe_session_set(CANDIDATE_KEY, JSON.stringify(candidate));
+	else safe_session_remove(CANDIDATE_KEY);
+}
+
+/**
+ * Take the stashed intake out of the modes' reach until the person decides.
+ *
+ * A share can come from any page, so the composer holds it for review
+ * ("Use shared content" / "Discard shared content") instead of letting each
+ * mode consume it on mount. Called once, before the modes render: it moves
+ * the stash into a session slot, so a mode mounting now finds nothing.
+ *
+ * Two slots: a share that arrives while another waits becomes the new
+ * share, and the person picks one. A third share replaces neither; it is
+ * refused and `refused` says so. Both slots survive a reload until the
+ * person decides. A photo share the service worker already refused (both
+ * photo slots full) is refused here too, since its bytes were never kept.
+ */
+export function hold_share_for_review(): HeldShares {
+	const fresh_raw = safe_session_get(KEY);
+	safe_session_remove(KEY);
+	const shares = [parse_held(safe_session_get(HELD_KEY)), parse_held(safe_session_get(CANDIDATE_KEY))].filter(
+		(s): s is ShareTargetData => s !== null,
+	);
+	let refused = false;
+	const fresh = parse_held(fresh_raw);
+	if (fresh) {
+		if (fresh.shareRefused || shares.length >= 2) {
+			refused = true;
+		} else {
+			shares.push(fresh);
+		}
+	}
+	set_held_shares(shares);
+	return { shares, refused };
+}
+
+/**
+ * "Use shared content": hand the earliest held share to its mode's normal
+ * intake and clear both slots. Only called with a single share waiting.
+ */
+export function release_held_share(): ShareTargetData | null {
+	const data = parse_held(safe_session_get(HELD_KEY));
+	set_held_shares([]);
+	if (!data) return null;
+	safe_session_set(KEY, JSON.stringify(data));
+	return data;
+}
+
+/** "Discard shared content" / "Discard both": drop every held share. */
+export function discard_held_share(): void {
+	set_held_shares([]);
 }

@@ -186,9 +186,8 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 					),
 				)
 			);
-			if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-				error_log( sprintf( 'Outpost WHOOP revocation failed: %s', $response->get_error_message() ) );
+			if ( is_wp_error( $response ) ) {
+				Outpost_Debug_Log::write( sprintf( 'OAuth whoop revocation failed: %s', Outpost_Debug_Log::error_code( $response ) ) );
 			}
 		}
 		return Outpost_Credentials_Store::delete( $this->id(), $user_id );

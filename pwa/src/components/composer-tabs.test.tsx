@@ -517,11 +517,18 @@ describe('ComposerTabs: Home and the start screen', () => {
 		}
 	});
 
-	it('a share launch opens its tab even when another start screen is saved', () => {
+	it('a share launch opens its tab even when another start screen is saved', async () => {
 		prefer_start('reply');
 		stash_share_target({ tab: 'photo' });
 		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
-		expect(visible_panels()).toEqual(['outpost-panel-photo']);
+		// The share's decision comes first and is the only thing showing (T10-S3-05 v1.2)…
+		expect(root.querySelector('[data-outpost-share-review]')).not.toBeNull();
+		expect(visible_panels()).toEqual([]);
+		// …then its tab opens, not the saved start screen.
+		Array.from(root.querySelectorAll('button'))
+			.find((b) => (b.textContent ?? '').trim() === 'Discard shared content')
+			?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await vi.waitFor(() => expect(visible_panels()).toEqual(['outpost-panel-photo']));
 	});
 
 	it("uses the site's saved start screen on a device that hasn't stored one", async () => {

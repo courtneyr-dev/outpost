@@ -114,14 +114,22 @@ final class Outpost_Pending_Syndication_Notice {
 			return;
 		}
 
-		wp_add_inline_script(
-			Outpost_Sidebar_Assets::HANDLE,
-			sprintf(
-				'window.%s = %s;',
-				self::PAYLOAD_GLOBAL,
-				wp_json_encode( $payload )
-			),
-			'before'
+		wp_add_inline_script( Outpost_Sidebar_Assets::HANDLE, self::inline_payload( $payload ), 'before' );
+	}
+
+	/**
+	 * The inline script that hands the payload to the editor bundle. The
+	 * JSON is hex-escaped so no `<!--`, `<script`, or `</script>` sequence
+	 * from a filtered label or a translation can appear inside the
+	 * <script> element (T10-S4-07); the same flags as the PWA manifest.
+	 *
+	 * @param array<string, mixed> $payload Payload from editor_notice_payload().
+	 */
+	public static function inline_payload( array $payload ): string {
+		return sprintf(
+			'window.%s = %s;',
+			self::PAYLOAD_GLOBAL,
+			wp_json_encode( $payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT )
 		);
 	}
 
@@ -286,15 +294,35 @@ final class Outpost_Pending_Syndication_Notice {
 		unset( $post_id );
 	}
 
+	/**
+	 * The post the editor screen is showing, or 0 when there is none or the
+	 * current user may not edit it.
+	 *
+	 * `post` is read from the query (post.php?post=NN) only to pick which
+	 * post's own pending entries to show; it is a positive integer or
+	 * nothing. The `edit_post` check runs before any caller reads post
+	 * meta, because post-new.php?post=NN renders for any user who can
+	 * create posts, whoever owns post NN.
+	 */
 	private static function current_post_id(): int {
-		// post=NN on post.php; new posts have no id yet.
-		if ( isset( $_GET['post'] ) && is_numeric( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			return (int) $_GET['post']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$post_id = 0;
+		// Selects which post's notice to show; no state change. A `post`
+		// parameter of any shape decides alone (no fallback to the global post).
+		if ( Outpost_Request_Headers::query_present( 'post' ) ) {
+			$raw = Outpost_Request_Headers::query_text( 'post', 20 );
+			if ( 1 === preg_match( '/^[1-9][0-9]{0,18}$/', $raw ) ) {
+				$post_id = (int) $raw;
+			}
+		} elseif ( isset( $GLOBALS['post'] ) && $GLOBALS['post'] instanceof WP_Post ) {
+			$post_id = (int) $GLOBALS['post']->ID;
 		}
-		if ( isset( $GLOBALS['post'] ) && $GLOBALS['post'] instanceof WP_Post ) {
-			return (int) $GLOBALS['post']->ID;
+		if ( $post_id <= 0 ) {
+			return 0;
 		}
-		return 0;
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return 0;
+		}
+		return $post_id;
 	}
 
 	private static function label_for( string $platform_id ): string {

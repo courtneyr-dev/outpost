@@ -136,9 +136,8 @@ final class Outpost_OAuth_Provider_Polar extends Outpost_OAuth_Provider_Base {
 			return;
 		}
 		$response = self::register_user_with_app( $access_token, $user_id );
-		if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-			error_log( sprintf( 'Outpost Polar after_token_exchange registration failed: %s', $response->get_error_message() ) );
+		if ( is_wp_error( $response ) ) {
+			Outpost_Debug_Log::write( sprintf( 'OAuth polar user registration failed: %s', Outpost_Debug_Log::error_code( $response ) ) );
 		}
 	}
 

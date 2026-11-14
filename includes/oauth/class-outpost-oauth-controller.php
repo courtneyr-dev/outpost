@@ -8,9 +8,10 @@
  *   GET  /wp-json/outpost/v1/oauth/{provider}/callback   → exchange code, store creds
  *   POST /wp-json/outpost/v1/oauth/{provider}/disconnect → revoke + delete creds
  *
- * The start, disconnect and verify routes require a logged-in user with
- * manage_options and refuse any request that carries an IndieAuth bearer
- * token (see permission_check()). The callback URL pattern is fixed; each
+ * The start, disconnect and verify routes require the person's own
+ * wp-admin session (a cookie with a valid REST nonce) and manage_options;
+ * bearer tokens and application passwords are refused (see
+ * permission_check()). The callback URL pattern is fixed; each
  * provider's app registration uses its own callback URL with the provider
  * id in the path.
  *
@@ -141,22 +142,20 @@ final class Outpost_OAuth_Controller {
 	}
 
 	/**
-	 * Permission for the start, disconnect and verify routes: a logged-in
-	 * user with manage_options, and never a bearer-token request.
+	 * Permission for the start, disconnect and verify routes: the person's
+	 * own wp-admin session (a cookie with a valid REST nonce) and
+	 * manage_options.
 	 *
-	 * IndieAuth's map_meta_cap does not restrict manage_options, so an
-	 * admin's token of any scope would pass the capability check alone.
-	 * These are wp-admin actions with no token use case, so the required
-	 * scope list is empty: bearer_has_scope() refuses every bearer request,
-	 * and a cookie session with a valid REST nonce, or a request with no
-	 * credential, is decided by the capability check.
+	 * These routes read or remove a connected-account credential and are
+	 * wp-admin actions only (the start link carries `_wpnonce`). Bearer
+	 * tokens and application passwords are refused, the same client
+	 * boundary as connected-account reads (T10-S3-06, T10-S4-11).
 	 *
 	 * @param \WP_REST_Request $request REST request.
 	 */
 	public static function permission_check( \WP_REST_Request $request ): bool {
-		return is_user_logged_in()
-			&& current_user_can( 'manage_options' )
-			&& self::bearer_has_scope( $request, array() );
+		return self::is_first_party_cookie_request( $request )
+			&& current_user_can( 'manage_options' );
 	}
 
 	/**

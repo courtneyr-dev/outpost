@@ -244,14 +244,17 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
-	 * Resolve a Source_Base for this request. Honors explicit
-	 * `source_id` first; falls back to URL-based matching via
-	 * `Outpost_Source_Registry::find_for_url`.
+	 * Resolve a Source_Base for this request.
 	 *
-	 * Returns null only when neither path resolves — e.g. the
-	 * registry is empty in a test context. Production boot
-	 * registers Source_Unknown as the universal fallback so the
-	 * URL match always finds at least that.
+	 * The source decides which adapter runs and which service the server
+	 * contacts, so the URL decides it. A client-supplied `source_id` is only
+	 * a hint between sources that all claim the URL: it is honored when
+	 * that source is registered, is not the catch-all Source_Unknown, and
+	 * matches the URL under the same rules the share route uses. Anything
+	 * else falls back to `Outpost_Source_Registry::find_for_url()`.
+	 *
+	 * Returns null only when the registry is empty (a test context).
+	 * Production boot registers Source_Unknown as the universal fallback.
 	 *
 	 * @param WP_REST_Request $request The incoming REST request.
 	 * @param string          $url     Source URL.
@@ -262,9 +265,9 @@ final class Outpost_Preview_Endpoint {
 			return null;
 		}
 		$source_id = $request->get_param( 'source_id' );
-		if ( is_string( $source_id ) && '' !== $source_id ) {
+		if ( is_string( $source_id ) && '' !== $source_id && Outpost_Source_Unknown::ID !== $source_id ) {
 			$by_id = Outpost_Source_Registry::get_by_id( $source_id );
-			if ( null !== $by_id ) {
+			if ( null !== $by_id && $by_id->matches_url( $url ) ) {
 				return $by_id;
 			}
 		}
@@ -438,6 +441,16 @@ final class Outpost_Preview_Endpoint {
 	 */
 	private static function handle_via_authenticated_source( Outpost_Source_Base $source, string $source_id, string $url ) {
 		unset( $source );  // Reserved for future per-source attribute reads.
+		// Connected-account enrichment reads the person's stored credential
+		// and calls the provider with it, so only the Outpost PWA gets it: an
+		// IndieAuth bearer whose verified client_id is exactly this site's
+		// Outpost client (T10-S3-06). Every other caller, including a cookie
+		// session or an Application Password, falls through to the generic
+		// preview before any credential is read, so the answer can't reveal
+		// whether a provider is connected.
+		if ( ! self::is_outpost_pwa_bearer() ) {
+			return null;
+		}
 		$user_id = (int) get_current_user_id();
 		if ( $user_id <= 0 ) {
 			// Anonymous request — no per-user creds to dispatch with.
@@ -721,6 +734,24 @@ final class Outpost_Preview_Endpoint {
 	}
 
 	/**
+	 * Whether the vetted-address pin will take effect for this request:
+	 * Requests picks its curl transport (it tries curl first, with the same
+	 * SSL capability it derives from the URL) and no WordPress proxy routes
+	 * the URL. Without both, the connection could resolve the host again.
+	 *
+	 * @param string $url URL about to be fetched.
+	 */
+	private static function pin_applies( string $url ): bool {
+		$https = 'https' === strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! class_exists( \WpOrg\Requests\Transport\Curl::class )
+			|| true !== \WpOrg\Requests\Transport\Curl::test( array( \WpOrg\Requests\Capability::SSL => $https ) ) ) {
+			return false;
+		}
+		$proxy = new \WP_HTTP_Proxy();
+		return ! ( $proxy->is_enabled() && $proxy->send_through_proxy( $url ) );
+	}
+
+	/**
 	 * Fetch a URL with SSRF-safe, per-hop redirect validation.
 	 *
 	 * `wp_safe_remote_get()` blocks loopback + RFC1918 but not the ranges
@@ -738,10 +769,10 @@ final class Outpost_Preview_Endpoint {
 	 * `WP_Http::request()` sends through Requests, and the action fires from
 	 * `WP_Http_Requests_Hooks::dispatch()` on Requests' `curl.before_send`
 	 * hook, so the pin only takes effect when Requests uses its curl
-	 * transport — if the curl extension is unavailable, Requests falls back
-	 * to `fsockopen`, and a configured `WP_PROXY_HOST` routes the connection
-	 * through a proxy instead; in both cases this pin has no effect and the
-	 * guard's per-hop revalidation is the only protection for that hop.
+	 * transport. If the curl extension can't serve the hop, Requests falls
+	 * back to `fsockopen`, and a configured `WP_PROXY_HOST` routes the
+	 * connection through a proxy; the pin would have no effect in either
+	 * case, so the hop is refused before anything is sent (T10-S4-17).
 	 *
 	 * @param string   $url             Initial URL (already scheme/host-validated).
 	 * @param string[] $accept_prefixes Accept header content-type prefixes.
@@ -756,10 +787,15 @@ final class Outpost_Preview_Endpoint {
 				return self::generic_fetch_error();
 			}
 
+			if ( ! self::pin_applies( $current ) ) {
+				return self::generic_fetch_error();
+			}
+
 			$pin_entry   = self::resolve_pin_entry( $current, $ip );
 			$pin_resolve = static function ( $handle ) use ( $pin_entry ): void {
 				// WP_Http has no DNS-pin option, so set CURLOPT_RESOLVE directly: curl connects only to the IP the SSRF guard vetted.
-				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) );
+				// The request itself still goes through wp_safe_remote_get(); this only adjusts the handle WordPress created.
+				curl_setopt( $handle, CURLOPT_RESOLVE, array( $pin_entry ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- http_api_curl handler; pins the IP the SSRF guard vetted (DNS rebinding).
 			};
 
 			// `http_api_curl` is an action (`do_action_ref_array()` in
@@ -771,9 +807,13 @@ final class Outpost_Preview_Endpoint {
 				$response = wp_safe_remote_get(
 					$current,
 					array(
-						'timeout'     => self::HTTP_TIMEOUT,
-						'redirection' => 0,
-						'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+						'timeout'             => self::HTTP_TIMEOUT,
+						'redirection'         => 0,
+						'headers'             => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+						// One byte past the cap: the transport stops reading
+						// there, and a body that reaches it is refused below
+						// instead of being parsed as a truncated document.
+						'limit_response_size' => self::MAX_RESPONSE_BYTES + 1,
 					)
 				);
 			} finally {
@@ -798,9 +838,46 @@ final class Outpost_Preview_Endpoint {
 				continue;
 			}
 
+			if ( self::exceeds_size_cap( $response ) ) {
+				return self::too_large_error();
+			}
 			return $response;
 		}
 		return self::generic_fetch_error();
+	}
+
+	/**
+	 * Whether a response is over the 5 MiB cap, by its declared
+	 * Content-Length (checked before any parsing) or by the body actually
+	 * received (after any decompression, so a small compressed transfer that
+	 * expands past the cap is caught, as is a chunked body with no header).
+	 * A missing or non-numeric Content-Length is ignored here; the body
+	 * check decides.
+	 *
+	 * @param array<string,mixed> $response Raw wp_remote response.
+	 */
+	private static function exceeds_size_cap( array $response ): bool {
+		$declared = wp_remote_retrieve_header( $response, 'content-length' );
+		foreach ( (array) $declared as $value ) {
+			$value = trim( (string) $value );
+			if ( '' !== $value && ctype_digit( $value ) && ( strlen( $value ) > 15 || (int) $value > self::MAX_RESPONSE_BYTES ) ) {
+				return true;
+			}
+		}
+		return strlen( (string) wp_remote_retrieve_body( $response ) ) > self::MAX_RESPONSE_BYTES;
+	}
+
+	/**
+	 * The response-size refusal. Says only that the cap was exceeded.
+	 *
+	 * @return WP_Error
+	 */
+	private static function too_large_error(): WP_Error {
+		return new WP_Error(
+			'response_too_large',
+			__( 'Target URL response exceeded the 5 MB cap.', 'outpost-mobile-publishing' ),
+			array( 'status' => 413 )
+		);
 	}
 
 	/**

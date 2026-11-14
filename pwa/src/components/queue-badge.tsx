@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-	list as list_queue,
+	list_for_owner,
 	flush as flush_queue,
-	remove as remove_from_queue,
+	dismiss_owned,
 	subscribe_queue_changes,
 	type QueueEntry,
 	type OfflineQueueEnvironment,
@@ -17,6 +17,10 @@ import { Drawer } from './drawer';
  * Phase DS-3b. Replaces the full-width QueueBanner. The badge renders
  * nothing when the queue is empty. Tapping it opens a Drawer with the
  * per-entry list (retry-now, per-entry dismiss).
+ *
+ * Only the signed-in account's posts are counted, listed, retried, or
+ * dismissed (T10-S3-07). Posts another account or an older version left on
+ * this device appear only as a count, never with their content.
  *
  * The count re-reads IndexedDB whenever any tab writes the queue
  * (offline-queue.ts notifies this tab and the others), so a post queued
@@ -40,6 +44,8 @@ export const QUEUE_RETRY_DELAYS_MS = [5_000, 15_000, 45_000, 120_000];
 export const NEW_ENTRY_REPLAY_DELAY_MS = 3_000;
 
 export interface QueueBadgeProps {
+	/** Canonical identity of the signed-in account (canonical_account(token.me)). */
+	owner: string | null;
 	micropubEnv?: MicropubEnvironment;
 	queueEnv?: OfflineQueueEnvironment;
 }
@@ -48,8 +54,10 @@ function browser_online(): boolean {
 	return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
-export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
+export function QueueBadge({ owner, micropubEnv, queueEnv }: QueueBadgeProps) {
 	const [entries, setEntries] = useState<QueueEntry[]>([]);
+	// Other accounts' and locked entries on this device: a count only.
+	const [others, setOthers] = useState(0);
 	const [busy, setBusy] = useState(false);
 	const [open, setOpen] = useState(false);
 	// Refs, not state: the window listeners are attached once and must see
@@ -63,9 +71,10 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 
 	const refresh = async (): Promise<QueueEntry[]> => {
 		try {
-			const next = await list_queue(queueEnv);
-			setEntries(next);
-			return next;
+			const next = await list_for_owner(owner, queueEnv);
+			setEntries(next.own);
+			setOthers(next.others);
+			return next.own;
 		} catch (_err) {
 			// Queue read failures are non-fatal — badge stays as it was.
 			return [];
@@ -99,6 +108,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 		try {
 			left = await flush_queue(micropubEnv, queueEnv);
 			setEntries(left);
+			await refresh();
 		} catch (_err) {
 			// flush() records per-entry failures itself; this is IndexedDB.
 			left = await refresh();
@@ -133,7 +143,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 
 	const dismiss = async (id: number): Promise<void> => {
 		try {
-			await remove_from_queue(id, queueEnv);
+			await dismiss_owned(id, owner, queueEnv);
 		} catch (_err) {
 			// no-op — refresh shows current persisted state.
 		}
@@ -167,8 +177,16 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 	}, []);
 
 	const count = entries.length;
+	const others_note =
+		others > 0 ? (
+			<p class="outpost-status outpost-queue-others">
+				{others === 1
+					? '1 queued post on this device belongs to another account or an older version of Outpost. It stays here and isn’t shown.'
+					: `${String(others)} queued posts on this device belong to another account or an older version of Outpost. They stay here and aren’t shown.`}
+			</p>
+		) : null;
 	if (count === 0) {
-		return null;
+		return others_note;
 	}
 
 	const aria_label =
@@ -178,6 +196,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 
 	return (
 		<>
+			{others_note}
 			<button
 				type="button"
 				class="outpost-queue-badge"

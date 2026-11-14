@@ -33,7 +33,10 @@ export default defineConfig({
 		// Modern target — iOS 16.4+ for Web Share Target, plus the PWA install
 		// flow on Android Chrome 113+. Both support ES2022 natively.
 		target: 'es2022',
-		sourcemap: true,
+		// Hidden maps: the .map is still written for debugging, but the bundle
+		// carries no sourceMappingURL, because the WordPress.org package leaves
+		// maps out (T10-S5-04).
+		sourcemap: 'hidden',
 	},
 	server: {
 		port: 5173,

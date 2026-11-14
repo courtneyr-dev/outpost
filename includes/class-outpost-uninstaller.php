@@ -44,7 +44,16 @@ final class Outpost_Uninstaller {
 		'outpost_telegraph_author_name',
 		'outpost_telegraph_author_url',
 		'outpost_appearance_schema',
+		'outpost_ios_shortcut_legacy_purged',
 	);
+
+	/**
+	 * `app_id` of the iOS Shortcut application passwords Outpost creates
+	 * (Outpost_IOS_Shortcut_App_Password::APP_ID; repeated here because the
+	 * plugin isn't loaded during uninstall). Only passwords with this id are
+	 * deleted; passwords the person made for anything else stay.
+	 */
+	private const SHORTCUT_APP_ID = 'eb290b80-79b0-4104-b470-4d6188280ccc';
 
 	/** Exact user-meta keys Outpost owns (deleted for every user). */
 	private const USER_META_KEYS = array(
@@ -85,10 +94,48 @@ final class Outpost_Uninstaller {
 	private const CRON_HOOKS = array( 'outpost_posse_dispatch' );
 
 	/**
+	 * Delete the stored rewrite table on every site but the current one.
+	 *
+	 * A network deactivation runs Outpost's deactivation hook once, on the
+	 * current site, which flushes its own table. Each other site rebuilds
+	 * its table on its next request, now without Outpost (F5-02).
+	 */
+	public static function delete_rewrite_rules_on_other_sites(): void {
+		$current  = (int) get_current_blog_id();
+		$site_ids = get_sites(
+			array(
+				'fields'        => 'ids',
+				'number'        => 0,
+				'no_found_rows' => true,
+			)
+		);
+		foreach ( (array) $site_ids as $site_id ) {
+			if ( $current === (int) $site_id ) {
+				continue;
+			}
+			switch_to_blog( (int) $site_id );
+			delete_option( 'rewrite_rules' );
+			restore_current_blog();
+		}
+	}
+
+	/**
 	 * Run the full uninstall — every site on multisite, otherwise the one site.
 	 */
-	public static function run(): void {
+	public static function run( string $plugin_basename = '' ): void {
+		// Application passwords live in network-wide user meta, so they are
+		// removed once, not per site. If one survives, stop before deleting
+		// anything else. Uninstall runs after deactivation and without
+		// loading Outpost, so keeping the files alone can't keep the password
+		// scoped: turn Outpost back on, so the next request loads its route
+		// rule, and then stop (T10-S4-27, final delta review D-01).
+		if ( ! self::delete_shortcut_application_passwords() ) {
+			self::stop_uninstall( self::reactivate( $plugin_basename ) );
+			return;
+		}
+
 		if ( is_multisite() ) {
+			delete_site_option( 'outpost_ios_shortcut_unscoped_swept' );
 			$site_ids = get_sites(
 				array(
 					'fields'        => 'ids',
@@ -104,6 +151,110 @@ final class Outpost_Uninstaller {
 			return;
 		}
 		self::clean_current_site();
+	}
+
+	/**
+	 * Delete the iOS Shortcut application passwords Outpost created, for every
+	 * user who has one, and leave every other application password alone.
+	 *
+	 * Returns whether none is left (T10-S4-27): after deleting, it reads every
+	 * user's passwords again rather than trusting the delete calls, because a
+	 * password that outlives Outpost's route rule works everywhere.
+	 */
+	public static function delete_shortcut_application_passwords(): bool {
+		if ( ! class_exists( 'WP_Application_Passwords' ) ) {
+			return true;
+		}
+		foreach ( self::users_with_application_passwords() as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( $user_id ) as $item ) {
+				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) && isset( $item['uuid'] ) ) {
+					WP_Application_Passwords::delete_application_password( $user_id, (string) $item['uuid'] );
+				}
+			}
+		}
+		foreach ( self::users_with_application_passwords() as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( $user_id ) as $item ) {
+				if ( self::SHORTCUT_APP_ID === ( $item['app_id'] ?? '' ) ) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Stop deactivation when a Shortcut application password survived
+	 * cleanup. WordPress saves the plugin as inactive only after the
+	 * deactivation hooks, so Outpost and its route rule stay loaded.
+	 */
+	public static function stop_deactivation(): void {
+		wp_die(
+			esc_html__( 'Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again.', 'outpost-mobile-publishing' ),
+			esc_html__( 'Outpost is still active', 'outpost-mobile-publishing' ),
+			array(
+				'response'  => 500,
+				'back_link' => true,
+			)
+		);
+	}
+
+	/**
+	 * Stop uninstall when a Shortcut application password survived cleanup.
+	 *
+	 * @param bool $reactivated Whether Outpost was turned back on.
+	 */
+	private static function stop_uninstall( bool $reactivated ): void {
+		$message = $reactivated
+			? __( 'Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords.', 'outpost-mobile-publishing' )
+			: __( 'Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again.', 'outpost-mobile-publishing' );
+		wp_die(
+			esc_html( $message ),
+			esc_html__( 'Outpost uninstall stopped', 'outpost-mobile-publishing' ),
+			array(
+				'response'  => 500,
+				'back_link' => true,
+			)
+		);
+	}
+
+	/**
+	 * Turn Outpost back on, network-wide on multisite (where the Shortcut
+	 * password needs network activation), without running activation hooks.
+	 *
+	 * @param string $plugin_basename Plugin basename, e.g. outpost-mobile-publishing/outpost.php.
+	 * @return bool Whether Outpost is saved as active afterward.
+	 */
+	private static function reactivate( string $plugin_basename ): bool {
+		if ( '' === $plugin_basename ) {
+			return false;
+		}
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$result = activate_plugin( $plugin_basename, '', is_multisite(), true );
+		if ( is_wp_error( $result ) ) {
+			return false;
+		}
+		// Trust only the saved state: a failed option write would leave the
+		// next request without Outpost loaded (T10-S4-27 v1.2).
+		if ( is_multisite() ) {
+			return is_plugin_active_for_network( $plugin_basename );
+		}
+		return in_array( $plugin_basename, (array) get_option( 'active_plugins', array() ), true );
+	}
+
+	/**
+	 * Every user id with at least one application password, network-wide.
+	 *
+	 * @return array<int, int>
+	 */
+	private static function users_with_application_passwords(): array {
+		$user_ids = get_users(
+			array(
+				'blog_id'  => 0,
+				'meta_key' => '_application_passwords', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one-time uninstall sweep.
+				'fields'   => 'ID',
+			)
+		);
+		return array_map( 'intval', (array) $user_ids );
 	}
 
 	/**
@@ -174,5 +325,14 @@ final class Outpost_Uninstaller {
 		foreach ( self::CRON_HOOKS as $hook ) {
 			wp_unschedule_hook( $hook );
 		}
+
+		// Rewrite rules. WP-CLI's `plugin uninstall --deactivate` runs this
+		// in the request that loaded Outpost, so drop its registered rules
+		// first; then delete the stored table, which WordPress rebuilds on
+		// the next request without Outpost (T10-S5-02).
+		if ( class_exists( 'Outpost_Route_Handler' ) ) {
+			Outpost_Route_Handler::unregister_rewrite_rules();
+		}
+		delete_option( 'rewrite_rules' );
 	}
 }

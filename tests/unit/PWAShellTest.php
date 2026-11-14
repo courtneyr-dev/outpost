@@ -340,7 +340,11 @@ final class PWAShellTest extends TestCase {
 		$this->assertLessThan( $get_gate, $post_branch, 'The share POST branch must run before the non-GET passthrough.' );
 		$this->assertStringContainsString( "'outpost-share-inbox'", $out );
 		$this->assertStringContainsString( "form.getAll('photos')", $out );
-		$this->assertStringContainsString( "?mode=photo&shared=photos', 303", $out );
+		$this->assertStringContainsString( "'?mode=photo&shared=photos' + refused, 303", $out );
+		// T10-S3-05 v1.1: two inbox slots, never overwritten; nothing else is parked.
+		$this->assertStringContainsString( "const SHARE_INBOX_CANDIDATE_KEY = 'candidate';", $out );
+		$this->assertStringNotContainsString( 'image/heic', $out );
+		$this->assertStringNotContainsString( '.put(payload', $out );
 	}
 
 	/** @test */

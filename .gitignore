@@ -19,6 +19,7 @@ build/*
 !build/index.js
 !build/index.asset.php
 !build/index.css
+!build/index-rtl.css
 !build/style-index.css
 !build/index.css.map
 !build/index.js.map
@@ -114,3 +115,6 @@ wp-includes/
 # Docs site build output (docs/ is an Astro Starlight project)
 docs/dist/
 docs/.astro/
+
+# Playwright session token minted by tests/e2e/global-setup.ts
+tests/e2e/.auth/

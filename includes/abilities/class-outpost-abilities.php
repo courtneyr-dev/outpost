@@ -15,7 +15,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Abilities {
 
+	use Outpost_Bearer_Auth;
+
 	private const CATEGORY = 'outpost';
+
+	/** Token scopes the matching read routes accept. */
+	private const READ_SCOPES = array( 'create', 'update', 'read' );
+
+	/**
+	 * The REST requests whose handlers are running, innermost last.
+	 *
+	 * @var array<int, WP_REST_Request>
+	 */
+	private static array $requests = array();
 
 	/**
 	 * Hook category and ability registration into the Abilities API lifecycle.
@@ -23,6 +35,55 @@ final class Outpost_Abilities {
 	public static function register(): void {
 		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
 		add_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
+		add_filter( 'rest_request_before_callbacks', array( self::class, 'enter_request' ), 10, 3 );
+		add_filter( 'rest_request_after_callbacks', array( self::class, 'leave_request' ), 10, 3 );
+		// Core's rest_send_allow_header() (rest_post_dispatch, priority 10)
+		// runs the permission callback again; keep the request in view.
+		add_filter( 'rest_post_dispatch', array( self::class, 'enter_request' ), 9, 3 );
+		add_filter( 'rest_post_dispatch', array( self::class, 'leave_request' ), 11, 3 );
+	}
+
+	/**
+	 * Remember the request whose permission callback core is about to run,
+	 * so the credential gate sees the same headers and body the routes see.
+	 *
+	 * @param mixed           $response Response so far (passed through).
+	 * @param array<string, mixed> $handler Route handler (unused).
+	 * @param WP_REST_Request $request  The request being handled.
+	 * @return mixed
+	 */
+	public static function enter_request( $response, $handler, $request ) {
+		unset( $handler );
+		if ( $request instanceof WP_REST_Request ) {
+			self::$requests[] = $request;
+		}
+		return $response;
+	}
+
+	/**
+	 * Forget the request once its handler finished, with anything tracked
+	 * after it: a nested request whose handler threw never reached its own
+	 * leave, and it must not outlive the request that started it.
+	 *
+	 * @param mixed           $response Response (passed through).
+	 * @param array<string, mixed> $handler Route handler (unused).
+	 * @param WP_REST_Request $request  The request that was handled.
+	 * @return mixed
+	 */
+	public static function leave_request( $response, $handler, $request ) {
+		unset( $handler );
+		if ( ! $request instanceof WP_REST_Request ) {
+			return $response;
+		}
+		// The last frame for this request: the same object can be handled
+		// again while it's still being handled (re-entrant dispatch).
+		for ( $index = count( self::$requests ) - 1; $index >= 0; $index-- ) {
+			if ( self::$requests[ $index ] === $request ) {
+				array_splice( self::$requests, $index );
+				break;
+			}
+		}
+		return $response;
 	}
 
 	/**
@@ -240,16 +301,24 @@ final class Outpost_Abilities {
 	}
 
 	/**
-	 * Check the shared edit_posts capability for local reads.
+	 * Check the gate the matching read routes apply: edit_posts, plus the
+	 * credential check every Outpost route makes (a cookie session needs a
+	 * valid REST nonce; a token needs create, update or read scope). Core's
+	 * Abilities REST controller calls only this callback, so it can't be
+	 * weaker than the routes (F5-01). Inside a REST request it checks that
+	 * request, body token included; a PHP caller with no cookie session and
+	 * no token keeps the capability check alone.
 	 *
 	 * @return bool
 	 */
 	public static function can_read_outpost(): bool {
-		return current_user_can( 'edit_posts' );
+		$request = array() === self::$requests ? new WP_REST_Request( 'GET' ) : end( self::$requests );
+		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, self::READ_SCOPES );
 	}
 
 	/**
-	 * Check per-post access for the share-status reader.
+	 * Check per-post access for the share-status reader: the read gate the
+	 * status route applies, plus edit_post on that post.
 	 *
 	 * @param array<string, mixed> $input Validated ability input.
 	 * @return bool
@@ -264,7 +333,7 @@ final class Outpost_Abilities {
 			return false;
 		}
 
-		return current_user_can( 'edit_post', $post_id );
+		return self::can_read_outpost() && current_user_can( 'edit_post', $post_id );
 	}
 
 	/**

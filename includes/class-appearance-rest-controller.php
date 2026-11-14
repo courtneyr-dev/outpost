@@ -225,6 +225,15 @@ final class Outpost_Appearance_REST_Controller {
 				array( 'status' => 401 )
 			);
 		}
+		// The route and the settings page check this too; the method is
+		// public, so it doesn't rely on its callers (T10-S4-06).
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new \WP_Error(
+				'outpost_appearance_forbidden',
+				__( 'You are not allowed to change appearance settings.', 'outpost-mobile-publishing' ),
+				array( 'status' => 403 )
+			);
+		}
 
 		$body = $request->get_json_params();
 		if ( ! is_array( $body ) ) {

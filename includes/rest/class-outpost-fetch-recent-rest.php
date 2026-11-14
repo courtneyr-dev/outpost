@@ -51,6 +51,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Fetch_Recent_REST {
 
+	use Outpost_Bearer_Auth;
+
 	public const NAMESPACE_ROOT = 'outpost/v1';
 	public const ROUTE_BASE     = '/fetch-recent/(?P<provider_id>[a-z0-9_-]+)';
 	public const ROUTE_LIST     = '/fetch-recent-providers';
@@ -110,13 +112,21 @@ final class Outpost_Fetch_Recent_REST {
 	}
 
 	/**
-	 * Initial gate: route is private to logged-in users with edit_posts.
-	 * Per-provider capability further refines inside handle_request.
+	 * Initial gate for both routes. They return data from a person's
+	 * connected accounts, and their only consumer is the block-editor
+	 * sidebar (apiFetch: logged-in cookie plus REST nonce). So they accept
+	 * exactly a first-party cookie session with a valid nonce and
+	 * `edit_posts`; every bearer token (the Outpost PWA's included) and
+	 * every Application Password is refused here, before any provider
+	 * lookup, credential read, or provider callback (T10-S3-06). The
+	 * per-provider capability further refines inside the handlers.
 	 *
 	 * @since 0.1.79
+	 *
+	 * @param WP_REST_Request $request Current REST request.
 	 */
-	public static function permission_callback(): bool {
-		return is_user_logged_in() && current_user_can( 'edit_posts' );
+	public static function permission_callback( WP_REST_Request $request ): bool {
+		return self::is_first_party_cookie_request( $request ) && current_user_can( 'edit_posts' );
 	}
 
 	/**

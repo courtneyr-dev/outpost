@@ -212,14 +212,39 @@ final class Outpost_Fetch_Recent_Polar {
 		$urls = array();
 		if ( isset( $response['exercises'] ) && is_array( $response['exercises'] ) ) {
 			foreach ( $response['exercises'] as $entry ) {
+				$url = null;
 				if ( is_string( $entry ) && '' !== $entry ) {
-					$urls[] = $entry;
+					$url = $entry;
 				} elseif ( is_array( $entry ) && isset( $entry['url'] ) && is_string( $entry['url'] ) ) {
-					$urls[] = $entry['url'];
+					$url = $entry['url'];
+				}
+				// The listing comes from the API response, so each URL is
+				// bound to this transaction before the token goes near it.
+				if ( null !== $url && self::is_permitted_exercise_url( $url, $user_id, $txn ) ) {
+					$urls[] = $url;
 				}
 			}
 		}
 		return $urls;
+	}
+
+	/**
+	 * Whether a listed exercise URL is one the stored token may be sent to
+	 * (T10-S4-01, F-22): exactly
+	 * https://www.polaraccesslink.com/v3/users/{user}/exercise-transactions/{txn}/exercises/{id}
+	 * for the transaction this fetch opened, with no user info, port, query,
+	 * fragment, or dot segments.
+	 *
+	 * @param string $url     URL from the transaction listing.
+	 * @param int    $user_id Polar user segment the transaction was opened for.
+	 * @param string $txn     Transaction id this fetch opened.
+	 */
+	public static function is_permitted_exercise_url( string $url, int $user_id, string $txn ): bool {
+		$prefix = self::API_BASE . '/users/' . rawurlencode( (string) $user_id ) . '/exercise-transactions/' . rawurlencode( $txn ) . '/exercises/';
+		if ( 0 !== strpos( $url, $prefix ) ) {
+			return false;
+		}
+		return 1 === preg_match( '/\A[A-Za-z0-9_-]{1,64}\z/', substr( $url, strlen( $prefix ) ) );
 	}
 
 	/**
@@ -301,13 +326,21 @@ final class Outpost_Fetch_Recent_Polar {
 	 * @return array<string,mixed>|null
 	 */
 	private static function api_request( string $method, string $url, string $token, ?string $body ) {
+		// Backstop for the destination contract: the token only ever goes
+		// to the AccessLink API base (T10-S4-01, F-22).
+		if ( 0 !== strpos( $url, self::API_BASE . '/' ) ) {
+			return null;
+		}
 		if ( null !== self::$http_resolver ) {
 			return ( self::$http_resolver )( $method, $url, $token, $body );
 		}
 		$args = array(
-			'method'  => $method,
-			'timeout' => self::TIMEOUT_SECONDS,
-			'headers' => array(
+			'method'      => $method,
+			'timeout'     => self::TIMEOUT_SECONDS,
+			// A redirect would carry the Authorization header to wherever
+			// it points; Polar's API answers directly, so follow none.
+			'redirection' => 0,
+			'headers'     => array(
 				'Authorization' => 'Bearer ' . $token,
 				'Accept'        => 'application/json',
 			),

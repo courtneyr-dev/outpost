@@ -90,7 +90,7 @@ final class SettingsHandlerTest extends TestCase {
 		$this->assertNotEquals( 'sk-test-' . str_repeat( 'a', 16 ), $saved['api_key']['encrypted'] );
 	}
 
-	public function test_sanitize_and_encrypt_skips_empty_sensitive(): void {
+	public function test_sanitize_and_encrypt_stores_nothing_for_an_empty_sensitive_field_with_nothing_saved(): void {
 		$fields = array(
 			'api_key' => array(
 				'label'     => 'API key',
@@ -104,8 +104,9 @@ final class SettingsHandlerTest extends TestCase {
 			array( 'api_key' => '' )
 		);
 
-		// Empty sensitive field stays as the empty string (NOT wrapped in encrypted envelope).
-		$this->assertSame( '', $saved['api_key'] );
+		// T10-S3-11: a blank secret with nothing saved stores nothing (a blank
+		// with something saved keeps it; SettingsSecretsTest covers that).
+		$this->assertArrayNotHasKey( 'api_key', $saved );
 	}
 
 	public function test_decrypt_stored_returns_raw_value_for_nonsensitive(): void {

@@ -163,8 +163,8 @@ final class Outpost_Appearance_Settings_Page {
 		self::guard_post_request();
 
 		$user_id   = (int) get_current_user_id();
-		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( (string) $_POST['mode_preference'] ) ) : '';
-		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( (string) $_POST['style_source'] ) ) : '';
+		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( $_POST['mode_preference'] ) ) : '';
+		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( $_POST['style_source'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
 			? array_keys( array_filter( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) ) )
@@ -201,16 +201,20 @@ final class Outpost_Appearance_Settings_Page {
 		$response = Outpost_Appearance_REST_Controller::handle_post( $request );
 
 		if ( $response instanceof \WP_Error ) {
-			self::redirect_with_notice( 'error', $response->get_error_message() );
+			// The message rides in a short-lived per-user transient, not the
+			// redirect URL, so the notice never prints text a link supplied
+			// (T10-S3-13, F-11). It is shown once, escaped, on this screen.
+			set_transient( self::notice_key( $user_id ), $response->get_error_message(), MINUTE_IN_SECONDS );
+			self::redirect_with_notice( 'error' );
 			return;
 		}
 
-		self::redirect_with_notice( 'saved', '' );
+		self::redirect_with_notice( 'saved' );
 	}
 
 	private static function guard_post_request(): void {
 		$nonce = isset( $_POST[ self::NONCE_NAME ] )
-			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_NAME ] ) )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
@@ -337,9 +341,13 @@ final class Outpost_Appearance_Settings_Page {
 		<?php
 	}
 
+	/** Per-user transient that carries a save error to the next page view. */
+	private static function notice_key( int $user_id ): string {
+		return 'outpost_appearance_notice_' . $user_id;
+	}
+
 	private static function render_admin_notice(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display flag.
-		$notice = isset( $_GET['notice'] ) ? sanitize_key( wp_unslash( (string) $_GET['notice'] ) ) : '';
+		$notice = Outpost_Request_Headers::query_key( 'notice' );
 		switch ( $notice ) {
 			case 'saved':
 				printf(
@@ -348,8 +356,10 @@ final class Outpost_Appearance_Settings_Page {
 				);
 				break;
 			case 'error':
-				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display.
-				$message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['message'] ) ) : '';
+				$key     = self::notice_key( (int) get_current_user_id() );
+				$stored  = get_transient( $key );
+				$message = is_string( $stored ) ? $stored : '';
+				delete_transient( $key );
 				printf(
 					'<div class="notice notice-error is-dismissible"><p>%s</p></div>',
 					esc_html( '' === $message ? __( 'Save failed.', 'outpost-mobile-publishing' ) : $message )
@@ -358,15 +368,12 @@ final class Outpost_Appearance_Settings_Page {
 		}
 	}
 
-	private static function redirect_with_notice( string $notice, string $message ): void {
+	private static function redirect_with_notice( string $notice ): void {
 		$args = array(
 			'page'   => self::PAGE_SLUG,
 			'notice' => $notice,
 		);
-		if ( '' !== $message && 'error' === $notice ) {
-			$args['message'] = $message;
-		}
-		$url = add_query_arg( $args, admin_url( 'admin.php' ) );
+		$url  = add_query_arg( $args, admin_url( 'admin.php' ) );
 		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
 			wp_safe_redirect( $url );
 			exit;

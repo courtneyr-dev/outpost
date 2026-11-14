@@ -3,6 +3,8 @@ import { BookmarkletList } from '../bookmarklet-list';
 import { ExternalLink } from '../external-link';
 import { ShareSheetGuide } from '../share-sheet-guide';
 import { PreferencesPanel, type PreferencesPanelProps } from '../preferences-panel';
+import { SignOutControl } from '../sign-out-control';
+import type { OfflineQueueEnvironment } from '../../lib/offline-queue';
 import type { CompanionId, CompanionStatus } from '../../lib/composer-config';
 
 /**
@@ -40,8 +42,13 @@ export interface AboutTabProps {
 	companions: Record<CompanionId, CompanionStatus> | null;
 	onRetry: () => void;
 	onReauth: () => void;
-	/** Forget this sign-in, drafts, and preferences copy on this device. */
-	onSignOut: () => void;
+	/** Remove this device's sign-in; rejects when the token store fails (lib/sign-out.ts). */
+	onClearSignIn: () => Promise<void>;
+	/** Forget drafts and the preferences copy, then reload (lib/sign-out.ts). */
+	onFinishSignOut: () => void;
+	/** Canonical identity of the signed-in account, for the queued-posts choice at sign-out. */
+	queueOwner: string | null;
+	queueEnv?: OfflineQueueEnvironment;
 	/** The same preferences the header's Preferences sheet shows. */
 	preferences: Omit<PreferencesPanelProps, 'idPrefix'>;
 }
@@ -138,7 +145,7 @@ export function diagnostics_text(props: Pick<AboutTabProps, 'siteUrl' | 'me' | '
  * readers), so a draft in another tab stays where it is.
  */
 export function AboutTab(props: AboutTabProps): preact.JSX.Element {
-	const { siteUrl, me, connection, onRetry, onReauth, onSignOut, preferences } = props;
+	const { siteUrl, me, connection, onRetry, onReauth, onClearSignIn, onFinishSignOut, queueOwner, queueEnv, preferences } = props;
 	const version = app_version();
 	const [copied, setCopied] = useState('');
 	const text = CONNECTION_TEXT[connection];
@@ -214,17 +221,16 @@ export function AboutTab(props: AboutTabProps): preact.JSX.Element {
 						Check connection again
 					</button>
 				)}
-				<button
-					type="button"
-					class="outpost-button outpost-button--secondary"
-					onClick={onSignOut}
-					aria-describedby="outpost-about-signout-help"
-				>
-					Sign out of this device
-				</button>
 			</div>
+			<SignOutControl
+				owner={queueOwner}
+				{...(queueEnv ? { queueEnv } : {})}
+				clearSignIn={onClearSignIn}
+				finishSignOut={onFinishSignOut}
+			/>
 			<p class="outpost-help" id="outpost-about-signout-help">
-				Signing out removes this sign-in, your unsent drafts, and the preferences copy from this device.
+				Signing out removes this sign-in, your unsent drafts, and the preferences copy from this device. If you
+				have queued posts, you choose whether to keep them on this device or remove them.
 			</p>
 
 			<details class="outpost-disclosure">

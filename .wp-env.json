@@ -2,9 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/WordPress/gutenberg/trunk/schemas/json/wp-env.json",
   "core": "WordPress/WordPress#tags/6.7",
   "plugins": [
-    ".",
     "https://downloads.wordpress.org/plugin/indieauth.zip",
-    "https://downloads.wordpress.org/plugin/micropub.zip"
+    "https://downloads.wordpress.org/plugin/micropub.zip",
+    "."
   ],
   "themes": [],
   "config": {

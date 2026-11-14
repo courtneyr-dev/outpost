@@ -264,12 +264,15 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( $url, Outpost_Source_Detector::sanitize_shared_url( $url ) );
 	}
 
-	public function test_sanitize_shared_url_keeps_the_link_inside_a_text_blob(): void {
+	public function test_the_url_field_adapter_keeps_the_link_inside_a_text_blob(): void {
 		CoreSanitizerMocks::register();
 
-		// iOS apps put a quote plus the link in the url field. esc_url_raw()
-		// empties a blob, so the blob has to stay text.
-		$clean = Outpost_Source_Detector::sanitize_shared_url( "A good line.\n\nhttps://example.com/a%20b/caf%C3%A9" );
+		// iOS apps put a quote plus the link in the url field. The URL-only
+		// sanitizer refuses prose (T10-S3-13 v1.1); the field adapter keeps it
+		// as text so the link inside can be found and validated.
+		$blob = "A good line.\n\nhttps://example.com/a%20b/caf%C3%A9";
+		$this->assertSame( '', Outpost_Source_Detector::sanitize_shared_url( $blob ) );
+		$clean = Outpost_Source_Detector::sanitize_shared_url_field( $blob );
 
 		$this->assertSame( 'A good line. https://example.com/a%20b/caf%C3%A9', $clean );
 		$this->assertSame(
@@ -341,7 +344,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$decision = Outpost_Source_Detector::dispatch( 'https://example.com/page' );
 
-		$this->assertNull( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision );
 		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'] );
 	}
 
@@ -367,10 +370,10 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'auto', $decision['route_type'] );
 		$this->assertSame( 'listen', $decision['mode'] );
 		$this->assertSame( 'fake-spotify', $decision['source_id'] );
-		$this->assertNotEmpty( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision, 'T10-S3-01: no server-side prefill state.' );
 	}
 
-	public function test_dispatch_auto_redirect_url_includes_mode_and_token(): void {
+	public function test_dispatch_auto_redirect_url_includes_mode_and_source(): void {
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
 		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
 
@@ -389,7 +392,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertStringContainsString( 'mode=watch', $decision['redirect_url'] );
 		$this->assertStringContainsString( 'source=fake', $decision['redirect_url'] );
-		$this->assertStringContainsString( 'cached_for=', $decision['redirect_url'] );
+		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'], 'T10-S3-01: no server-side cache to look up.' );
 	}
 
 	public function test_dispatch_redirect_url_is_absolute(): void {
@@ -444,20 +447,6 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'specific', $decision['source_id'] );
 	}
 
-	// --- prefill_token determinism ---------------------------------------
-
-	public function test_prefill_token_is_deterministic_for_a_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$this->assertSame( $a, $b );
-		$this->assertSame( 16, strlen( $a ) );
-	}
-
-	public function test_prefill_token_varies_by_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/a' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/b' );
-		$this->assertNotSame( $a, $b );
-	}
 
 	// --- per-request memoization -----------------------------------------
 

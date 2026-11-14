@@ -76,7 +76,7 @@ final class Outpost_Settings_Handler {
 		}
 
 		$nonce = isset( $_POST[ self::NONCE_FIELD ] )
-			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_FIELD ] ) )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_FIELD ] ) )
 			: '';
 		if ( ! wp_verify_nonce( $nonce, self::nonce_action( $tab_id ) ) ) {
 			wp_die( esc_html__( 'Security check failed. Please reload and try again.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
@@ -88,9 +88,14 @@ final class Outpost_Settings_Handler {
 			? array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings'] ) )
 			: array();
 
-		$saved = self::sanitize_and_encrypt( $fields, $submitted );
+		// "Remove the saved …" checkboxes (T10-S3-11): explicit deletion only.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$clear_in = isset( $_POST['outpost_settings_clear'] ) && is_array( $_POST['outpost_settings_clear'] )
+			? array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings_clear'] ) )
+			: array();
+		$clear    = array_map( 'sanitize_key', array_keys( $clear_in ) );
 
-		update_option( Outpost_Settings_Registry::option_name_for_tab( $tab_id ), $saved, false );
+		self::save_submission( $tab_id, $submitted, $clear );
 
 		$redirect = add_query_arg(
 			array(
@@ -105,37 +110,110 @@ final class Outpost_Settings_Handler {
 	}
 
 	/**
+	 * Save one tab's submission. Called by handle_save() after its nonce and
+	 * capability checks; public so the save rules can be tested directly.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string             $tab_id    Tab id.
+	 * @param array<string,mixed> $submitted Submitted values (POST['outpost_settings']).
+	 * @param string[]           $clear     Field ids whose saved secret the person chose to remove.
+	 */
+	public static function save_submission( string $tab_id, array $submitted, array $clear ): void {
+		$option   = Outpost_Settings_Registry::option_name_for_tab( $tab_id );
+		$existing = get_option( $option, array() );
+		$saved    = self::sanitize_and_encrypt(
+			Outpost_Settings_Registry::get_fields( $tab_id ),
+			$submitted,
+			is_array( $existing ) ? $existing : array(),
+			$clear
+		);
+		update_option( $option, $saved, false );
+	}
+
+	/**
 	 * Walk registered fields and produce the storage shape: scalars for
 	 * non-sensitive fields; `[ 'encrypted' => '<base64>' ]` for sensitive.
+	 *
+	 * Sensitive fields (T10-S3-11): a non-empty submission replaces the
+	 * stored secret; a blank one keeps it, so saving any other setting never
+	 * erases it; listing the field in `$clear` deletes it. If encryption
+	 * fails, the stored secret is kept and nothing is written in plaintext.
 	 *
 	 * @since 0.1.79
 	 *
 	 * @param array<string,array<string,mixed>> $fields    Registered fields.
 	 * @param array<string,mixed>               $submitted Raw POST['outpost_settings'].
+	 * @param array<string,mixed>               $existing  The tab's stored option.
+	 * @param string[]                          $clear     Field ids to delete.
 	 * @return array<string,mixed>
 	 */
-	public static function sanitize_and_encrypt( array $fields, array $submitted ): array {
+	public static function sanitize_and_encrypt( array $fields, array $submitted, array $existing = array(), array $clear = array() ): array {
 		$saved = array();
 		foreach ( $fields as $field_id => $config ) {
 			$type      = (string) ( $config['type'] ?? 'text' );
-			$sensitive = ! empty( $config['sensitive'] );
+			$sensitive = ! empty( $config['sensitive'] ) || 'password' === $type;
 			$raw       = $submitted[ $field_id ] ?? null;
 			$clean     = Outpost_Settings_Fields::sanitize( $type, $raw );
 
-			if ( $sensitive && is_string( $clean ) && '' !== $clean ) {
+			if ( ! $sensitive ) {
+				$saved[ $field_id ] = $clean;
+				continue;
+			}
+			if ( in_array( $field_id, $clear, true ) ) {
+				continue;
+			}
+			$kept = self::stored_secret( $existing[ $field_id ] ?? null );
+			if ( is_string( $clean ) && '' !== $clean ) {
 				try {
 					$saved[ $field_id ] = array( 'encrypted' => Outpost_Encryption::encrypt( $clean ) );
+					continue;
 				} catch ( Outpost_Encryption_Exception $e ) {
 					unset( $e );
-					// Encryption unavailable; persist nothing for this field
-					// rather than leaking plaintext into the option store.
-					continue;
+					// Encryption unavailable: keep what was stored, never plaintext.
 				}
-			} else {
-				$saved[ $field_id ] = $clean;
+			}
+			if ( null !== $kept ) {
+				$saved[ $field_id ] = $kept;
 			}
 		}
 		return $saved;
+	}
+
+	/**
+	 * The stored encrypted wrapper for a secret, or null when none is saved.
+	 *
+	 * @param mixed $stored Raw stored value.
+	 * @return array{encrypted: string}|null
+	 */
+	private static function stored_secret( $stored ): ?array {
+		if ( is_array( $stored ) && isset( $stored['encrypted'] ) && is_string( $stored['encrypted'] ) && '' !== $stored['encrypted'] ) {
+			return array( 'encrypted' => $stored['encrypted'] );
+		}
+		return null;
+	}
+
+	/**
+	 * A tab's values for its settings form: non-secret values as stored, and
+	 * for each secret only whether one is saved (bool). Never decrypts.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function read_tab_for_form( string $tab_id ): array {
+		$stored = get_option( Outpost_Settings_Registry::option_name_for_tab( $tab_id ), array() );
+		$stored = is_array( $stored ) ? $stored : array();
+		$out    = array();
+		foreach ( Outpost_Settings_Registry::get_fields( $tab_id ) as $field_id => $config ) {
+			$secret = ! empty( $config['sensitive'] ) || 'password' === ( $config['type'] ?? '' );
+			if ( $secret ) {
+				$out[ $field_id ] = null !== self::stored_secret( $stored[ $field_id ] ?? null );
+			} elseif ( array_key_exists( $field_id, $stored ) ) {
+				$out[ $field_id ] = $stored[ $field_id ];
+			}
+		}
+		return $out;
 	}
 
 	/**

@@ -138,29 +138,37 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 	}
 
 	/**
+	 * Share status needs edit_posts (the route's gate) and edit_post on the post (F5-01).
+	 *
 	 * @dataProvider edit_post_permission_provider
 	 */
-	public function test_share_status_permission_matrix( string $role, bool $allowed ): void {
+	public function test_share_status_permission_matrix( string $role, bool $edit_posts, bool $edit_post, bool $allowed ): void {
 		unset( $role );
 		$post = new \stdClass();
 		WP_Mock::userFunction( 'get_post' )->once()->with( 42 )->andReturn( $post );
-		WP_Mock::userFunction( 'current_user_can' )
-			->once()
-			->with( 'edit_post', 42 )
-			->andReturn( $allowed );
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing(
+			static function ( string $cap, ...$args ) use ( $edit_posts, $edit_post ): bool {
+				if ( 'edit_posts' === $cap ) {
+					return $edit_posts;
+				}
+				return 'edit_post' === $cap && array( 42 ) === $args && $edit_post;
+			}
+		);
 
 		$this->assertSame( $allowed, Outpost_Abilities::can_get_share_status( array( 'post_id' => 42 ) ) );
 	}
 
 	/**
-	 * @return array<string, array{string, bool}>
+	 * @return array<string, array{string, bool, bool, bool}>
 	 */
 	public function edit_post_permission_provider(): array {
 		return array(
-			'logged out'    => array( 'logged-out', false ),
-			'subscriber'    => array( 'subscriber', false ),
-			'contributor'   => array( 'contributor-own-post', true ),
-			'administrator' => array( 'administrator', true ),
+			'logged out'                    => array( 'logged-out', false, false, false ),
+			'subscriber'                    => array( 'subscriber', false, false, false ),
+			'contributor'                   => array( 'contributor-own-post', true, true, true ),
+			'administrator'                 => array( 'administrator', true, true, true ),
+			'edit_post without edit_posts'  => array( 'custom', false, true, false ),
+			'edit_posts without edit_post'  => array( 'author-other-post', true, false, false ),
 		);
 	}
 

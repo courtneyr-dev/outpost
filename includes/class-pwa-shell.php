@@ -663,10 +663,16 @@ const PRECACHE_URLS = [
 	PLUGIN_URL + 'assets/icons/outpost-icon-maskable.svg',
 ];
 
+// Precache without cookies. The shell is sent no-store because a
+// cookie-identified response carries that person's appearance choice, and
+// the Cache API stores whatever it gets; the credential-less shell keeps the
+// composer opening offline without keeping one person's shell (T10-S4-04).
+const PRECACHE_REQUESTS = PRECACHE_URLS.map((url) => new Request(url, { credentials: 'omit' }));
+
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(CACHE_NAME)
-			.then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {
+			.then((cache) => cache.addAll(PRECACHE_REQUESTS).catch(() => {
 				// Best-effort precache. If a single URL 404s on first install
 				// (e.g. token CSS not yet deployed) we don't want the whole
 				// install to fail — the fetch handler will fill the cache
@@ -736,9 +742,31 @@ function is_share_target_request(url) {
 // Nothing is uploaded until the user posts. Text-only shares pass through
 // to the PHP dispatcher, which routes them by content. The database and
 // store names must match pwa/src/lib/share-inbox.ts.
+//
+// The share may come from any app or page, so every field and file is
+// untrusted: only image types the composer can upload (pwa/src/lib/photo.ts),
+// within the limits below, are parked. The body is read as a stream and
+// never past SHARE_MAX_BODY_BYTES: a larger share passes through unparsed.
+// The per-file, count, and total limits then apply to the parsed parts, and
+// shared title and text are cut to SHARE_MAX_TEXT_CHARS. Parked photos wait for the person: the composer shows them
+// for review and nothing is used until they choose. The inbox holds the
+// waiting share (`pending`) and at most one newer share (`candidate`) while
+// the person decides between them; neither is ever overwritten, and a third
+// share is not kept. Everything else passes through to the server, which
+// keeps nothing.
 const SHARE_INBOX_DB = 'outpost-share-inbox';
 const SHARE_INBOX_STORE = 'inbox';
 const SHARE_INBOX_KEY = 'pending';
+const SHARE_INBOX_CANDIDATE_KEY = 'candidate';
+const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+// Same per-file cap the composer applies before upload (pwa/src/lib/photo.ts).
+const SHARE_MAX_FILE_BYTES = 50 * 1024 * 1024;
+const SHARE_MAX_FILES = 10;
+const SHARE_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+// Room for the title, text, and multipart framing on top of the photos.
+const SHARE_MAX_BODY_BYTES = SHARE_MAX_TOTAL_BYTES + 1024 * 1024;
+// Same bound the PHP dispatcher applies (Outpost_Source_Detector::TEXT_MAX_LENGTH).
+const SHARE_MAX_TEXT_CHARS = 4000;
 
 function open_share_inbox() {
 	return new Promise((resolve, reject) => {
@@ -754,13 +782,29 @@ function open_share_inbox() {
 	});
 }
 
+// Park a share in the first free slot: `pending`, else `candidate`.
+// Resolves with the slot used, or 'refused' when both are taken. Rejects
+// when IndexedDB fails.
 async function park_shared_photos(payload) {
 	const db = await open_share_inbox();
 	try {
-		await new Promise((resolve, reject) => {
+		return await new Promise((resolve, reject) => {
 			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
-			tx.objectStore(SHARE_INBOX_STORE).put(payload, SHARE_INBOX_KEY);
-			tx.oncomplete = () => resolve();
+			const store = tx.objectStore(SHARE_INBOX_STORE);
+			let slot = 'refused';
+			const keys = store.getAllKeys();
+			keys.onsuccess = () => {
+				const taken = keys.result.map(String);
+				if (!taken.includes(SHARE_INBOX_KEY)) {
+					slot = SHARE_INBOX_KEY;
+				} else if (!taken.includes(SHARE_INBOX_CANDIDATE_KEY)) {
+					slot = SHARE_INBOX_CANDIDATE_KEY;
+				}
+				if (slot !== 'refused') {
+					store.add(payload, slot);
+				}
+			};
+			tx.oncomplete = () => resolve(slot);
 			tx.onerror = () => reject(tx.error);
 			tx.onabort = () => reject(tx.error);
 		});
@@ -769,22 +813,58 @@ async function park_shared_photos(payload) {
 	}
 }
 
+// The share's form fields, read without ever holding more than
+// SHARE_MAX_BODY_BYTES (T10-S4-19). Resolves null when the body declares or
+// streams past that limit; rejects when it can't be read or parsed.
+async function read_bounded_form(request) {
+	const declared = request.headers.get('content-length');
+	if (declared !== null && (!/^[0-9]+$/.test(declared) || Number(declared) > SHARE_MAX_BODY_BYTES)) {
+		return null;
+	}
+	if (!request.body) {
+		throw new Error('no body');
+	}
+	const reader = request.body.getReader();
+	const chunks = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > SHARE_MAX_BODY_BYTES) {
+			// Don't wait for the cancel: this body is one branch of the
+			// clone's tee, and cancelling it can wait on the other branch,
+			// which only the pass-through fetch reads (T10-S4-23).
+			reader.cancel().catch(() => {});
+			return null;
+		}
+		chunks.push(value);
+	}
+	const type = request.headers.get('content-type') || '';
+	return new Response(new Blob(chunks), { headers: { 'content-type': type } }).formData();
+}
+
 async function handle_share_post(event) {
-	// Clone before reading: formData() consumes the body, and a share with
+	// Clone before reading: reading consumes the body, and a share with
 	// no photo still has to reach the server as the original POST.
 	const passthrough = event.request.clone();
 	let form;
 	try {
-		form = await event.request.formData();
+		form = await read_bounded_form(event.request);
 	} catch (_err) {
+		return fetch(passthrough);
+	}
+	if (form === null) {
 		return fetch(passthrough);
 	}
 	const photos = form.getAll('photos').filter((entry) =>
 		entry && typeof entry === 'object' &&
 		typeof entry.size === 'number' && entry.size > 0 &&
-		/^image\//.test(entry.type || '')
+		entry.size <= SHARE_MAX_FILE_BYTES &&
+		SHARE_IMAGE_TYPES.includes(String(entry.type || '').toLowerCase())
 	);
-	if (photos.length === 0) {
+	const total = photos.reduce((sum, photo) => sum + photo.size, 0);
+	if (photos.length === 0 || photos.length > SHARE_MAX_FILES || total > SHARE_MAX_TOTAL_BYTES) {
 		return fetch(passthrough);
 	}
 	try {
@@ -798,18 +878,22 @@ async function handle_share_post(event) {
 			lastModified: typeof photo.lastModified === 'number' ? photo.lastModified : Date.now(),
 			buffer: await photo.arrayBuffer(),
 		})));
-		await park_shared_photos({
+		const slot = await park_shared_photos({
 			files: records,
-			title: String(form.get('title') || ''),
-			text: String(form.get('text') || ''),
+			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
+			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
 		});
+		// The composer shows what is waiting for review; `refused` tells it
+		// this share wasn't kept because two were already waiting.
+		const refused = 'refused' === slot ? '&refused=1' : '';
+		return Response.redirect(SHELL_URL + '?mode=photo&shared=photos' + refused, 303);
 	} catch (_err) {
-		// IndexedDB unavailable (storage pressure, private mode). The
-		// composer still opens on the Photo tab; the user picks the photo
-		// again from the library.
+		// IndexedDB unavailable (storage pressure, private mode): nothing
+		// was kept. The composer opens on the Photo tab with nothing to
+		// review; the person picks the photo again from the library.
+		return Response.redirect(SHELL_URL + '?mode=photo', 303);
 	}
-	return Response.redirect(SHELL_URL + '?mode=photo&shared=photos', 303);
 }
 
 self.addEventListener('fetch', (event) => {
