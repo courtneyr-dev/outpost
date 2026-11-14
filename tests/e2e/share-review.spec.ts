@@ -152,12 +152,14 @@ async function tab_stops(page: Page, count: number): Promise<string[]> {
 	return stops;
 }
 
-test('while a share waits, only the decision can be reached; afterwards focus lands on its tab', async ({ page }) => {
+test('while a share waits, only the decision can be reached; afterwards focus lands on its mode button', async ({ page }) => {
 	await page.goto('/post/?mode=note&text=Shared%20words');
 	const review = page.getByRole('region', { name: 'Shared content' });
 	await expect(review).toBeVisible();
 
-	await expect(page.getByRole('tablist', { name: 'Composer modes' })).toBeHidden();
+	// Since #322 the modes are a group of buttons, not a tablist.
+	const modes = page.getByRole('group', { name: 'Composer modes' });
+	await expect(modes).toBeHidden();
 	await expect(page.locator('#outpost-panel-note')).toBeHidden();
 	await expect(page.getByRole('button', { name: 'Preferences' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Home' })).toHaveCount(0);
@@ -168,7 +170,10 @@ test('while a share waits, only the decision can be reached; afterwards focus la
 
 	await review.getByRole('button', { name: 'Use shared content' }).click();
 	await expect(review).toBeHidden();
-	await expect(page.getByRole('tab', { name: 'Post' })).toBeFocused();
+	await expect(modes).toBeVisible();
+	const post = modes.getByRole('button', { name: 'Post', exact: true });
+	await expect(post).toBeFocused();
+	await expect(post).toHaveAttribute('aria-current', 'true');
 	await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible();
 	await expect(page.locator('#outpost-note-content')).toHaveValue('Shared words');
 });
