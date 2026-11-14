@@ -226,15 +226,13 @@ final class WporgReviewGuardsTest extends TestCase {
 	 * before sanitizing. On PHP 8 an array-shaped field cast that way raises
 	 * "Array to string conversion" and becomes the text 'Array'; core's
 	 * sanitize_key() and sanitize_text_field() already return '' for arrays.
-	 * The two reads in handlers the coordinator kept unchanged (encryption-key
-	 * dismissal, OAuth status notice) are listed and stay for its decision.
+	 * None remain (T10-S4-28 removed the last three).
 	 */
 	public function test_no_superglobal_is_string_cast_before_sanitizing(): void {
 		$root    = dirname( __DIR__, 2 );
-		$allowed = array(
-			'includes/admin/class-outpost-encryption-key-notice.php' => 1,
-			'includes/admin/class-outpost-oauth-settings-page.php'   => 2,
-		);
+		// T10-S4-28 removed the last three, in the encryption-key dismissal and
+		// the OAuth status notice.
+		$allowed = array();
 		$found   = array();
 		$it      = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root . '/includes', \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $it as $file ) {
@@ -249,7 +247,7 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		ksort( $found );
 		ksort( $allowed );
-		$this->assertSame( $allowed, $found, 'Only the coordinator-held reads keep a (string) cast.' );
+		$this->assertSame( $allowed, $found, 'No superglobal is cast with (string) before sanitizing.' );
 	}
 
 	public function test_input_legibility_sources(): void {
