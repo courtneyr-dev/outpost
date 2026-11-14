@@ -100,7 +100,7 @@ final class Outpost_Request_Headers {
 
 	/**
 	 * A query-string value as a key (sanitize_key), or '' when it is absent
-	 * or not a single string. An array- or object-shaped value (`?tab[]=x`)
+	 * or not a scalar string or integer. An array- or object-shaped value (`?tab[]=x`)
 	 * is refused without a PHP warning (T10-S3-13). For display flags and
 	 * selectors only: a caller still checks the nonce and capability before
 	 * any protected effect.
@@ -112,7 +112,7 @@ final class Outpost_Request_Headers {
 	public static function query_key( string $key ): string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
 		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
-		return is_string( $value ) ? sanitize_key( $value ) : '';
+		return is_string( $value ) || is_int( $value ) ? sanitize_key( (string) $value ) : '';
 	}
 
 	/**
@@ -140,6 +140,9 @@ final class Outpost_Request_Headers {
 	public static function query_text( string $key, int $max_length = 200 ): string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
 		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
+		if ( is_int( $value ) ) {
+			$value = (string) $value;
+		}
 		if ( ! is_string( $value ) || strlen( $value ) > $max_length ) {
 			return '';
 		}
