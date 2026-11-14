@@ -62,7 +62,7 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 		}
 
 		$payload = array(
-			'subject'       => (string) $post->post_title,
+			'subject'       => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 			'body'          => Outpost_POSSE_Content_Transformer::to_markdown_only( $post_id ),
 			'status'        => $settings['send_as_draft'] ? 'draft' : 'about_to_send',
 			'canonical_url' => (string) get_permalink( $post_id ),
