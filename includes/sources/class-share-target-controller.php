@@ -85,39 +85,34 @@ final class Outpost_Share_Target_Controller {
 	 * @return array{title:string, text:string, url:string}
 	 */
 	private static function read_payload(): array {
-		// Every superglobal read below sits directly inside wp_kses(), which is
-		// a fatal TypeError on an array (`?text[]=`), so it only ever sees a
-		// string. sanitize_text_field() is not used: it deletes %XX octets,
-		// which rewrites an encoded link (`/a%20b` becomes `/ab`). Android
-		// share sheets put the link in `text`, often mid-sentence.
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing -- Web Share Target spec; nonces don't apply to OS-initiated share intents.
-		$title = isset( $_POST['title'] ) && is_string( $_POST['title'] ) ? wp_kses( wp_unslash( $_POST['title'] ), array() ) : '';
-		if ( '' === $title && isset( $_GET['title'] ) && is_string( $_GET['title'] ) ) {
-			$title = wp_kses( wp_unslash( $_GET['title'] ), array() );
-		}
-		$text = isset( $_POST['text'] ) && is_string( $_POST['text'] ) ? wp_kses( wp_unslash( $_POST['text'] ), array() ) : '';
-		if ( '' === $text && isset( $_GET['text'] ) && is_string( $_GET['text'] ) ) {
-			$text = wp_kses( wp_unslash( $_GET['text'] ), array() );
-		}
-		// The url field is usually one bare URL, but share sheets sometimes put
-		// text there. It is sanitized as text here; sanitize_shared_url() then
-		// decides, on the sanitized value, whether it is one bare http(s) URL
-		// (esc_url_raw()) or text for the same link detection `text` gets.
-		$url = isset( $_POST['url'] ) && is_string( $_POST['url'] ) ? wp_kses( wp_unslash( $_POST['url'] ), array() ) : '';
-		if ( '' === $url && isset( $_GET['url'] ) && is_string( $_GET['url'] ) ) {
-			$url = wp_kses( wp_unslash( $_GET['url'] ), array() );
-		}
-		// phpcs:enable
-
-		// The shared-field sanitizers finish the job on the sanitized values:
-		// UTF-8 check, control characters, whitespace, the `&` wp_kses()
-		// encoded, and esc_url_raw() with an http/https allowlist when the url
-		// field is one bare URL. The Shortcut endpoints use the same two.
+		// Each field is read once as an unslashed string and handed straight to
+		// its sanitizer (T10-S3-13, F-14): sanitize_shared_text() for the free
+		// text, sanitize_shared_url() for the link, which validates a URL as a
+		// URL rather than cleaning it as text. The Shortcut endpoints use the
+		// same two.
 		return array(
-			'title' => Outpost_Source_Detector::sanitize_shared_text( $title ),
-			'text'  => Outpost_Source_Detector::sanitize_shared_text( $text ),
-			'url'   => Outpost_Source_Detector::sanitize_shared_url( $url ),
+			'title' => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'title' ) ),
+			'text'  => Outpost_Source_Detector::sanitize_shared_text( self::read_field( 'text' ) ),
+			'url'   => Outpost_Source_Detector::sanitize_shared_url( self::read_field( 'url' ) ),
 		);
+	}
+
+	/**
+	 * One share field, POST first then GET, unslashed. Anything but a string
+	 * (an array-shaped `?url[]=`, say) reads as '' with no warning. The value
+	 * is not yet sanitized; read_payload() passes it to its sanitizer at once.
+	 *
+	 * @param string $name Field name.
+	 */
+	private static function read_field( string $name ): string {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Web Share Target spec: nonces don't apply to OS-initiated share intents; the type-checked string is sanitized by the caller.
+		$posted = isset( $_POST[ $name ] ) ? wp_unslash( $_POST[ $name ] ) : null;
+		if ( is_string( $posted ) && '' !== $posted ) {
+			return $posted;
+		}
+		$query = isset( $_GET[ $name ] ) ? wp_unslash( $_GET[ $name ] ) : null;
+		// phpcs:enable
+		return is_string( $query ) ? $query : '';
 	}
 
 	/**

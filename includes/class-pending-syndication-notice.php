@@ -298,8 +298,10 @@ final class Outpost_Pending_Syndication_Notice {
 	 */
 	private static function current_post_id(): int {
 		$post_id = 0;
-		if ( isset( $_GET['post'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- selects which post's notice to show; no state change.
-			$raw = sanitize_text_field( wp_unslash( (string) $_GET['post'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		// Selects which post's notice to show; no state change. A `post`
+		// parameter of any shape decides alone (no fallback to the global post).
+		if ( Outpost_Request_Headers::query_present( 'post' ) ) {
+			$raw = Outpost_Request_Headers::query_text( 'post', 20 );
 			if ( 1 === preg_match( '/^[1-9][0-9]{0,18}$/', $raw ) ) {
 				$post_id = (int) $raw;
 			}

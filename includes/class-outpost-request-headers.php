@@ -99,6 +99,54 @@ final class Outpost_Request_Headers {
 	}
 
 	/**
+	 * A query-string value as a key (sanitize_key), or '' when it is absent
+	 * or not a single string. An array- or object-shaped value (`?tab[]=x`)
+	 * is refused without a PHP warning (T10-S3-13). For display flags and
+	 * selectors only: a caller still checks the nonce and capability before
+	 * any protected effect.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_key( string $key ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
+		return is_string( $value ) ? sanitize_key( $value ) : '';
+	}
+
+	/**
+	 * Whether the query string carries `$key` at all, in any shape.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_present( string $key ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only.
+		return isset( $_GET[ $key ] );
+	}
+
+	/**
+	 * A query-string value as short text (sanitize_text_field, length-capped),
+	 * or '' when it is absent or not a single string. Same rules as
+	 * query_key().
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key        `$_GET` key.
+	 * @param int    $max_length Longest value accepted; longer values are refused.
+	 */
+	public static function query_text( string $key, int $max_length = 200 ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		$value = isset( $_GET[ $key ] ) ? wp_unslash( $_GET[ $key ] ) : null;
+		if ( ! is_string( $value ) || strlen( $value ) > $max_length ) {
+			return '';
+		}
+		return sanitize_text_field( $value );
+	}
+
+	/**
 	 * The REST nonce presented with this request, unslashed and sanitized, or
 	 * '' when none was sent.
 	 *

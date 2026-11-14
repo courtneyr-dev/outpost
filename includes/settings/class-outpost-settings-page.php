@@ -67,8 +67,7 @@ final class Outpost_Settings_Page {
 	 * @since 0.1.79
 	 */
 	public static function resolve_active_tab(): string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$requested = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : '';
+		$requested = Outpost_Request_Headers::query_key( 'tab' );
 		$tabs      = Outpost_Settings_Registry::get_tabs();
 		if ( '' !== $requested && isset( $tabs[ $requested ] ) ) {
 			return $requested;
@@ -106,8 +105,7 @@ final class Outpost_Settings_Page {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Outpost Settings', 'outpost-mobile-publishing' ) . '</h1>';
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( isset( $_GET['settings-updated'] ) && 'true' === $_GET['settings-updated'] ) {
+		if ( 'true' === Outpost_Request_Headers::query_key( 'settings-updated' ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>'
 				. esc_html__( 'Settings saved.', 'outpost-mobile-publishing' )
 				. '</p></div>';

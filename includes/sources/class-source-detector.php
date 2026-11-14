@@ -166,21 +166,42 @@ final class Outpost_Source_Detector {
 	}
 
 	/**
-	 * Clean a shared `url` field. One bare http(s) URL goes through
-	 * esc_url_raw(); a text blob stays text, because esc_url_raw() empties it
-	 * and iOS apps put a quote plus the link in this field —
-	 * extract_url_from_payload() finds the link inside it.
+	 * Clean a shared `url` field (T10-S3-13, F-14).
+	 *
+	 * The value must be a string within URL_MAX_LENGTH. One token (no
+	 * whitespace) is a URL and is validated as one: no control bytes, angle
+	 * brackets, quotes, backslashes, or HTML entities; an http(s) scheme and
+	 * a host; then esc_url_raw() with an http/https allowlist. Anything that
+	 * fails is ''. A value with whitespace is a text blob (iOS apps put a
+	 * quote plus the link in this field): it is cleaned as text, and
+	 * extract_url_from_payload() finds and validates the link inside it.
+	 * wp_kses() never sanitizes a URL.
 	 *
 	 * @param mixed $value Unslashed field value.
 	 * @return string
 	 */
 	public static function sanitize_shared_url( mixed $value ): string {
-		$as_text = self::sanitize_shared_text( $value );
-		if ( 1 !== preg_match( '#^https?://\S+$#i', $as_text ) ) {
-			return $as_text;
+		if ( ! is_string( $value ) || strlen( $value ) > self::URL_MAX_LENGTH ) {
+			return '';
 		}
-		$as_url = esc_url_raw( $as_text, array( 'http', 'https' ) );
-		return '' !== $as_url ? $as_url : $as_text;
+		$trimmed = trim( $value );
+		if ( '' === $trimmed ) {
+			return '';
+		}
+		if ( 1 === preg_match( '/\s/', $trimmed ) ) {
+			return self::sanitize_shared_text( $value );
+		}
+		if ( 1 === preg_match( '/[\x00-\x1F\x7F<>"\'`\\\\]/', $trimmed ) ) {
+			return '';
+		}
+		if ( 1 === preg_match( '/&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i', $trimmed ) ) {
+			return '';
+		}
+		if ( ! self::is_http_url( $trimmed ) ) {
+			return '';
+		}
+		$clean = esc_url_raw( $trimmed, array( 'http', 'https' ) );
+		return ( '' !== $clean && self::is_http_url( $clean ) ) ? $clean : '';
 	}
 
 	/**
