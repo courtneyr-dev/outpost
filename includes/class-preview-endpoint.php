@@ -785,9 +785,13 @@ final class Outpost_Preview_Endpoint {
 				$response = wp_safe_remote_get(
 					$current,
 					array(
-						'timeout'     => self::HTTP_TIMEOUT,
-						'redirection' => 0,
-						'headers'     => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+						'timeout'             => self::HTTP_TIMEOUT,
+						'redirection'         => 0,
+						'headers'             => array( 'Accept' => implode( ', ', $accept_prefixes ) ),
+						// One byte past the cap: the transport stops reading
+						// there, and a body that reaches it is refused below
+						// instead of being parsed as a truncated document.
+						'limit_response_size' => self::MAX_RESPONSE_BYTES + 1,
 					)
 				);
 			} finally {
@@ -812,9 +816,46 @@ final class Outpost_Preview_Endpoint {
 				continue;
 			}
 
+			if ( self::exceeds_size_cap( $response ) ) {
+				return self::too_large_error();
+			}
 			return $response;
 		}
 		return self::generic_fetch_error();
+	}
+
+	/**
+	 * Whether a response is over the 5 MiB cap, by its declared
+	 * Content-Length (checked before any parsing) or by the body actually
+	 * received (after any decompression, so a small compressed transfer that
+	 * expands past the cap is caught, as is a chunked body with no header).
+	 * A missing or non-numeric Content-Length is ignored here; the body
+	 * check decides.
+	 *
+	 * @param array<string,mixed> $response Raw wp_remote response.
+	 */
+	private static function exceeds_size_cap( array $response ): bool {
+		$declared = wp_remote_retrieve_header( $response, 'content-length' );
+		foreach ( (array) $declared as $value ) {
+			$value = trim( (string) $value );
+			if ( '' !== $value && ctype_digit( $value ) && ( strlen( $value ) > 15 || (int) $value > self::MAX_RESPONSE_BYTES ) ) {
+				return true;
+			}
+		}
+		return strlen( (string) wp_remote_retrieve_body( $response ) ) > self::MAX_RESPONSE_BYTES;
+	}
+
+	/**
+	 * The response-size refusal. Says only that the cap was exceeded.
+	 *
+	 * @return WP_Error
+	 */
+	private static function too_large_error(): WP_Error {
+		return new WP_Error(
+			'response_too_large',
+			__( 'Target URL response exceeded the 5 MB cap.', 'outpost-mobile-publishing' ),
+			array( 'status' => 413 )
+		);
 	}
 
 	/**
