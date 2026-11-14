@@ -6,10 +6,13 @@
  * The SSRF guard vets an address and safe_fetch() pins curl to it. Through a
  * WordPress proxy the pin has no effect, so pin_applies() refuses the hop
  * before wp_safe_remote_get() runs. Proxy constants can't be undone inside
- * the shared test process, so this test runs safe_fetch() in a fresh PHP
- * process (tests/_helpers/preview-proxy-gate-probe.php) that defines them
- * before WordPress loads. The probe counts calls into WP_Http::request
- * (`http_request_args`) and transport attempts (`pre_http_request`).
+ * the shared test process, so this test runs a real preview request
+ * (POST /outpost/v1/preview through REST dispatch, permission, validation,
+ * and source resolution) in a fresh PHP process
+ * (tests/_helpers/preview-proxy-gate-probe.php) that defines them before
+ * WordPress loads, with Outpost loaded as an active plugin. The probe
+ * counts calls into WP_Http::request (`http_request_args`) and transport
+ * attempts (`pre_http_request`).
  *
  * The no-proxy control in the same probe shows the harness sees a request
  * when one is allowed; the real-transport path stays covered by
@@ -35,10 +38,15 @@ final class PreviewProxyPinGateTest extends TestCase {
 		}
 	}
 
-	/** @return array<string, mixed> */
+	/**
+	 * Run the probe in a fresh PHP process.
+	 *
+	 * @param string $mode `proxy` or `control`.
+	 * @return array<string, mixed>
+	 */
 	private function probe( string $mode ): array {
 		$root    = dirname( __DIR__, 2 );
-		$command = array( PHP_BINARY, $root . '/tests/_helpers/preview-proxy-gate-probe.php', ABSPATH, $root . '/outpost.php', $mode );
+		$command = array( PHP_BINARY, $root . '/tests/_helpers/preview-proxy-gate-probe.php', ABSPATH, basename( $root ) . '/outpost.php', $mode );
 		$process = proc_open( $command, array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
 		$this->assertIsResource( $process );
 		$out  = (string) stream_get_contents( $pipes[1] );
@@ -50,20 +58,29 @@ final class PreviewProxyPinGateTest extends TestCase {
 		return $json;
 	}
 
-	public function test_a_proxied_hop_is_refused_before_any_request(): void {
+	/**
+	 * With a proxy configured, the preview request gets the generic fetch
+	 * error and nothing reaches WP_Http::request or the transport.
+	 */
+	public function test_a_proxied_preview_request_is_refused_before_any_fetch(): void {
 		$result = $this->probe( 'proxy' );
 
+		$this->assertTrue( $result['outpost_loaded'], 'Control: Outpost loaded as an active plugin.' );
 		$this->assertTrue( $result['proxy_enabled'], 'Control: the proxy constants took effect.' );
 		$this->assertSame( 0, $result['http_request_args'], 'wp_safe_remote_get() is never reached.' );
 		$this->assertSame( 0, $result['transport_attempts'], 'Nothing reaches the transport.' );
-		$this->assertSame( 'error:fetch_failed', $result['result'], 'The generic fetch error.' );
+		$this->assertSame( 502, $result['status'] );
+		$this->assertSame( 'fetch_failed', $result['code'], 'The generic fetch error.' );
 	}
 
-	public function test_without_a_proxy_the_same_probe_fetches(): void {
+	/**
+	 * Without a proxy, the same request fetches once and succeeds.
+	 */
+	public function test_without_a_proxy_the_same_preview_request_fetches(): void {
 		$result = $this->probe( 'control' );
 
 		$this->assertFalse( $result['proxy_enabled'] );
 		$this->assertSame( 1, $result['transport_attempts'], 'Control: the harness sees an allowed request.' );
-		$this->assertSame( 'response:200', $result['result'] );
+		$this->assertSame( 200, $result['status'] );
 	}
 }
