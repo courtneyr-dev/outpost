@@ -130,6 +130,24 @@ final class IosShortcutAppPasswordScopeTest extends TestCase {
 	}
 
 	/**
+	 * T10-S4-09 (P4-01): the route restriction is plugin code, so a password
+	 * left behind after deactivation would work everywhere core accepts
+	 * application passwords. Deactivation deletes Outpost's Shortcut
+	 * passwords and leaves the person's other application passwords alone.
+	 */
+	public function test_deactivation_deletes_only_the_outpost_password(): void {
+		\Outpost_IOS_Shortcut_App_Password::create( $this->user_id );
+		\WP_Application_Passwords::create_new_application_password( $this->user_id, array( 'name' => 'Mobile app' ) );
+		$this->assertNotNull( \Outpost_IOS_Shortcut_App_Password::find( $this->user_id ), 'Control: the Shortcut password exists.' );
+
+		outpost_deactivate();
+
+		$this->assertNull( \Outpost_IOS_Shortcut_App_Password::find( $this->user_id ), 'The Shortcut password is gone.' );
+		$left = \WP_Application_Passwords::get_user_application_passwords( $this->user_id );
+		$this->assertSame( array( 'Mobile app' ), array_column( $left, 'name' ), 'Other application passwords stay.' );
+	}
+
+	/**
 	 * @test
 	 */
 	public function uninstall_deletes_only_the_outpost_password(): void {
