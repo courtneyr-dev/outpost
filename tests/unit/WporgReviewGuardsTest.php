@@ -324,6 +324,39 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertSame( array(), $offenders );
 	}
 
+	/**
+	 * The legacy Shortcut token sign-in and the old /post/shortcut controller never ship (T10-S5-01).
+	 *
+	 * The Shortcut signs in with a scoped core application password. The old
+	 * classes authenticated a plugin-defined token; only the meta key strings
+	 * stay, because upgrade and uninstall purge them.
+	 */
+	public function test_no_legacy_shortcut_token_auth_ships(): void {
+		$root = dirname( __DIR__, 2 );
+		foreach ( array( 'includes/auth/class-ios-shortcut-token.php', 'includes/auth/class-ios-shortcut-token-authenticator.php', 'includes/sources/class-shortcut-controller.php' ) as $gone ) {
+			$this->assertFileDoesNotExist( $root . '/' . $gone );
+		}
+
+		$offenders = array();
+		$files     = array_merge( array( $root . '/outpost.php', $root . '/uninstall.php' ), $this->php_files( $root . '/includes' ) );
+		foreach ( $files as $path ) {
+			// Code only: a comment may record that a class was removed.
+			$source = '';
+			foreach ( token_get_all( (string) file_get_contents( $path ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ) {
+					continue;
+				}
+				$source .= is_array( $token ) ? $token[1] : $token;
+			}
+			foreach ( array( 'Outpost_IOS_Shortcut_Token', 'Outpost_Shortcut_Controller', "'determine_current_user'" ) as $needle ) {
+				if ( false !== strpos( $source, $needle ) ) {
+					$offenders[] = substr( $path, strlen( $root ) + 1 ) . ': ' . $needle;
+				}
+			}
+		}
+		$this->assertSame( array(), $offenders );
+	}
+
 	/** @return string[] */
 	private function php_files( string $dir ): array {
 		$out = array();
