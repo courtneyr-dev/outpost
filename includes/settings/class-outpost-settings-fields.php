@@ -27,7 +27,9 @@ final class Outpost_Settings_Fields {
 	 *
 	 * @param string              $field_id Sanitized id (sanitize_key applied).
 	 * @param array<string,mixed> $config   Field config from the registry.
-	 * @param mixed               $value    Current decrypted value.
+	 * @param mixed               $value    Current value. For a password (or other
+	 *                                      sensitive) field, only whether one is
+	 *                                      saved (bool); its secret is never passed.
 	 */
 	public static function render( string $field_id, array $config, $value ): void {
 		$type        = (string) ( $config['type'] ?? 'text' );
@@ -40,12 +42,22 @@ final class Outpost_Settings_Fields {
 
 		switch ( $type ) {
 			case 'password':
+				// No value attribute, ever (T10-S3-11): the stored secret is
+				// not rendered, and a blank submission keeps it.
 				printf(
-					'<input type="password" id="%1$s" name="%2$s" value="%3$s" class="regular-text" autocomplete="new-password" />',
+					'<input type="password" id="%1$s" name="%2$s" class="regular-text" autocomplete="new-password" />',
 					esc_attr( $id_attr ),
-					esc_attr( $name ),
-					esc_attr( (string) $value )
+					esc_attr( $name )
 				);
+				if ( true === $value ) {
+					echo '<p class="description">' . esc_html__( 'A value is saved. Leave this blank to keep it, or enter a new one to replace it.', 'outpost-mobile-publishing' ) . '</p>';
+					printf(
+						'<p><label><input type="checkbox" name="outpost_settings_clear[%1$s]" value="1" /> %2$s</label></p>',
+						esc_attr( $field_id ),
+						/* translators: %s: setting label, e.g. "Kit API secret (v3)". */
+						esc_html( sprintf( __( 'Remove the saved %s', 'outpost-mobile-publishing' ), $label ) )
+					);
+				}
 				break;
 			case 'url':
 				printf(

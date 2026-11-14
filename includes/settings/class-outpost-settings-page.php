@@ -198,7 +198,8 @@ final class Outpost_Settings_Page {
 			}
 		}
 
-		$values     = Outpost_Settings_Handler::read_tab( $tab_id );
+		// Secrets are reported as saved or not; never decrypted to render.
+		$values     = Outpost_Settings_Handler::read_tab_for_form( $tab_id );
 		$action_url = admin_url( 'admin-post.php' );
 
 		echo '<form method="post" action="' . esc_url( $action_url ) . '">';
