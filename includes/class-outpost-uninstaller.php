@@ -102,6 +102,7 @@ final class Outpost_Uninstaller {
 		self::delete_shortcut_application_passwords();
 
 		if ( is_multisite() ) {
+			delete_site_option( 'outpost_ios_shortcut_unscoped_swept' );
 			$site_ids = get_sites(
 				array(
 					'fields'        => 'ids',

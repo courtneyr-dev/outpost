@@ -49,12 +49,16 @@ final class Outpost_IOS_Shortcut_App_Password {
 	/** Option recording that legacy tokens were purged. */
 	public const LEGACY_PURGED_OPTION = 'outpost_ios_shortcut_legacy_purged';
 
+	/** Network option set once the unscoped-password sweep has run (T10-S4-24). */
+	public const UNSCOPED_SWEPT_OPTION = 'outpost_ios_shortcut_unscoped_swept';
+
 	/**
 	 * Hook registration.
 	 */
 	public static function register(): void {
 		add_action( 'wp_authenticate_application_password_errors', array( __CLASS__, 'restrict_to_shortcut_route' ), 10, 3 );
 		add_action( 'init', array( __CLASS__, 'purge_legacy_tokens' ) );
+		add_action( 'init', array( __CLASS__, 'sweep_unscoped' ) );
 	}
 
 	/**
@@ -183,5 +187,29 @@ final class Outpost_IOS_Shortcut_App_Password {
 			delete_metadata( 'user', 0, $key, '', true );
 		}
 		update_option( self::LEGACY_PURGED_OPTION, '1', true );
+	}
+
+	/**
+	 * Delete Outpost's Shortcut passwords network-wide, once, on a network
+	 * where Outpost isn't network-activated (T10-S4-24). network_allows()
+	 * stops new ones there; this removes any made before that rule existed,
+	 * which would otherwise work unscoped on the sites without Outpost. Other
+	 * application passwords stay.
+	 */
+	public static function sweep_unscoped(): void {
+		if ( self::network_allows() || get_site_option( self::UNSCOPED_SWEPT_OPTION ) ) {
+			return;
+		}
+		$user_ids = get_users(
+			array(
+				'blog_id'  => 0,
+				'meta_key' => '_application_passwords', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one-time network sweep.
+				'fields'   => 'ID',
+			)
+		);
+		foreach ( (array) $user_ids as $user_id ) {
+			self::revoke( (int) $user_id );
+		}
+		update_site_option( self::UNSCOPED_SWEPT_OPTION, '1' );
 	}
 }
