@@ -45,9 +45,10 @@ import {
  * Doing group — life-tracking posts that point at media, places, and
  * activities.
  *
- * Fifteen sub-modes under one tab, picked via radio. Three shapes:
- *   - URL-anchored: Listen (listen-of), Watch (watch-of), Read (read-of),
- *     Play/Game (play-of), Jam (jam-of), Review (item), Video (video),
+ * Fifteen sub-modes under one tab, picked via radio, plus Comic when the
+ * site's Post Kinds builds comic cards. Three shapes:
+ *   - URL-anchored: Listen (listen-of), Watch (watch-of), Read and Comic
+ *     (read-of), Play/Game (play-of), Jam (jam-of), Review (item), Video (video),
  *     Audio (audio) — target URL required, optional title/creator/rating.
  *   - Person-primary: Eat (eat-of), Drink (drink-of), Exercise
  *     (exercise), Craft (craft-of) — the what-was-it input is the primary
@@ -77,6 +78,7 @@ type Variant =
 	| 'listen'
 	| 'watch'
 	| 'read'
+	| 'comics'
 	| 'play'
 	| 'game'
 	| 'jam'
@@ -104,6 +106,15 @@ type VariantProperty =
 	| 'item'
 	| 'video'
 	| 'audio';
+
+/** Comic card properties, sent only when non-empty. */
+type ComicDetailProperty =
+	| 'mp-series'
+	| 'mp-volume'
+	| 'mp-issue-number'
+	| 'mp-publisher'
+	| 'mp-started-at'
+	| 'mp-finished-at';
 
 /**
  * Per-variant feature flags drive conditional rendering and submit-payload
@@ -144,6 +155,16 @@ interface VariantConfig {
 	/** Show the start / end datetime inputs (Event only). */
 	hasStart?: boolean;
 	hasEnd?: boolean;
+	/** Show Series, Volume, Issue number, Publisher, Started and Finished,
+	 *  sent as the `mp-*` properties Post Kinds' comic card reads. */
+	hasComicDetails?: boolean;
+	/** Send a looked-up or source-preview cover as `mp-cover-image` (plus
+	 *  alt text) instead of `photo`. The Micropub plugin downloads every
+	 *  `photo` into the media library; Post Kinds reads the cover URL. */
+	coverAsCoverImage?: boolean;
+	/** Post Kinds capability the server must report in
+	 *  `composerConfig.postKinds` before the picker offers this variant. */
+	requiresPostKinds?: keyof NonNullable<ComposerConfig['postKinds']>;
 	/** Post Kinds metadata lookup category. When set, the mode shows the
 	 *  one-tap MediaLookup search that fills title/creator/cover from Post
 	 *  Kinds' lookup APIs. Eat/Drink/Exercise have no catalog to search. */
@@ -212,6 +233,27 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasReadStatus: true,
 		hasRating: true,
 		lookup: 'book',
+	},
+	comics: {
+		// Post Kinds builds a comic card from a `read-of` entry carrying
+		// `pkiw-kind: comics`. Only offered when the installed Post Kinds can
+		// build it; an older one would set the term but render a read card.
+		label: 'Comic',
+		property: 'read-of',
+		kind: 'comics',
+		targetLabel: 'Comic URL',
+		contentLabel: 'Optional comment',
+		submitLabel: 'Post comic',
+		hasPhoto: true,
+		targetRequired: true,
+		hasTitle: true,
+		personLabel: 'Creators',
+		personProperty: 'author',
+		hasReadStatus: true,
+		hasRating: true,
+		hasComicDetails: true,
+		coverAsCoverImage: true,
+		requiresPostKinds: 'comics',
 	},
 	play: {
 		label: 'Play',
@@ -408,6 +450,7 @@ const VARIANT_ORDER: Variant[] = [
 	'listen',
 	'watch',
 	'read',
+	'comics',
 	'play',
 	'game',
 	'jam',
@@ -422,8 +465,22 @@ const VARIANT_ORDER: Variant[] = [
 	'audio',
 ];
 
-/** Variant labels in picker order; Home lists them as the tab's inventory. */
-export const DOING_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+/**
+ * Variant labels in picker order; Home lists them as the tab's inventory.
+ * Variants that depend on a Post Kinds capability are left out, because
+ * Home can't promise them on every site.
+ */
+export const DOING_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.filter(
+	(id) => !VARIANTS[id].requiresPostKinds,
+).map((id) => VARIANTS[id].label);
+
+/** Variants the picker offers on this site, in picker order. */
+function available_variants(config: ComposerConfig | undefined): Variant[] {
+	return VARIANT_ORDER.filter((id) => {
+		const capability = VARIANTS[id].requiresPostKinds;
+		return !capability || config?.postKinds?.[capability] === true;
+	});
+}
 
 function is_variant(value: unknown): value is Variant {
 	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
@@ -553,9 +610,14 @@ export function ListenMode({
 	const draft_variant = draft?.meta.variant;
 	const draft_read_status = draft?.meta.readStatus;
 
-	const [variant, setVariant] = useState<Variant>(
+	// The variant the person (or a draft or share) picked. A variant the site
+	// can't offer yet falls back to Listen; the pick is kept, so a Comic
+	// draft reopens on Comic once the composer config confirms support.
+	const [picked_variant, setVariant] = useState<Variant>(
 		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'listen'),
 	);
+	const variant_options = available_variants(composerConfig);
+	const variant: Variant = variant_options.includes(picked_variant) ? picked_variant : 'listen';
 	const [target_url, setTargetUrl] = useState(initial_share.url ?? draft_text(d?.target));
 	// Source-id from share-target dispatch. It enables the "Fill in details
 	// from this link" action and is passed through to the submission so
@@ -582,6 +644,13 @@ export function ListenMode({
 	const [event_start, setEventStart] = useState(draft_text(d?.eventStart));
 	const [event_end, setEventEnd] = useState(draft_text(d?.eventEnd));
 	const [rating, setRating] = useState(draft_text(d?.rating));
+	// Comic details, read only when the variant has hasComicDetails.
+	const [comic_series, setComicSeries] = useState(draft_text(d?.comicSeries));
+	const [comic_volume, setComicVolume] = useState(draft_text(d?.comicVolume));
+	const [comic_issue, setComicIssue] = useState(draft_text(d?.comicIssue));
+	const [comic_publisher, setComicPublisher] = useState(draft_text(d?.comicPublisher));
+	const [comic_started, setComicStarted] = useState(draft_text(d?.comicStarted));
+	const [comic_finished, setComicFinished] = useState(draft_text(d?.comicFinished));
 	const [content, setContent] = useState(initial_share.content ?? draft_text(d?.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const error_ref = useRef<HTMLDivElement>(null);
@@ -624,11 +693,17 @@ export function ListenMode({
 			eventStart: event_start,
 			eventEnd: event_end,
 			rating,
+			comicSeries: comic_series,
+			comicVolume: comic_volume,
+			comicIssue: comic_issue,
+			comicPublisher: comic_publisher,
+			comicStarted: comic_started,
+			comicFinished: comic_finished,
 			content,
 			video: video_url,
 			venue: venue_name,
 		},
-		meta: { variant, readStatus: read_status, cover: cover_url, publication },
+		meta: { variant: picked_variant, readStatus: read_status, cover: cover_url, publication },
 		restored: draft !== null,
 	});
 	// Media endpoint is discovered once per session and cached, matching
@@ -932,6 +1007,22 @@ export function ListenMode({
 			if (config.hasRating && trimmed_rating !== '') {
 				base.rating = trimmed_rating;
 			}
+			if (config.hasComicDetails) {
+				const comic_details: [ComicDetailProperty, string][] = [
+					['mp-series', comic_series],
+					['mp-volume', comic_volume],
+					['mp-issue-number', comic_issue],
+					['mp-publisher', comic_publisher],
+					['mp-started-at', comic_started],
+					['mp-finished-at', comic_finished],
+				];
+				for (const [key, value] of comic_details) {
+					const trimmed = value.trim();
+					if (trimmed) {
+						base[key] = trimmed;
+					}
+				}
+			}
 			// Photo property: user-attached uploads win over source-preview
 			// cover. hasGeocode variants (Checkin / Eat / Drink / Exercise)
 			// always have cover_url empty (no source-preview flow), so the
@@ -945,7 +1036,16 @@ export function ListenMode({
 				// (Spotify / YouTube / Apple Music …): Post Kinds oEmbeds the
 				// URL into a player that already shows album art, so attaching
 				// the cover too duplicated it as a stray gallery below the card.
-				base.photo = cover_url;
+				if (config.coverAsCoverImage) {
+					// Post Kinds reads the cover URL; `photo` would be downloaded
+					// into the media library by the Micropub plugin.
+					base['mp-cover-image'] = cover_url;
+					if (config.hasTitle && trimmed_watch_title) {
+						base['mp-cover-image-alt'] = 'Cover of ' + trimmed_watch_title;
+					}
+				} else {
+					base.photo = cover_url;
+				}
 			}
 			// Video URL: paste-only (no client-side upload pipeline). Submitted
 			// verbatim as the Micropub spec's standard `video` property;
@@ -1022,6 +1122,12 @@ export function ListenMode({
 			setWatchTitle('');
 			setReadStatus('');
 			setRating('');
+			setComicSeries('');
+			setComicVolume('');
+			setComicIssue('');
+			setComicPublisher('');
+			setComicStarted('');
+			setComicFinished('');
 			setContent('');
 			resetMoreValues();
 			for (const entry of media_entries) {
@@ -1096,7 +1202,7 @@ export function ListenMode({
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
 				<fieldset class="outpost-variant-picker outpost-variant-picker--compact">
 					<legend class="outpost-label">Type</legend>
-					{VARIANT_ORDER.map((id) => (
+					{variant_options.map((id) => (
 						<label key={id} class="outpost-radio">
 							<input
 								type="radio"
@@ -1293,6 +1399,89 @@ export function ListenMode({
 							value={rating}
 							onInput={(event): void =>
 								setRating((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+					</>
+				)}
+
+				{config.hasComicDetails && (
+					<>
+						<label class="outpost-label" for="outpost-listen-comic-series">
+							Series (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-series"
+							class="outpost-input"
+							type="text"
+							value={comic_series}
+							onInput={(event): void =>
+								setComicSeries((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-volume">
+							Volume (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-volume"
+							class="outpost-input"
+							type="text"
+							value={comic_volume}
+							onInput={(event): void =>
+								setComicVolume((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-issue">
+							Issue number (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-issue"
+							class="outpost-input"
+							type="text"
+							value={comic_issue}
+							onInput={(event): void =>
+								setComicIssue((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-publisher">
+							Publisher (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-publisher"
+							class="outpost-input"
+							type="text"
+							value={comic_publisher}
+							onInput={(event): void =>
+								setComicPublisher((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-started">
+							Started (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-started"
+							class="outpost-input"
+							type="date"
+							value={comic_started}
+							onInput={(event): void =>
+								setComicStarted((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-finished">
+							Finished (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-finished"
+							class="outpost-input"
+							type="date"
+							value={comic_finished}
+							onInput={(event): void =>
+								setComicFinished((event.target as HTMLInputElement).value)
 							}
 							disabled={submitting}
 						/>

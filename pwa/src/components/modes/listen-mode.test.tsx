@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render } from 'preact';
-import { ListenMode } from './listen-mode';
+import { ListenMode, DOING_VARIANT_LABELS } from './listen-mode';
 import type { StoredToken } from '../../lib/token-store';
 import type { MicropubEnvironment } from '../../lib/micropub';
 import type { MediaLookupEnvironment } from '../../lib/media-lookup';
 import { fetch_source_preview, type PreviewEnvironment } from '../../lib/preview';
 import { stash_share_target } from '../../lib/share-target';
+import type { ComposerConfig } from '../../lib/composer-config';
+import { write_draft } from '../../lib/drafts';
 
 // T10-S3-03: count every source-preview call, whichever environment it uses.
 vi.mock('../../lib/preview', async (importOriginal) => {
@@ -351,5 +353,287 @@ describe('ListenMode share intake waits for the person (T10-S3-03)', () => {
 
 		expect(vi.mocked(fetch_source_preview)).not.toHaveBeenCalled();
 		expect(fill_button()).toBeNull();
+	});
+});
+
+describe('ListenMode Comic variant (#243)', () => {
+	const COVER = 'https://img.example/comic-cover.jpg';
+
+	function config(post_kinds?: { comics: boolean }): ComposerConfig {
+		return {
+			companions: {
+				'post-kinds': 'active',
+				'post-formats': 'absent',
+				xfn: 'absent',
+				'syndication-links': 'absent',
+				yoast: 'absent',
+				activitypub: 'absent',
+				'accessibility-checker': 'absent',
+				'rss-chat-routing': 'absent',
+			},
+			postFormats: null,
+			xfnRels: [],
+			existingCategories: [],
+			existingTags: [],
+			bridgyHostMap: {},
+			siteSettings: { bridgyAutoSuggest: false, defaultPostVariant: 'article' },
+			...(post_kinds ? { postKinds: post_kinds } : {}),
+		};
+	}
+
+	function preview_env(extracted: Record<string, string>): PreviewEnvironment {
+		return {
+			fetch: async (): Promise<Response> =>
+				new Response(JSON.stringify({ extracted }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		};
+	}
+
+	function mount_with(cfg: ComposerConfig | undefined, preview?: PreviewEnvironment): void {
+		render(
+			<ListenMode
+				token={mock_token}
+				micropubEnv={make_env()}
+				{...(cfg ? { composerConfig: cfg } : {})}
+				{...(preview ? { previewEnv: preview } : {})}
+			/>,
+			root,
+		);
+	}
+
+	function variant_values(): string[] {
+		return variant_radios().map((r) => r.value);
+	}
+
+	function variant_labels(): string[] {
+		return variant_radios().map((r) => r.parentElement?.textContent ?? '');
+	}
+
+	function checked_variant(): string | undefined {
+		return variant_radios().find((r) => r.checked)?.value;
+	}
+
+	async function pick(value: string): Promise<void> {
+		variant_radios()
+			.find((r) => r.value === value)
+			?.click();
+		await flush();
+	}
+
+	function fill_button(): HTMLButtonElement | undefined {
+		return Array.from(root.querySelectorAll('button')).find((b) =>
+			/fill in details/i.test(b.textContent ?? ''),
+		);
+	}
+
+	function posted(): URLSearchParams {
+		return new URLSearchParams(posted_bodies[0] ?? '');
+	}
+
+	/** A share with a source lands on Read; the person asks for details, which sets the cover. */
+	async function share_and_fill(extracted: Record<string, string>): Promise<void> {
+		stash_share_target({
+			tab: 'listen',
+			doingVariant: 'read',
+			url: 'https://example.test/comics/issue-1',
+			sourceId: 'unknown',
+		});
+		mount_with(config({ comics: true }), preview_env(extracted));
+		await flush(2);
+		fill_button()?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await flush(4);
+	}
+
+	beforeEach(() => {
+		localStorage.clear();
+		sessionStorage.clear();
+	});
+
+	it('is not offered when the server sends no postKinds capabilities', () => {
+		mount_with(config());
+		expect(variant_values()).not.toContain('comics');
+		expect(variant_labels()).not.toContain('Comic');
+	});
+
+	it('is not offered when postKinds.comics is false', () => {
+		mount_with(config({ comics: false }));
+		expect(variant_values()).not.toContain('comics');
+	});
+
+	it('is not offered before the composer config loads', () => {
+		mount_with(undefined);
+		expect(variant_values()).not.toContain('comics');
+	});
+
+	it('is offered right after Read when postKinds.comics is true', () => {
+		mount_with(config({ comics: true }));
+		const values = variant_values();
+		expect(values).toContain('comics');
+		expect(values.indexOf('comics')).toBe(values.indexOf('read') + 1);
+		expect(variant_labels()[values.indexOf('comics')]).toBe('Comic');
+	});
+
+	it('is left out of the Doing inventory Home lists as always there', () => {
+		expect(DOING_VARIANT_LABELS).not.toContain('Comic');
+		expect(DOING_VARIANT_LABELS).toContain('Read');
+	});
+
+	it('names the Comic URL in the publish hint until it is filled', async () => {
+		mount_with(config({ comics: true }));
+		await pick('comics');
+		expect(root.textContent).toContain('Still needed: Comic URL.');
+		set_value(input_for('outpost-listen-target'), 'https://example.test/comics/issue-1');
+		await flush();
+		expect(root.textContent).not.toContain('Still needed: Comic URL.');
+	});
+
+	it('sends a read-of entry with the comic fields and the comics kind hint', async () => {
+		mount_with(config({ comics: true }));
+		await pick('comics');
+		set_value(input_for('outpost-listen-target'), 'https://example.test/comics/issue-1');
+		set_value(input_for('outpost-listen-watch-title'), 'The Long Night');
+		set_value(input_for('outpost-listen-person'), 'A. Writer, B. Artist');
+		set_value(input_for('outpost-listen-comic-series'), ' Night Shift ');
+		set_value(input_for('outpost-listen-comic-volume'), '2');
+		set_value(input_for('outpost-listen-comic-issue'), '14');
+		set_value(input_for('outpost-listen-comic-publisher'), 'Small Press');
+		set_value(input_for('outpost-listen-comic-started'), '2026-11-01');
+		set_value(input_for('outpost-listen-comic-finished'), '2026-11-03');
+		const status = root.querySelector('#outpost-listen-read-status') as HTMLSelectElement;
+		status.value = 'finished';
+		status.dispatchEvent(new Event('change', { bubbles: true }));
+		set_value(input_for('outpost-listen-rating'), '4');
+		const content = root.querySelector('#outpost-listen-content') as HTMLTextAreaElement;
+		content.value = 'Great finale.';
+		content.dispatchEvent(new Event('input', { bubbles: true }));
+		await flush();
+		submit();
+		await flush(4);
+
+		expect(posted_bodies.length).toBe(1);
+		const body = posted();
+		expect(body.get('read-of')).toBe('https://example.test/comics/issue-1');
+		expect(body.get('pkiw-kind')).toBe('comics');
+		expect(body.get('name')).toBe('The Long Night');
+		expect(body.get('author')).toBe('A. Writer, B. Artist');
+		expect(body.get('mp-series')).toBe('Night Shift');
+		expect(body.get('mp-volume')).toBe('2');
+		expect(body.get('mp-issue-number')).toBe('14');
+		expect(body.get('mp-publisher')).toBe('Small Press');
+		expect(body.get('mp-started-at')).toBe('2026-11-01');
+		expect(body.get('mp-finished-at')).toBe('2026-11-03');
+		expect(body.get('read-status')).toBe('finished');
+		expect(body.get('rating')).toBe('4');
+		expect(body.get('content')).toBe('Great finale.');
+		expect(body.has('mp-post-format')).toBe(false);
+	});
+
+	it('leaves out comic fields that are empty or only spaces', async () => {
+		mount_with(config({ comics: true }));
+		await pick('comics');
+		set_value(input_for('outpost-listen-target'), 'https://example.test/comics/issue-1');
+		set_value(input_for('outpost-listen-comic-series'), '   ');
+		await flush();
+		submit();
+		await flush(4);
+
+		expect(posted_bodies.length).toBe(1);
+		const body = posted();
+		for (const key of [
+			'mp-series',
+			'mp-volume',
+			'mp-issue-number',
+			'mp-publisher',
+			'mp-started-at',
+			'mp-finished-at',
+		]) {
+			expect(body.has(key), key).toBe(false);
+		}
+	});
+
+	it('does not send comic fields from a Read post', async () => {
+		mount_with(config({ comics: true }));
+		await pick('comics');
+		set_value(input_for('outpost-listen-comic-series'), 'Night Shift');
+		await flush();
+		await pick('read');
+		set_value(input_for('outpost-listen-target'), 'https://example.test/books/1');
+		await flush();
+		submit();
+		await flush(4);
+
+		expect(posted_bodies.length).toBe(1);
+		expect(posted().get('pkiw-kind')).toBe('read');
+		expect(posted().has('mp-series')).toBe(false);
+	});
+
+	it('sends a source-preview cover as mp-cover-image with alt text, never as photo', async () => {
+		await share_and_fill({ 'p-name': 'The Long Night', 'u-photo': COVER });
+		await pick('comics');
+		submit();
+		await flush(4);
+
+		expect(posted_bodies.length).toBe(1);
+		const body = posted();
+		expect(body.get('mp-cover-image')).toBe(COVER);
+		expect(body.get('mp-cover-image-alt')).toBe('Cover of The Long Night');
+		expect(body.has('photo')).toBe(false);
+		expect(body.has('photo[]')).toBe(false);
+	});
+
+	it('omits the cover alt text when the comic has no title', async () => {
+		await share_and_fill({ 'u-photo': COVER });
+		await pick('comics');
+		submit();
+		await flush(4);
+
+		const body = posted();
+		expect(body.get('mp-cover-image')).toBe(COVER);
+		expect(body.has('mp-cover-image-alt')).toBe(false);
+		expect(body.has('photo')).toBe(false);
+	});
+
+	it('still sends a Read cover as photo', async () => {
+		await share_and_fill({ 'p-name': 'A Book', 'u-photo': COVER });
+		expect(checked_variant()).toBe('read');
+		submit();
+		await flush(4);
+
+		const body = posted();
+		expect(body.get('photo')).toBe(COVER);
+		expect(body.has('mp-cover-image')).toBe(false);
+		expect(body.has('mp-cover-image-alt')).toBe(false);
+	});
+
+	it('opens a saved comics draft on Listen when the site cannot build comic cards', async () => {
+		write_draft(
+			'listen',
+			mock_token.me,
+			{ target: 'https://example.test/comics/issue-1' },
+			{ variant: 'comics' },
+		);
+		mount_with(config({ comics: false }));
+		await flush();
+		expect(checked_variant()).toBe('listen');
+		expect(input_for('outpost-listen-comic-series')).toBeNull();
+	});
+
+	it('opens a saved comics draft on Comic once the config says comics are supported', async () => {
+		write_draft(
+			'listen',
+			mock_token.me,
+			{ target: 'https://example.test/comics/issue-1', comicSeries: 'Night Shift' },
+			{ variant: 'comics' },
+		);
+		// The config arrives after the composer mounts, as it does in the app.
+		mount_with(undefined);
+		await flush();
+		expect(checked_variant()).toBe('listen');
+		mount_with(config({ comics: true }));
+		await flush();
+		expect(checked_variant()).toBe('comics');
+		expect(input_for('outpost-listen-comic-series').value).toBe('Night Shift');
 	});
 });

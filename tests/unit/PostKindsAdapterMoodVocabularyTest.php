@@ -29,7 +29,7 @@ final class PostKindsAdapterMoodVocabularyTest extends TestCase {
 
 		$this->assertSame( array(), $adapter->mood_vocabulary() );
 		$this->assertContains( 'post-kinds.mood', $adapter->feature_slugs() );
-		$this->assertCount( 36, $adapter->feature_slugs() );
+		$this->assertCount( 37, $adapter->feature_slugs() );
 	}
 
 	/**
@@ -48,7 +48,7 @@ final class PostKindsAdapterMoodVocabularyTest extends TestCase {
 		$this->assertContains( 'Energised', $labels );
 		$this->assertNotContains( 'Energized', $labels, 'Outpost must not respell labels.' );
 		$this->assertContains( 'post-kinds.mood', $adapter->feature_slugs() );
-		$this->assertCount( 36, $adapter->feature_slugs() );
+		$this->assertCount( 37, $adapter->feature_slugs() );
 	}
 
 	/**
