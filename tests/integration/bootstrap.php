@@ -102,6 +102,10 @@ tests_add_filter(
 	'muplugins_loaded',
 	static function (): void {
 		require dirname( __DIR__, 2 ) . '/outpost.php';
+		// The WireMock rewriter is test machinery (tests/_helpers/, not shipped;
+		// T10-S3-09): only this bootstrap registers it.
+		require_once dirname( __DIR__ ) . '/_helpers/class-outpost-mock-server-filter.php';
+		\Outpost_Mock_Server_Filter::register();
 	}
 );
 

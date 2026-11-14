@@ -63,10 +63,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-outpost-client-identity.p
 require_once OUTPOST_PLUGIN_DIR . 'includes/trait-bearer-auth.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-url-guard.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
-// G99-mock-server — test-time HTTP rewriter. No-op in production
-// because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the
-// integration-test bootstrap.
-require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-mock-server-filter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-kinds-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-formats-adapter.php';
@@ -204,7 +200,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-sidebar-assets.php';
 // platforms (Oura, WHOOP, Polar). Real provider classes register
 // against the picker's filter in follow-up PRs.
 require_once OUTPOST_PLUGIN_DIR . 'includes/rest/class-outpost-fetch-recent-rest.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-test-provider.php';
 // G11a-consumer — Oura fetch-recent provider.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-oura.php';
 // G11b-consumer — WHOOP fetch-recent provider.
@@ -434,10 +429,6 @@ add_action(
 		// G5b — Register Kit (v3 API secret) + write.as destinations.
 		Outpost_POSSE_Destination_Kit::register();
 		Outpost_POSSE_Destination_WriteAs::register();
-		// G99-mock-server — register the pre_http_request rewriter. Safe
-		// in production: rewrite is gated on OUTPOST_TEST_MOCK_SERVER_URL,
-		// which is only defined by integration-test bootstrap.
-		Outpost_Mock_Server_Filter::register();
 		Outpost_Encryption_Key_Notice::register();
 		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
 		// Outpost PWA routes — those features postpone JS/CSS until first
@@ -447,7 +438,6 @@ add_action(
 		Outpost_Sidebar_Assets::register();
 		// G-fetch-recent-picker.
 		Outpost_Fetch_Recent_REST::register();
-		Outpost_Fetch_Recent_Test_Provider::register();
 		// G11a-consumer — Oura fetch-recent provider.
 		Outpost_Fetch_Recent_Oura::register();
 		// G11b-consumer — WHOOP fetch-recent provider.
