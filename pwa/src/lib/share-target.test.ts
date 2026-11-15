@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parse_dispatch_params, parse_share_target } from './share-target';
 
 /**
@@ -218,5 +218,74 @@ describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
 		expect(peek_share_target()).toEqual({ tab: 'note', content: 'first' });
 		expect(sessionStorage.getItem('outpost.share_review')).toBeNull();
 		expect(sessionStorage.getItem('outpost.share_review_candidate')).toBeNull();
+	});
+});
+
+/**
+ * P4G-01: another tab can change the account between this tab reading a
+ * share and writing it back. A sessionStorage wrapper flips the origin epoch
+ * at the moment of the write, which the Web Storage spec allows.
+ */
+describe('a write that races an account change in another tab (P4G-01)', () => {
+	beforeEach(() => {
+		sessionStorage.clear();
+		localStorage.clear();
+		localStorage.setItem('outpost.share_epoch', 'A');
+	});
+
+	function flip_epoch_when_writing(keys: string[]): void {
+		const real = sessionStorage;
+		vi.stubGlobal('sessionStorage', {
+			getItem: (k: string) => real.getItem(k),
+			setItem: (k: string, v: string) => {
+				real.setItem(k, v);
+				if (keys.includes(k)) localStorage.setItem('outpost.share_epoch', 'B');
+			},
+			removeItem: (k: string) => real.removeItem(k),
+			clear: () => real.clear(),
+			key: (i: number) => real.key(i),
+			get length() {
+				return real.length;
+			},
+		});
+	}
+
+	it('set_held_shares refuses and leaves nothing readable under the new epoch', async () => {
+		const { set_held_shares, hold_share_for_review } = await import('./share-target');
+		flip_epoch_when_writing(['outpost.share_review']);
+		try {
+			expect(set_held_shares([{ tab: 'note', content: 'Account A' }], 'A')).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(hold_share_for_review().shares).toEqual([]);
+	});
+
+	it('release_held_share returns nothing and leaves nothing for the modes under the new epoch', async () => {
+		const { set_held_shares, release_held_share, peek_share_target, hold_share_for_review } = await import('./share-target');
+		expect(set_held_shares([{ tab: 'note', content: 'Account A' }], 'A')).toBe(true);
+		flip_epoch_when_writing(['outpost.share_target']);
+		let released: unknown;
+		try {
+			released = release_held_share('A');
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(released).toBeNull();
+		expect(peek_share_target()).toBeNull();
+		expect(hold_share_for_review().shares).toEqual([]);
+	});
+
+	it('hold_share_for_review returns no share it couldn’t keep under its epoch', async () => {
+		const { stash_share_target, hold_share_for_review } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'Account A' });
+		flip_epoch_when_writing(['outpost.share_review']);
+		let held: { shares: unknown[] };
+		try {
+			held = hold_share_for_review();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(held.shares).toEqual([]);
 	});
 });

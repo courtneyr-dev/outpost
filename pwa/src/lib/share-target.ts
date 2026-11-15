@@ -174,13 +174,42 @@ function safe_session_get(key: string): string | null {
 	}
 }
 
-function safe_session_set(key: string, value: string): void {
-	drop_stale_shares();
-	try {
-		globalThis.sessionStorage?.setItem(key, value);
-	} catch (_err) {
-		// no-op
+/**
+ * Write share slots under `epoch` (P4G-01). Every share write goes through
+ * here: it refuses when the origin epoch isn't `epoch`, drops this tab's
+ * slots from an older epoch, records `epoch` itself (not whatever is current
+ * by then) as this tab's epoch, writes, and checks again, undoing the writes
+ * if another tab changed the account meanwhile. A share read under one
+ * epoch can't be saved under another. `null` removes a slot.
+ */
+function write_slots_under(epoch: string | null, entries: ReadonlyArray<readonly [string, string | null]>): boolean {
+	if (origin_epoch() !== epoch) {
+		drop_stale_shares();
+		return false;
 	}
+	drop_stale_shares();
+	let store: Storage | undefined;
+	try {
+		store = globalThis.sessionStorage;
+		if (!store) return false;
+		if (null !== epoch) store.setItem(EPOCH_KEY, epoch);
+		for (const [key, value] of entries) {
+			if (null === value) store.removeItem(key);
+			else store.setItem(key, value);
+		}
+	} catch (_err) {
+		// Checked below.
+	}
+	if (origin_epoch() !== epoch) {
+		try {
+			for (const [key] of entries) store?.removeItem(key);
+		} catch (_err) {
+			// sessionStorage is blocked, so nothing written can be read either.
+		}
+		drop_stale_shares();
+		return false;
+	}
+	return true;
 }
 
 function safe_session_remove(key: string): void {
@@ -370,7 +399,7 @@ export function parse_share_target(search: string): ShareTargetData | null {
  * can consume it on its next mount.
  */
 export function stash_share_target(data: ShareTargetData): void {
-	safe_session_set(KEY, JSON.stringify(data));
+	write_slots_under(origin_epoch(), [[KEY, JSON.stringify(data)]]);
 }
 
 /**
@@ -458,23 +487,16 @@ export function shares_still_current(epoch: string | null): boolean {
  * slots are dropped and nothing is written, and this returns false (P4F).
  */
 export function set_held_shares(shares: ShareTargetData[], epoch: string | null): boolean {
-	if (!shares_still_current(epoch)) {
-		drop_stale_shares();
-		return false;
-	}
-	write_held_shares(shares);
-	return true;
+	return write_slots_under(epoch, held_entries(shares));
 }
 
-/**
- * Anything past two is dropped; callers refuse a third share before this.
- */
-function write_held_shares(shares: ShareTargetData[]): void {
+/** The two review slots for `shares`; anything past two is dropped (callers refuse a third first). */
+function held_entries(shares: ShareTargetData[]): Array<readonly [string, string | null]> {
 	const [earlier, candidate] = shares;
-	if (earlier) safe_session_set(HELD_KEY, JSON.stringify(earlier));
-	else safe_session_remove(HELD_KEY);
-	if (candidate) safe_session_set(CANDIDATE_KEY, JSON.stringify(candidate));
-	else safe_session_remove(CANDIDATE_KEY);
+	return [
+		[HELD_KEY, earlier ? JSON.stringify(earlier) : null],
+		[CANDIDATE_KEY, candidate ? JSON.stringify(candidate) : null],
+	];
 }
 
 /**
@@ -492,8 +514,8 @@ function write_held_shares(shares: ShareTargetData[]): void {
  * photo slots full) is refused here too, since its bytes were never kept.
  */
 export function hold_share_for_review(): HeldShares {
+	const epoch = origin_epoch();
 	const fresh_raw = safe_session_get(KEY);
-	safe_session_remove(KEY);
 	const shares = [parse_share(safe_session_get(HELD_KEY)), parse_share(safe_session_get(CANDIDATE_KEY))].filter(
 		(s): s is ShareTargetData => s !== null,
 	);
@@ -506,25 +528,37 @@ export function hold_share_for_review(): HeldShares {
 			shares.push(fresh);
 		}
 	}
-	write_held_shares(shares);
-	return { shares, refused, epoch: origin_epoch() };
+	if (!write_slots_under(epoch, [[KEY, null], ...held_entries(shares)])) {
+		// The account changed in another tab while these were read (P4G-01).
+		return { shares: [], refused: false, epoch: origin_epoch() };
+	}
+	return { shares, refused, epoch };
 }
 
 /**
  * "Use shared content": hand the earliest held share to its mode's normal
  * intake and clear both slots. Only called with a single share waiting.
+ * `epoch` is the one the review read its shares under; once it has moved,
+ * nothing is handed over (P4G-01).
  */
-export function release_held_share(): ShareTargetData | null {
+export function release_held_share(epoch: string | null = origin_epoch()): ShareTargetData | null {
+	if (origin_epoch() !== epoch) {
+		drop_stale_shares();
+		return null;
+	}
 	const data = parse_share(safe_session_get(HELD_KEY));
-	write_held_shares([]);
-	if (!data) return null;
-	safe_session_set(KEY, JSON.stringify(data));
-	return data;
+	const cleared = [[HELD_KEY, null], [CANDIDATE_KEY, null]] as const;
+	if (!data) {
+		write_slots_under(epoch, cleared);
+		return null;
+	}
+	return write_slots_under(epoch, [...cleared, [KEY, JSON.stringify(data)]]) ? data : null;
 }
 
 /** "Discard shared content" / "Discard both": drop every held share. */
 export function discard_held_share(): void {
-	write_held_shares([]);
+	safe_session_remove(HELD_KEY);
+	safe_session_remove(CANDIDATE_KEY);
 }
 
 /** Clearing pending shares failed; some may still be readable on this device. */

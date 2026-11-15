@@ -373,7 +373,7 @@ export function ComposerTabs({
 			return;
 		}
 		if (!(await apply_to_inbox(0))) return;
-		if (null === release_held_share()) {
+		if (null === release_held_share(held.epoch)) {
 			expire_review();
 			return;
 		}
@@ -382,6 +382,12 @@ export function ComposerTabs({
 
 	const discard_shared = async (): Promise<void> => {
 		if (!review_tab) return;
+		// A stale review must not touch the shared photo inbox, which may now
+		// hold the next account's photo (P4G-02).
+		if (!shares_still_current(held.epoch)) {
+			expire_review();
+			return;
+		}
 		if (!(await apply_to_inbox(null))) return;
 		discard_held_share();
 		finish_review(review_tab, false, 'Shared content discarded.');
@@ -410,6 +416,10 @@ export function ComposerTabs({
 
 	const discard_both_shares = async (): Promise<void> => {
 		if (!review_tab) return;
+		if (!shares_still_current(held.epoch)) {
+			expire_review();
+			return;
+		}
 		if (!(await apply_to_inbox(null))) return;
 		discard_held_share();
 		finish_review(review_tab, false, 'Both shares discarded.');

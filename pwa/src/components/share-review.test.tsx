@@ -802,6 +802,43 @@ describe('a review open when the account changes in another tab', () => {
 		expect(region()).toBeNull();
 	});
 
+	const b_photo = (): Promise<void> =>
+		stash_shared_photos(
+			{ files: [new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' })], title: 'Account B photo', text: '', received: 2 },
+			inbox_env,
+		);
+
+	it('"Discard shared content" leaves a photo the next account shared alone (P4G-02)', async () => {
+		stash_share_target({ tab: 'note', content: 'Account A words' });
+		mount();
+		await wait(30);
+		other_tab_changes_account();
+		await b_photo();
+
+		click('Discard shared content');
+		await wait(40);
+
+		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Account B photo');
+		expect(root.textContent).toMatch(/expired/i);
+	});
+
+	it('"Discard both" leaves a photo the next account shared alone (P4G-02)', async () => {
+		stash_share_target({ tab: 'note', content: 'Account A first' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Account A second' });
+		remount();
+		await wait(30);
+		other_tab_changes_account();
+		await b_photo();
+
+		click('Discard both');
+		await wait(40);
+
+		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Account B photo');
+		expect(root.textContent).toMatch(/expired/i);
+	});
+
 	it('the inbox check after mount writes nothing back once the epoch moved', async () => {
 		stash_share_target({ tab: 'note', content: 'Account A words' });
 		mount();
