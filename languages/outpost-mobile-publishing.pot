@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-15T13:37:46+00:00\n"
+"POT-Creation-Date: 2026-11-15T14:03:48+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -75,43 +75,47 @@ msgstr ""
 msgid "Returns the local configuration used by the Outpost composer."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:160
+#: includes/adapters/outbound/class-telegraph-adapter.php:172
+msgid "Telegraph is off, or this post is not a published, unprotected post it may send."
+msgstr ""
+
+#: includes/adapters/outbound/class-telegraph-adapter.php:176
 msgid "Post has no author."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:174
+#: includes/adapters/outbound/class-telegraph-adapter.php:190
 msgid "(empty)"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:212
+#: includes/adapters/outbound/class-telegraph-adapter.php:230
 msgid "Telegraph response missing URL."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:271
+#: includes/adapters/outbound/class-telegraph-adapter.php:291
 msgid "Telegraph account creation returned no token."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:275
+#: includes/adapters/outbound/class-telegraph-adapter.php:295
 msgid "Telegraph token could not be stored securely."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/adapters/outbound/class-telegraph-adapter.php:478
+#: includes/adapters/outbound/class-telegraph-adapter.php:498
 #, php-format
 msgid "Telegraph transport error: %s"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/adapters/outbound/class-telegraph-adapter.php:486
+#: includes/adapters/outbound/class-telegraph-adapter.php:506
 #, php-format
 msgid "Telegraph HTTP %d"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:493
+#: includes/adapters/outbound/class-telegraph-adapter.php:513
 msgid "Telegraph returned non-JSON."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:498
+#: includes/adapters/outbound/class-telegraph-adapter.php:518
 msgid "Telegraph API error."
 msgstr ""
 
@@ -235,118 +239,118 @@ msgstr ""
 msgid "Save appearance settings"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:220
+#: includes/admin/class-appearance-settings-page.php:167
 msgid "Security check failed."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:223
+#: includes/admin/class-appearance-settings-page.php:170
 #: includes/class-appearance-rest-controller.php:112
 msgid "You do not have permission to manage appearance preferences."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:236
+#: includes/admin/class-appearance-settings-page.php:231
 msgid "Colors"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:242
+#: includes/admin/class-appearance-settings-page.php:237
 msgid "Fonts"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:282
+#: includes/admin/class-appearance-settings-page.php:277
 msgid "Contrast adjustment applied."
 msgstr ""
 
 #. translators: 1: original color hex, 2: adjusted hex, 3: ratio before, 4: ratio after.
-#: includes/admin/class-appearance-settings-page.php:286
+#: includes/admin/class-appearance-settings-page.php:281
 #, php-format
 msgid "Your %1$s rendered at %3$s:1 against the surface; auto-adjusted to %2$s for %4$s:1."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:300
+#: includes/admin/class-appearance-settings-page.php:295
 msgid "Override anyway (keep my color, accept the lower contrast)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:337
+#: includes/admin/class-appearance-settings-page.php:332
 msgid "Paste a CSS font-family value. Outpost picks up custom fonts your theme already loads — installing fonts is your theme's job."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:355
+#: includes/admin/class-appearance-settings-page.php:350
 msgid "Appearance settings saved."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:365
+#: includes/admin/class-appearance-settings-page.php:360
 msgid "Save failed."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:574
+#: includes/admin/class-appearance-settings-page.php:569
 msgid "Light"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:575
+#: includes/admin/class-appearance-settings-page.php:570
 msgid "Dark"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:576
+#: includes/admin/class-appearance-settings-page.php:571
 msgid "System"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:583
+#: includes/admin/class-appearance-settings-page.php:578
 msgid "Outpost Default"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:584
+#: includes/admin/class-appearance-settings-page.php:579
 msgid "Use Site Theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:591
+#: includes/admin/class-appearance-settings-page.php:586
 msgid "Background"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:592
+#: includes/admin/class-appearance-settings-page.php:587
 msgid "Surface"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:593
+#: includes/admin/class-appearance-settings-page.php:588
 msgid "Text"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:594
+#: includes/admin/class-appearance-settings-page.php:589
 msgid "Text (secondary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:595
+#: includes/admin/class-appearance-settings-page.php:590
 msgid "Accent (primary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:596
+#: includes/admin/class-appearance-settings-page.php:591
 msgid "Accent (second)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:597
+#: includes/admin/class-appearance-settings-page.php:592
 msgid "Border"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:604
+#: includes/admin/class-appearance-settings-page.php:599
 msgid "Body font"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:605
+#: includes/admin/class-appearance-settings-page.php:600
 msgid "Display font (headings)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:606
+#: includes/admin/class-appearance-settings-page.php:601
 msgid "Monospace (URL fields)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:613
+#: includes/admin/class-appearance-settings-page.php:608
 msgid "overridden"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:615
+#: includes/admin/class-appearance-settings-page.php:610
 msgid "from theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:618
+#: includes/admin/class-appearance-settings-page.php:613
 msgid "default"
 msgstr ""
 
@@ -1696,11 +1700,11 @@ msgstr ""
 msgid "Invalid settings tab."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-handler.php:75
+#: includes/settings/class-outpost-settings-handler.php:78
 msgid "You do not have permission to update these settings."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-handler.php:82
+#: includes/settings/class-outpost-settings-handler.php:85
 msgid "Security check failed. Please reload and try again."
 msgstr ""
 
