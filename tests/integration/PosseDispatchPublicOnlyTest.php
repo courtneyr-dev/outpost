@@ -99,6 +99,8 @@ final class PosseDispatchPublicOnlyTest extends TestCase {
 				'dest' => self::HOSTS[ $host ] ?? 'other',
 				'url'  => (string) $url,
 				'body' => is_array( $body ) ? (string) wp_json_encode( $body ) : (string) $body,
+				'redirection' => $args['redirection'] ?? null,
+				'limit_response_size' => $args['limit_response_size'] ?? null,
 			);
 			if ( self::$fail ) {
 				return array(
@@ -399,6 +401,25 @@ final class PosseDispatchPublicOnlyTest extends TestCase {
 		$this->assertCount( 5, Outpost_POSSE_Meta::get_syndication_urls( $id ) );
 		$this->assertSame( array(), Outpost_POSSE_Meta::get_failures( $id ) );
 		$this->assertSame( array(), Outpost_POSSE_Meta::get_in_flight( $id ) );
+		$this->assert_no_escape();
+	}
+
+	/**
+	 * T11 residual of F-54: the four shipped destinations carry an API key,
+	 * so their requests follow no redirect and cap the response at 5 MiB,
+	 * like every other credential-carrying request.
+	 */
+	public function test_shipped_destinations_follow_no_redirect_and_cap_the_response(): void {
+		$id = $this->make_post( 'public-args' );
+		$this->publish( $id );
+		$this->run_cron( $id );
+
+		$shipped = array_values( array_filter( self::$http_log, static fn( array $r ): bool => in_array( $r['dest'], self::SHIPPED, true ) ) );
+		$this->assertCount( count( self::SHIPPED ), $shipped, 'One request to each shipped destination.' );
+		foreach ( $shipped as $request ) {
+			$this->assertSame( 0, $request['redirection'], $request['dest'] . ' follows no redirect.' );
+			$this->assertSame( 5 * 1024 * 1024, $request['limit_response_size'], $request['dest'] . ' caps the response at 5 MiB.' );
+		}
 		$this->assert_no_escape();
 	}
 

@@ -75,15 +75,17 @@ final class Outpost_POSSE_Destination_Beehiiv extends Outpost_POSSE_Destination_
 
 		$response = wp_safe_remote_post(
 			$endpoint,
-			array(
-				'timeout'   => 10,
-				'headers'   => array(
-					'Authorization' => 'Bearer ' . $settings['api_key'],
-					'Content-Type'  => 'application/json',
-					'Accept'        => 'application/json',
-				),
-				'body'      => (string) wp_json_encode( $payload ),
-				'sslverify' => true,
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout'   => 10,
+					'headers'   => array(
+						'Authorization' => 'Bearer ' . $settings['api_key'],
+						'Content-Type'  => 'application/json',
+						'Accept'        => 'application/json',
+					),
+					'body'      => (string) wp_json_encode( $payload ),
+					'sslverify' => true,
+				)
 			)
 		);
 
