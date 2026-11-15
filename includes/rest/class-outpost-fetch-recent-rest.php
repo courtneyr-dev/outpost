@@ -34,7 +34,7 @@
  *       'post_payload' => [
  *           'title'                  => string,
  *           'content'                => string,
- *           'post_meta'              => array<string,mixed>,
+ *           // A provider's `post_meta` stays on the server (P4B-01).
  *           'syndication_source_url' => ?string,
  *           // Optional card parts, each validated in normalize_item():
  *           'blocks'                 => list<array{name,attributes}>, // ≤ 5 registered post-kinds-indieweb/ blocks
@@ -294,10 +294,12 @@ final class Outpost_Fetch_Recent_REST {
 			? $entry['post_payload']
 			: array();
 
+		// A provider's `post_meta` stays on the server: the picker would hand
+		// it to editPost(), which writes any REST-registered meta the person
+		// can edit (Phase 4 review P4B-01).
 		$post_payload = array(
 			'title'                  => isset( $payload['title'] ) ? (string) $payload['title'] : $title,
 			'content'                => isset( $payload['content'] ) ? (string) $payload['content'] : '',
-			'post_meta'              => isset( $payload['post_meta'] ) && is_array( $payload['post_meta'] ) ? $payload['post_meta'] : array(),
 			'syndication_source_url' => isset( $payload['syndication_source_url'] ) ? (string) $payload['syndication_source_url'] : null,
 		);
 		// The card parts the picker inserts in place of the paragraph

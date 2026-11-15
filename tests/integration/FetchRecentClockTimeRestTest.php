@@ -377,9 +377,7 @@ final class FetchRecentClockTimeRestTest extends TestCase {
 		$this->assertSame( array_keys( $dates ), array_column( $response['items'], 'id' ), 'Items arrive, newest first.' );
 		foreach ( $response['items'] as $item ) {
 			$this->assertSame( $dates[ $item['id'] ], $item['fetched_at'], "Positive control: {$item['id']} keeps its date." );
-			foreach ( $time_keys as $key ) {
-				$this->assertArrayNotHasKey( $key, $item['post_payload']['post_meta'], "{$key} stays on the server." );
-			}
+			$this->assertArrayNotHasKey( 'post_meta', $item['post_payload'], 'Provider meta, start times included, stays on the server (P4B-01).' );
 		}
 	}
 

@@ -194,7 +194,6 @@ describe( 'FetchRecentPickerModal', () => {
 				{ name: 'post-kinds-indieweb/sleep-card', attrs: { durationMinutes: 462 } },
 			] );
 			expect( mockEditPost ).toHaveBeenCalledWith( {
-				meta: { _outpost_oura_sleep_day: '2026-11-13' },
 				kind: [ 5 ],
 				date: '2026-11-12T12:00:00',
 			} );
@@ -207,9 +206,7 @@ describe( 'FetchRecentPickerModal', () => {
 			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
 				{ name: 'core/paragraph', attrs: { content: '<p>Sleep</p>' } },
 			] );
-			expect( mockEditPost ).toHaveBeenCalledWith( {
-				meta: { _outpost_oura_sleep_day: '2026-11-13' },
-			} );
+			expect( mockEditPost ).not.toHaveBeenCalled();
 		} );
 
 		it( 'inserts the Post Kinds exercise card the route sends (F-43)', async () => {
@@ -238,7 +235,6 @@ describe( 'FetchRecentPickerModal', () => {
 				},
 			] );
 			expect( mockEditPost ).toHaveBeenCalledWith( {
-				meta: { _outpost_polar_sport: 'Running' },
 				kind: [ 9 ],
 			} );
 		} );
@@ -260,9 +256,19 @@ describe( 'FetchRecentPickerModal', () => {
 			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
 				{ name: 'core/paragraph', attrs: { content: '<p>Sleep</p>' } },
 			] );
-			expect( mockEditPost ).toHaveBeenCalledWith( {
-				meta: { _outpost_oura_sleep_day: '2026-11-13' },
+			expect( mockEditPost ).not.toHaveBeenCalled();
+		} );
+
+		it( 'never applies post_meta a payload carries (P4B-01)', async () => {
+			mockGetBlockType.mockReturnValue( undefined );
+			await pick( {
+				...sleep,
+				post_payload: {
+					content: '<p>Sleep</p>',
+					post_meta: { _outpost_posse_targets: [ 'kit' ], _outpost_oura_calories: '412' },
+				},
 			} );
+			expect( mockEditPost ).not.toHaveBeenCalled();
 		} );
 
 		it( 'keeps the paragraph for a payload without blocks', async () => {

@@ -103,10 +103,8 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 					edits.date = payload.date;
 				}
 			}
-			const meta = payload.post_meta || {};
-			if ( Object.keys( meta ).length > 0 ) {
-				edits.meta = meta;
-			}
+			// Provider post meta is never applied (P4B-01): editPost() would
+			// write any REST-registered meta, such as syndication targets.
 			if ( Object.keys( edits ).length > 0 ) {
 				dispatch( 'core/editor' ).editPost( edits );
 			}
