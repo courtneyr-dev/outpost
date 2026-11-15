@@ -22,6 +22,9 @@ import { applyFilters } from '@wordpress/hooks';
 import { __, sprintf } from '@wordpress/i18n';
 import { DefaultItemRenderer } from './default-item-renderer.js';
 
+/** Block names a provider may insert: Post Kinds' own cards. */
+const POST_KINDS_BLOCK = /^post-kinds-indieweb\/[a-z0-9-]+$/;
+
 /**
  * @param {Object}   props
  * @param {string}   props.providerId    Provider id.
@@ -69,14 +72,19 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 			}
 			const payload = item.post_payload;
 
-			// A provider can send blocks a companion plugin registers, such
-			// as Post Kinds' sleep card (#260). They go in only when the
-			// editor knows every one; otherwise the paragraph does.
+			// A provider can send Post Kinds cards, such as the sleep card
+			// (#260). They go in only when every one is a Post Kinds block
+			// the editor knows (the route checks the same prefix, F-43);
+			// otherwise the paragraph does.
 			const wanted = Array.isArray( payload.blocks ) ? payload.blocks : [];
 			const known =
 				wanted.length > 0 &&
 				wanted.every(
-					( block ) => block && typeof block.name === 'string' && getBlockType( block.name )
+					( block ) =>
+						block &&
+						typeof block.name === 'string' &&
+						POST_KINDS_BLOCK.test( block.name ) &&
+						getBlockType( block.name )
 				);
 			const blocks = known
 				? wanted.map( ( block ) => createBlock( block.name, block.attributes || {} ) )
@@ -95,10 +103,8 @@ export function FetchRecentPickerModal( { providerId, providerLabel, onClose } )
 					edits.date = payload.date;
 				}
 			}
-			const meta = payload.post_meta || {};
-			if ( Object.keys( meta ).length > 0 ) {
-				edits.meta = meta;
-			}
+			// Provider post meta is never applied (P4B-01): editPost() would
+			// write any REST-registered meta, such as syndication targets.
 			if ( Object.keys( edits ).length > 0 ) {
 				dispatch( 'core/editor' ).editPost( edits );
 			}

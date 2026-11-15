@@ -97,7 +97,7 @@ final class WporgReviewGuardsTest extends TestCase {
 			'Contributors:',
 			'Tags:',
 			'Tested up to:',
-			'Stable tag:        1.0.27',
+			'Stable tag:        1.0.28',
 			'License:           GPLv2 or later',
 			'Requires at least:',
 			'Requires PHP:',
@@ -106,7 +106,7 @@ final class WporgReviewGuardsTest extends TestCase {
 			'== External services ==',
 			'== Source Code ==',
 			'== Changelog ==',
-			'= 1.0.27 =',
+			'= 1.0.28 =',
 			'`pwa/src/`',
 			'`src/`',
 			'npm run build:all',
@@ -139,7 +139,7 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertFileExists( $root . '/CHANGELOG.md' );
 		$this->assertMatchesRegularExpression( '/^CHANGELOG\.md$/m', (string) file_get_contents( $root . '/.distignore' ), 'CHANGELOG.md is not packaged.' );
 		$this->assertSame( 1, preg_match( '/^Stable tag:\s*(\S+)\s*$/m', $readme, $tag ) );
-		$this->assertSame( '1.0.27', $tag[1], 'No version other than 1.0.27.' );
+		$this->assertSame( '1.0.28', $tag[1], 'No version other than 1.0.28.' );
 	}
 
 	/**
@@ -193,6 +193,32 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertNotEmpty( $packaged_build, 'The zip carries build files.' );
 		$this->assertContains( 'build/index-rtl.css', $packaged_build, 'The RTL sidebar stylesheet ships.' );
 		$this->assertSame( array(), array_values( array_diff( $packaged_build, $tracked ) ), 'Every packaged build file is tracked.' );
+	}
+
+	/**
+	 * T11 F-53: the site deploy (tracked files through rsync --exclude-from=.distignore)
+	 * ships the same files as the WordPress.org zip (npm's packlist from
+	 * package.json `files`, minus the package.json and README.md that npm
+	 * always adds and bin/package-wporg.mjs removes).
+	 */
+	public function test_the_distignore_set_matches_the_release_zip_set(): void {
+		$root = dirname( __DIR__, 2 );
+		if ( ! is_dir( $root . '/.git' ) && ! is_file( $root . '/.git' ) ) {
+			$this->markTestSkipped( 'Needs a git checkout to list tracked files.' );
+		}
+		exec( 'cd ' . escapeshellarg( $root ) . ' && npm pack --dry-run --json --ignore-scripts 2>/dev/null', $out, $code ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		$pack = json_decode( implode( "\n", $out ), true );
+		if ( 0 !== $code || ! is_array( $pack ) || ! isset( $pack[0]['files'] ) ) {
+			$this->markTestIncomplete( 'npm unavailable; the release zip list was not checked.' );
+		}
+		$zip = array_values( array_diff( array_column( $pack[0]['files'], 'path' ), array( 'package.json', 'README.md' ) ) );
+		$rsync = self::packaged_files( $root );
+		sort( $zip );
+		sort( $rsync );
+
+		$this->assertContains( 'outpost.php', $rsync, 'The rsync set is the plugin.' );
+		$this->assertSame( array(), array_values( array_diff( $rsync, $zip ) ), 'The deploy ships nothing the zip leaves out.' );
+		$this->assertSame( array(), array_values( array_diff( $zip, $rsync ) ), 'The deploy ships everything the zip carries.' );
 	}
 
 	/**
@@ -643,6 +669,29 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * T11 F-50: shipped PHP escapes at output, so no phpcs comment may
+	 * suppress an EscapeOutput sniff (reviewers grep for these).
+	 */
+	public function test_no_escape_output_sniff_is_suppressed(): void {
+		$root  = dirname( __DIR__, 2 );
+		$files = array_keys( self::shipped_tokens() );
+		foreach ( glob( $root . '/admin/*.php' ) ?: array() as $path ) {
+			$files[] = substr( $path, strlen( $root ) + 1 );
+		}
+		$found = array();
+		// shipped_tokens() drops comments, so read the files with them.
+		foreach ( $files as $file ) {
+			foreach ( token_get_all( (string) file_get_contents( $root . '/' . $file ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) && 1 === preg_match( '/phpcs:\w+[^\n]*EscapeOutput/', $token[1] ) ) {
+					$found[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertContains( 'includes/class-syndication-admin-column.php', $files, 'The scan covers the badge renderer.' );
+		$this->assertSame( array(), $found, 'Escape at output instead of suppressing EscapeOutput.' );
+	}
+
+	/**
 	 * T10 (2026-11-13): share intake (share-target route and iOS Shortcut)
 	 * keeps no server-side state. The removed prefill transient had no
 	 * reader, so nothing may write `outpost_prefill_*` or carry its helpers.
@@ -722,5 +771,148 @@ final class WporgReviewGuardsTest extends TestCase {
 			$this->assertArrayHasKey( $check, $verified, "The scan must see the plugin's {$check}() calls." );
 		}
 		$this->assertSame( array(), array_values( array_unique( $found ) ) );
+	}
+
+	/**
+	 * T11 F-47: the eight `outpost_*_permission` filters can only refuse.
+	 * Each apply_filters() call starts from `true` and comes after a
+	 * current_user_can() check in the same function, so a filter can never
+	 * admit a request the credential and capability checks refused.
+	 */
+	public function test_permission_filters_can_only_refuse(): void {
+		$calls = array();
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			$last_function = -1;
+			$last_cap      = -1;
+			foreach ( $tokens as $i => $token ) {
+				if ( is_array( $token ) && T_FUNCTION === $token[0] ) {
+					$last_function = $i;
+				}
+				if ( is_array( $token ) && T_STRING === $token[0] && 'current_user_can' === $token[1] ) {
+					$last_cap = $i;
+				}
+				if ( ! is_array( $token ) || T_STRING !== $token[0] || 'apply_filters' !== $token[1] ) {
+					continue;
+				}
+				$hook = self::text( $tokens[ $i + 2 ] ?? '' );
+				if ( 1 !== preg_match( "/^'outpost_\\w+_permission'$/", $hook ) ) {
+					continue;
+				}
+				$where   = $file . ':' . $token[2] . ' ' . $hook;
+				$calls[] = $where;
+				$this->assertSame( ',', self::text( $tokens[ $i + 3 ] ?? '' ), $where );
+				$this->assertSame( 'true', strtolower( self::text( $tokens[ $i + 4 ] ?? '' ) ), $where . ' starts from true, so a filter can only refuse.' );
+				$this->assertGreaterThan( $last_function, $last_cap, $where . ' runs after current_user_can() in the same function.' );
+			}
+		}
+		$this->assertCount( 8, $calls, implode( "\n", $calls ) );
+	}
+
+	/**
+	 * T11 F-51: the default Nominatim User-Agent names the plugin, never the
+	 * site, so the geocode endpoint reads no site address.
+	 */
+	public function test_geocode_requests_never_name_the_site(): void {
+		$file   = 'includes/class-geocode-endpoint.php';
+		$tokens = self::shipped_tokens()[ $file ];
+		$found  = array();
+		foreach ( $tokens as $token ) {
+			if ( is_array( $token ) && T_STRING === $token[0] && in_array( strtolower( $token[1] ), array( 'home_url', 'site_url', 'get_home_url', 'get_site_url', 'network_home_url', 'network_site_url', 'get_bloginfo', 'get_option' ), true ) ) {
+				$found[] = $token[1] . ':' . $token[2];
+			}
+		}
+		$this->assertSame( array(), $found, $file . ' must not read the site address.' );
+		$this->assertStringContainsString( "'Outpost/%s WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)'", (string) file_get_contents( dirname( __DIR__, 2 ) . '/' . $file ) );
+	}
+
+	/**
+	 * T11 F-52: the POT covers the block-editor sidebar bundle. make-pot.sh
+	 * leaves out only build/pwa, and every __() string in build/index.js is
+	 * a msgid in the committed POT.
+	 */
+	public function test_the_pot_covers_the_sidebar_bundle(): void {
+		$root   = dirname( __DIR__, 2 );
+		$script = (string) file_get_contents( $root . '/bin/make-pot.sh' );
+		$this->assertSame( 1, preg_match( '/--exclude=([^\s"]+)/', $script, $m ), 'make-pot.sh passes --exclude.' );
+		$excluded = explode( ',', $m[1] );
+		$this->assertContains( 'build/pwa', $excluded );
+		$this->assertNotContains( 'build', $excluded, 'build/index.js must be scanned.' );
+
+		$msgids  = array();
+		$current = null;
+		foreach ( file( $root . '/languages/outpost-mobile-publishing.pot', FILE_IGNORE_NEW_LINES ) ?: array() as $line ) {
+			if ( 1 === preg_match( '/^msgid "(.*)"$/', $line, $mm ) ) {
+				$current = $mm[1];
+				continue;
+			}
+			if ( null !== $current && 1 === preg_match( '/^"(.*)"$/', $line, $mm ) ) {
+				$current .= $mm[1];
+				continue;
+			}
+			if ( null !== $current ) {
+				$msgids[ stripcslashes( $current ) ] = true;
+				$current                             = null;
+			}
+		}
+
+		$bundle = (string) file_get_contents( $root . '/build/index.js' );
+		preg_match_all( '/\.__\)\("((?:[^"\\\\]|\\\\.)*)","outpost-mobile-publishing"\)/', $bundle, $strings );
+		$this->assertGreaterThanOrEqual( 15, count( $strings[1] ), 'The scan sees the sidebar strings.' );
+		$missing = array();
+		foreach ( $strings[1] as $raw ) {
+			$string = (string) json_decode( '"' . $raw . '"' );
+			if ( ! isset( $msgids[ $string ] ) ) {
+				$missing[] = $string;
+			}
+		}
+		$this->assertSame( array(), $missing, 'Regenerate the POT with bin/make-pot.sh.' );
+	}
+
+	/**
+	 * T11 Phase 4 (P4A-04, P4B-04): a handler's nonce and capability checks
+	 * sit in the handler, where a top-down read finds them, not in a helper
+	 * behind a block-wide `phpcs:disable` of NonceVerification. Only the
+	 * share-target controller keeps one: share sheets can't send a nonce and
+	 * it does no protected work (T10 P-1).
+	 */
+	public function test_nonce_verification_is_never_block_disabled_outside_share_intake(): void {
+		$root  = dirname( __DIR__, 2 );
+		$found = array();
+		foreach ( array_keys( self::shipped_tokens() ) as $file ) {
+			foreach ( token_get_all( (string) file_get_contents( $root . '/' . $file ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) && 1 === preg_match( '/phpcs:disable[^\n]*NonceVerification/', $token[1] ) ) {
+					$found[] = $file;
+				}
+			}
+		}
+		$this->assertSame( array( 'includes/sources/class-share-target-controller.php' ), array_values( array_unique( $found ) ) );
+	}
+
+	/**
+	 * T11 Phase 5 (Plugin Check 2.2.0): every define() names its constant
+	 * with a string literal. A variable name hides which constants the
+	 * plugin defines and draws PrefixAllGlobals.VariableConstantNameFound.
+	 */
+	public function test_every_define_names_a_literal_constant(): void {
+		$found = array();
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			foreach ( $tokens as $i => $token ) {
+				if ( ! is_array( $token ) || T_STRING !== $token[0] || 'define' !== strtolower( $token[1] ) ) {
+					continue;
+				}
+				$prev = $tokens[ $i - 1 ] ?? null;
+				if ( is_array( $prev ) && in_array( $prev[0], array( T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION ), true ) ) {
+					continue;
+				}
+				if ( '(' !== self::text( $tokens[ $i + 1 ] ?? '' ) ) {
+					continue;
+				}
+				$arg = $tokens[ $i + 2 ] ?? null;
+				if ( ! is_array( $arg ) || T_CONSTANT_ENCAPSED_STRING !== $arg[0] ) {
+					$found[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertSame( array(), $found );
 	}
 }

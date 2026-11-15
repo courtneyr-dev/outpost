@@ -44,6 +44,8 @@ export interface SharedPhotosRecord {
 	title: string;
 	text: string;
 	received: number;
+	/** Random per-share identity the service worker assigns (P4I-01); absent on records from before 1.0.28. */
+	id?: string;
 }
 
 /** What the composer gets back: real File objects, ready for the photo list. */
@@ -52,6 +54,16 @@ export interface SharedPhotos {
 	title: string;
 	text: string;
 	received: number;
+	id?: string;
+}
+
+/**
+ * Which share a slot holds, for a decision to check it hasn't changed
+ * (P4H-01, P4I-01): the service worker's random id plus the arrival time.
+ * null for an empty or unusable slot.
+ */
+export function inbox_identity(photos: SharedPhotos | null): string | null {
+	return photos ? `${photos.id ?? ''}|${photos.received}` : null;
 }
 
 export interface ShareInboxEnvironment {
@@ -146,6 +158,7 @@ export async function stash_shared_photos(
 		title: payload.title,
 		text: payload.text,
 		received: payload.received,
+		...(undefined !== payload.id ? { id: payload.id } : {}),
 	};
 	const db = await open_inbox(env.indexedDB);
 	try {
@@ -191,6 +204,7 @@ export async function consume_shared_photos(
 			title: typeof v.title === 'string' ? v.title : '',
 			text: typeof v.text === 'string' ? v.text : '',
 			received: typeof v.received === 'number' ? v.received : 0,
+			...(typeof v.id === 'string' ? { id: v.id } : {}),
 		};
 	} catch (_err) {
 		return null;
@@ -210,6 +224,7 @@ function from_record(record: unknown): SharedPhotos | null {
 		title: typeof v.title === 'string' ? v.title : '',
 		text: typeof v.text === 'string' ? v.text : '',
 		received: typeof v.received === 'number' ? v.received : 0,
+		...(typeof v.id === 'string' ? { id: v.id } : {}),
 	};
 }
 
@@ -253,6 +268,28 @@ export async function read_share_inbox(
 	}
 }
 
+/** A decision found a slot holding a record the review never saw (P4H-01). */
+export class ShareInboxChangedError extends Error {
+	constructor() {
+		super('share inbox: changed since the review read it');
+		this.name = 'ShareInboxChangedError';
+	}
+}
+
+/** The inbox_identity() of the records a review showed, per slot; null for an empty slot. */
+export interface ReviewedInbox {
+	pending: string | null;
+	candidate: string | null;
+}
+
+/** inbox_identity() of a stored record, without rebuilding its files. */
+function stored_identity(record: unknown): string | null {
+	if (!record || typeof record !== 'object') return null;
+	const v = record as Record<string, unknown>;
+	if (!(Array.isArray(v.files) && v.files.some(is_photo_record))) return null;
+	return `${typeof v.id === 'string' ? v.id : ''}|${typeof v.received === 'number' ? v.received : 0}`;
+}
+
 /**
  * Apply the person's decision about waiting photo shares, in one
  * transaction.
@@ -263,10 +300,17 @@ export async function read_share_inbox(
  * there is no IndexedDB, or it can't open, errors, or aborts, so the caller
  * can keep the review open and say the choice wasn't applied. A missing
  * backend is a failure, not a no-op: records it can't see may still exist.
+ *
+ * With `reviewed`, the decision applies only if both slots still hold the
+ * records the review showed (by inbox_identity()), checked inside the transaction; otherwise it
+ * aborts with ShareInboxChangedError and changes nothing. A record another
+ * account wrote since (after a sign-out in another tab) is never deleted or
+ * overwritten by an older review (P4H-01).
  */
 export async function keep_shared_photos(
 	keep: ShareInboxSlot | null,
-	env: ShareInboxEnvironment = default_env()
+	env: ShareInboxEnvironment = default_env(),
+	reviewed?: ReviewedInbox
 ): Promise<void> {
 	if (!env.indexedDB) throw new Error('share inbox: IndexedDB is unavailable');
 	const db = await open_inbox(env.indexedDB);
@@ -276,6 +320,16 @@ export async function keep_shared_photos(
 		// Observed below; this keeps an early abort from going unhandled.
 		done.catch(() => undefined);
 		const store = tx.objectStore(SHARE_INBOX_STORE);
+		if (reviewed) {
+			const [pending, candidate] = await Promise.all([
+				await_request(store.get(SHARE_INBOX_KEY)),
+				await_request(store.get(SHARE_INBOX_CANDIDATE_KEY)),
+			]);
+			if (stored_identity(pending) !== reviewed.pending || stored_identity(candidate) !== reviewed.candidate) {
+				tx.abort();
+				throw new ShareInboxChangedError();
+			}
+		}
 		const kept: unknown = keep ? await await_request(store.get(keep)) : undefined;
 		if (kept !== undefined) {
 			store.put(kept, SHARE_INBOX_KEY);

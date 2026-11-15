@@ -886,6 +886,11 @@ async function handle_share_post(event) {
 			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
+			// A random identity, so a decision about this share can tell it
+			// from a later one that arrived in the same millisecond (P4I-01).
+			id: (self.crypto && typeof self.crypto.randomUUID === 'function')
+				? self.crypto.randomUUID()
+				: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
 		});
 		// The composer shows what is waiting for review; `refused` tells it
 		// this share wasn't kept because two were already waiting.
@@ -1040,11 +1045,20 @@ async function cache_first(request) {
 	 *   LITESPEED_NO_OPTM and LITESPEED_NO_PAGEOPTM at flush.
 	 */
 	private static function opt_out_of_page_optimizers(): void {
-		$constants = array( 'DONOTCACHEPAGE', 'DONOTROCKETOPTIMIZE', 'DONOTMINIFY', 'LITESPEED_NO_OPTM', 'LITESPEED_NO_PAGEOPTM' );
-		foreach ( $constants as $constant ) {
-			if ( ! defined( $constant ) ) {
-				define( $constant, true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Names other plugins read; defined only on Outpost's HTML routes.
-			}
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTROCKETOPTIMIZE' ) ) {
+			define( 'DONOTROCKETOPTIMIZE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTMINIFY' ) ) {
+			define( 'DONOTMINIFY', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_OPTM' ) ) {
+			define( 'LITESPEED_NO_OPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_PAGEOPTM' ) ) {
+			define( 'LITESPEED_NO_PAGEOPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
 		}
 
 		add_filter( 'perfmatters_allow_buffer', '__return_false', PHP_INT_MAX );

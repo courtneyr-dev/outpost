@@ -107,12 +107,14 @@ final class Outpost_OAuth_Provider_Ridewithgps extends Outpost_OAuth_Provider_Ba
 		}
 		$response = wp_remote_get(
 			self::VERIFY_ENDPOINT,
-			array(
-				'timeout' => self::VERIFY_TIMEOUT,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . (string) $creds['access_token'],
-					'Accept'        => 'application/json',
-				),
+			self::credential_request_args(
+				array(
+					'timeout' => self::VERIFY_TIMEOUT,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . (string) $creds['access_token'],
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {

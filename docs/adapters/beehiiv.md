@@ -29,7 +29,7 @@ Shipped in G5a (Phase G).
       -d '{"meta":{"_outpost_posse_targets":["beehiiv"]}}'
     ```
 
-    WP-CLI works too: `wp post meta update 123 _outpost_posse_targets '["beehiiv"]' --format=json`. The meta is registered for the `post` post type only, and the post's author needs `publish_posts`. When the post moves into `publish`, the dispatcher schedules the first attempt 30 seconds later. Edits to a post that's already published don't dispatch again.
+    WP-CLI works too: `wp post meta update 123 _outpost_posse_targets '["beehiiv"]' --format=json`. The meta is registered for the `post` post type only, and the post's author needs `publish_posts`. When the post moves into `publish`, the dispatcher schedules the first attempt 30 seconds later. Edits to a post that's already published don't dispatch again. A password-protected post is never scheduled, and a post that's no longer published, or has gained a password, by the time an attempt runs isn't sent.
 
 ## What gets syndicated
 

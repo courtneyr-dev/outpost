@@ -143,28 +143,29 @@ final class Outpost_Fetch_Recent_Polar {
 		// Step 3: GET each exercise URL. For LIST display we deliberately
 		// do NOT commit (PUT) the transaction — items remain in the
 		// window for next time.
-		$items = array();
+		// Items carry only a date (F-44), so the newest-first order comes
+		// from each exercise's start time, which stays in this function.
+		$entries = array();
 		foreach ( $exercise_urls as $url ) {
 			$exercise = self::fetch_exercise( $token, (string) $url );
 			if ( null === $exercise ) {
 				continue;
 			}
-			$items[] = self::map_exercise_item( $exercise, (string) $url );
-			if ( count( $items ) >= $count ) {
+			$start     = isset( $exercise['start-time'] ) ? strtotime( (string) $exercise['start-time'] ) : false;
+			$entries[] = array( false === $start ? 0 : $start, self::map_exercise_item( $exercise, (string) $url ) );
+			if ( count( $entries ) >= $count ) {
 				break;
 			}
 		}
 
 		usort(
-			$items,
+			$entries,
 			static function ( array $a, array $b ): int {
-				$at = isset( $a['fetched_at'] ) ? (string) $a['fetched_at'] : '';
-				$bt = isset( $b['fetched_at'] ) ? (string) $b['fetched_at'] : '';
-				return strcmp( $bt, $at );
+				return $b[0] <=> $a[0];
 			}
 		);
 
-		return $items;
+		return array_column( $entries, 1 );
 	}
 
 	/**
@@ -297,25 +298,22 @@ final class Outpost_Fetch_Recent_Polar {
 
 		$content = '<p>' . esc_html( $title ) . '</p>';
 
+		// The start time picks the date and never leaves the server, with
+		// or without the exercise card (F-44).
 		$post_meta = array(
 			'_outpost_polar_exercise_id' => $id,
 			'_outpost_polar_sport'       => $sport,
-			'_outpost_polar_start_time'  => $start,
 			'_outpost_polar_distance_m'  => (string) $distance_m,
 			'_outpost_polar_duration'    => $duration,
 		);
 		$card      = self::post_kinds_exercise_parts( $sport, $distance_m, $duration );
-		if ( array() !== $card ) {
-			// The exercise card keeps time of day private; so does the post.
-			unset( $post_meta['_outpost_polar_start_time'] );
-		}
 
 		return array(
 			'id'           => 'polar-exercise-' . $id,
 			'title'        => $title,
 			'subtitle'     => '' !== $start ? self::short_date( $start ) : '',
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $start ? $start : gmdate( 'c' ),
+			'fetched_at'   => '' !== $start ? self::short_date( $start ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'workout',
 			'post_payload' => array(
 				'title'                  => $title,
@@ -420,12 +418,9 @@ final class Outpost_Fetch_Recent_Polar {
 			return ( self::$http_resolver )( $method, $url, $token, $body );
 		}
 		$args = array(
-			'method'      => $method,
-			'timeout'     => self::TIMEOUT_SECONDS,
-			// A redirect would carry the Authorization header to wherever
-			// it points; Polar's API answers directly, so follow none.
-			'redirection' => 0,
-			'headers'     => array(
+			'method'  => $method,
+			'timeout' => self::TIMEOUT_SECONDS,
+			'headers' => array(
 				'Authorization' => 'Bearer ' . $token,
 				'Accept'        => 'application/json',
 			),
@@ -434,7 +429,9 @@ final class Outpost_Fetch_Recent_Polar {
 			$args['headers']['Content-Type'] = 'application/json';
 			$args['body']                    = $body;
 		}
-		$response = wp_remote_request( $url, $args );
+		// A redirect would carry the Authorization header to wherever it
+		// points; Polar's API answers directly, so follow none (F-54).
+		$response = wp_remote_request( $url, Outpost_OAuth_Provider_Base::credential_request_args( $args ) );
 		if ( is_wp_error( $response ) ) {
 			return null;
 		}

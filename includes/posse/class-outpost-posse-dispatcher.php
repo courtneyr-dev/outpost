@@ -9,13 +9,20 @@
  *
  * Lifecycle (per G3.5b prompt):
  *
- *   1. transition_post_status to 'publish' fires.
+ *   1. transition_post_status to 'publish' fires for a public post: an
+ *      allowed type (`post` by default, see `outpost_posse_post_types`)
+ *      with no password. Anything else schedules nothing.
  *   2. read _outpost_posse_targets from post_meta.
  *   3. for each target NOT already in _outpost_posse_in_flight:
  *      - add to _outpost_posse_in_flight (idempotency seal)
  *      - schedule wp-cron event 'outpost_posse_dispatch' at +30s with
  *        args [ post_id, destination_id, attempt = 1 ].
  *   4. cron fires → handle_dispatch( post_id, destination_id, attempt ):
+ *      - re-read the post; unless it's still public (published, no
+ *        password, allowed type), record the non-retrying failure
+ *        `post_not_public`, remove in-flight, and exit. This runs on every
+ *        attempt, retries included, so a post made draft, private,
+ *        trashed or password-protected after scheduling never leaves.
  *      - resolve destination via registry; if missing, record failure + exit
  *      - call destination->dispatch( post_id )
  *      - on success: write to _outpost_syndication_urls, remove in-flight
@@ -47,6 +54,11 @@ final class Outpost_POSSE_Dispatcher {
 	public const SCHEDULE_DELAY_SECONDS = 30;
 
 	public const MAX_ATTEMPTS = 3;
+
+	/**
+	 * Failure reason recorded when a post is no longer public at dispatch.
+	 */
+	public const NOT_PUBLIC = 'post_not_public';
 
 	/**
 	 * Hook everything onto WordPress: the publish-trigger that schedules
@@ -81,6 +93,42 @@ final class Outpost_POSSE_Dispatcher {
 	}
 
 	/**
+	 * Whether a post may leave the site through POSSE: it's published, has
+	 * no password, and is of an allowed type. Fails closed on anything that
+	 * isn't a post object or lacks one of those fields.
+	 *
+	 * The scheduler, the dispatcher (on every attempt), and each direct
+	 * destination all call this.
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param mixed $post WP_Post (or a post-shaped object).
+	 */
+	public static function post_is_public( $post ): bool {
+		if ( ! is_object( $post ) || ! isset( $post->post_status, $post->post_type ) ) {
+			return false;
+		}
+		if ( 'publish' !== (string) $post->post_status ) {
+			return false;
+		}
+		if ( ! isset( $post->post_password ) || '' !== (string) $post->post_password ) {
+			return false;
+		}
+		/**
+		 * Filters the post types POSSE may send.
+		 *
+		 * @since 1.0.28
+		 *
+		 * @param string[] $types Post type names. Default `array( 'post' )`.
+		 */
+		$types = apply_filters( 'outpost_posse_post_types', array( 'post' ) );
+		if ( ! is_array( $types ) ) {
+			return false;
+		}
+		return in_array( (string) $post->post_type, array_map( 'strval', $types ), true );
+	}
+
+	/**
 	 * Hooked on transition_post_status. Schedules a dispatch for each
 	 * registered target on the post's _outpost_posse_targets list, when
 	 * the transition is into `publish` (and out of any non-publish state).
@@ -103,6 +151,11 @@ final class Outpost_POSSE_Dispatcher {
 			return;
 		}
 		if ( ! is_object( $post ) || ! isset( $post->ID ) ) {
+			return;
+		}
+		// Only a public post is scheduled: a password-protected post, or a
+		// type the site hasn't allowed (pages, by default), never is.
+		if ( ! self::post_is_public( $post ) ) {
 			return;
 		}
 		$post_id = (int) $post->ID;
@@ -169,6 +222,18 @@ final class Outpost_POSSE_Dispatcher {
 	 * @param int    $attempt        Attempt number (1-indexed).
 	 */
 	public static function handle_dispatch( int $post_id, string $destination_id, int $attempt ): void {
+		// Re-read the post on every attempt. A post deleted since scheduling
+		// has no meta left to update, so there is nothing to record.
+		$post = get_post( $post_id );
+		if ( null === $post ) {
+			return;
+		}
+		if ( ! self::post_is_public( $post ) ) {
+			Outpost_POSSE_Meta::add_failure( $post_id, $destination_id, self::NOT_PUBLIC, $attempt );
+			Outpost_POSSE_Meta::remove_in_flight( $post_id, $destination_id );
+			return;
+		}
+
 		$destination = Outpost_POSSE_Registry::get( $destination_id );
 		if ( null === $destination ) {
 			Outpost_POSSE_Meta::add_failure(

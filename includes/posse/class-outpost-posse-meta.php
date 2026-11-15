@@ -61,6 +61,11 @@ final class Outpost_POSSE_Meta {
 	 * Auth callback gates writes on `edit_post` cap for the specific
 	 * post the meta is being set on — standard WP pattern.
 	 *
+	 * Core's REST meta reader has no read gate of its own, so failures
+	 * (whose error text can carry a destination's HTTP response body) and
+	 * the in-flight list are limited to `context=edit`. The core posts
+	 * route serves that context only to a user who can edit the post.
+	 *
 	 * @since 0.1.78
 	 */
 	public static function register_post_meta_keys(): void {
@@ -86,8 +91,8 @@ final class Outpost_POSSE_Meta {
 			'post',
 			self::SYNDICATION_URLS,
 			array(
-				'type'          => 'array',
-				'show_in_rest'  => array(
+				'type'              => 'array',
+				'show_in_rest'      => array(
 					'schema' => array(
 						'items' => array(
 							'type'       => 'object',
@@ -99,18 +104,20 @@ final class Outpost_POSSE_Meta {
 						),
 					),
 				),
-				'single'        => true,
-				'auth_callback' => $auth,
+				'single'            => true,
+				'auth_callback'     => $auth,
+				'sanitize_callback' => array( __CLASS__, 'sanitize_syndication_urls' ),
 			)
 		);
 		register_post_meta(
 			'post',
 			self::FAILURES,
 			array(
-				'type'          => 'array',
-				'show_in_rest'  => array(
+				'type'              => 'array',
+				'show_in_rest'      => array(
 					'schema' => array(
-						'items' => array(
+						'context' => array( 'edit' ),
+						'items'   => array(
 							'type'       => 'object',
 							'properties' => array(
 								'destination_id' => array( 'type' => 'string' ),
@@ -121,8 +128,9 @@ final class Outpost_POSSE_Meta {
 						),
 					),
 				),
-				'single'        => true,
-				'auth_callback' => $auth,
+				'single'            => true,
+				'auth_callback'     => $auth,
+				'sanitize_callback' => array( __CLASS__, 'sanitize_failures' ),
 			)
 		);
 		register_post_meta(
@@ -131,7 +139,10 @@ final class Outpost_POSSE_Meta {
 			array(
 				'type'              => 'array',
 				'show_in_rest'      => array(
-					'schema' => array( 'items' => array( 'type' => 'string' ) ),
+					'schema' => array(
+						'context' => array( 'edit' ),
+						'items'   => array( 'type' => 'string' ),
+					),
 				),
 				'single'            => true,
 				'auth_callback'     => $auth,
@@ -264,6 +275,71 @@ final class Outpost_POSSE_Meta {
 			}
 		}
 		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * Keep well-formed syndication rows: a destination id and an http(s)
+	 * URL. Rows without either are dropped.
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param mixed $value Raw input.
+	 * @return array<int, array{destination_id: string, url: string, posted_at: string}>
+	 */
+	public static function sanitize_syndication_urls( $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $value as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$destination_id = sanitize_key( (string) ( $row['destination_id'] ?? '' ) );
+			$url            = esc_url_raw( (string) ( $row['url'] ?? '' ), array( 'http', 'https' ) );
+			if ( '' === $destination_id || '' === $url ) {
+				continue;
+			}
+			$out[] = array(
+				'destination_id' => $destination_id,
+				'url'            => $url,
+				'posted_at'      => sanitize_text_field( (string) ( $row['posted_at'] ?? '' ) ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Keep well-formed failure rows: a destination id plus plain-text error
+	 * and timestamp, and an integer attempt count. Rows without a
+	 * destination id are dropped.
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param mixed $value Raw input.
+	 * @return array<int, array{destination_id: string, error: string, attempted_at: string, attempt_count: int}>
+	 */
+	public static function sanitize_failures( $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $value as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$destination_id = sanitize_key( (string) ( $row['destination_id'] ?? '' ) );
+			if ( '' === $destination_id ) {
+				continue;
+			}
+			$out[] = array(
+				'destination_id' => $destination_id,
+				'error'          => sanitize_text_field( (string) ( $row['error'] ?? '' ) ),
+				'attempted_at'   => sanitize_text_field( (string) ( $row['attempted_at'] ?? '' ) ),
+				'attempt_count'  => absint( $row['attempt_count'] ?? 0 ),
+			);
+		}
+		return $out;
 	}
 
 	/**

@@ -70,8 +70,11 @@ final class Outpost_Settings_Handler {
 			wp_die( esc_html__( 'Invalid settings tab.', 'outpost-mobile-publishing' ), '', array( 'response' => 400 ) );
 		}
 
+		// The tabs hold site-wide secrets, so `manage_options` applies to every
+		// save. A tab's own capability (from the `outpost_settings_tabs`
+		// filter) can add a stricter check, never a looser one.
 		$capability = isset( $tab_config['capability'] ) ? (string) $tab_config['capability'] : 'manage_options';
-		if ( ! current_user_can( $capability ) ) {
+		if ( ! current_user_can( 'manage_options' ) || ! current_user_can( $capability ) ) {
 			wp_die( esc_html__( 'You do not have permission to update these settings.', 'outpost-mobile-publishing' ), '', array( 'response' => 403 ) );
 		}
 

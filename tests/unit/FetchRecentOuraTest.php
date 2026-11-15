@@ -81,7 +81,8 @@ final class FetchRecentOuraTest extends TestCase {
 		$this->assertSame( 'workout', $item['post_kind'] );
 		$this->assertStringContainsString( '32 min', $item['subtitle'] );
 		$this->assertStringContainsString( '478 kcal', $item['subtitle'] );
-		$this->assertSame( '2026-05-04T07:30:00+00:00', $item['fetched_at'] );
+		$this->assertSame( '2026-05-04', $item['fetched_at'], 'The date alone (F-44).' );
+		$this->assertArrayNotHasKey( '_outpost_oura_start_at', $item['post_payload']['post_meta'], 'The start time stays on the server (F-44).' );
 	}
 
 	public function test_map_workout_item_omits_distance_when_zero(): void {

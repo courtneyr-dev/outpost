@@ -131,16 +131,27 @@ final class Outpost_Manual_Share_Status_Controller {
 				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
 			);
 		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the manual-share status endpoint permission decision.
+		 * Filters whether a request may use the manual-share status endpoint.
 		 *
-		 * Decides the capability check only. The credential check above has
-		 * already passed, so returning true never admits a cookie session
-		 * without a valid REST nonce or a token without an accepted scope.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
 		 *
-		 * @param bool $allow Whether the current user has `edit_posts`.
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_manual_share_status_permission', current_user_can( 'edit_posts' ) );
+		$allow = (bool) apply_filters( 'outpost_manual_share_status_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',

@@ -93,6 +93,7 @@ final class OutboundSafeTitleTest extends TestCase {
 				'write_as_collection'      => '',
 			)
 		);
+		update_option( Outpost_Telegraph_Adapter::ENABLED_OPTION, true );
 		Outpost_Credentials_Store::set( 'telegraph', array( 'access_token' => 'telegraph_test_token' ), $this->user_id );
 
 		$this->captured = array();
@@ -133,6 +134,7 @@ final class OutboundSafeTitleTest extends TestCase {
 		}
 		wp_set_current_user( 0 );
 		delete_option( Outpost_Settings_Registry::option_name_for_tab( 'api_keys' ) );
+		delete_option( Outpost_Telegraph_Adapter::ENABLED_OPTION );
 		parent::tearDown();
 	}
 

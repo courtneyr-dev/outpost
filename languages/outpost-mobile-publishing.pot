@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.27\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.28\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-14T05:50:27+00:00\n"
+"POT-Creation-Date: 2026-11-15T14:03:48+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -43,6 +43,7 @@ msgstr ""
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
 #: includes/class-admin-page.php:208
+#: build/index.js:3
 msgid "Outpost"
 msgstr ""
 
@@ -74,43 +75,47 @@ msgstr ""
 msgid "Returns the local configuration used by the Outpost composer."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:160
+#: includes/adapters/outbound/class-telegraph-adapter.php:172
+msgid "Telegraph is off, or this post is not a published, unprotected post it may send."
+msgstr ""
+
+#: includes/adapters/outbound/class-telegraph-adapter.php:176
 msgid "Post has no author."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:174
+#: includes/adapters/outbound/class-telegraph-adapter.php:190
 msgid "(empty)"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:212
+#: includes/adapters/outbound/class-telegraph-adapter.php:230
 msgid "Telegraph response missing URL."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:271
+#: includes/adapters/outbound/class-telegraph-adapter.php:291
 msgid "Telegraph account creation returned no token."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:275
+#: includes/adapters/outbound/class-telegraph-adapter.php:295
 msgid "Telegraph token could not be stored securely."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/adapters/outbound/class-telegraph-adapter.php:478
+#: includes/adapters/outbound/class-telegraph-adapter.php:498
 #, php-format
 msgid "Telegraph transport error: %s"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/adapters/outbound/class-telegraph-adapter.php:486
+#: includes/adapters/outbound/class-telegraph-adapter.php:506
 #, php-format
 msgid "Telegraph HTTP %d"
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:493
+#: includes/adapters/outbound/class-telegraph-adapter.php:513
 msgid "Telegraph returned non-JSON."
 msgstr ""
 
-#: includes/adapters/outbound/class-telegraph-adapter.php:498
+#: includes/adapters/outbound/class-telegraph-adapter.php:518
 msgid "Telegraph API error."
 msgstr ""
 
@@ -234,118 +239,118 @@ msgstr ""
 msgid "Save appearance settings"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:220
+#: includes/admin/class-appearance-settings-page.php:167
 msgid "Security check failed."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:223
-#: includes/class-appearance-rest-controller.php:102
+#: includes/admin/class-appearance-settings-page.php:170
+#: includes/class-appearance-rest-controller.php:112
 msgid "You do not have permission to manage appearance preferences."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:236
+#: includes/admin/class-appearance-settings-page.php:231
 msgid "Colors"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:242
+#: includes/admin/class-appearance-settings-page.php:237
 msgid "Fonts"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:282
+#: includes/admin/class-appearance-settings-page.php:277
 msgid "Contrast adjustment applied."
 msgstr ""
 
 #. translators: 1: original color hex, 2: adjusted hex, 3: ratio before, 4: ratio after.
-#: includes/admin/class-appearance-settings-page.php:286
+#: includes/admin/class-appearance-settings-page.php:281
 #, php-format
 msgid "Your %1$s rendered at %3$s:1 against the surface; auto-adjusted to %2$s for %4$s:1."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:300
+#: includes/admin/class-appearance-settings-page.php:295
 msgid "Override anyway (keep my color, accept the lower contrast)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:337
+#: includes/admin/class-appearance-settings-page.php:332
 msgid "Paste a CSS font-family value. Outpost picks up custom fonts your theme already loads — installing fonts is your theme's job."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:355
+#: includes/admin/class-appearance-settings-page.php:350
 msgid "Appearance settings saved."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:365
+#: includes/admin/class-appearance-settings-page.php:360
 msgid "Save failed."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:491
+#: includes/admin/class-appearance-settings-page.php:569
 msgid "Light"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:492
+#: includes/admin/class-appearance-settings-page.php:570
 msgid "Dark"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:493
+#: includes/admin/class-appearance-settings-page.php:571
 msgid "System"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:500
+#: includes/admin/class-appearance-settings-page.php:578
 msgid "Outpost Default"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:501
+#: includes/admin/class-appearance-settings-page.php:579
 msgid "Use Site Theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:508
+#: includes/admin/class-appearance-settings-page.php:586
 msgid "Background"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:509
+#: includes/admin/class-appearance-settings-page.php:587
 msgid "Surface"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:510
+#: includes/admin/class-appearance-settings-page.php:588
 msgid "Text"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:511
+#: includes/admin/class-appearance-settings-page.php:589
 msgid "Text (secondary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:512
+#: includes/admin/class-appearance-settings-page.php:590
 msgid "Accent (primary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:513
+#: includes/admin/class-appearance-settings-page.php:591
 msgid "Accent (second)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:514
+#: includes/admin/class-appearance-settings-page.php:592
 msgid "Border"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:521
+#: includes/admin/class-appearance-settings-page.php:599
 msgid "Body font"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:522
+#: includes/admin/class-appearance-settings-page.php:600
 msgid "Display font (headings)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:523
+#: includes/admin/class-appearance-settings-page.php:601
 msgid "Monospace (URL fields)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:530
+#: includes/admin/class-appearance-settings-page.php:608
 msgid "overridden"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:532
+#: includes/admin/class-appearance-settings-page.php:610
 msgid "from theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:535
+#: includes/admin/class-appearance-settings-page.php:613
 msgid "default"
 msgstr ""
 
@@ -694,94 +699,94 @@ msgid "Settings"
 msgstr ""
 
 #: includes/class-appearance-rest-controller.php:95
-#: includes/class-appearance-rest-controller.php:187
-#: includes/class-appearance-rest-controller.php:224
+#: includes/class-appearance-rest-controller.php:188
+#: includes/class-appearance-rest-controller.php:225
 #: includes/class-ios-shortcut-rest-controller.php:106
 msgid "Authentication required."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:111
+#: includes/class-appearance-rest-controller.php:105
 msgid "This sign-in does not allow changing appearance preferences."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:233
+#: includes/class-appearance-rest-controller.php:234
 msgid "You are not allowed to change appearance settings."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:245
+#: includes/class-appearance-rest-controller.php:246
 msgid "Request body must be a JSON object."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:254
+#: includes/class-appearance-rest-controller.php:255
 msgid "Invalid style_source value."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:255
+#: includes/class-appearance-rest-controller.php:256
 msgid "Invalid mode_preference value."
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:256
+#: includes/class-appearance-rest-controller.php:257
 msgid "Invalid start_screen value."
 msgstr ""
 
 #. translators: %s: rejected token slug.
-#: includes/class-appearance-rest-controller.php:341
+#: includes/class-appearance-rest-controller.php:342
 #, php-format
 msgid "Invalid color token slug: %s"
 msgstr ""
 
 #. translators: 1: token slug, 2: rejected value.
-#: includes/class-appearance-rest-controller.php:357
+#: includes/class-appearance-rest-controller.php:358
 #, php-format
 msgid "Invalid color value for %1$s: %2$s"
 msgstr ""
 
 #. translators: %s: rejected token slug.
-#: includes/class-appearance-rest-controller.php:375
+#: includes/class-appearance-rest-controller.php:376
 #, php-format
 msgid "Invalid font token slug: %s"
 msgstr ""
 
 #. translators: 1: token slug, 2: rejected value.
-#: includes/class-appearance-rest-controller.php:391
+#: includes/class-appearance-rest-controller.php:392
 #, php-format
 msgid "Invalid font value for %1$s: %2$s"
 msgstr ""
 
-#: includes/class-appearance-rest-controller.php:414
+#: includes/class-appearance-rest-controller.php:415
 msgid "bypass_contrast must be a list of token slugs."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:125
+#: includes/class-geocode-endpoint.php:113
 msgid "Outpost geocode requires an authenticated user."
 msgstr ""
 
 #. translators: 1: minimum length, 2: maximum length
-#: includes/class-geocode-endpoint.php:152
-#: includes/class-media-lookup-endpoint.php:172
+#: includes/class-geocode-endpoint.php:175
+#: includes/class-media-lookup-endpoint.php:195
 #, php-format
 msgid "Search query must be between %1$d and %2$d characters."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:216
+#: includes/class-geocode-endpoint.php:239
 msgid "Too many geocode requests. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:241
+#: includes/class-geocode-endpoint.php:264
 msgid "Too many geocode requests from this network. Try again in a minute."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:358
+#: includes/class-geocode-endpoint.php:381
 msgid "Could not reach the geocoding service."
 msgstr ""
 
 #. translators: %d: HTTP status code
-#: includes/class-geocode-endpoint.php:371
+#: includes/class-geocode-endpoint.php:394
 #, php-format
 msgid "Geocoding service returned HTTP %d."
 msgstr ""
 
-#: includes/class-geocode-endpoint.php:397
+#: includes/class-geocode-endpoint.php:420
 msgid "Geocoding service returned invalid JSON."
 msgstr ""
 
@@ -793,118 +798,118 @@ msgstr ""
 msgid "No URL detected in payload."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:185
+#: includes/class-manual-share-controller.php:173
 msgid "Outpost manual-share intent firing requires an authenticated user."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:214
+#: includes/class-manual-share-controller.php:237
 msgid "Manual-share intent requires a positive integer post_id."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:223
+#: includes/class-manual-share-controller.php:246
 msgid "Manual-share intent requires a platform_id string."
 msgstr ""
 
 #. translators: %s: platform id supplied by the client.
-#: includes/class-manual-share-controller.php:238
+#: includes/class-manual-share-controller.php:261
 #, php-format
 msgid "Unknown manual-share platform: %s"
 msgstr ""
 
-#: includes/class-manual-share-controller.php:255
+#: includes/class-manual-share-controller.php:278
 msgid "You do not have permission to share this post."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:272
+#: includes/class-manual-share-controller.php:295
 msgid "Manual-share platform lookup failed."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:329
+#: includes/class-manual-share-controller.php:352
 msgid "Manual-share telemetry requires a positive integer post_id."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:337
+#: includes/class-manual-share-controller.php:360
 msgid "You do not have permission to update telemetry for this post."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:346
+#: includes/class-manual-share-controller.php:369
 msgid "Manual-share telemetry requires the audit_log_id from the original intent payload."
 msgstr ""
 
-#: includes/class-manual-share-controller.php:360
+#: includes/class-manual-share-controller.php:383
 msgid "Manual-share telemetry could not match an audit log entry. The PWA may have stale state."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:133
+#: includes/class-manual-share-status-controller.php:121
 msgid "Outpost manual-share status requires an authenticated user."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:151
-#: includes/class-manual-share-status-controller.php:234
-#: includes/class-syndication-capture-controller.php:178
+#: includes/class-manual-share-status-controller.php:174
+#: includes/class-manual-share-status-controller.php:257
+#: includes/class-syndication-capture-controller.php:201
 msgid "A positive post_id is required."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:154
+#: includes/class-manual-share-status-controller.php:177
 msgid "You do not have permission to view this post's syndication."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:189
-#: includes/class-manual-share-status-controller.php:280
-#: includes/class-syndication-capture-controller.php:146
+#: includes/class-manual-share-status-controller.php:212
+#: includes/class-manual-share-status-controller.php:303
+#: includes/class-syndication-capture-controller.php:169
 msgid "You must be logged in."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:237
+#: includes/class-manual-share-status-controller.php:260
 msgid "You do not have permission to update this post's syndication."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:242
-#: includes/class-syndication-capture-controller.php:194
+#: includes/class-manual-share-status-controller.php:265
+#: includes/class-syndication-capture-controller.php:217
 msgid "audit_log_id is required."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:248
+#: includes/class-manual-share-status-controller.php:271
 msgid "Invalid snooze duration. Use a SNOOZE_* duration or a valid date/time string."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:257
+#: includes/class-manual-share-status-controller.php:280
 msgid "No matching audit log entry."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:285
+#: includes/class-manual-share-status-controller.php:308
 msgid "Snooze-all was used recently; try again in a few minutes."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:297
+#: includes/class-manual-share-status-controller.php:320
 msgid "Invalid snooze duration."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:145
+#: includes/class-media-lookup-endpoint.php:133
 msgid "Outpost media lookup requires an authenticated user."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:184
+#: includes/class-media-lookup-endpoint.php:207
 msgid "Unknown lookup kind."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:194
+#: includes/class-media-lookup-endpoint.php:217
 msgid "Post Kinds for IndieWeb must be active to look up media."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:215
+#: includes/class-media-lookup-endpoint.php:238
 msgid "The metadata lookup service could not be reached."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:230
+#: includes/class-media-lookup-endpoint.php:253
 msgid "The lookup was not authorized. Sign out and back in to refresh your token."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:247
+#: includes/class-media-lookup-endpoint.php:270
 msgid "The metadata lookup service returned an error."
 msgstr ""
 
-#: includes/class-media-lookup-endpoint.php:342
+#: includes/class-media-lookup-endpoint.php:365
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
@@ -955,139 +960,139 @@ msgstr ""
 msgid "fired %s ago"
 msgstr ""
 
-#: includes/class-preview-endpoint.php:143
+#: includes/class-preview-endpoint.php:131
 msgid "Outpost preview requires an authenticated user."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:221
+#: includes/class-preview-endpoint.php:244
 msgid "Target URL did not return HTML."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:230
-#: includes/class-preview-endpoint.php:878
+#: includes/class-preview-endpoint.php:253
+#: includes/class-preview-endpoint.php:901
 msgid "Target URL response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:330
+#: includes/class-preview-endpoint.php:353
 #, php-format
 msgid "Source declares an unrecognized extractor type: %s"
 msgstr ""
 
-#: includes/class-preview-endpoint.php:342
+#: includes/class-preview-endpoint.php:365
 msgid "Source recipe is invalid for the requested URL."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:368
+#: includes/class-preview-endpoint.php:391
 msgid "Source response content type is not one of the extractor accepted types."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:377
+#: includes/class-preview-endpoint.php:400
 msgid "Source response exceeded the 5 MB cap."
 msgstr ""
 
 #. translators: %s: extractor type id
-#: includes/class-preview-endpoint.php:388
+#: includes/class-preview-endpoint.php:411
 #, php-format
 msgid "Extractor \"%s\" is not yet implemented in this build."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:394
+#: includes/class-preview-endpoint.php:417
 msgid "Extractor failed to parse the source response."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:657
+#: includes/class-preview-endpoint.php:680
 msgid "A url is required."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:665
+#: includes/class-preview-endpoint.php:688
 msgid "The URL is too long."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:674
+#: includes/class-preview-endpoint.php:697
 msgid "The url could not be parsed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:684
+#: includes/class-preview-endpoint.php:707
 msgid "Only http and https URLs are allowed."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:692
+#: includes/class-preview-endpoint.php:715
 msgid "The URL must include a host."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:704
+#: includes/class-preview-endpoint.php:727
 msgid "The target URL could not be retrieved."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:893
+#: includes/class-preview-endpoint.php:916
 msgid "Could not fetch the target URL."
 msgstr ""
 
-#: includes/class-preview-endpoint.php:916
+#: includes/class-preview-endpoint.php:939
 msgid "Too many preview requests. Try again in a minute."
 msgstr ""
 
 #. translators: %s: plugin name.
-#: includes/class-pwa-shell.php:410
+#: includes/class-pwa-shell.php:411
 #: outpost.php:640
 #, php-format
 msgid "Install %s"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: includes/class-pwa-shell.php:415
+#: includes/class-pwa-shell.php:416
 #, php-format
 msgid "Outpost needs the %s plugin before it can run. Install it from WordPress.org to continue."
 msgstr ""
 
 #. translators: %s: plugin name.
-#: includes/class-pwa-shell.php:425
+#: includes/class-pwa-shell.php:426
 #: outpost.php:625
 #, php-format
 msgid "Activate %s"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: includes/class-pwa-shell.php:430
+#: includes/class-pwa-shell.php:431
 #: outpost.php:630
 #, php-format
 msgid "Outpost needs the %s plugin to be activated before the composer can run."
 msgstr ""
 
-#: includes/class-pwa-shell.php:442
-#: includes/class-pwa-shell.php:497
+#: includes/class-pwa-shell.php:444
+#: includes/class-pwa-shell.php:500
 msgid "Outpost setup"
 msgstr ""
 
-#: includes/class-pwa-shell.php:448
+#: includes/class-pwa-shell.php:450
 msgid "Welcome to Outpost"
 msgstr ""
 
-#: includes/class-pwa-shell.php:451
+#: includes/class-pwa-shell.php:453
 msgid "Outpost is a mobile-first composer for posting to your own WordPress site, built on the IndieWeb specs (Micropub, IndieAuth, microformats2). It only writes posts — not Pages or custom post types — and it leaves the visual paint to your active theme."
 msgstr ""
 
-#: includes/class-pwa-shell.php:458
+#: includes/class-pwa-shell.php:460
 msgid "POSSE"
 msgstr ""
 
-#: includes/class-pwa-shell.php:460
+#: includes/class-pwa-shell.php:462
 msgid " — Publish (on your) Own Site, Syndicate Elsewhere. Your domain stays the canonical source; copies go to Mastodon, Twitter / X, Bluesky, or wherever your audience is."
 msgstr ""
 
-#: includes/class-pwa-shell.php:468
+#: includes/class-pwa-shell.php:470
 msgid "One more step"
 msgstr ""
 
 #. translators: 1: minimum WP version, 2: minimum PHP version.
-#: includes/class-pwa-shell.php:487
+#: includes/class-pwa-shell.php:489
 #: outpost.php:688
 #, php-format
 msgid "Outpost requires WordPress %1$s or newer and PHP %2$s or newer."
 msgstr ""
 
-#: includes/class-pwa-shell.php:507
+#: includes/class-pwa-shell.php:510
 msgid "Server requirements"
 msgstr ""
 
@@ -1168,7 +1173,7 @@ msgstr ""
 msgid "Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only."
 msgstr ""
 
-#: includes/class-syndicate-targets-endpoint.php:99
+#: includes/class-syndicate-targets-endpoint.php:87
 msgid "Outpost syndication targets require an authenticated user."
 msgstr ""
 
@@ -1177,55 +1182,55 @@ msgid "Syndication"
 msgstr ""
 
 #. translators: %d: total syndicated platforms.
-#: includes/class-syndication-admin-column.php:99
+#: includes/class-syndication-admin-column.php:112
 #, php-format
 msgid "Syndication complete: %d platforms"
 msgstr ""
 
 #. translators: %1$d: completed; %2$d: total.
-#: includes/class-syndication-admin-column.php:105
+#: includes/class-syndication-admin-column.php:118
 #, php-format
 msgid "Syndication partial: %1$d of %2$d completed"
 msgstr ""
 
 #. translators: %d: pending platforms.
-#: includes/class-syndication-admin-column.php:112
+#: includes/class-syndication-admin-column.php:125
 #, php-format
 msgid "Syndication pending: %d platforms"
 msgstr ""
 
 #. translators: %d: abandoned platforms.
-#: includes/class-syndication-admin-column.php:118
+#: includes/class-syndication-admin-column.php:131
 #, php-format
 msgid "Syndication abandoned: %d platforms"
 msgstr ""
 
-#: includes/class-syndication-admin-column.php:123
+#: includes/class-syndication-admin-column.php:136
 msgid "No syndication"
 msgstr ""
 
-#: includes/class-syndication-admin-column.php:144
+#: includes/class-syndication-admin-column.php:157
 msgid "abandoned"
 msgstr ""
 
-#: includes/class-syndication-admin-column.php:146
+#: includes/class-syndication-admin-column.php:159
 msgid "none"
 msgstr ""
 
-#: includes/class-syndication-capture-controller.php:125
+#: includes/class-syndication-capture-controller.php:113
 msgid "Outpost syndication capture requires an authenticated user."
 msgstr ""
 
-#: includes/class-syndication-capture-controller.php:185
+#: includes/class-syndication-capture-controller.php:208
 msgid "You do not have permission to update syndication for this post."
 msgstr ""
 
-#: includes/class-syndication-capture-controller.php:215
+#: includes/class-syndication-capture-controller.php:238
 msgid "No matching audit log entry. The PWA may have stale state."
 msgstr ""
 
 #. translators: %1$s: platform id; %2$s: pasted URL host.
-#: includes/class-syndication-capture-controller.php:235
+#: includes/class-syndication-capture-controller.php:258
 #, php-format
 msgid "This URL's domain doesn't match the expected %1$s domain. Confirm the URL is correct, then resubmit with confirm_mismatch=true."
 msgstr ""
@@ -1379,26 +1384,26 @@ msgid "That URL points at a private or local network address."
 msgstr ""
 
 #. translators: %s: provider id
-#: includes/oauth/class-outpost-oauth-controller.php:297
+#: includes/oauth/class-outpost-oauth-controller.php:299
 #, php-format
 msgid "Unknown OAuth provider: %s"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/oauth/class-outpost-oauth-provider-base.php:210
+#: includes/oauth/class-outpost-oauth-provider-base.php:233
 #, php-format
 msgid "OAuth token exchange failed (HTTP %d)."
 msgstr ""
 
-#: includes/oauth/class-outpost-oauth-provider-base.php:220
+#: includes/oauth/class-outpost-oauth-provider-base.php:243
 msgid "OAuth token endpoint returned no access_token."
 msgstr ""
 
-#: includes/oauth/class-outpost-oauth-provider-base.php:308
+#: includes/oauth/class-outpost-oauth-provider-base.php:333
 msgid "No refresh_token stored — reconnect this provider."
 msgstr ""
 
-#: includes/oauth/class-outpost-oauth-provider-base.php:364
+#: includes/oauth/class-outpost-oauth-provider-base.php:391
 msgid "This provider does not implement connection verification."
 msgstr ""
 
@@ -1418,7 +1423,7 @@ msgid "Polar Flow"
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/oauth/providers/class-outpost-oauth-provider-polar.php:264
+#: includes/oauth/providers/class-outpost-oauth-provider-polar.php:268
 #, php-format
 msgid "Polar AccessLink user registration failed (HTTP %d)."
 msgstr ""
@@ -1460,43 +1465,50 @@ msgstr ""
 msgid "Post not found."
 msgstr ""
 
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:65
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:66
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:65
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:64
+msgid "Only a published post without a password can be syndicated."
+msgstr ""
+
 #. translators: %s: error message
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:89
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:96
 #, php-format
 msgid "Beehiiv request failed: %s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:106
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:113
 msgid "Beehiiv accepted the post but returned no URL."
 msgstr ""
 
 #. translators: 1: HTTP status code, 2: response body
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:114
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:121
 #, php-format
 msgid "Beehiiv returned HTTP %1$d: %2$s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:148
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:155
 msgid "Syndicate to Beehiiv"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:151
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:158
 msgid "When checked, published posts fan out to your Beehiiv publication."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:155
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:162
 msgid "Beehiiv API key"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:158
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:165
 msgid "Beehiiv → Settings → Integrations → API. Stored encrypted."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:162
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:169
 msgid "Beehiiv publication ID"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:165
+#: includes/posse/destinations/class-outpost-posse-destination-beehiiv.php:172
 msgid "The pub_… identifier for the publication that should receive posts."
 msgstr ""
 
@@ -1513,42 +1525,42 @@ msgid "Buttondown API key missing."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:89
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:96
 #, php-format
 msgid "Buttondown request failed: %s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:106
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:113
 msgid "Buttondown accepted the email but returned no URL."
 msgstr ""
 
 #. translators: 1: HTTP status code, 2: response body
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:114
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:121
 #, php-format
 msgid "Buttondown returned HTTP %1$d: %2$s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:143
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:150
 msgid "Syndicate to Buttondown"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:146
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:153
 msgid "When checked, published posts fan out as Buttondown emails."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:150
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:157
 msgid "Buttondown API key"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:153
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:160
 msgid "Buttondown → Settings → API. Stored encrypted."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:157
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:164
 msgid "Send as draft for manual review"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:160
+#: includes/posse/destinations/class-outpost-posse-destination-buttondown.php:167
 msgid "When checked, fan-out copies land as drafts in Buttondown so you can review before sending."
 msgstr ""
 
@@ -1565,40 +1577,40 @@ msgid "Kit API secret missing."
 msgstr ""
 
 #. translators: %s: WordPress post permalink
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:69
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:74
 #, php-format
 msgid "Syndicated from %s"
 msgstr ""
 
 #. translators: %s: error message
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:91
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:98
 #, php-format
 msgid "Kit request failed: %s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:116
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:123
 msgid "Kit accepted the broadcast but returned no identifier."
 msgstr ""
 
 #. translators: 1: HTTP status code, 2: response body
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:124
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:131
 #, php-format
 msgid "Kit returned HTTP %1$d: %2$s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:153
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:160
 msgid "Syndicate to Kit"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:156
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:163
 msgid "When checked, published posts fan out as Kit broadcast drafts."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:160
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:167
 msgid "Kit API secret (v3)"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-kit.php:163
+#: includes/posse/destinations/class-outpost-posse-destination-kit.php:170
 msgid "Kit account → Settings → Advanced → API. Use the API Secret (not the API Key) — broadcast creation requires the secret. Stored encrypted. Kit OAuth v4 connection arrives in the next release; this v3 path stays supported alongside it."
 msgstr ""
 
@@ -1615,61 +1627,61 @@ msgid "write.as API token missing."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:89
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:96
 #, php-format
 msgid "write.as request failed: %s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:109
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:116
 msgid "write.as accepted the post but returned no URL."
 msgstr ""
 
 #. translators: 1: HTTP status code, 2: response body
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:117
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:124
 #, php-format
 msgid "write.as returned HTTP %1$d: %2$s"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:146
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:153
 msgid "Syndicate to write.as"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:149
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:156
 msgid "When checked, published posts fan out to write.as."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:153
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:160
 msgid "write.as API token"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:156
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:163
 msgid "write.as → Settings → Get API token. Stored encrypted."
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:160
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:167
 msgid "write.as collection alias (optional)"
 msgstr ""
 
-#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:163
+#: includes/posse/destinations/class-outpost-posse-destination-write-as.php:170
 msgid "The collection (blog) alias posts should publish into. Leave blank to publish standalone posts owned by your account."
 msgstr ""
 
-#: includes/rest/class-outpost-fetch-recent-rest.php:175
+#: includes/rest/class-outpost-fetch-recent-rest.php:182
 msgid "Unknown fetch-recent provider."
 msgstr ""
 
-#: includes/rest/class-outpost-fetch-recent-rest.php:186
+#: includes/rest/class-outpost-fetch-recent-rest.php:193
 msgid "You do not have permission to use this picker."
 msgstr ""
 
 #. translators: %s: provider label.
-#: includes/rest/class-outpost-fetch-recent-rest.php:204
+#: includes/rest/class-outpost-fetch-recent-rest.php:211
 #, php-format
 msgid "Connect %s in OAuth settings before using this picker."
 msgstr ""
 
 #. translators: 1: provider label, 2: error message.
-#: includes/rest/class-outpost-fetch-recent-rest.php:219
+#: includes/rest/class-outpost-fetch-recent-rest.php:226
 #, php-format
 msgid "Couldn't reach %1$s right now: %2$s"
 msgstr ""
@@ -1688,11 +1700,11 @@ msgstr ""
 msgid "Invalid settings tab."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-handler.php:75
+#: includes/settings/class-outpost-settings-handler.php:78
 msgid "You do not have permission to update these settings."
 msgstr ""
 
-#: includes/settings/class-outpost-settings-handler.php:82
+#: includes/settings/class-outpost-settings-handler.php:85
 msgid "Security check failed. Please reload and try again."
 msgstr ""
 
@@ -1746,96 +1758,96 @@ msgstr ""
 msgid "Some platforms (such as scholarly databases) use API keys instead of OAuth. Add keys here for the platforms you use."
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-oura.php:168
+#: includes/sources/class-outpost-fetch-recent-oura.php:170
 msgid "Workout"
 msgstr ""
 
 #. translators: 1: activity name, 2: distance in km.
-#: includes/sources/class-outpost-fetch-recent-oura.php:179
+#: includes/sources/class-outpost-fetch-recent-oura.php:181
 #, php-format
 msgid "Workout — %1$s, %2$s km"
 msgstr ""
 
 #. translators: %s: activity name.
-#: includes/sources/class-outpost-fetch-recent-oura.php:185
+#: includes/sources/class-outpost-fetch-recent-oura.php:187
 #, php-format
 msgid "Workout — %s"
 msgstr ""
 
 #. translators: %d: duration in minutes.
-#: includes/sources/class-outpost-fetch-recent-oura.php:196
+#: includes/sources/class-outpost-fetch-recent-oura.php:198
 #, php-format
 msgid "%d min"
 msgstr ""
 
 #. translators: %d: calories.
-#: includes/sources/class-outpost-fetch-recent-oura.php:203
+#: includes/sources/class-outpost-fetch-recent-oura.php:205
 #, php-format
 msgid "%d kcal"
 msgstr ""
 
 #. translators: %s: date.
-#: includes/sources/class-outpost-fetch-recent-oura.php:248
+#: includes/sources/class-outpost-fetch-recent-oura.php:250
 #, php-format
 msgid "Sleep — %s"
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-oura.php:249
+#: includes/sources/class-outpost-fetch-recent-oura.php:251
 msgid "recent"
 msgstr ""
 
 #. translators: %s: hours of sleep.
-#: includes/sources/class-outpost-fetch-recent-oura.php:256
+#: includes/sources/class-outpost-fetch-recent-oura.php:258
 #, php-format
 msgid "%s hours"
 msgstr ""
 
 #. translators: %d: sleep score.
-#: includes/sources/class-outpost-fetch-recent-oura.php:263
+#: includes/sources/class-outpost-fetch-recent-oura.php:265
 #, php-format
 msgid "score: %d"
 msgstr ""
 
 #. translators: 1: sport name, 2: distance in km.
-#: includes/sources/class-outpost-fetch-recent-polar.php:276
+#: includes/sources/class-outpost-fetch-recent-polar.php:277
 #, php-format
 msgid "Training — %1$s, %2$s km"
 msgstr ""
 
 #. translators: 1: sport name, 2: duration in minutes.
-#: includes/sources/class-outpost-fetch-recent-polar.php:285
+#: includes/sources/class-outpost-fetch-recent-polar.php:286
 #, php-format
 msgid "Training — %1$s, %2$d min"
 msgstr ""
 
 #. translators: %s: sport name.
-#: includes/sources/class-outpost-fetch-recent-polar.php:291
+#: includes/sources/class-outpost-fetch-recent-polar.php:292
 #, php-format
 msgid "Training — %s"
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-polar.php:295
+#: includes/sources/class-outpost-fetch-recent-polar.php:296
 msgid "Training"
 msgstr ""
 
 #. translators: %s: strain score (X.X).
-#: includes/sources/class-outpost-fetch-recent-whoop.php:162
+#: includes/sources/class-outpost-fetch-recent-whoop.php:164
 #, php-format
 msgid "Cycle — Strain %s/21"
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-whoop.php:165
+#: includes/sources/class-outpost-fetch-recent-whoop.php:167
 msgid "Cycle"
 msgstr ""
 
 #. translators: 1: date, 2: recovery percent.
-#: includes/sources/class-outpost-fetch-recent-whoop.php:204
+#: includes/sources/class-outpost-fetch-recent-whoop.php:206
 #, php-format
 msgid "Recovery — %1$s, %2$d%%"
 msgstr ""
 
 #. translators: %s: date.
-#: includes/sources/class-outpost-fetch-recent-whoop.php:210
+#: includes/sources/class-outpost-fetch-recent-whoop.php:212
 #, php-format
 msgid "Recovery — %s"
 msgstr ""
@@ -1856,21 +1868,21 @@ msgstr ""
 msgid "Notion is not connected. Connect via Settings → OAuth."
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:230
+#: includes/sources/class-outpost-source-notion.php:232
 msgid "This Notion page has not been shared with Outpost. In Notion, click the ••• menu on the page → Add connections → Outpost."
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:236
+#: includes/sources/class-outpost-source-notion.php:238
 msgid "Notion rejected the access token. Reconnect Notion in Settings → OAuth."
 msgstr ""
 
 #. translators: %d: HTTP status
-#: includes/sources/class-outpost-source-notion.php:243
+#: includes/sources/class-outpost-source-notion.php:245
 #, php-format
 msgid "Notion API HTTP %d"
 msgstr ""
 
-#: includes/sources/class-outpost-source-notion.php:252
+#: includes/sources/class-outpost-source-notion.php:254
 msgid "Notion API returned non-JSON."
 msgstr ""
 
@@ -2018,4 +2030,80 @@ msgstr ""
 #: outpost.php:796
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
+msgstr ""
+
+#: build/index.js:1
+msgid "Just now"
+msgstr ""
+
+#: build/index.js:1
+msgid "minute ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "minutes ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "hour ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "hours ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "day ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "days ago"
+msgstr ""
+
+#: build/index.js:1
+msgid "Request failed."
+msgstr ""
+
+#. translators: %s: provider label
+#: build/index.js:2
+#, js-format
+msgid "Pick a recent item from %s"
+msgstr ""
+
+#: build/index.js:2
+msgid "Fetching recent items…"
+msgstr ""
+
+#: build/index.js:2
+msgid "Retry"
+msgstr ""
+
+#: build/index.js:2
+msgid "Connect this provider in OAuth settings before using this picker."
+msgstr ""
+
+#: build/index.js:2
+msgid "Connection expired. Reconnect in OAuth settings."
+msgstr ""
+
+#: build/index.js:2
+msgid "No recent items available."
+msgstr ""
+
+#: build/index.js:2
+msgid "Add from connected platforms"
+msgstr ""
+
+#: build/index.js:2
+msgid "No fetch-recent providers registered. Connect a provider (Oura, WHOOP, Polar) to see \"Add from …\" buttons here."
+msgstr ""
+
+#. translators: %s: provider label
+#: build/index.js:3
+#, js-format
+msgid "Add from %s"
+msgstr ""
+
+#: build/index.js:3
+msgid "Outpost sidebar is loaded. Components will appear here as features ship."
 msgstr ""
