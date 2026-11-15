@@ -156,7 +156,7 @@ final class Outpost_Fetch_Recent_Whoop {
 		$score         = self::extract_score( $cycle, 'strain' );
 		$score_rounded = $score > 0 ? round( $score, 1 ) : 0.0;
 		$start_at      = isset( $cycle['start'] ) ? (string) $cycle['start'] : '';
-		$id            = isset( $cycle['id'] ) ? (string) $cycle['id'] : md5( $start_at );
+		$id            = isset( $cycle['id'] ) ? (string) $cycle['id'] : wp_hash( 'outpost-fetch-recent|' . $start_at );
 
 		$title = $score_rounded > 0
 			? sprintf(
@@ -216,7 +216,7 @@ final class Outpost_Fetch_Recent_Whoop {
 		$content = '<p>' . esc_html( $title ) . '</p>';
 
 		return array(
-			'id'           => 'whoop-recovery-' . ( '' !== $cycle_id ? $cycle_id : md5( $created ) ),
+			'id'           => 'whoop-recovery-' . ( '' !== $cycle_id ? $cycle_id : wp_hash( 'outpost-fetch-recent|' . $created ) ),
 			'title'        => $title,
 			'subtitle'     => $day,
 			'icon_url'     => null,

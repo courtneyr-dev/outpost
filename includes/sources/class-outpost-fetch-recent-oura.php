@@ -210,7 +210,7 @@ final class Outpost_Fetch_Recent_Oura {
 		$content = '<p>' . esc_html( $title ) . '</p>';
 
 		return array(
-			'id'           => isset( $workout['id'] ) ? 'oura-workout-' . (string) $workout['id'] : 'oura-workout-' . md5( $start_at ),
+			'id'           => isset( $workout['id'] ) ? 'oura-workout-' . (string) $workout['id'] : 'oura-workout-' . wp_hash( 'outpost-fetch-recent|' . $start_at ),
 			'title'        => $title,
 			'subtitle'     => implode( ', ', $subtitle_parts ),
 			'icon_url'     => null,
