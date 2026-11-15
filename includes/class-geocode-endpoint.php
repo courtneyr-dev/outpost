@@ -328,12 +328,12 @@ final class Outpost_Geocode_Endpoint {
 		);
 
 		// User-Agent identifies the application per Nominatim usage policy.
-		// Sites can override via the `outpost_geocode_user_agent` filter
-		// (e.g., to add an admin contact email).
+		// It names the plugin and its directory page, not the site, so the
+		// site address isn't sent. Sites can identify themselves through the
+		// `outpost_geocode_user_agent` filter (e.g., to add a contact email).
 		$default_ua = sprintf(
-			'Outpost/%s WordPress plugin (%s)',
-			defined( 'OUTPOST_VERSION' ) ? OUTPOST_VERSION : 'unknown',
-			home_url( '/' )
+			'Outpost/%s WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)',
+			defined( 'OUTPOST_VERSION' ) ? OUTPOST_VERSION : 'unknown'
 		);
 		/**
 		 * Filter the User-Agent string sent to OpenStreetMap Nominatim.
