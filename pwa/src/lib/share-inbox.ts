@@ -44,6 +44,8 @@ export interface SharedPhotosRecord {
 	title: string;
 	text: string;
 	received: number;
+	/** Random per-share identity the service worker assigns (P4I-01); absent on records from before 1.0.28. */
+	id?: string;
 }
 
 /** What the composer gets back: real File objects, ready for the photo list. */
@@ -52,6 +54,16 @@ export interface SharedPhotos {
 	title: string;
 	text: string;
 	received: number;
+	id?: string;
+}
+
+/**
+ * Which share a slot holds, for a decision to check it hasn't changed
+ * (P4H-01, P4I-01): the service worker's random id plus the arrival time.
+ * null for an empty or unusable slot.
+ */
+export function inbox_identity(photos: SharedPhotos | null): string | null {
+	return photos ? `${photos.id ?? ''}|${photos.received}` : null;
 }
 
 export interface ShareInboxEnvironment {
@@ -146,6 +158,7 @@ export async function stash_shared_photos(
 		title: payload.title,
 		text: payload.text,
 		received: payload.received,
+		...(undefined !== payload.id ? { id: payload.id } : {}),
 	};
 	const db = await open_inbox(env.indexedDB);
 	try {
@@ -191,6 +204,7 @@ export async function consume_shared_photos(
 			title: typeof v.title === 'string' ? v.title : '',
 			text: typeof v.text === 'string' ? v.text : '',
 			received: typeof v.received === 'number' ? v.received : 0,
+			...(typeof v.id === 'string' ? { id: v.id } : {}),
 		};
 	} catch (_err) {
 		return null;
@@ -210,6 +224,7 @@ function from_record(record: unknown): SharedPhotos | null {
 		title: typeof v.title === 'string' ? v.title : '',
 		text: typeof v.text === 'string' ? v.text : '',
 		received: typeof v.received === 'number' ? v.received : 0,
+		...(typeof v.id === 'string' ? { id: v.id } : {}),
 	};
 }
 
@@ -261,16 +276,18 @@ export class ShareInboxChangedError extends Error {
 	}
 }
 
-/** The `received` stamps of the records a review showed, per slot; null for an empty slot. */
+/** The inbox_identity() of the records a review showed, per slot; null for an empty slot. */
 export interface ReviewedInbox {
-	pending: number | null;
-	candidate: number | null;
+	pending: string | null;
+	candidate: string | null;
 }
 
-function received_stamp(record: unknown): number | null {
-	if (typeof record !== 'object' || record === null) return null;
-	const received: unknown = (record as { received?: unknown }).received;
-	return typeof received === 'number' ? received : null;
+/** inbox_identity() of a stored record, without rebuilding its files. */
+function stored_identity(record: unknown): string | null {
+	if (!record || typeof record !== 'object') return null;
+	const v = record as Record<string, unknown>;
+	if (!(Array.isArray(v.files) && v.files.some(is_photo_record))) return null;
+	return `${typeof v.id === 'string' ? v.id : ''}|${typeof v.received === 'number' ? v.received : 0}`;
 }
 
 /**
@@ -285,7 +302,7 @@ function received_stamp(record: unknown): number | null {
  * backend is a failure, not a no-op: records it can't see may still exist.
  *
  * With `reviewed`, the decision applies only if both slots still hold the
- * records the review showed, checked inside the transaction; otherwise it
+ * records the review showed (by inbox_identity()), checked inside the transaction; otherwise it
  * aborts with ShareInboxChangedError and changes nothing. A record another
  * account wrote since (after a sign-out in another tab) is never deleted or
  * overwritten by an older review (P4H-01).
@@ -308,7 +325,7 @@ export async function keep_shared_photos(
 				await_request(store.get(SHARE_INBOX_KEY)),
 				await_request(store.get(SHARE_INBOX_CANDIDATE_KEY)),
 			]);
-			if (received_stamp(pending) !== reviewed.pending || received_stamp(candidate) !== reviewed.candidate) {
+			if (stored_identity(pending) !== reviewed.pending || stored_identity(candidate) !== reviewed.candidate) {
 				tx.abort();
 				throw new ShareInboxChangedError();
 			}

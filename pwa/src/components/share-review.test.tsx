@@ -464,20 +464,21 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 	const NOT_APPLIED =
 		"Your choice wasn't applied because this device couldn't update its saved shares. Nothing changed; try again.";
 
-	// [label, action, earlier, candidate, expected]. A choice that keeps a photo
-	// it can't read is UNREADABLE; one that must change stored photos is NOT_APPLIED.
+	// [label, action, earlier, candidate, expected]. Every photo decision needs
+	// a readable inbox, discard included (P4I-02), so each case here is
+	// UNREADABLE; NOT_APPLIED is a readable inbox whose write fails (below).
 	const CASES: Array<[string, string, ShareTargetData, ShareTargetData | undefined, string]> = [
 		['one photo share', 'Use shared content', PHOTO, undefined, UNREADABLE],
-		['one photo share', 'Discard shared content', PHOTO, undefined, NOT_APPLIED],
+		['one photo share', 'Discard shared content', PHOTO, undefined, UNREADABLE],
 		['two photo shares', 'Keep earlier share', PHOTO, PHOTO, UNREADABLE],
 		['two photo shares', 'Use new share', PHOTO, PHOTO, UNREADABLE],
-		['two photo shares', 'Discard both', PHOTO, PHOTO, NOT_APPLIED],
-		['text, then photo', 'Keep earlier share', TEXT, PHOTO, NOT_APPLIED],
+		['two photo shares', 'Discard both', PHOTO, PHOTO, UNREADABLE],
+		['text, then photo', 'Keep earlier share', TEXT, PHOTO, UNREADABLE],
 		['text, then photo', 'Use new share', TEXT, PHOTO, UNREADABLE],
-		['text, then photo', 'Discard both', TEXT, PHOTO, NOT_APPLIED],
+		['text, then photo', 'Discard both', TEXT, PHOTO, UNREADABLE],
 		['photo, then text', 'Keep earlier share', PHOTO, TEXT, UNREADABLE],
-		['photo, then text', 'Use new share', PHOTO, TEXT, NOT_APPLIED],
-		['photo, then text', 'Discard both', PHOTO, TEXT, NOT_APPLIED],
+		['photo, then text', 'Use new share', PHOTO, TEXT, UNREADABLE],
+		['photo, then text', 'Discard both', PHOTO, TEXT, UNREADABLE],
 	];
 
 	it.each(CASES)('%s: "%s" keeps the review, both slots, and the summary', async (_label, action, earlier, candidate, expected) => {
@@ -506,10 +507,42 @@ describe('photo decisions without IndexedDB fail closed (T10-S3-05 v1.3)', () =>
 		await vi.waitFor(() => expect(status_line()).toBe(UNREADABLE));
 	});
 
-	it('announces the failed-update outcome when a choice must change stored photos', async () => {
+	it('announces the unreadable outcome for a discard too (P4I-02)', async () => {
 		await waiting(PHOTO);
 		click('Discard shared content');
+		await vi.waitFor(() => expect(status_line()).toBe(UNREADABLE));
+	});
+
+	it('announces the failed-update outcome when a readable inbox can’t be changed', async () => {
+		const real = new IDBFactory();
+		await stash_shared_photos(
+			{ files: [new File([new Uint8Array([1, 2, 3])], 'p.jpg', { type: 'image/jpeg' })], title: 'Photo', text: '', received: 1, id: 'p' },
+			{ indexedDB: real },
+		);
+		inbox_env = {
+			indexedDB: {
+				open: (...args: Parameters<IDBFactory['open']>): IDBOpenDBRequest => {
+					const req = real.open(...args);
+					req.addEventListener('success', () => {
+						const db = req.result;
+						const transaction = db.transaction.bind(db);
+						db.transaction = ((stores: string | string[], mode?: IDBTransactionMode) => {
+							if (mode === 'readwrite') throw new DOMException('write refused');
+							return transaction(stores, mode);
+						}) as IDBDatabase['transaction'];
+					});
+					return req;
+				},
+			} as unknown as IDBFactory,
+		};
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+		mount();
+		await vi.waitFor(() => expect(region()?.textContent).toContain('p.jpg'), { timeout: 5000 });
+
+		click('Discard shared content');
 		await vi.waitFor(() => expect(status_line()).toBe(NOT_APPLIED));
+		expect(region()).not.toBeNull();
+		expect((await read_share_inbox({ indexedDB: real })).pending?.title).toBe('Photo');
 	});
 
 	it('text-only decisions still work without IndexedDB', async () => {
@@ -842,14 +875,14 @@ describe('a review open when the account changes in another tab', () => {
 	it('a photo that replaced the reviewed one is never deleted by this review (P4H-01)', async () => {
 		stash_share_target({ tab: 'photo', sharedPhotos: true });
 		await stash_shared_photos(
-			{ files: [new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' })], title: 'Account A photo', text: '', received: 1 },
+			{ files: [new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' })], title: 'Account A photo', text: '', received: 1, id: 'a' },
 			inbox_env,
 		);
 		mount();
 		await vi.waitFor(() => expect(region()?.textContent).toContain('a.jpg'), { timeout: 5000 });
 		// The slot changed after the review read it: another account's photo.
 		await stash_shared_photos(
-			{ files: [new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' })], title: 'Account B photo', text: '', received: 2 },
+			{ files: [new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' })], title: 'Account B photo', text: '', received: 1, id: 'b' },
 			inbox_env,
 			SHARE_INBOX_KEY,
 		);
@@ -860,6 +893,35 @@ describe('a review open when the account changes in another tab', () => {
 		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Account B photo');
 		expect(region()).toBeNull();
 		expect(root.textContent).toMatch(/expired/i);
+	});
+
+	it('a discard after an unreadable inbox read changes nothing (P4I-02)', async () => {
+		const real = new IDBFactory();
+		let failures = 1;
+		inbox_env = {
+			indexedDB: {
+				open: (...args: Parameters<IDBFactory['open']>): IDBOpenDBRequest => {
+					if (failures-- > 0) {
+						const req = { error: new DOMException('blocked'), onerror: null as null | (() => void) };
+						setTimeout(() => req.onerror?.(), 0);
+						return req as unknown as IDBOpenDBRequest;
+					}
+					return real.open(...args);
+				},
+			} as unknown as IDBFactory,
+		};
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+		mount();
+		await wait(60);
+		await stash_shared_photos(
+			{ files: [new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' })], title: 'Account B photo', text: '', received: 2, id: 'b' },
+			{ indexedDB: real },
+		);
+
+		click('Discard shared content');
+		await wait(60);
+
+		expect((await read_share_inbox({ indexedDB: real })).pending?.title).toBe('Account B photo');
 	});
 
 	it('the inbox check after mount writes nothing back once the epoch moved', async () => {

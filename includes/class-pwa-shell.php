@@ -886,6 +886,11 @@ async function handle_share_post(event) {
 			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
+			// A random identity, so a decision about this share can tell it
+			// from a later one that arrived in the same millisecond (P4I-01).
+			id: (self.crypto && typeof self.crypto.randomUUID === 'function')
+				? self.crypto.randomUUID()
+				: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
 		});
 		// The composer shows what is waiting for review; `refused` tells it
 		// this share wasn't kept because two were already waiting.

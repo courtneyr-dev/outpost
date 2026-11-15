@@ -32,6 +32,7 @@ import {
 import {
 	read_share_inbox,
 	ShareInboxChangedError,
+	inbox_identity,
 	keep_shared_photos,
 	SHARE_INBOX_KEY,
 	SHARE_INBOX_CANDIDATE_KEY,
@@ -280,8 +281,8 @@ export function ComposerTabs({
 				// A third share's bytes: remove them, keeping the matched photo share.
 				try {
 					await keep_shared_photos(slots.find((slot) => slot !== null) ?? null, shareInboxEnv, {
-						pending: inbox.pending?.received ?? null,
-						candidate: inbox.candidate?.received ?? null,
+						pending: inbox_identity(inbox.pending),
+						candidate: inbox_identity(inbox.candidate),
 					});
 					slots = slots.map((slot) => (slot ? SHARE_INBOX_KEY : null));
 					final_inbox = await read_share_inbox(shareInboxEnv);
@@ -343,11 +344,13 @@ export function ComposerTabs({
 			setReviewStatus(SHARE_READING);
 			return false;
 		}
-		// Only the records this review showed may change (P4H-01).
-		const reviewed =
-			share_inbox.status === 'ok'
-				? { pending: share_inbox.pending?.received ?? null, candidate: share_inbox.candidate?.received ?? null }
-				: undefined;
+		// Only the records this review showed may change (P4H-01), so a
+		// decision needs a readable inbox, discard included (P4I-02).
+		if (share_inbox.status !== 'ok') {
+			setReviewStatus(SHARE_UNREADABLE);
+			return false;
+		}
+		const reviewed = { pending: inbox_identity(share_inbox.pending), candidate: inbox_identity(share_inbox.candidate) };
 		try {
 			await keep_shared_photos(keep, shareInboxEnv, reviewed);
 		} catch (err) {
