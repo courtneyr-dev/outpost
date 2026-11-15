@@ -59,6 +59,11 @@ final class Outpost_POSSE_Destination_Beehiiv extends Outpost_POSSE_Destination_
 		if ( null === $post ) {
 			return self::failure_result( __( 'Post not found.', 'outpost-mobile-publishing' ), false );
 		}
+		// Defense in depth: the dispatcher already stops a post that isn't
+		// public, but dispatch() is public and callable directly.
+		if ( ! Outpost_POSSE_Dispatcher::post_is_public( $post ) ) {
+			return self::failure_result( __( 'Only a published post without a password can be syndicated.', 'outpost-mobile-publishing' ), false );
+		}
 
 		$endpoint = sprintf( self::API_ENDPOINT_TEMPLATE, rawurlencode( $settings['publication_id'] ) );
 
