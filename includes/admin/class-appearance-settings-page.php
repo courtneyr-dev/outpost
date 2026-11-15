@@ -154,13 +154,21 @@ final class Outpost_Appearance_Settings_Page {
 	}
 
 	/**
-	 * admin-post.php handler — validates nonce + cap, forwards into
-	 * the REST controller's POST handler so there's a single write
-	 * path. Redirects back with notice on success/failure.
+	 * admin-post.php handler. The nonce and the `edit_posts` check run
+	 * first, here, and stop the request when either fails; then the
+	 * fields are forwarded into the REST controller's POST handler so
+	 * there's a single write path. Redirects back with a notice.
 	 */
 	public static function handle_save(): void {
-		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Verified by guard_post_request() at the top of this handler.
-		self::guard_post_request();
+		$nonce = isset( $_POST[ self::NONCE_NAME ] )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) )
+			: '';
+		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
+		}
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ) );
+		}
 
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( $_POST['mode_preference'] ) ) : '';
@@ -189,7 +197,6 @@ final class Outpost_Appearance_Settings_Page {
 				'fonts'  => self::clean_string_map( $fonts_in ),
 			);
 		}
-		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		// Forward into REST handler. We stand up a synthetic
 		// WP_REST_Request so validation + persistence + cache
@@ -210,18 +217,6 @@ final class Outpost_Appearance_Settings_Page {
 		}
 
 		self::redirect_with_notice( 'saved' );
-	}
-
-	private static function guard_post_request(): void {
-		$nonce = isset( $_POST[ self::NONCE_NAME ] )
-			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) )
-			: '';
-		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
-			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
-		}
-		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ) );
-		}
 	}
 
 	/**

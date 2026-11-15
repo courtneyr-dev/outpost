@@ -867,4 +867,24 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		$this->assertSame( array(), $missing, 'Regenerate the POT with bin/make-pot.sh.' );
 	}
+
+	/**
+	 * T11 Phase 4 (P4A-04, P4B-04): a handler's nonce and capability checks
+	 * sit in the handler, where a top-down read finds them, not in a helper
+	 * behind a block-wide `phpcs:disable` of NonceVerification. Only the
+	 * share-target controller keeps one: share sheets can't send a nonce and
+	 * it does no protected work (T10 P-1).
+	 */
+	public function test_nonce_verification_is_never_block_disabled_outside_share_intake(): void {
+		$root  = dirname( __DIR__, 2 );
+		$found = array();
+		foreach ( array_keys( self::shipped_tokens() ) as $file ) {
+			foreach ( token_get_all( (string) file_get_contents( $root . '/' . $file ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) && 1 === preg_match( '/phpcs:disable[^\n]*NonceVerification/', $token[1] ) ) {
+					$found[] = $file;
+				}
+			}
+		}
+		$this->assertSame( array( 'includes/sources/class-share-target-controller.php' ), array_values( array_unique( $found ) ) );
+	}
 }
