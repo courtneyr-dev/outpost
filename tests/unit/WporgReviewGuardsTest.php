@@ -196,6 +196,32 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * T11 F-53: the site deploy (tracked files through rsync --exclude-from=.distignore)
+	 * ships the same files as the WordPress.org zip (npm's packlist from
+	 * package.json `files`, minus the package.json and README.md that npm
+	 * always adds and bin/package-wporg.mjs removes).
+	 */
+	public function test_the_distignore_set_matches_the_release_zip_set(): void {
+		$root = dirname( __DIR__, 2 );
+		if ( ! is_dir( $root . '/.git' ) && ! is_file( $root . '/.git' ) ) {
+			$this->markTestSkipped( 'Needs a git checkout to list tracked files.' );
+		}
+		exec( 'cd ' . escapeshellarg( $root ) . ' && npm pack --dry-run --json --ignore-scripts 2>/dev/null', $out, $code ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+		$pack = json_decode( implode( "\n", $out ), true );
+		if ( 0 !== $code || ! is_array( $pack ) || ! isset( $pack[0]['files'] ) ) {
+			$this->markTestIncomplete( 'npm unavailable; the release zip list was not checked.' );
+		}
+		$zip = array_values( array_diff( array_column( $pack[0]['files'], 'path' ), array( 'package.json', 'README.md' ) ) );
+		$rsync = self::packaged_files( $root );
+		sort( $zip );
+		sort( $rsync );
+
+		$this->assertContains( 'outpost.php', $rsync, 'The rsync set is the plugin.' );
+		$this->assertSame( array(), array_values( array_diff( $rsync, $zip ) ), 'The deploy ships nothing the zip leaves out.' );
+		$this->assertSame( array(), array_values( array_diff( $zip, $rsync ) ), 'The deploy ships everything the zip carries.' );
+	}
+
+	/**
 	 * Tracked files left after the .distignore rules, via rsync's own matcher.
 	 *
 	 * @return array<int, string>
