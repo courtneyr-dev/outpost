@@ -772,4 +772,99 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		$this->assertSame( array(), array_values( array_unique( $found ) ) );
 	}
+
+	/**
+	 * T11 F-47: the eight `outpost_*_permission` filters can only refuse.
+	 * Each apply_filters() call starts from `true` and comes after a
+	 * current_user_can() check in the same function, so a filter can never
+	 * admit a request the credential and capability checks refused.
+	 */
+	public function test_permission_filters_can_only_refuse(): void {
+		$calls = array();
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			$last_function = -1;
+			$last_cap      = -1;
+			foreach ( $tokens as $i => $token ) {
+				if ( is_array( $token ) && T_FUNCTION === $token[0] ) {
+					$last_function = $i;
+				}
+				if ( is_array( $token ) && T_STRING === $token[0] && 'current_user_can' === $token[1] ) {
+					$last_cap = $i;
+				}
+				if ( ! is_array( $token ) || T_STRING !== $token[0] || 'apply_filters' !== $token[1] ) {
+					continue;
+				}
+				$hook = self::text( $tokens[ $i + 2 ] ?? '' );
+				if ( 1 !== preg_match( "/^'outpost_\\w+_permission'$/", $hook ) ) {
+					continue;
+				}
+				$where   = $file . ':' . $token[2] . ' ' . $hook;
+				$calls[] = $where;
+				$this->assertSame( ',', self::text( $tokens[ $i + 3 ] ?? '' ), $where );
+				$this->assertSame( 'true', strtolower( self::text( $tokens[ $i + 4 ] ?? '' ) ), $where . ' starts from true, so a filter can only refuse.' );
+				$this->assertGreaterThan( $last_function, $last_cap, $where . ' runs after current_user_can() in the same function.' );
+			}
+		}
+		$this->assertCount( 8, $calls, implode( "\n", $calls ) );
+	}
+
+	/**
+	 * T11 F-51: the default Nominatim User-Agent names the plugin, never the
+	 * site, so the geocode endpoint reads no site address.
+	 */
+	public function test_geocode_requests_never_name_the_site(): void {
+		$file   = 'includes/class-geocode-endpoint.php';
+		$tokens = self::shipped_tokens()[ $file ];
+		$found  = array();
+		foreach ( $tokens as $token ) {
+			if ( is_array( $token ) && T_STRING === $token[0] && in_array( strtolower( $token[1] ), array( 'home_url', 'site_url', 'get_home_url', 'get_site_url', 'network_home_url', 'network_site_url', 'get_bloginfo', 'get_option' ), true ) ) {
+				$found[] = $token[1] . ':' . $token[2];
+			}
+		}
+		$this->assertSame( array(), $found, $file . ' must not read the site address.' );
+		$this->assertStringContainsString( "'Outpost/%s WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)'", (string) file_get_contents( dirname( __DIR__, 2 ) . '/' . $file ) );
+	}
+
+	/**
+	 * T11 F-52: the POT covers the block-editor sidebar bundle. make-pot.sh
+	 * leaves out only build/pwa, and every __() string in build/index.js is
+	 * a msgid in the committed POT.
+	 */
+	public function test_the_pot_covers_the_sidebar_bundle(): void {
+		$root   = dirname( __DIR__, 2 );
+		$script = (string) file_get_contents( $root . '/bin/make-pot.sh' );
+		$this->assertSame( 1, preg_match( '/--exclude=([^\s"]+)/', $script, $m ), 'make-pot.sh passes --exclude.' );
+		$excluded = explode( ',', $m[1] );
+		$this->assertContains( 'build/pwa', $excluded );
+		$this->assertNotContains( 'build', $excluded, 'build/index.js must be scanned.' );
+
+		$msgids  = array();
+		$current = null;
+		foreach ( file( $root . '/languages/outpost-mobile-publishing.pot', FILE_IGNORE_NEW_LINES ) ?: array() as $line ) {
+			if ( 1 === preg_match( '/^msgid "(.*)"$/', $line, $mm ) ) {
+				$current = $mm[1];
+				continue;
+			}
+			if ( null !== $current && 1 === preg_match( '/^"(.*)"$/', $line, $mm ) ) {
+				$current .= $mm[1];
+				continue;
+			}
+			if ( null !== $current ) {
+				$msgids[ stripcslashes( $current ) ] = true;
+				$current                             = null;
+			}
+		}
+
+		$bundle = (string) file_get_contents( $root . '/build/index.js' );
+		preg_match_all( '/\.__\)\("((?:[^"\\\\]|\\\\.)*)","outpost-mobile-publishing"\)/', $bundle, $strings );
+		$this->assertGreaterThanOrEqual( 15, count( $strings[1] ), 'The scan sees the sidebar strings.' );
+		$missing = array();
+		foreach ( $strings[1] as $raw ) {
+			$string = (string) json_decode( '"' . $raw . '"' );
+			if ( ! isset( $msgids[ $string ] ) ) {
+				$missing[] = $string;
+			}
+		}
+		$this->assertSame( array(), $missing, 'Regenerate the POT with bin/make-pot.sh.' );
+	}
 }
