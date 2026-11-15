@@ -499,8 +499,11 @@ const default_pending_shares_env = (): PendingSharesEnvironment => ({
  * The inbox goes first and its failure stops everything: the call rejects
  * with PendingSharesError and the sessionStorage slots stay as they were, so
  * the caller can keep the person signed in. A missing IndexedDB is a failure,
- * not an empty inbox. A sessionStorage that throws on access could not have
- * stored a share, so it counts as cleared.
+ * not an empty inbox.
+ *
+ * Each sessionStorage slot is read back after removal: a value still readable
+ * rejects with PendingSharesError (P4A-01). A slot whose read is blocked
+ * counts as cleared, since nobody can read a share from it.
  */
 export async function clear_pending_shares(
 	env: PendingSharesEnvironment = default_pending_shares_env(),
@@ -517,7 +520,16 @@ export async function clear_pending_shares(
 		try {
 			env.sessionStorage?.removeItem(key);
 		} catch (_err) {
-			// Storage access is blocked, so nothing was stored under this key.
+			// Checked by the read-back below.
+		}
+		let remaining: string | null;
+		try {
+			remaining = env.sessionStorage?.getItem(key) ?? null;
+		} catch (_err) {
+			remaining = null;
+		}
+		if (null !== remaining) {
+			throw new PendingSharesError('A share waiting on this device could not be removed.');
 		}
 	}
 }

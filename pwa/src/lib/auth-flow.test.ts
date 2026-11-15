@@ -316,4 +316,31 @@ describe('handle_callback clears pending shares before storing the new account (
 		expect(error).toBeInstanceOf(AuthFlowError);
 		expect((await read_token(env.tokenStore))?.accessToken).toBe('token-a');
 	});
+
+	it('doesn’t store the new token when a share slot can’t be removed but stays readable (P4A-01)', async () => {
+		const env = ready_env(new IDBFactory());
+		const storage = env.sessionStorage;
+		env.sessionStorage = {
+			getItem: (k: string) => storage.getItem(k),
+			setItem: (k: string, v: string) => storage.setItem(k, v),
+			removeItem: (k: string) => {
+				if (SESSION_KEYS.includes(k)) throw new DOMException('removal refused');
+				storage.removeItem(k);
+			},
+			clear: () => storage.clear(),
+			key: (i: number) => storage.key(i),
+			get length() {
+				return storage.length;
+			},
+		};
+
+		const error = await handle_callback({ code: 'code-b', state: 'state-b' }, client_id, redirect_uri, env).then(
+			() => null,
+			(err: unknown) => err,
+		);
+
+		expect(error).toBeInstanceOf(AuthFlowError);
+		expect((error as AuthFlowError).code).toBe('shares_not_cleared');
+		expect(await read_token(env.tokenStore)).toBeNull();
+	});
 });

@@ -188,6 +188,52 @@ describe('pending shares across sign-out (F-46)', () => {
 		expect((await read_token(env))?.accessToken).toBe('abc');
 	});
 
+	// P4A-01: deletion that fails while the value stays readable must not pass.
+	function retaining(storage: Storage): Storage {
+		return {
+			getItem: (k: string) => storage.getItem(k),
+			setItem: (k: string, v: string) => storage.setItem(k, v),
+			removeItem: () => {
+				throw new DOMException('removal refused');
+			},
+			clear: () => storage.clear(),
+			key: (i: number) => storage.key(i),
+			get length() {
+				return storage.length;
+			},
+		};
+	}
+
+	it('when a share slot can’t be removed but stays readable, sign-out rejects and the person stays signed in', async () => {
+		const env = token_env();
+		await signed_in(env);
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+
+		await expect(
+			clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: retaining(sessionStorage) }),
+		).rejects.toBeTruthy();
+
+		expect((await read_token(env))?.accessToken).toBe('abc');
+	});
+
+	it('a sessionStorage that refuses every access holds nothing anyone can read, so sign-out goes ahead', async () => {
+		const env = token_env();
+		await signed_in(env);
+		const blocked = {
+			getItem: () => {
+				throw new DOMException('blocked');
+			},
+			removeItem: () => {
+				throw new DOMException('blocked');
+			},
+		} as unknown as Storage;
+
+		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: blocked });
+
+		expect(await read_token(env)).toBeNull();
+	});
+
 	it('a share received after the next sign-in still reaches review, text and photos', async () => {
 		const env = token_env();
 		await signed_in(env);
