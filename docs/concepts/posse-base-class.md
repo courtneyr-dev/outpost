@@ -112,7 +112,7 @@ The four canonical keys, all keyed by post id:
 - **`_outpost_posse_failures`** (`array<{destination_id, error, attempted_at, attempt_count}>`) — permanent failures.
 - **`_outpost_posse_in_flight`** (`string[]`) — currently scheduled or retrying.
 
-All four are `register_post_meta`'d on `init` for the `post` post type with `show_in_rest`, the auth callback gating writes on `edit_post` cap.
+All four are `register_post_meta`'d on `init` for the `post` post type with `show_in_rest`, the auth callback gating writes on `edit_post` cap, and a sanitize callback on each. `_outpost_posse_failures` and `_outpost_posse_in_flight` appear only in `context=edit` responses, which the core posts route serves only to a user who can edit the post, so a public read of a published post never shows them.
 
 Nothing in Outpost reads `_outpost_posse_failures` back: no admin notice, list-table column, or editor panel shows POSSE failures. Read the meta with `get_post_meta( $post_id, '_outpost_posse_failures', true )`, `wp post meta get <id> _outpost_posse_failures --format=json`, or `GET /wp-json/wp/v2/posts/<id>?context=edit`.
 
