@@ -131,7 +131,42 @@ const HELD_KEY = 'outpost.share_review';
 /** A second share that arrived while the first still waited. */
 const CANDIDATE_KEY = 'outpost.share_review_candidate';
 
+/** Every sessionStorage slot a share can wait in: the stash and both review slots. */
+const SHARE_SESSION_KEYS = [KEY, HELD_KEY, CANDIDATE_KEY] as const;
+
+/**
+ * The share epoch (P4B-07). Shares wait in sessionStorage, which belongs to
+ * one tab, while the sign-in is shared by every tab on the origin. Clearing
+ * pending shares (sign-out, a new sign-in) writes a new epoch to
+ * localStorage; each tab records the epoch its shares arrived under, in its
+ * own sessionStorage, and drops them when the two differ. So a share left
+ * waiting in another tab never reaches the next account.
+ */
+const EPOCH_KEY = 'outpost.share_epoch';
+
+function origin_epoch(): string | null {
+	try {
+		return globalThis.localStorage?.getItem(EPOCH_KEY) ?? null;
+	} catch (_err) {
+		return null;
+	}
+}
+
+function drop_stale_shares(): void {
+	const current = origin_epoch();
+	if (null === current) return;
+	try {
+		const store = globalThis.sessionStorage;
+		if (!store || store.getItem(EPOCH_KEY) === current) return;
+		for (const key of SHARE_SESSION_KEYS) store.removeItem(key);
+		store.setItem(EPOCH_KEY, current);
+	} catch (_err) {
+		// sessionStorage is blocked, so no share can be read from it either.
+	}
+}
+
 function safe_session_get(key: string): string | null {
+	drop_stale_shares();
 	try {
 		return globalThis.sessionStorage?.getItem(key) ?? null;
 	} catch (_err) {
@@ -140,6 +175,7 @@ function safe_session_get(key: string): string | null {
 }
 
 function safe_session_set(key: string, value: string): void {
+	drop_stale_shares();
 	try {
 		globalThis.sessionStorage?.setItem(key, value);
 	} catch (_err) {
@@ -467,9 +503,6 @@ export function discard_held_share(): void {
 	set_held_shares([]);
 }
 
-/** Every sessionStorage slot a share can wait in: the stash and both review slots. */
-const SHARE_SESSION_KEYS = [KEY, HELD_KEY, CANDIDATE_KEY] as const;
-
 /** Clearing pending shares failed; some may still be readable on this device. */
 export class PendingSharesError extends Error {
 	constructor(message: string) {
@@ -503,11 +536,20 @@ const default_pending_shares_env = (): PendingSharesEnvironment => ({
  *
  * Each sessionStorage slot is read back after removal: a value still readable
  * rejects with PendingSharesError (P4A-01). A slot whose read is blocked
- * counts as cleared, since nobody can read a share from it.
+ * counts as cleared, since nobody can read a share from it. Shares waiting in
+ * other tabs are dropped there through the share epoch (P4B-07).
  */
 export async function clear_pending_shares(
 	env: PendingSharesEnvironment = default_pending_shares_env(),
 ): Promise<void> {
+	// A new epoch first, so a share waiting in any other tab is dropped
+	// there on its next read (P4B-07). Blocked localStorage only loses that
+	// cross-tab step; this tab's slots and the inbox still clear below.
+	try {
+		globalThis.localStorage?.setItem(EPOCH_KEY, Date.now().toString(36) + Math.random().toString(36).slice(2));
+	} catch (_err) {
+		// no-op
+	}
 	try {
 		await keep_shared_photos(null, env.shareInbox);
 	} catch (err) {

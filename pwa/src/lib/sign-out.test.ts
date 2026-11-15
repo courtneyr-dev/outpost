@@ -8,6 +8,7 @@ import { read_token, write_token, type TokenStoreEnvironment } from './token-sto
 import {
 	discard_held_share,
 	hold_share_for_review,
+	release_held_share,
 	stash_share_target,
 	type ShareTargetData,
 } from './share-target';
@@ -230,6 +231,60 @@ describe('pending shares across sign-out (F-46)', () => {
 		} as unknown as Storage;
 
 		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: blocked });
+
+		expect(await read_token(env)).toBeNull();
+	});
+
+	// P4B-07: sessionStorage belongs to one tab, the token to the origin.
+	function memory_storage(): Storage {
+		const m = new Map<string, string>();
+		return {
+			getItem: (k: string) => m.get(k) ?? null,
+			setItem: (k: string, v: string) => void m.set(k, String(v)),
+			removeItem: (k: string) => void m.delete(k),
+			clear: () => m.clear(),
+			key: (i: number) => [...m.keys()][i] ?? null,
+			get length() {
+				return m.size;
+			},
+		};
+	}
+
+	it('a share waiting in another tab is gone once this tab signs out (P4B-07)', async () => {
+		const env = token_env();
+		await signed_in(env);
+		// This test's own sessionStorage plays the second tab.
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+		stash_share_target(A_URL);
+
+		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: memory_storage() });
+
+		expect(hold_share_for_review().shares).toEqual([]);
+		expect(release_held_share()).toBeNull();
+	});
+
+	it('a share that arrives in the other tab after the sign-out still reaches review', async () => {
+		const env = token_env();
+		await signed_in(env);
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: memory_storage() });
+
+		await signed_in(env);
+		stash_share_target({ tab: 'note', content: 'B shares in the second tab' });
+
+		expect(hold_share_for_review().shares).toEqual([{ tab: 'note', content: 'B shares in the second tab' }]);
+	});
+
+	it('sign-out still succeeds when localStorage is blocked', async () => {
+		const env = token_env();
+		await signed_in(env);
+		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage) {
+			if (this === localStorage) throw new DOMException('blocked');
+		});
+
+		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: memory_storage() });
 
 		expect(await read_token(env)).toBeNull();
 	});
