@@ -757,3 +757,60 @@ describe('accessibility of the decision region', () => {
 		]);
 	});
 });
+
+/**
+ * P4F (final-delta review of P4B-07): another tab signed out or in while
+ * this tab's review was open, so the share epoch moved. The review's cached
+ * shares must not be written back under the new epoch, and "Use" must not
+ * report success for a share that was dropped.
+ */
+describe('a review open when the account changes in another tab', () => {
+	const other_tab_changes_account = (): void => localStorage.setItem('outpost.share_epoch', 'other-tab-' + String(Math.random()));
+	const share_keys = (): string[] => Object.keys(sessionStorage).filter((k) => k.startsWith('outpost.share_') && k !== 'outpost.share_epoch');
+
+	it('"Use shared content" fills nothing and says the share expired', async () => {
+		stash_share_target({ tab: 'note', content: 'Account A words' });
+		mount();
+		await wait(30);
+		other_tab_changes_account();
+
+		click('Use shared content');
+		await wait(40);
+
+		expect(field('outpost-note-content').value).not.toBe('Account A words');
+		expect(root.textContent).not.toContain('Shared content added');
+		expect(root.textContent).toMatch(/expired/i);
+		expect(region()).toBeNull();
+	});
+
+	it('"Keep earlier share" writes nothing back and closes the review', async () => {
+		stash_share_target({ tab: 'note', content: 'Account A first' });
+		mount();
+		await wait(30);
+		stash_share_target({ tab: 'note', content: 'Account A second' });
+		remount();
+		await wait(30);
+		other_tab_changes_account();
+
+		click('Keep earlier share');
+		await wait(30);
+
+		expect(region()).toBeNull();
+		expect(share_keys()).toEqual([]);
+		remount();
+		await wait(30);
+		expect(region()).toBeNull();
+	});
+
+	it('the inbox check after mount writes nothing back once the epoch moved', async () => {
+		stash_share_target({ tab: 'note', content: 'Account A words' });
+		mount();
+		other_tab_changes_account();
+		await wait(40);
+
+		expect(share_keys()).toEqual([]);
+		remount();
+		await wait(30);
+		expect(region()).toBeNull();
+	});
+});

@@ -26,6 +26,7 @@ import {
 	release_held_share,
 	discard_held_share,
 	set_held_shares,
+	shares_still_current,
 	type ShareTargetData,
 } from '../lib/share-target';
 import {
@@ -86,6 +87,8 @@ const SHARE_REFUSED =
 const SHARE_UNREADABLE =
 	"Couldn't read the shared photos on this device, so this choice wasn't applied. Reload and try again.";
 const SHARE_READING = 'Still reading the shared photos. Try again in a moment.';
+const SHARE_EXPIRED =
+	'This share expired because the account on this device changed in another tab. Share it again if you still want it.';
 const SHARE_NOT_APPLIED =
 	"Your choice wasn't applied because this device couldn't update its saved shares. Nothing changed; try again.";
 
@@ -265,6 +268,10 @@ export function ComposerTabs({
 				if (held.shares.some((share) => share.sharedPhotos)) setReviewStatus(SHARE_UNREADABLE);
 				return;
 			}
+			if (!shares_still_current(held.epoch)) {
+				expire_review();
+				return;
+			}
 			const matched = match_photo_slots(held.shares, inbox);
 			let final_inbox = inbox;
 			let slots = matched.slots;
@@ -280,7 +287,10 @@ export function ComposerTabs({
 				if (cancelled || decided.current) return;
 				setReviewStatus(SHARE_REFUSED);
 			}
-			set_held_shares(matched.shares);
+			if (!set_held_shares(matched.shares, held.epoch)) {
+				expire_review();
+				return;
+			}
 			setShares(matched.shares);
 			setPhotoSlots(slots);
 			setShareInbox(final_inbox);
@@ -345,10 +355,28 @@ export function ComposerTabs({
 		reopen(tab, remount);
 	};
 
+	// The account changed in another tab while this review was open (P4F):
+	// close it without writing the cached shares back or reporting success.
+	const expire_review = (): void => {
+		decided.current = true;
+		discard_held_share();
+		setShares([]);
+		setPhotoSlots([]);
+		setReviewStatus('');
+		setShareStatus(SHARE_EXPIRED);
+	};
+
 	const use_shared = async (): Promise<void> => {
 		if (!review_tab || shares.length !== 1) return;
+		if (!shares_still_current(held.epoch)) {
+			expire_review();
+			return;
+		}
 		if (!(await apply_to_inbox(0))) return;
-		release_held_share();
+		if (null === release_held_share()) {
+			expire_review();
+			return;
+		}
 		finish_review(review_tab, true, `Shared content added to the ${tab_label(review_tab)} form.`);
 	};
 
@@ -362,8 +390,15 @@ export function ComposerTabs({
 	const keep_one = async (index: 0 | 1, message: string): Promise<void> => {
 		const kept = shares[index];
 		if (!kept || shares.length !== 2) return;
+		if (!shares_still_current(held.epoch)) {
+			expire_review();
+			return;
+		}
 		if (!(await apply_to_inbox(index))) return;
-		set_held_shares([kept]);
+		if (!set_held_shares([kept], held.epoch)) {
+			expire_review();
+			return;
+		}
 		setShares([kept]);
 		setPhotoSlots([kept.sharedPhotos ? SHARE_INBOX_KEY : null]);
 		if (kept.sharedPhotos) setShareInbox(await read_share_inbox(shareInboxEnv));

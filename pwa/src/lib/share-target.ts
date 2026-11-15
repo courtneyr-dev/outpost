@@ -438,14 +438,38 @@ export interface HeldShares {
 	shares: ShareTargetData[];
 	/** A share arrived while two were already waiting and wasn't kept. */
 	refused: boolean;
+	/**
+	 * The share epoch these shares were read under (P4B-07). Writes of a
+	 * cached copy pass it back, so a review that outlived an account change
+	 * in another tab can't save its shares under the new epoch.
+	 */
+	epoch: string | null;
+}
+
+/** Whether shares read under `epoch` still belong to the current sign-in (P4F). */
+export function shares_still_current(epoch: string | null): boolean {
+	return origin_epoch() === epoch;
 }
 
 
 /**
- * Write the waiting shares back to their two session slots, earliest first.
+ * Write the waiting shares back to their two session slots, earliest first,
+ * when `epoch` (from hold_share_for_review) is still current. Otherwise the
+ * slots are dropped and nothing is written, and this returns false (P4F).
+ */
+export function set_held_shares(shares: ShareTargetData[], epoch: string | null): boolean {
+	if (!shares_still_current(epoch)) {
+		drop_stale_shares();
+		return false;
+	}
+	write_held_shares(shares);
+	return true;
+}
+
+/**
  * Anything past two is dropped; callers refuse a third share before this.
  */
-export function set_held_shares(shares: ShareTargetData[]): void {
+function write_held_shares(shares: ShareTargetData[]): void {
 	const [earlier, candidate] = shares;
 	if (earlier) safe_session_set(HELD_KEY, JSON.stringify(earlier));
 	else safe_session_remove(HELD_KEY);
@@ -482,8 +506,8 @@ export function hold_share_for_review(): HeldShares {
 			shares.push(fresh);
 		}
 	}
-	set_held_shares(shares);
-	return { shares, refused };
+	write_held_shares(shares);
+	return { shares, refused, epoch: origin_epoch() };
 }
 
 /**
@@ -492,7 +516,7 @@ export function hold_share_for_review(): HeldShares {
  */
 export function release_held_share(): ShareTargetData | null {
 	const data = parse_share(safe_session_get(HELD_KEY));
-	set_held_shares([]);
+	write_held_shares([]);
 	if (!data) return null;
 	safe_session_set(KEY, JSON.stringify(data));
 	return data;
@@ -500,7 +524,7 @@ export function release_held_share(): ShareTargetData | null {
 
 /** "Discard shared content" / "Discard both": drop every held share. */
 export function discard_held_share(): void {
-	set_held_shares([]);
+	write_held_shares([]);
 }
 
 /** Clearing pending shares failed; some may still be readable on this device. */
@@ -539,16 +563,33 @@ const default_pending_shares_env = (): PendingSharesEnvironment => ({
  * counts as cleared, since nobody can read a share from it. Shares waiting in
  * other tabs are dropped there through the share epoch (P4B-07).
  */
+function session_storage_usable(store: Storage | undefined): boolean {
+	if (!store) return false;
+	try {
+		store.getItem(EPOCH_KEY);
+		return true;
+	} catch (_err) {
+		return false;
+	}
+}
+
 export async function clear_pending_shares(
 	env: PendingSharesEnvironment = default_pending_shares_env(),
 ): Promise<void> {
 	// A new epoch first, so a share waiting in any other tab is dropped
-	// there on its next read (P4B-07). Blocked localStorage only loses that
-	// cross-tab step; this tab's slots and the inbox still clear below.
+	// there on its next read (P4B-07). It is read back: when other tabs can't
+	// be told and this browser can hold shares in sessionStorage, the call
+	// rejects before anything changes (P4F).
+	const epoch = Date.now().toString(36) + Math.random().toString(36).slice(2);
+	let told = false;
 	try {
-		globalThis.localStorage?.setItem(EPOCH_KEY, Date.now().toString(36) + Math.random().toString(36).slice(2));
+		globalThis.localStorage?.setItem(EPOCH_KEY, epoch);
+		told = globalThis.localStorage?.getItem(EPOCH_KEY) === epoch;
 	} catch (_err) {
-		// no-op
+		told = false;
+	}
+	if (!told && session_storage_usable(env.sessionStorage)) {
+		throw new PendingSharesError('Other open tabs could not be told to drop shares waiting in them.');
 	}
 	try {
 		await keep_shared_photos(null, env.shareInbox);

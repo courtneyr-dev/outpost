@@ -158,7 +158,7 @@ describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
 	it('holds a first share, then a second as the new share, across reloads', async () => {
 		const { hold_share_for_review, stash_share_target } = await import('./share-target');
 		stash_share_target({ tab: 'note', content: 'first' });
-		expect(hold_share_for_review()).toEqual({ shares: [{ tab: 'note', content: 'first' }], refused: false });
+		expect(hold_share_for_review()).toEqual({ shares: [{ tab: 'note', content: 'first' }], refused: false, epoch: null });
 		stash_share_target({ tab: 'reply', url: 'https://example.test/' });
 		const held = hold_share_for_review();
 		expect(held.shares.map((s) => s.tab)).toEqual(['note', 'reply']);
@@ -182,7 +182,7 @@ describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
 	it('refuses a photo share the service worker could not keep', async () => {
 		const { hold_share_for_review, stash_share_target } = await import('./share-target');
 		stash_share_target({ tab: 'photo', sharedPhotos: true, shareRefused: true });
-		expect(hold_share_for_review()).toEqual({ shares: [], refused: true });
+		expect(hold_share_for_review()).toEqual({ shares: [], refused: true, epoch: null });
 	});
 
 	it('drops an unreadable slot instead of failing', async () => {

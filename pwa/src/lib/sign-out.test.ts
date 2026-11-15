@@ -277,16 +277,23 @@ describe('pending shares across sign-out (F-46)', () => {
 		expect(hold_share_for_review().shares).toEqual([{ tab: 'note', content: 'B shares in the second tab' }]);
 	});
 
-	it('sign-out still succeeds when localStorage is blocked', async () => {
+	it('when other tabs can’t be told (localStorage write fails), sign-out rejects and the person stays signed in (P4F)', async () => {
 		const env = token_env();
 		await signed_in(env);
-		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage) {
-			if (this === localStorage) throw new DOMException('blocked');
-		});
+		const blocked = memory_storage();
+		blocked.setItem = (): void => {
+			throw new DOMException('blocked');
+		};
+		vi.stubGlobal('localStorage', blocked);
+		try {
+			await expect(
+				clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: memory_storage() }),
+			).rejects.toBeTruthy();
+		} finally {
+			vi.unstubAllGlobals();
+		}
 
-		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage: memory_storage() });
-
-		expect(await read_token(env)).toBeNull();
+		expect((await read_token(env))?.accessToken).toBe('abc');
 	});
 
 	it('a share received after the next sign-in still reaches review, text and photos', async () => {
