@@ -20,7 +20,7 @@ import type { MicropubEnvironment } from '../lib/micropub';
 import { write_cache } from '../lib/appearance';
 import { stash_share_target, type ShareTargetData } from '../lib/share-target';
 import { DRAFT_SAVE_DELAY_MS, read_draft, write_draft, type DraftMode } from '../lib/drafts';
-import { stash_shared_photos, read_share_inbox, type ShareInboxEnvironment } from '../lib/share-inbox';
+import { stash_shared_photos, read_share_inbox, SHARE_INBOX_KEY, type ShareInboxEnvironment } from '../lib/share-inbox';
 import { list } from '../lib/offline-queue';
 import { fetch_preview, fetch_source_preview } from '../lib/preview';
 
@@ -836,6 +836,29 @@ describe('a review open when the account changes in another tab', () => {
 		await wait(40);
 
 		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Account B photo');
+		expect(root.textContent).toMatch(/expired/i);
+	});
+
+	it('a photo that replaced the reviewed one is never deleted by this review (P4H-01)', async () => {
+		stash_share_target({ tab: 'photo', sharedPhotos: true });
+		await stash_shared_photos(
+			{ files: [new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' })], title: 'Account A photo', text: '', received: 1 },
+			inbox_env,
+		);
+		mount();
+		await vi.waitFor(() => expect(region()?.textContent).toContain('a.jpg'), { timeout: 5000 });
+		// The slot changed after the review read it: another account's photo.
+		await stash_shared_photos(
+			{ files: [new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' })], title: 'Account B photo', text: '', received: 2 },
+			inbox_env,
+			SHARE_INBOX_KEY,
+		);
+
+		click('Discard shared content');
+		await wait(60);
+
+		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Account B photo');
+		expect(region()).toBeNull();
 		expect(root.textContent).toMatch(/expired/i);
 	});
 

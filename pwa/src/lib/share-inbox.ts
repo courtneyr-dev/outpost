@@ -253,6 +253,26 @@ export async function read_share_inbox(
 	}
 }
 
+/** A decision found a slot holding a record the review never saw (P4H-01). */
+export class ShareInboxChangedError extends Error {
+	constructor() {
+		super('share inbox: changed since the review read it');
+		this.name = 'ShareInboxChangedError';
+	}
+}
+
+/** The `received` stamps of the records a review showed, per slot; null for an empty slot. */
+export interface ReviewedInbox {
+	pending: number | null;
+	candidate: number | null;
+}
+
+function received_stamp(record: unknown): number | null {
+	if (typeof record !== 'object' || record === null) return null;
+	const received: unknown = (record as { received?: unknown }).received;
+	return typeof received === 'number' ? received : null;
+}
+
 /**
  * Apply the person's decision about waiting photo shares, in one
  * transaction.
@@ -263,10 +283,17 @@ export async function read_share_inbox(
  * there is no IndexedDB, or it can't open, errors, or aborts, so the caller
  * can keep the review open and say the choice wasn't applied. A missing
  * backend is a failure, not a no-op: records it can't see may still exist.
+ *
+ * With `reviewed`, the decision applies only if both slots still hold the
+ * records the review showed, checked inside the transaction; otherwise it
+ * aborts with ShareInboxChangedError and changes nothing. A record another
+ * account wrote since (after a sign-out in another tab) is never deleted or
+ * overwritten by an older review (P4H-01).
  */
 export async function keep_shared_photos(
 	keep: ShareInboxSlot | null,
-	env: ShareInboxEnvironment = default_env()
+	env: ShareInboxEnvironment = default_env(),
+	reviewed?: ReviewedInbox
 ): Promise<void> {
 	if (!env.indexedDB) throw new Error('share inbox: IndexedDB is unavailable');
 	const db = await open_inbox(env.indexedDB);
@@ -276,6 +303,16 @@ export async function keep_shared_photos(
 		// Observed below; this keeps an early abort from going unhandled.
 		done.catch(() => undefined);
 		const store = tx.objectStore(SHARE_INBOX_STORE);
+		if (reviewed) {
+			const [pending, candidate] = await Promise.all([
+				await_request(store.get(SHARE_INBOX_KEY)),
+				await_request(store.get(SHARE_INBOX_CANDIDATE_KEY)),
+			]);
+			if (received_stamp(pending) !== reviewed.pending || received_stamp(candidate) !== reviewed.candidate) {
+				tx.abort();
+				throw new ShareInboxChangedError();
+			}
+		}
 		const kept: unknown = keep ? await await_request(store.get(keep)) : undefined;
 		if (kept !== undefined) {
 			store.put(kept, SHARE_INBOX_KEY);

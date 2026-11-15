@@ -10,6 +10,7 @@ import {
 	SHARE_INBOX_DB,
 	SHARE_INBOX_KEY,
 	SHARE_INBOX_STORE,
+	ShareInboxChangedError,
 } from './share-inbox';
 
 const png = (name = 'IMG_0001.png'): File =>
@@ -234,5 +235,50 @@ describe('share inbox state and decisions (T10-S3-05 v1.2)', () => {
 		const state = await read_share_inbox({ indexedDB: factory });
 		expect(state.pending?.title).toBe('Earlier');
 		expect(state.candidate?.title).toBe('Newer');
+	});
+});
+
+/**
+ * P4H-01: a decision touches only the records the review showed. The
+ * service worker stamps each record with `received`; the review passes the
+ * stamps it saw, and the check runs inside the readwrite transaction, so a
+ * record another account wrote since (after a sign-out in another tab) is
+ * never deleted or overwritten by this review.
+ */
+describe('decisions apply only to the records the review saw (P4H-01)', () => {
+	const at = (title: string, received: number) => ({ ...parked(title), received });
+
+	it('discarding leaves a newer record in the reviewed slot alone', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account B', 2), env, SHARE_INBOX_KEY);
+
+		await expect(keep_shared_photos(null, env, { pending: 1, candidate: null })).rejects.toBeInstanceOf(
+			ShareInboxChangedError,
+		);
+		expect((await read_share_inbox(env)).pending?.title).toBe('Account B');
+	});
+
+	it('keeping a photo fails when a slot holds a record the review never saw', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account A', 1), env, SHARE_INBOX_KEY);
+		await stash_shared_photos(at('Account B', 2), env, SHARE_INBOX_CANDIDATE_KEY);
+
+		await expect(keep_shared_photos(SHARE_INBOX_KEY, env, { pending: 1, candidate: null })).rejects.toBeInstanceOf(
+			ShareInboxChangedError,
+		);
+		const state = await read_share_inbox(env);
+		expect(state.pending?.title).toBe('Account A');
+		expect(state.candidate?.title).toBe('Account B');
+	});
+
+	it('applies when the slots hold exactly what the review saw', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account A', 1), env, SHARE_INBOX_KEY);
+
+		await keep_shared_photos(null, env, { pending: 1, candidate: null });
+
+		const state = await read_share_inbox(env);
+		expect(state.pending).toBeNull();
+		expect(state.candidate).toBeNull();
 	});
 });
