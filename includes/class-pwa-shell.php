@@ -1040,11 +1040,20 @@ async function cache_first(request) {
 	 *   LITESPEED_NO_OPTM and LITESPEED_NO_PAGEOPTM at flush.
 	 */
 	private static function opt_out_of_page_optimizers(): void {
-		$constants = array( 'DONOTCACHEPAGE', 'DONOTROCKETOPTIMIZE', 'DONOTMINIFY', 'LITESPEED_NO_OPTM', 'LITESPEED_NO_PAGEOPTM' );
-		foreach ( $constants as $constant ) {
-			if ( ! defined( $constant ) ) {
-				define( $constant, true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Names other plugins read; defined only on Outpost's HTML routes.
-			}
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTROCKETOPTIMIZE' ) ) {
+			define( 'DONOTROCKETOPTIMIZE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTMINIFY' ) ) {
+			define( 'DONOTMINIFY', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_OPTM' ) ) {
+			define( 'LITESPEED_NO_OPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_PAGEOPTM' ) ) {
+			define( 'LITESPEED_NO_PAGEOPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
 		}
 
 		add_filter( 'perfmatters_allow_buffer', '__return_false', PHP_INT_MAX );

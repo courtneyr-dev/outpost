@@ -887,4 +887,32 @@ final class WporgReviewGuardsTest extends TestCase {
 		}
 		$this->assertSame( array( 'includes/sources/class-share-target-controller.php' ), array_values( array_unique( $found ) ) );
 	}
+
+	/**
+	 * T11 Phase 5 (Plugin Check 2.2.0): every define() names its constant
+	 * with a string literal. A variable name hides which constants the
+	 * plugin defines and draws PrefixAllGlobals.VariableConstantNameFound.
+	 */
+	public function test_every_define_names_a_literal_constant(): void {
+		$found = array();
+		foreach ( self::shipped_tokens() as $file => $tokens ) {
+			foreach ( $tokens as $i => $token ) {
+				if ( ! is_array( $token ) || T_STRING !== $token[0] || 'define' !== strtolower( $token[1] ) ) {
+					continue;
+				}
+				$prev = $tokens[ $i - 1 ] ?? null;
+				if ( is_array( $prev ) && in_array( $prev[0], array( T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION ), true ) ) {
+					continue;
+				}
+				if ( '(' !== self::text( $tokens[ $i + 1 ] ?? '' ) ) {
+					continue;
+				}
+				$arg = $tokens[ $i + 2 ] ?? null;
+				if ( ! is_array( $arg ) || T_CONSTANT_ENCAPSED_STRING !== $arg[0] ) {
+					$found[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertSame( array(), $found );
+	}
 }
