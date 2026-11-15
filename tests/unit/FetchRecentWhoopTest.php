@@ -58,8 +58,9 @@ final class FetchRecentWhoopTest extends TestCase {
 		$this->assertSame( 'whoop-cycle-cyc-1', $item['id'] );
 		$this->assertStringContainsString( 'Strain 14.7/21', $item['title'] );
 		$this->assertSame( 'note', $item['post_kind'] );
-		$this->assertSame( '2026-05-04T00:00:00+00:00', $item['fetched_at'] );
+		$this->assertSame( '2026-05-04', $item['fetched_at'], 'The date alone (F-44).' );
 		$this->assertSame( '14.7', $item['post_payload']['post_meta']['_outpost_whoop_strain'] );
+		$this->assertArrayNotHasKey( '_outpost_whoop_start_at', $item['post_payload']['post_meta'], 'The cycle start stays on the server (F-44).' );
 	}
 
 	public function test_map_cycle_item_handles_top_level_strain_field(): void {

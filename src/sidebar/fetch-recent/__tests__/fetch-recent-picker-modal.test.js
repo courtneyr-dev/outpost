@@ -154,7 +154,7 @@ describe( 'FetchRecentPickerModal', () => {
 			id: 'oura-sleep-1',
 			title: 'Sleep',
 			subtitle: '7.7 hours',
-			fetched_at: '2026-11-13T05:40:00+00:00',
+			fetched_at: '2026-11-13',
 			post_payload: {
 				content: '<p>Sleep</p>',
 				post_meta: { _outpost_oura_sleep_day: '2026-11-13' },

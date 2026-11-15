@@ -115,21 +115,23 @@ final class Outpost_Fetch_Recent_Oura {
 		$workouts = self::fetch_workouts( $token, $start_date, $end_date );
 		$sleep    = self::fetch_sleep( $token, $start_date, $end_date );
 
-		$items = array_merge(
-			array_map( array( __CLASS__, 'map_workout_item' ), $workouts ),
-			array_map( array( __CLASS__, 'map_sleep_item' ), $sleep )
-		);
-
+		// Items carry only a date (F-44), so the newest-first order comes
+		// from each record's start time, which stays in this function.
+		$entries = array();
+		foreach ( $workouts as $workout ) {
+			$entries[] = array( self::sort_key( (string) ( $workout['start_datetime'] ?? '' ) ), self::map_workout_item( $workout ) );
+		}
+		foreach ( $sleep as $night ) {
+			$entries[] = array( self::sort_key( (string) ( $night['bedtime_start'] ?? $night['day'] ?? '' ) ), self::map_sleep_item( $night ) );
+		}
 		usort(
-			$items,
+			$entries,
 			static function ( array $a, array $b ): int {
-				$at = isset( $a['fetched_at'] ) ? (string) $a['fetched_at'] : '';
-				$bt = isset( $b['fetched_at'] ) ? (string) $b['fetched_at'] : '';
-				return strcmp( $bt, $at );
+				return $b[0] <=> $a[0];
 			}
 		);
 
-		return array_slice( $items, 0, $count );
+		return array_slice( array_column( $entries, 1 ), 0, $count );
 	}
 
 	/**
@@ -212,14 +214,14 @@ final class Outpost_Fetch_Recent_Oura {
 			'title'        => $title,
 			'subtitle'     => implode( ', ', $subtitle_parts ),
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $start_at ? $start_at : gmdate( 'c' ),
+			// The date alone: the start time never leaves the server (F-44).
+			'fetched_at'   => '' !== $start_at ? self::short_date( $start_at ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'workout',
 			'post_payload' => array(
 				'title'                  => $title,
 				'content'                => $content,
 				'post_meta'              => array(
 					'_outpost_oura_activity'   => isset( $workout['activity'] ) ? (string) $workout['activity'] : '',
-					'_outpost_oura_start_at'   => $start_at,
 					'_outpost_oura_duration_s' => (string) $duration_s,
 					'_outpost_oura_distance_m' => (string) $distance_m,
 					'_outpost_oura_calories'   => (string) $kcal,
@@ -272,7 +274,8 @@ final class Outpost_Fetch_Recent_Oura {
 			'title'        => $title,
 			'subtitle'     => implode( ', ', $subtitle_parts ),
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $bedtime ? $bedtime : ( '' !== $day ? $day . 'T00:00:00+00:00' : gmdate( 'c' ) ),
+			// The night's day, never the bedtime (F-44).
+			'fetched_at'   => 1 === preg_match( '/\A\d{4}-\d{2}-\d{2}\z/', $day ) ? $day : ( '' !== $bedtime ? self::short_date( $bedtime ) : gmdate( 'Y-m-d' ) ),
 			'post_kind'    => 'note',
 			'post_payload' => array(
 				'title'                  => $title,
@@ -387,6 +390,14 @@ final class Outpost_Fetch_Recent_Oura {
 			return 0;
 		}
 		return max( 0, $end_ts - $start_ts );
+	}
+
+	/**
+	 * Unix time to sort by, 0 when the value doesn't parse. Never sent.
+	 */
+	private static function sort_key( string $iso ): int {
+		$ts = '' !== $iso ? strtotime( $iso ) : false;
+		return false === $ts ? 0 : $ts;
 	}
 
 	private static function short_date( string $iso ): string {

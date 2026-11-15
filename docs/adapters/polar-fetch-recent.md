@@ -39,11 +39,11 @@ title:    "Training — Running, 5.2 km"        (when distance > 0)
           "Training — Strength Training, 46 min" (when only duration)
           "Training — Yoga"                   (when neither)
 subtitle: "2026-05-04"
+fetched_at: "2026-05-04"
 post_kind: "workout"
 post_meta:
   _outpost_polar_exercise_id: "ex-1"
   _outpost_polar_sport:       "Running"
-  _outpost_polar_start_time:  "2026-05-04T07:30:00.000"
   _outpost_polar_distance_m:  "5200"
   _outpost_polar_duration:    "PT32M0S"
 ```
@@ -60,7 +60,9 @@ blocks: [ { name: "post-kinds-indieweb/exercise-card",
 terms:  { kind: [ <id of the exercise term> ] }
 ```
 
-The card keeps distance and duration private until its author turns on showing details, and it has no field for start time, calories or heart rate. `_outpost_polar_start_time` is left out of `post_meta` on this path, so the start time reaches neither the card, the content nor the meta. Polar's fractional seconds are rounded to whole seconds. `terms` is left out when the site has no `exercise` term yet; Post Kinds files the post by its first card on save.
+The card keeps distance and duration private until its author turns on showing details, and it has no field for start time, calories or heart rate. The REST route checks `blocks` and `terms` before sending them (see [the fetch-recent picker](../concepts/fetch-recent-picker.md)).
+
+The start time sets the newest-first order on the server and never leaves it, with or without the card: `fetched_at` and the subtitle carry the date alone, and `post_meta` has no start-time key (`_outpost_polar_start_time` was removed in 1.0.28). Polar's fractional seconds are rounded to whole seconds. `terms` is left out when the site has no `exercise` term yet; Post Kinds files the post by its first card on save.
 
 ## Roundtrip count
 

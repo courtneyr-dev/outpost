@@ -101,21 +101,23 @@ final class Outpost_Fetch_Recent_Whoop {
 		$cycles     = self::fetch_cycles( $token, $start_iso );
 		$recoveries = self::fetch_recoveries( $token, $start_iso );
 
-		$items = array_merge(
-			array_map( array( __CLASS__, 'map_cycle_item' ), $cycles ),
-			array_map( array( __CLASS__, 'map_recovery_item' ), $recoveries )
-		);
-
+		// Items carry only a date (F-44), so the newest-first order comes
+		// from each record's time, which stays in this function.
+		$entries = array();
+		foreach ( $cycles as $cycle ) {
+			$entries[] = array( self::sort_key( (string) ( $cycle['start'] ?? '' ) ), self::map_cycle_item( $cycle ) );
+		}
+		foreach ( $recoveries as $recovery ) {
+			$entries[] = array( self::sort_key( (string) ( $recovery['created_at'] ?? '' ) ), self::map_recovery_item( $recovery ) );
+		}
 		usort(
-			$items,
+			$entries,
 			static function ( array $a, array $b ): int {
-				$at = isset( $a['fetched_at'] ) ? (string) $a['fetched_at'] : '';
-				$bt = isset( $b['fetched_at'] ) ? (string) $b['fetched_at'] : '';
-				return strcmp( $bt, $at );
+				return $b[0] <=> $a[0];
 			}
 		);
 
-		return array_slice( $items, 0, $count );
+		return array_slice( array_column( $entries, 1 ), 0, $count );
 	}
 
 	/**
@@ -171,7 +173,8 @@ final class Outpost_Fetch_Recent_Whoop {
 			'title'        => $title,
 			'subtitle'     => '' !== $start_at ? self::short_date( $start_at ) : '',
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $start_at ? $start_at : gmdate( 'c' ),
+			// The date alone: the cycle start never leaves the server (F-44).
+			'fetched_at'   => '' !== $start_at ? self::short_date( $start_at ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'note',
 			'post_payload' => array(
 				'title'                  => $title,
@@ -179,7 +182,6 @@ final class Outpost_Fetch_Recent_Whoop {
 				'post_meta'              => array(
 					'_outpost_whoop_cycle_id' => $id,
 					'_outpost_whoop_strain'   => (string) $score_rounded,
-					'_outpost_whoop_start_at' => $start_at,
 				),
 				'syndication_source_url' => null,
 			),
@@ -218,7 +220,8 @@ final class Outpost_Fetch_Recent_Whoop {
 			'title'        => $title,
 			'subtitle'     => $day,
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $created ? $created : gmdate( 'c' ),
+			// The date alone: the recovery time never leaves the server (F-44).
+			'fetched_at'   => '' !== $created ? $day : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'note',
 			'post_payload' => array(
 				'title'                  => $title,
@@ -226,7 +229,6 @@ final class Outpost_Fetch_Recent_Whoop {
 				'post_meta'              => array(
 					'_outpost_whoop_recovery_score' => (string) $score_int,
 					'_outpost_whoop_cycle_id'       => $cycle_id,
-					'_outpost_whoop_created_at'     => $created,
 				),
 				'syndication_source_url' => null,
 			),
@@ -277,6 +279,14 @@ final class Outpost_Fetch_Recent_Whoop {
 		}
 		$decoded = json_decode( $body, true );
 		return is_array( $decoded ) ? $decoded : null;
+	}
+
+	/**
+	 * Unix time to sort by, 0 when the value doesn't parse. Never sent.
+	 */
+	private static function sort_key( string $iso ): int {
+		$ts = '' !== $iso ? strtotime( $iso ) : false;
+		return false === $ts ? 0 : $ts;
 	}
 
 	private static function short_date( string $iso ): string {

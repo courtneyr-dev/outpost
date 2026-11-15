@@ -23,6 +23,9 @@ Registers WHOOP as a fetch-recent provider per PR #57's primitive. Users connect
 | Date range | last 14 days |
 | Modal cap | 10 items per open (caller-supplied; clamped to [1, 50]) |
 | Combined? | yes — cycles + recoveries merged, sorted descending by start time |
+| `fetched_at` | the date only, `YYYY-MM-DD` |
+
+The cycle start and recovery time set the order on the server and never go out in the response. `_outpost_whoop_start_at` and `_outpost_whoop_created_at` were removed from `post_meta` in 1.0.28.
 
 ## Item shape mapping
 
@@ -35,7 +38,6 @@ post_kind: "note"
 post_meta:
   _outpost_whoop_cycle_id: "cyc-1"
   _outpost_whoop_strain:   "14.7"
-  _outpost_whoop_start_at: "2026-05-04T00:00:00+00:00"
 ```
 
 ### Recoveries (morning recovery score)
@@ -47,7 +49,6 @@ post_kind: "note"
 post_meta:
   _outpost_whoop_recovery_score: "78"
   _outpost_whoop_cycle_id:       "cyc-99"
-  _outpost_whoop_created_at:     "2026-05-04T07:30:00+00:00"
 ```
 
 Both kinds → `note` post_kind. Cycles and recoveries are observational reflections, not active sessions.

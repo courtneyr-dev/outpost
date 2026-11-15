@@ -29,7 +29,7 @@
  *       'title'        => string,
  *       'subtitle'     => ?string,
  *       'icon_url'     => ?string,
- *       'fetched_at'   => string (ISO 8601),
+ *       'fetched_at'   => string (Y-m-d; the route keeps only the date),
  *       'post_kind'    => string,
  *       'post_payload' => [
  *           'title'                  => string,
@@ -323,10 +323,24 @@ final class Outpost_Fetch_Recent_REST {
 			'title'        => $title,
 			'subtitle'     => isset( $entry['subtitle'] ) ? (string) $entry['subtitle'] : null,
 			'icon_url'     => isset( $entry['icon_url'] ) ? (string) $entry['icon_url'] : null,
-			'fetched_at'   => isset( $entry['fetched_at'] ) ? (string) $entry['fetched_at'] : gmdate( 'c' ),
+			'fetched_at'   => self::date_only( $entry['fetched_at'] ?? null ),
 			'post_kind'    => isset( $entry['post_kind'] ) ? (string) $entry['post_kind'] : 'note',
 			'post_payload' => $post_payload,
 		);
+	}
+
+	/**
+	 * The item's date as Y-m-d: the leading date of whatever the provider
+	 * sent, or today (UTC). A health event's clock time never goes out
+	 * with it (F-44).
+	 *
+	 * @param mixed $fetched_at Raw `fetched_at` from the provider.
+	 */
+	private static function date_only( $fetched_at ): string {
+		if ( is_string( $fetched_at ) && 1 === preg_match( '/\A(\d{4})-(\d{2})-(\d{2})/', $fetched_at, $m ) && checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			return $m[0];
+		}
+		return gmdate( 'Y-m-d' );
 	}
 
 	/** Most card blocks one item may carry. */

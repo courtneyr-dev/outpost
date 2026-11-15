@@ -27,7 +27,7 @@ Every provider's callback returns items in this shape:
     "title": "Workout - Running 5.2 miles",
     "subtitle": "2026-05-04, 32 minutes, 478 kcal",
     "icon_url": "optional-thumbnail-url-or-null",
-    "fetched_at": "ISO 8601 timestamp",
+    "fetched_at": "YYYY-MM-DD",
     "post_kind": "workout",
     "post_payload": {
         "title": "post title to insert",
@@ -39,6 +39,8 @@ Every provider's callback returns items in this shape:
 ```
 
 `Outpost_Fetch_Recent_REST::normalize_item()` coerces partial entries into the canonical shape and drops malformed ones (missing `id` or `title`). The REST endpoint then caps to the requested `count` (1–50, default 10).
+
+`fetched_at` is the item's date. The route keeps the leading `YYYY-MM-DD` of whatever the provider sends, or today (UTC) when there isn't one, so a health event's clock time never reaches the editor. Providers sort by the event time on the server before mapping.
 
 A provider can also send three optional card parts in `post_payload`, which the picker inserts in place of the paragraph. `normalize_item()` checks each one and drops it when it doesn't pass:
 
