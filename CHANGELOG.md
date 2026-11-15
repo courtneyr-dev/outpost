@@ -11,6 +11,15 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- WordPress.org review T11 remediation, kept at 1.0.28:
+  - After a 401, the composer no longer repeats a Micropub query with the access token in the URL (the 1.0.12 fallback). It shows its sign-in-again message instead, and no request URL carries the token (F-45).
+  - Signing out clears shared content waiting for Use or Discard, in the tab and in the service worker's share inbox, before it reports success; if the inbox can't be cleared, sign-out says so. Signing in clears anything left from an earlier session, so a share that arrived while signed out is discarded at the next sign-in (F-46).
+  - The eight `outpost_*_permission` filters can only refuse. They run after the credential and capability checks pass and start from `true`, and a request with no credential and no logged-in user is refused before any filter runs, so a filter can no longer admit an anonymous request (F-47).
+  - Syndication sends only a published post without a password, at scheduling and again at every attempt, retries included. A post made private, drafted, trashed or password-protected before it goes out stops with the non-retrying reason `post_not_public`, and Kit, Beehiiv, Buttondown and Write.as each refuse it on their own too. Only `post` is syndicated unless the new `outpost_posse_post_types` filter adds a type, so pages no longer are (F-48).
+  - `_outpost_posse_failures` and `_outpost_posse_in_flight` appear in REST responses only with `context=edit`, and both meta keys sanitize on save (F-49).
+  - The fetch-recent endpoint passes card payloads through only after checking them: at most five registered `post-kinds-indieweb/` blocks with their declared scalar attributes, existing terms of registered taxonomies, and a date at noon (F-43).
+  - Fetch-recent responses carry dates, not clock times: `fetched_at` is the day, no Oura, Polar or WHOOP item puts a start or creation time in post meta, and an item without an id gets a keyed `wp_hash()` id instead of an `md5()` of its start time (F-44).
+  - Requests that carry a stored provider token or a syndication API key follow no redirect and read at most 5 MiB (F-54).
 - Posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as, and the manual-share caption, use the title the site prints: Post Kinds' safe title (`pkiw_get_safe_title()`, Post Kinds 1.9.0+). A check-in with a hidden location no longer sends its stored "Checked in at <venue>" title off the site (#242).
 
 ### Added
@@ -18,6 +27,13 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A Comic variant under Doing that sends a Post Kinds comic card: `read-of` with `pkiw-kind: comics`, creators, series, volume, issue number, publisher, started and finished dates, read status and rating. It shows only when the site's Post Kinds builds the comic card (`postKinds.comics` in the composer config, from `\PKIW\Comic_Strip`). A cover from the shared link goes out as `mp-cover-image`, never as `photo` (#243).
 - With Post Kinds active, the editor's Oura picker inserts a Post Kinds sleep card with the night's duration, files the post under the sleep kind and dates it at noon of the night. No bedtime, wake time or clock time reaches the card, the content or the meta (#260).
 - With Post Kinds active, the editor's Polar picker inserts a Post Kinds exercise card with the activity, distance and duration and files the post under the exercise kind. The card keeps distance and duration private until its author opts in; the start time and calories stay out of the card, the content and the meta (#259).
+
+### Changed
+
+- The manual-share status badge escapes each part as it prints it, with no `phpcs:ignore` (F-50).
+- Nominatim requests identify as `Outpost/<version> WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)` instead of naming the site (F-51).
+- The POT includes the block-editor sidebar's strings from `build/index.js` (F-52).
+- `.distignore` leaves out source maps, `README.md`, `playwright.config.ts` and `webpack.config.js`, so the site deploy matches the WordPress.org package (F-53).
 
 ### Fixed
 

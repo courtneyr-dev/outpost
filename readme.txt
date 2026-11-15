@@ -107,7 +107,7 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 
 = 1.0.28 =
 * Security: the iOS Shortcut uses an application password limited to its endpoint; upgrading deletes old tokens.
-* Security: shared content waits for Use or Discard, cookie REST requests need a nonce, connected-account data stays first-party, offline posts stay with their account, previews refuse internal addresses, logging is debug-only, saved API keys never render, and syndicated posts keep check-in locations hidden.
+* Security: shares wait for Use or Discard and clear on sign-out, cookie REST requests need a nonce, connected accounts stay first-party, offline posts stay with their account, previews refuse internal addresses, saved API keys never render, and syndication sends only public posts and hides check-in locations.
 * Added: three read-only abilities, a Comic type, and Post Kinds cards from Oura and Polar.
 * Changed: composer modes are two rows of buttons.
 * Fixed: page optimizers, More options without its stylesheet, publish errors, photo size, the fallback category, shared tabs, and the Appearance preview.
