@@ -212,6 +212,59 @@ describe( 'FetchRecentPickerModal', () => {
 			} );
 		} );
 
+		it( 'inserts the Post Kinds exercise card the route sends (F-43)', async () => {
+			mockGetBlockType.mockImplementation( ( name ) => ( { name } ) );
+			await pick( {
+				id: 'polar-exercise-1',
+				title: 'Training — Running, 5.2 km',
+				subtitle: '2026-11-12',
+				fetched_at: '2026-11-12',
+				post_payload: {
+					content: '<p>Training — Running, 5.2 km</p>',
+					post_meta: { _outpost_polar_sport: 'Running' },
+					blocks: [
+						{
+							name: 'post-kinds-indieweb/exercise-card',
+							attributes: { activity: 'Running', distance: 5.23, distanceUnit: 'km', duration: 'PT29M13S' },
+						},
+					],
+					terms: { kind: [ 9 ] },
+				},
+			} );
+			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
+				{
+					name: 'post-kinds-indieweb/exercise-card',
+					attrs: { activity: 'Running', distance: 5.23, distanceUnit: 'km', duration: 'PT29M13S' },
+				},
+			] );
+			expect( mockEditPost ).toHaveBeenCalledWith( {
+				meta: { _outpost_polar_sport: 'Running' },
+				kind: [ 9 ],
+			} );
+		} );
+
+		it.each( [
+			[ 'core/html' ],
+			[ 'acme/sleep-card' ],
+			[ 'post-kinds-indieweb-evil/sleep-card' ],
+			[ 'post-kinds-indieweb/Sleep-Card' ],
+		] )( 'inserts the paragraph, not %s, even when the editor knows it (F-43)', async ( name ) => {
+			mockGetBlockType.mockImplementation( ( blockName ) => ( { name: blockName } ) );
+			await pick( {
+				...sleep,
+				post_payload: {
+					...sleep.post_payload,
+					blocks: [ { name, attributes: { content: '<b>x</b>' } } ],
+				},
+			} );
+			expect( mockInsertBlocks ).toHaveBeenCalledWith( [
+				{ name: 'core/paragraph', attrs: { content: '<p>Sleep</p>' } },
+			] );
+			expect( mockEditPost ).toHaveBeenCalledWith( {
+				meta: { _outpost_oura_sleep_day: '2026-11-13' },
+			} );
+		} );
+
 		it( 'keeps the paragraph for a payload without blocks', async () => {
 			await pick( {
 				...sleep,

@@ -36,6 +36,10 @@
  *           'content'                => string,
  *           'post_meta'              => array<string,mixed>,
  *           'syndication_source_url' => ?string,
+ *           // Optional card parts, each validated in normalize_item():
+ *           'blocks'                 => list<array{name,attributes}>, // ≤ 5 registered post-kinds-indieweb/ blocks
+ *           'terms'                  => array<rest_base,list<int>>,   // existing terms of REST taxonomies
+ *           'date'                   => string,                       // Y-m-d\T12:00:00 only
  *       ],
  *   ]
  *
@@ -289,6 +293,31 @@ final class Outpost_Fetch_Recent_REST {
 		$payload = isset( $entry['post_payload'] ) && is_array( $entry['post_payload'] )
 			? $entry['post_payload']
 			: array();
+
+		$post_payload = array(
+			'title'                  => isset( $payload['title'] ) ? (string) $payload['title'] : $title,
+			'content'                => isset( $payload['content'] ) ? (string) $payload['content'] : '',
+			'post_meta'              => isset( $payload['post_meta'] ) && is_array( $payload['post_meta'] ) ? $payload['post_meta'] : array(),
+			'syndication_source_url' => isset( $payload['syndication_source_url'] ) ? (string) $payload['syndication_source_url'] : null,
+		);
+		// The card parts the picker inserts in place of the paragraph
+		// (F-43). Each is checked here and dropped when it doesn't pass.
+		if ( isset( $payload['blocks'] ) ) {
+			$blocks = self::validate_blocks( $payload['blocks'] );
+			if ( null !== $blocks ) {
+				$post_payload['blocks'] = $blocks;
+			}
+		}
+		if ( isset( $payload['terms'] ) ) {
+			$terms = self::validate_terms( $payload['terms'] );
+			if ( array() !== $terms ) {
+				$post_payload['terms'] = $terms;
+			}
+		}
+		if ( isset( $payload['date'] ) && self::is_noon_date( $payload['date'] ) ) {
+			$post_payload['date'] = (string) $payload['date'];
+		}
+
 		return array(
 			'id'           => $id,
 			'title'        => $title,
@@ -296,13 +325,105 @@ final class Outpost_Fetch_Recent_REST {
 			'icon_url'     => isset( $entry['icon_url'] ) ? (string) $entry['icon_url'] : null,
 			'fetched_at'   => isset( $entry['fetched_at'] ) ? (string) $entry['fetched_at'] : gmdate( 'c' ),
 			'post_kind'    => isset( $entry['post_kind'] ) ? (string) $entry['post_kind'] : 'note',
-			'post_payload' => array(
-				'title'                  => isset( $payload['title'] ) ? (string) $payload['title'] : $title,
-				'content'                => isset( $payload['content'] ) ? (string) $payload['content'] : '',
-				'post_meta'              => isset( $payload['post_meta'] ) && is_array( $payload['post_meta'] ) ? $payload['post_meta'] : array(),
-				'syndication_source_url' => isset( $payload['syndication_source_url'] ) ? (string) $payload['syndication_source_url'] : null,
-			),
+			'post_payload' => $post_payload,
 		);
+	}
+
+	/** Most card blocks one item may carry. */
+	private const MAX_BLOCKS = 5;
+
+	/** Block names a provider may send: Post Kinds' own cards. */
+	private const BLOCK_NAME_PATTERN = '#^post-kinds-indieweb/[a-z0-9-]+$#';
+
+	/**
+	 * Validate a provider's card blocks: a list of at most five entries,
+	 * each a registered `post-kinds-indieweb/` block, with its attributes
+	 * cut down to scalars the block type declares.
+	 *
+	 * @param mixed $blocks Raw `blocks` from the provider.
+	 * @return list<array{name:string,attributes:array<string,scalar>}>|null Null drops the field.
+	 */
+	private static function validate_blocks( $blocks ): ?array {
+		if ( ! is_array( $blocks ) || array() === $blocks || ! array_is_list( $blocks ) || count( $blocks ) > self::MAX_BLOCKS ) {
+			return null;
+		}
+		$registry = WP_Block_Type_Registry::get_instance();
+		$out      = array();
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) || ! isset( $block['name'] ) || ! is_string( $block['name'] ) ) {
+				return null;
+			}
+			$name = $block['name'];
+			if ( 1 !== preg_match( self::BLOCK_NAME_PATTERN, $name ) ) {
+				return null;
+			}
+			$type = $registry->get_registered( $name );
+			if ( ! $type instanceof WP_Block_Type ) {
+				return null;
+			}
+			$declared   = is_array( $type->attributes ) ? $type->attributes : array();
+			$attributes = array();
+			if ( isset( $block['attributes'] ) && is_array( $block['attributes'] ) ) {
+				foreach ( $block['attributes'] as $key => $value ) {
+					if ( is_string( $key ) && array_key_exists( $key, $declared ) && is_scalar( $value ) ) {
+						$attributes[ $key ] = $value;
+					}
+				}
+			}
+			$out[] = array(
+				'name'       => $name,
+				'attributes' => $attributes,
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Validate a provider's terms: keys are REST bases of registered REST
+	 * taxonomies, values are ids of existing terms in that taxonomy.
+	 * Anything else is dropped.
+	 *
+	 * @param mixed $terms Raw `terms` from the provider.
+	 * @return array<string,list<int>>
+	 */
+	private static function validate_terms( $terms ): array {
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		$by_base = array();
+		foreach ( get_taxonomies( array( 'show_in_rest' => true ), 'objects' ) as $taxonomy ) {
+			$base             = is_string( $taxonomy->rest_base ) && '' !== $taxonomy->rest_base ? $taxonomy->rest_base : $taxonomy->name;
+			$by_base[ $base ] = $taxonomy->name;
+		}
+		$out = array();
+		foreach ( $terms as $base => $ids ) {
+			if ( ! is_string( $base ) || ! isset( $by_base[ $base ] ) || ! is_array( $ids ) ) {
+				continue;
+			}
+			$kept = array();
+			foreach ( $ids as $term_id ) {
+				if ( is_int( $term_id ) && $term_id > 0 && get_term( $term_id, $by_base[ $base ] ) instanceof WP_Term ) {
+					$kept[] = $term_id;
+				}
+			}
+			if ( array() !== $kept ) {
+				$out[ $base ] = $kept;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether a post date is a real calendar day at exactly noon, the only
+	 * time a provider may set, so no clock time travels with it.
+	 *
+	 * @param mixed $date Raw `date` from the provider.
+	 */
+	private static function is_noon_date( $date ): bool {
+		if ( ! is_string( $date ) || 1 !== preg_match( '/\A(\d{4})-(\d{2})-(\d{2})T12:00:00\z/', $date, $m ) ) {
+			return false;
+		}
+		return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] );
 	}
 
 	/**
