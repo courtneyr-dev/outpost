@@ -44,17 +44,13 @@ Some managed hosts strip the Authorization header that Micropub sign-in needs. T
 
 Not yet. The composer lives at `/post/` and calls `/wp-json/` from the root of your domain, so Outpost needs WordPress at that root and any permalink setting except Plain.
 
-= Does it work offline? =
-
-Yes. A post made offline waits on the device and sends when you reconnect, signed in as the same account.
-
 == External services ==
 
 Outpost publishes to your own site. It contacts a service below only for the feature named, and only when you use it. Recognizing a pasted link's host happens on your server and contacts nothing.
 
 Syndication (only for chips you leave on; the post's URL or content is sent):
 
-* Telegraph: off unless the `outpost_telegraph_enabled` option is set; then each published post (never a password-protected one) goes to api.telegra.ph, which makes a public copy, and the first use stores a Telegraph account token on your site. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy)
+* Telegraph: off unless the `outpost_telegraph_enabled` option is set; then each published post (never a password-protected one) goes to api.telegra.ph with its author name and URL, which makes a public copy; the first use creates a Telegraph account from your site's name and address and stores its token. [Terms](https://telegram.org/tos), [Privacy](https://telegram.org/privacy)
 * Beehiiv (api.beehiiv.com): [Terms](https://www.beehiiv.com/tou), [Privacy](https://www.beehiiv.com/privacy)
 * Buttondown (api.buttondown.email): [Terms](https://buttondown.com/legal/terms), [Privacy](https://buttondown.com/legal/privacy)
 * Kit (api.convertkit.com; the broadcast's app.kit.com URL is saved on the post, never requested): [Terms](https://kit.com/terms), [Privacy](https://kit.com/privacy)
@@ -74,7 +70,7 @@ Connected accounts (only after you connect one; an encrypted token is stored on 
 * Notion (api.notion.com): [Terms and privacy](https://www.notion.com/terms)
 * Oura (cloud.ouraring.com, api.ouraring.com): [Terms](https://ouraring.com/terms-and-conditions), [Privacy](https://ouraring.com/privacy-policy)
 * WHOOP (api.prod.whoop.com): [API terms](https://developer.whoop.com/api-terms-of-use/), [Privacy](https://www.whoop.com/privacy/)
-* Polar (flow.polar.com, polarremote.com, www.polaraccesslink.com): [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice)
+* Polar (flow.polar.com, polarremote.com, www.polaraccesslink.com; connecting sends your WordPress user ID as its member ID): [Terms](https://www.polar.com/en/legal/terms-of-use), [Privacy](https://www.polar.com/en/legal/privacy-notice)
 * Ride With GPS (ridewithgps.com): [Terms](https://ridewithgps.com/terms), [Privacy](https://ridewithgps.com/privacy)
 * Ravelry (www.ravelry.com, api.ravelry.com): [Terms](https://www.ravelry.com/about/terms), [Privacy](https://www.ravelry.com/about/privacy)
 
