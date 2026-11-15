@@ -643,6 +643,29 @@ final class WporgReviewGuardsTest extends TestCase {
 	}
 
 	/**
+	 * T11 F-50: shipped PHP escapes at output, so no phpcs comment may
+	 * suppress an EscapeOutput sniff (reviewers grep for these).
+	 */
+	public function test_no_escape_output_sniff_is_suppressed(): void {
+		$root  = dirname( __DIR__, 2 );
+		$files = array_keys( self::shipped_tokens() );
+		foreach ( glob( $root . '/admin/*.php' ) ?: array() as $path ) {
+			$files[] = substr( $path, strlen( $root ) + 1 );
+		}
+		$found = array();
+		// shipped_tokens() drops comments, so read the files with them.
+		foreach ( $files as $file ) {
+			foreach ( token_get_all( (string) file_get_contents( $root . '/' . $file ) ) as $token ) {
+				if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) && 1 === preg_match( '/phpcs:\w+[^\n]*EscapeOutput/', $token[1] ) ) {
+					$found[] = $file . ':' . $token[2];
+				}
+			}
+		}
+		$this->assertContains( 'includes/class-syndication-admin-column.php', $files, 'The scan covers the badge renderer.' );
+		$this->assertSame( array(), $found, 'Escape at output instead of suppressing EscapeOutput.' );
+	}
+
+	/**
 	 * T10 (2026-11-13): share intake (share-target route and iOS Shortcut)
 	 * keeps no server-side state. The removed prefill transient had no
 	 * reader, so nothing may write `outpost_prefill_*` or carry its helpers.

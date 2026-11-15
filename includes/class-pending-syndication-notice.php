@@ -247,7 +247,7 @@ final class Outpost_Pending_Syndication_Notice {
 		<div class="notice notice-info outpost-pending-syndication-notice">
 			<p>
 				<?php
-				echo Outpost_Syndication_Admin_Column::render_badge_html( $post_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				Outpost_Syndication_Admin_Column::print_badge( $post_id );
 				?>
 				<strong>
 					<?php
