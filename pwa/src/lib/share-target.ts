@@ -23,6 +23,8 @@
  * the next launch should be a fresh composer.
  */
 
+import { keep_shared_photos, type ShareInboxEnvironment } from './share-inbox';
+
 export type ReplyVariant =
 	| 'reply'
 	| 'like'
@@ -463,4 +465,59 @@ export function release_held_share(): ShareTargetData | null {
 /** "Discard shared content" / "Discard both": drop every held share. */
 export function discard_held_share(): void {
 	set_held_shares([]);
+}
+
+/** Every sessionStorage slot a share can wait in: the stash and both review slots. */
+const SHARE_SESSION_KEYS = [KEY, HELD_KEY, CANDIDATE_KEY] as const;
+
+/** Clearing pending shares failed; some may still be readable on this device. */
+export class PendingSharesError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'PendingSharesError';
+	}
+}
+
+export interface PendingSharesEnvironment {
+	shareInbox: ShareInboxEnvironment;
+	sessionStorage: Storage | undefined;
+}
+
+const default_pending_shares_env = (): PendingSharesEnvironment => ({
+	shareInbox: { indexedDB: globalThis.indexedDB },
+	sessionStorage: globalThis.sessionStorage,
+});
+
+/**
+ * Forget every share waiting on this device (F-46): the photo inbox's
+ * `pending` and `candidate` records, then the three sessionStorage slots.
+ *
+ * Shares carry no owner, so they belong to whoever is signed in when they
+ * arrive. Sign-out and a new sign-in call this so the next account never
+ * sees the last one's text, URLs or photos.
+ *
+ * The inbox goes first and its failure stops everything: the call rejects
+ * with PendingSharesError and the sessionStorage slots stay as they were, so
+ * the caller can keep the person signed in. A missing IndexedDB is a failure,
+ * not an empty inbox. A sessionStorage that throws on access could not have
+ * stored a share, so it counts as cleared.
+ */
+export async function clear_pending_shares(
+	env: PendingSharesEnvironment = default_pending_shares_env(),
+): Promise<void> {
+	try {
+		await keep_shared_photos(null, env.shareInbox);
+	} catch (err) {
+		throw new PendingSharesError(
+			'Shared photos waiting on this device could not be removed: ' +
+				(err instanceof Error ? err.message : String(err)),
+		);
+	}
+	for (const key of SHARE_SESSION_KEYS) {
+		try {
+			env.sessionStorage?.removeItem(key);
+		} catch (_err) {
+			// Storage access is blocked, so nothing was stored under this key.
+		}
+	}
 }

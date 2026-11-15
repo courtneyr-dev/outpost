@@ -5,10 +5,25 @@ import { CACHE_KEY, write_cache } from './appearance';
 import { DRAFTS_KEY, write_draft } from './drafts';
 import { clear_sign_in, finish_sign_out, sign_out } from './sign-out';
 import { read_token, write_token, type TokenStoreEnvironment } from './token-store';
+import {
+	discard_held_share,
+	hold_share_for_review,
+	stash_share_target,
+	type ShareTargetData,
+} from './share-target';
+import {
+	SHARE_INBOX_CANDIDATE_KEY,
+	SHARE_INBOX_KEY,
+	keep_shared_photos,
+	read_share_inbox,
+	stash_shared_photos,
+	type ShareInboxEnvironment,
+} from './share-inbox';
 
 afterEach(() => {
 	vi.restoreAllMocks();
 	localStorage.clear();
+	sessionStorage.clear();
 });
 
 describe('sign_out', () => {
@@ -75,5 +90,138 @@ describe('sign_out', () => {
 			expect(localStorage.getItem(CACHE_KEY)).toBeNull();
 			expect(reload).toHaveBeenCalledTimes(1);
 		});
+	});
+});
+
+/**
+ * F-46: pending shares belong to whoever was signed in when they arrived, so
+ * signing out clears them before the sign-in itself goes. A share that comes
+ * in after the next sign-in, and an explicit Discard, keep working.
+ */
+describe('pending shares across sign-out (F-46)', () => {
+	const SESSION_KEYS = ['outpost.share_target', 'outpost.share_review', 'outpost.share_review_candidate'];
+
+	function token_env(): TokenStoreEnvironment {
+		return { indexedDB: new IDBFactory(), crypto: globalThis.crypto };
+	}
+
+	async function signed_in(env: TokenStoreEnvironment): Promise<void> {
+		await write_token({ accessToken: 'abc', tokenType: 'Bearer', me: 'https://a.test/', scope: 'create' }, env);
+	}
+
+	function photos(title: string): { files: File[]; title: string; text: string; received: number } {
+		return {
+			files: [new File([new Uint8Array([1, 2, 3])], title + '.jpg', { type: 'image/jpeg' })],
+			title,
+			text: title + ' text',
+			received: 1,
+		};
+	}
+
+	/** An IndexedDB whose open() always fails, as a blocked or broken store does. */
+	function broken_idb(): IDBFactory {
+		return {
+			open: (): IDBOpenDBRequest => {
+				const req = { error: new DOMException('blocked'), onerror: null as null | (() => void) };
+				setTimeout(() => req.onerror?.(), 0);
+				return req as unknown as IDBOpenDBRequest;
+			},
+		} as unknown as IDBFactory;
+	}
+
+	const A_TEXT: ShareTargetData = { tab: 'note', content: 'Account A private text' };
+	const A_URL: ShareTargetData = { tab: 'reply', url: 'https://private.example/a' };
+
+	it('text and URL path: every sessionStorage share slot is empty after sign-out', async () => {
+		const env = token_env();
+		await signed_in(env);
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+		stash_share_target(A_URL);
+		hold_share_for_review();
+		stash_share_target({ tab: 'note', content: 'not yet held' });
+		for (const key of SESSION_KEYS) expect(sessionStorage.getItem(key), key).not.toBeNull();
+
+		await clear_sign_in(env, { shareInbox: { indexedDB: new IDBFactory() }, sessionStorage });
+
+		expect(await read_token(env)).toBeNull();
+		for (const key of SESSION_KEYS) expect(sessionStorage.getItem(key), key).toBeNull();
+	});
+
+	it('photo path: the pending and held inbox records are gone after sign-out', async () => {
+		const env = token_env();
+		await signed_in(env);
+		const inbox: ShareInboxEnvironment = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(photos('A-pending'), inbox, SHARE_INBOX_KEY);
+		await stash_shared_photos(photos('A-held'), inbox, SHARE_INBOX_CANDIDATE_KEY);
+
+		await clear_sign_in(env, { shareInbox: inbox, sessionStorage });
+
+		expect(await read_token(env)).toBeNull();
+		const state = await read_share_inbox(inbox);
+		expect(state.status).toBe('ok');
+		expect(state.pending).toBeNull();
+		expect(state.candidate).toBeNull();
+	});
+
+	it('when the inbox can’t be cleared, sign-out rejects and the person stays signed in', async () => {
+		const env = token_env();
+		await signed_in(env);
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+
+		await expect(
+			clear_sign_in(env, { shareInbox: { indexedDB: broken_idb() }, sessionStorage }),
+		).rejects.toBeTruthy();
+
+		// Still signed in, so no next person can sign in over a readable share.
+		expect((await read_token(env))?.accessToken).toBe('abc');
+	});
+
+	it('when IndexedDB is missing, sign-out rejects rather than assume the inbox is empty', async () => {
+		const env = token_env();
+		await signed_in(env);
+
+		await expect(
+			clear_sign_in(env, { shareInbox: { indexedDB: undefined }, sessionStorage }),
+		).rejects.toBeTruthy();
+		expect((await read_token(env))?.accessToken).toBe('abc');
+	});
+
+	it('a share received after the next sign-in still reaches review, text and photos', async () => {
+		const env = token_env();
+		await signed_in(env);
+		const inbox: ShareInboxEnvironment = { indexedDB: new IDBFactory() };
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+		await stash_shared_photos(photos('A'), inbox);
+		await clear_sign_in(env, { shareInbox: inbox, sessionStorage });
+
+		await signed_in(env);
+		stash_share_target({ tab: 'note', content: 'B shares after signing in' });
+		const held = hold_share_for_review();
+		await stash_shared_photos(photos('B'), inbox);
+
+		expect(held.shares).toEqual([{ tab: 'note', content: 'B shares after signing in' }]);
+		const state = await read_share_inbox(inbox);
+		expect(state.pending?.title).toBe('B');
+	});
+
+	it('explicit Discard still clears the held text share and the parked photos', async () => {
+		const inbox: ShareInboxEnvironment = { indexedDB: new IDBFactory() };
+		stash_share_target(A_TEXT);
+		hold_share_for_review();
+		stash_share_target(A_URL);
+		hold_share_for_review();
+		await stash_shared_photos(photos('A'), inbox, SHARE_INBOX_KEY);
+		await stash_shared_photos(photos('A2'), inbox, SHARE_INBOX_CANDIDATE_KEY);
+
+		discard_held_share();
+		await keep_shared_photos(null, inbox);
+
+		for (const key of SESSION_KEYS) expect(sessionStorage.getItem(key), key).toBeNull();
+		const state = await read_share_inbox(inbox);
+		expect(state.pending).toBeNull();
+		expect(state.candidate).toBeNull();
 	});
 });
