@@ -184,12 +184,14 @@ final class Outpost_OAuth_Provider_Polar extends Outpost_OAuth_Provider_Base {
 	private static function verify_against_polar( string $access_token, int $user_id ): array {
 		$response = wp_remote_get(
 			self::VERIFY_ENDPOINT_BASE . (string) $user_id,
-			array(
-				'timeout' => self::VERIFY_TIMEOUT,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $access_token,
-					'Accept'        => 'application/json',
-				),
+			self::credential_request_args(
+				array(
+					'timeout' => self::VERIFY_TIMEOUT,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . $access_token,
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {
@@ -241,14 +243,16 @@ final class Outpost_OAuth_Provider_Polar extends Outpost_OAuth_Provider_Base {
 	private static function register_user_with_app( string $access_token, int $user_id ) {
 		$response = wp_remote_post(
 			self::REGISTER_USER_ENDPOINT,
-			array(
-				'timeout' => self::REGISTRATION_TIMEOUT,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $access_token,
-					'Content-Type'  => 'application/json',
-					'Accept'        => 'application/json',
-				),
-				'body'    => (string) wp_json_encode( array( 'member-id' => (string) $user_id ) ),
+			self::credential_request_args(
+				array(
+					'timeout' => self::REGISTRATION_TIMEOUT,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . $access_token,
+						'Content-Type'  => 'application/json',
+						'Accept'        => 'application/json',
+					),
+					'body'    => (string) wp_json_encode( array( 'member-id' => (string) $user_id ) ),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {

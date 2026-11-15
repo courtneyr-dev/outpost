@@ -261,12 +261,14 @@ final class Outpost_Fetch_Recent_Whoop {
 		}
 		$response = wp_remote_get(
 			self::API_BASE . $path,
-			array(
-				'timeout' => self::TIMEOUT_SECONDS,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $token,
-					'Accept'        => 'application/json',
-				),
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout' => self::TIMEOUT_SECONDS,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . $token,
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {

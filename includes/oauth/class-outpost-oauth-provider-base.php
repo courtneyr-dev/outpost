@@ -100,6 +100,27 @@ abstract class Outpost_OAuth_Provider_Base {
 		return $response_body;
 	}
 
+	/** Largest provider response Outpost reads: 5 MiB (F-54). */
+	public const MAX_RESPONSE_BYTES = 5242880;
+
+	/**
+	 * Arguments for any request that carries a stored provider credential
+	 * (access or refresh token, client secret, authorization code): follow
+	 * no redirect, because WordPress resends the original headers,
+	 * Authorization included, to a redirect target; and read at most
+	 * 5 MiB of the response (F-54).
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param array<string,mixed> $args wp_remote_* arguments.
+	 * @return array<string,mixed>
+	 */
+	public static function credential_request_args( array $args ): array {
+		$args['redirection']         = 0;
+		$args['limit_response_size'] = self::MAX_RESPONSE_BYTES;
+		return $args;
+	}
+
 	/**
 	 * Build the URL the user gets redirected to (with state in query).
 	 *
@@ -142,15 +163,17 @@ abstract class Outpost_OAuth_Provider_Base {
 		);
 		$response = wp_remote_post(
 			$this->token_url(),
-			array(
-				'timeout' => 10,
-				'headers' => array_merge(
-					array(
-						'Accept' => 'application/json',
+			self::credential_request_args(
+				array(
+					'timeout' => 10,
+					'headers' => array_merge(
+						array(
+							'Accept' => 'application/json',
+						),
+						$this->extra_token_request_headers()
 					),
-					$this->extra_token_request_headers()
-				),
-				'body'    => $this->token_request_body( $body ),
+					'body'    => $this->token_request_body( $body ),
+				)
 			)
 		);
 		return $this->parse_token_response( $response );
@@ -240,13 +263,15 @@ abstract class Outpost_OAuth_Provider_Base {
 			if ( is_array( $creds ) && ! empty( $creds['access_token'] ) ) {
 				$response = wp_remote_post(
 					$endpoint,
-					array(
-						'timeout' => 5,
-						'body'    => array(
-							'token'         => (string) $creds['access_token'],
-							'client_id'     => $this->client_id(),
-							'client_secret' => $this->client_secret(),
-						),
+					self::credential_request_args(
+						array(
+							'timeout' => 5,
+							'body'    => array(
+								'token'         => (string) $creds['access_token'],
+								'client_id'     => $this->client_id(),
+								'client_secret' => $this->client_secret(),
+							),
+						)
 					)
 				);
 				if ( is_wp_error( $response ) ) {
@@ -316,13 +341,15 @@ abstract class Outpost_OAuth_Provider_Base {
 		);
 		$response = wp_remote_post(
 			$this->token_url(),
-			array(
-				'timeout' => 10,
-				'headers' => array_merge(
-					array( 'Accept' => 'application/json' ),
-					$this->extra_token_request_headers()
-				),
-				'body'    => $this->token_request_body( $body ),
+			self::credential_request_args(
+				array(
+					'timeout' => 10,
+					'headers' => array_merge(
+						array( 'Accept' => 'application/json' ),
+						$this->extra_token_request_headers()
+					),
+					'body'    => $this->token_request_body( $body ),
+				)
 			)
 		);
 		$decoded  = $this->parse_token_response( $response );

@@ -418,12 +418,9 @@ final class Outpost_Fetch_Recent_Polar {
 			return ( self::$http_resolver )( $method, $url, $token, $body );
 		}
 		$args = array(
-			'method'      => $method,
-			'timeout'     => self::TIMEOUT_SECONDS,
-			// A redirect would carry the Authorization header to wherever
-			// it points; Polar's API answers directly, so follow none.
-			'redirection' => 0,
-			'headers'     => array(
+			'method'  => $method,
+			'timeout' => self::TIMEOUT_SECONDS,
+			'headers' => array(
 				'Authorization' => 'Bearer ' . $token,
 				'Accept'        => 'application/json',
 			),
@@ -432,7 +429,9 @@ final class Outpost_Fetch_Recent_Polar {
 			$args['headers']['Content-Type'] = 'application/json';
 			$args['body']                    = $body;
 		}
-		$response = wp_remote_request( $url, $args );
+		// A redirect would carry the Authorization header to wherever it
+		// points; Polar's API answers directly, so follow none (F-54).
+		$response = wp_remote_request( $url, Outpost_OAuth_Provider_Base::credential_request_args( $args ) );
 		if ( is_wp_error( $response ) ) {
 			return null;
 		}
