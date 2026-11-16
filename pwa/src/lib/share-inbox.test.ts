@@ -283,6 +283,34 @@ describe('decisions apply only to the records the review saw (P4H-01, P4I-01)', 
 		expect(state.candidate?.title).toBe('Account B');
 	});
 
+	// P4J (deferred from 1.0.28): a record from a pre-1.0.28 service worker
+	// has no id, so two of them received in the same millisecond looked
+	// identical. Reading the inbox gives each id-less record an id first.
+	it('reading the inbox gives a record from an older service worker a stable id', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos({ ...parked('Legacy'), received: 1 }, env, SHARE_INBOX_KEY);
+
+		const first = await read_share_inbox(env);
+		const second = await read_share_inbox(env);
+
+		expect(typeof first.pending?.id).toBe('string');
+		expect(first.pending?.id).not.toBe('');
+		expect(second.pending?.id).toBe(first.pending?.id);
+	});
+
+	it('an id-less replacement with the same received time is a different record (P4J)', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos({ ...parked('Account A'), received: 1 }, env, SHARE_INBOX_KEY);
+		const reviewed = await read_share_inbox(env);
+		// An older worker replaces the share with another id-less record.
+		await stash_shared_photos({ ...parked('Account B'), received: 1 }, env, SHARE_INBOX_KEY);
+
+		await expect(
+			keep_shared_photos(null, env, { pending: inbox_identity(reviewed.pending), candidate: null }),
+		).rejects.toBeInstanceOf(ShareInboxChangedError);
+		expect((await read_share_inbox(env)).pending?.title).toBe('Account B');
+	});
+
 	it('applies when the slots hold exactly what the review saw', async () => {
 		const env = { indexedDB: new IDBFactory() };
 		await stash_shared_photos(at('Account A', 1, 'a'), env, SHARE_INBOX_KEY);

@@ -426,7 +426,8 @@ final class ConnectedAccountReadsTest extends TestCase {
 	}
 
 	public function test_ordinary_preview_is_unchanged_for_another_client(): void {
-		$this->arrive_with_bearer( 'https://other-client.example.test/', 'read' );
+		// `create`: since F-56 the preview route refuses a `read`-only token.
+		$this->arrive_with_bearer( 'https://other-client.example.test/', 'create' );
 		$request = new WP_REST_Request( 'POST', '/outpost/v1/preview' );
 		$request->set_param( 'url', 'https://example.org/page-0123456789abcdef' );
 

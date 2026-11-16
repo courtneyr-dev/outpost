@@ -12,9 +12,10 @@
  *
  * Membership-lapsed handling: Oura's API returns 403 with a body
  * containing "membership" when a previously-connected account no
- * longer has the active subscription required for v2 API access. In
- * that case the callback returns an empty list with reason
- * 'membership_lapsed' so the modal can render a graceful prompt.
+ * longer has the active subscription required for v2 API access.
+ * `api_get()` treats that, like every other non-2xx response, as no
+ * data, so the picker shows an empty list. No reason code reaches the
+ * modal (F-65).
  *
  * @package Outpost
  * @since   0.1.87
@@ -207,7 +208,16 @@ final class Outpost_Fetch_Recent_Oura {
 			);
 		}
 
-		$content = '<p>' . esc_html( $title ) . '</p>';
+		// The picker list shows the distance; the post shows it only when the
+		// site turns on "Workout details in post text" (P4B-02).
+		$post_title = Outpost_Settings::workout_details_in_text()
+			? $title
+			: sprintf(
+				/* translators: %s: activity name. */
+				__( 'Workout — %s', 'outpost-mobile-publishing' ),
+				$activity
+			);
+		$content = '<p>' . esc_html( $post_title ) . '</p>';
 
 		return array(
 			'id'           => isset( $workout['id'] ) ? 'oura-workout-' . (string) $workout['id'] : 'oura-workout-' . wp_hash( 'outpost-fetch-recent|' . $start_at ),
@@ -218,7 +228,7 @@ final class Outpost_Fetch_Recent_Oura {
 			'fetched_at'   => '' !== $start_at ? self::short_date( $start_at ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'workout',
 			'post_payload' => array(
-				'title'                  => $title,
+				'title'                  => $post_title,
 				'content'                => $content,
 				'post_meta'              => array(
 					'_outpost_oura_activity'   => isset( $workout['activity'] ) ? (string) $workout['activity'] : '',

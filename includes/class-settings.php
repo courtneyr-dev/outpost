@@ -22,6 +22,10 @@
  *   - default_tags (string[], default []) — tag names the composer
  *     pre-selects in More options, and the bridge appends to a post
  *     whose request carried no `category[]`.
+ *   - workout_details_in_text (bool, default false) — whether a Polar or
+ *     Oura workout picked in the block editor puts its distance and
+ *     duration in the post title and paragraph. Off keeps them in private
+ *     post meta only (P4B-02); the picker list shows them either way.
  *
  * The options are exposed to the composer via the composer-config
  * REST endpoint (`siteSettings` field) so the client can react.
@@ -56,6 +60,7 @@ final class Outpost_Settings {
 	 *     default_post_format_inference: bool,
 	 *     default_categories: int[],
 	 *     default_tags: string[],
+	 *     workout_details_in_text: bool,
 	 * }
 	 */
 	public static function defaults(): array {
@@ -65,6 +70,7 @@ final class Outpost_Settings {
 			'default_post_format_inference' => true,
 			'default_categories'            => array(),
 			'default_tags'                  => array(),
+			'workout_details_in_text'       => false,
 		);
 	}
 
@@ -138,6 +144,14 @@ final class Outpost_Settings {
 		);
 
 		add_settings_field(
+			'workout_details_in_text',
+			__( 'Workout details in post text', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_workout_details_field' ),
+			'outpost-settings',
+			'outpost_settings_main'
+		);
+
+		add_settings_field(
 			'default_post_format_inference',
 			__( 'Auto Post-Format inference', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_inference_field' ),
@@ -167,6 +181,7 @@ final class Outpost_Settings {
 			'default_post_format_inference' => ! empty( $input['default_post_format_inference'] ),
 			'default_categories'            => self::sanitize_category_ids( $input['default_categories'] ?? array() ),
 			'default_tags'                  => self::sanitize_tag_names( $input['default_tags'] ?? '' ),
+			'workout_details_in_text'       => ! empty( $input['workout_details_in_text'] ),
 		);
 	}
 
@@ -396,6 +411,27 @@ final class Outpost_Settings {
 				'outpost-mobile-publishing'
 			)
 		);
+	}
+
+	public static function render_workout_details_field(): void {
+		$settings = self::get();
+		printf(
+			'<label><input type="checkbox" name="%1$s[workout_details_in_text]" value="1"%2$s /> %3$s</label>',
+			esc_attr( self::OPTION_NAME ),
+			checked( ! empty( $settings['workout_details_in_text'] ), true, false ),
+			esc_html__(
+				'Put the distance and duration of a Polar or Oura workout in the post title and text. Off, they stay in private post meta; Post Kinds\' exercise card keeps them private until you choose to show them.',
+				'outpost-mobile-publishing'
+			)
+		);
+	}
+
+	/**
+	 * Whether workout posts carry distance and duration in their title and
+	 * text (P4B-02). Off by default.
+	 */
+	public static function workout_details_in_text(): bool {
+		return ! empty( self::get()['workout_details_in_text'] );
 	}
 
 	/**

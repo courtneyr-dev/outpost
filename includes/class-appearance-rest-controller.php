@@ -97,9 +97,9 @@ final class Outpost_Appearance_REST_Controller {
 			);
 		}
 		// Credential before capability, and it fails early: a cookie session
-		// needs a valid REST nonce, and a token needs a scope that lets it act
-		// for the user.
-		if ( ! self::bearer_has_scope( $request, array( 'create', 'draft', 'update', 'profile' ) ) ) {
+		// needs a valid REST nonce, and a token needs `create` or `update`;
+		// `profile` or `draft` alone isn't enough (F-56).
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
 			return new \WP_Error(
 				'outpost_appearance_scope',
 				__( 'This sign-in does not allow changing appearance preferences.', 'outpost-mobile-publishing' ),

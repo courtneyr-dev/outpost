@@ -87,6 +87,8 @@ final class UninstallTest extends TestCase {
 		update_option( 'outpost_encryption_key', base64_encode( 'k' ) );
 		update_option( 'outpost_settings', array( 'x' => 1 ) );
 		update_option( 'outpost_settings_api_keys', array( 'beehiiv_api_key' => array( 'encrypted' => 'z' ) ) );
+		// A tab a site added through `outpost_settings_tabs` (F-61).
+		update_option( 'outpost_settings_newsletter', array( 'list_id' => '42' ) );
 		update_option( 'outpost_bridgy_silos_enabled', array( 'bluesky' => true ) );
 		update_option( 'outpost_creds_notion', 'cipher' );
 		update_option( 'outpost_telegraph_author_name', 'Me' );
@@ -132,6 +134,7 @@ final class UninstallTest extends TestCase {
 		$this->assertFalse( get_option( 'outpost_encryption_key', false ) );
 		$this->assertFalse( get_option( 'outpost_settings', false ) );
 		$this->assertFalse( get_option( 'outpost_settings_api_keys', false ) );
+		$this->assertFalse( get_option( 'outpost_settings_newsletter', false ), 'A site-added settings tab option must not outlive uninstall (F-61).' );
 		$this->assertFalse( get_option( 'outpost_bridgy_silos_enabled', false ) );
 		$this->assertFalse( get_option( 'outpost_creds_notion', false ) );
 		$this->assertFalse( get_option( 'outpost_telegraph_author_name', false ) );

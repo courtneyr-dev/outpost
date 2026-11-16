@@ -24,7 +24,19 @@ final class FetchRecentOuraTest extends TestCase {
 		Outpost_Fetch_Recent_Oura::set_http_resolver_for_tests( null );
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
 		WP_Mock::userFunction( 'esc_html' )->andReturnUsing( static function ( $s ) { return (string) $s; } );
+		$this->site_settings = array();
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
+			fn ( $name, $fallback = false ) => 'outpost_settings' === $name
+				? $this->site_settings
+				: ( $this->other_option ?? $fallback )
+		);
 	}
+
+	/** @var array<string,mixed> What get_option( 'outpost_settings' ) returns. */
+	private array $site_settings = array();
+
+	/** @var string|null What every other get_option() call returns (the encryption key). */
+	private ?string $other_option = null;
 
 	public function tearDown(): void {
 		Outpost_Fetch_Recent_Oura::set_http_resolver_for_tests( null );
@@ -83,6 +95,30 @@ final class FetchRecentOuraTest extends TestCase {
 		$this->assertStringContainsString( '478 kcal', $item['subtitle'] );
 		$this->assertSame( '2026-05-04', $item['fetched_at'], 'The date alone (F-44).' );
 		$this->assertArrayNotHasKey( '_outpost_oura_start_at', $item['post_payload']['post_meta'], 'The start time stays on the server (F-44).' );
+	}
+
+	/**
+	 * P4B-02: the workout's post title and paragraph leave out the distance
+	 * unless the site turns on "Workout details in post text".
+	 */
+	public function test_post_text_leaves_out_distance_by_default(): void {
+		$item = Outpost_Fetch_Recent_Oura::map_workout_item(
+			array( 'id' => 'wid-1', 'activity' => 'running', 'distance' => 5200.0 )
+		);
+
+		$this->assertSame( 'Workout — Running', $item['post_payload']['title'] );
+		$this->assertSame( '<p>Workout — Running</p>', $item['post_payload']['content'] );
+		$this->assertStringContainsString( '5.2 km', $item['title'], 'The picker list still shows the distance.' );
+	}
+
+	public function test_post_text_includes_distance_when_the_site_turns_it_on(): void {
+		$this->site_settings = array( 'workout_details_in_text' => true );
+
+		$item = Outpost_Fetch_Recent_Oura::map_workout_item(
+			array( 'id' => 'wid-1', 'activity' => 'running', 'distance' => 5200.0 )
+		);
+
+		$this->assertSame( 'Workout — Running, 5.2 km', $item['post_payload']['title'] );
 	}
 
 	public function test_map_workout_item_omits_distance_when_zero(): void {
@@ -219,7 +255,8 @@ final class FetchRecentOuraTest extends TestCase {
 	private function stub_credentials_for_user( int $user_id, string $access_token ): void {
 		$creds = array( 'access_token' => $access_token );
 		\Outpost_Encryption_Key_Resolver::reset_for_tests();
-		WP_Mock::userFunction( 'get_option' )->andReturn( base64_encode( random_bytes( 32 ) ) );
+		// One get_option() mock per test (WP_Mock gotcha); setUp() registers it.
+		$this->other_option = base64_encode( random_bytes( 32 ) );
 		$envelope = \Outpost_Encryption::encrypt( wp_json_encode( $creds ) );
 		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
 			static function ( $uid, $key, $single ) use ( $user_id, $envelope ) {

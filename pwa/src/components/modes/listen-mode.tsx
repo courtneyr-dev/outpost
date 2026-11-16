@@ -1031,7 +1031,13 @@ export function ListenMode({
 			if (processed_blobs.length > 0) {
 				base['mp-photo-alt'] =
 					alt_values.length === 1 ? alt_values[0]! : alt_values;
-			} else if (cover_url && !is_embeddable_media_url(trimmed_url)) {
+			} else if (
+				cover_url &&
+				// The Micropub plugin downloads `photo` with download_url(),
+				// so only an http(s) cover leaves the composer (F-55).
+				is_safe_http_url(cover_url) &&
+				!is_embeddable_media_url(trimmed_url)
+			) {
 				// Skip the looked-up cover when the target is a streaming URL
 				// (Spotify / YouTube / Apple Music …): Post Kinds oEmbeds the
 				// URL into a player that already shows album art, so attaching

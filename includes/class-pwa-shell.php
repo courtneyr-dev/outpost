@@ -1109,9 +1109,8 @@ async function cache_first(request) {
 	 * for photo previews. All other directives stay tight.
 	 *
 	 * No 'unsafe-eval' — Vite's esbuild output is plain ES modules.
-	 * No 'unsafe-inline' on script-src — the SW registration script in
-	 * render_shell() is the one inline script; it gets a per-request
-	 * nonce that we attach to its tag.
+	 * No 'unsafe-inline' on script-src — the shell has no inline script;
+	 * the SW registration lives in the bundle.
 	 *
 	 * Filterable via `outpost_csp` for sites that need to extend
 	 * (e.g. allow a specific analytics origin, embed a CDN).
@@ -1149,43 +1148,67 @@ async function cache_first(request) {
 			$csp = array();
 		}
 
-		// Enforce a security baseline. Each required prefix represents
-		// a directive we won't allow filters to drop or weaken to a
-		// permissive value. If a filter dropped one, re-add the safe
-		// default; if a filter weakened one (e.g., `default-src *`),
-		// restoring the safe default takes precedence.
-		$required = array(
-			"default-src 'self'",
-			"frame-ancestors 'none'",
-			"object-src 'none'",
-			"base-uri 'self'",
-		);
-		foreach ( $required as $directive ) {
-			$prefix   = strtok( $directive, ' ' );
-			$has_safe = false;
-			$rebuilt  = array();
-			foreach ( $csp as $existing ) {
-				if ( ! is_string( $existing ) ) {
+		return implode( '; ', self::enforce_csp_baseline( $csp ) );
+	}
+
+	/**
+	 * Rebuilds a filtered CSP directive list so it can't drop or loosen the
+	 * baseline (F-58).
+	 *
+	 * Entries are split on `;`, so one entry can't smuggle in a second
+	 * directive, and directive names compare case-insensitively, as browsers
+	 * read them. The first copy of a directive wins, as in a browser.
+	 * `default-src`, `frame-ancestors`, `object-src` and `base-uri` always
+	 * get their safe values. `script-src` keeps any origins a filter adds,
+	 * so a site can still allow an analytics or CDN host, but always starts
+	 * with `'self'` and loses every token that loosens it. `script-src-elem`
+	 * and `script-src-attr` are removed, since either would override
+	 * `script-src`.
+	 *
+	 * @param array<mixed> $entries Directive strings from the filter.
+	 * @return list<string> Directives, one per entry.
+	 */
+	private static function enforce_csp_baseline( array $entries ): array {
+		$directives = array();
+		foreach ( $entries as $entry ) {
+			if ( ! is_string( $entry ) ) {
+				continue;
+			}
+			// Control characters can't reach the header.
+			$entry = (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $entry );
+			foreach ( explode( ';', $entry ) as $part ) {
+				$tokens = preg_split( '/\s+/', trim( $part ), -1, PREG_SPLIT_NO_EMPTY );
+				if ( ! is_array( $tokens ) || array() === $tokens ) {
 					continue;
 				}
-				if ( 0 === strpos( $existing, $prefix . ' ' ) || $existing === $prefix ) {
-					if ( $existing === $directive ) {
-						$has_safe  = true;
-						$rebuilt[] = $existing;
-					}
-					// Drop weakened variants of the required directive;
-					// the safe default gets appended below.
+				$name = strtolower( (string) array_shift( $tokens ) );
+				if ( 1 !== preg_match( '/^[a-z][a-z-]*$/', $name ) || isset( $directives[ $name ] ) ) {
 					continue;
 				}
-				$rebuilt[] = $existing;
+				$directives[ $name ] = $tokens;
 			}
-			if ( ! $has_safe ) {
-				$rebuilt[] = $directive;
-			}
-			$csp = $rebuilt;
 		}
 
-		return implode( '; ', $csp );
+		$directives['default-src']     = array( "'self'" );
+		$directives['frame-ancestors'] = array( "'none'" );
+		$directives['object-src']      = array( "'none'" );
+		$directives['base-uri']        = array( "'self'" );
+
+		$loosening = array( "'self'", "'none'", "'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "'wasm-unsafe-eval'", "'strict-dynamic'", '*', 'http:', 'https:', 'data:', 'blob:', 'filesystem:', 'ws:', 'wss:' );
+		$script    = array( "'self'" );
+		foreach ( $directives['script-src'] ?? array() as $token ) {
+			if ( ! in_array( strtolower( $token ), $loosening, true ) ) {
+				$script[] = $token;
+			}
+		}
+		$directives['script-src'] = array_values( array_unique( $script ) );
+		unset( $directives['script-src-elem'], $directives['script-src-attr'] );
+
+		$csp = array();
+		foreach ( $directives as $name => $tokens ) {
+			$csp[] = trim( $name . ' ' . implode( ' ', $tokens ) );
+		}
+		return $csp;
 	}
 
 	/**
@@ -1210,19 +1233,6 @@ async function cache_first(request) {
 				'accelerometer=()',
 			)
 		);
-	}
-
-	/**
-	 * Per-request script nonce. Generated lazily and cached for the
-	 * remainder of the request so the CSP header and the shell's inline
-	 * script tag agree.
-	 */
-	public static function script_nonce(): string {
-		static $nonce = null;
-		if ( null === $nonce ) {
-			$nonce = wp_generate_uuid4();
-		}
-		return $nonce;
 	}
 
 	private static function send_json_header(): void {
