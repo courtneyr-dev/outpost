@@ -296,7 +296,17 @@ final class Outpost_Fetch_Recent_Polar {
 			$title = __( 'Training', 'outpost-mobile-publishing' );
 		}
 
-		$content = '<p>' . esc_html( $title ) . '</p>';
+		// The picker list shows the details; the post shows them only when the
+		// site turns on "Workout details in post text" (P4B-02).
+		$post_title = $title;
+		if ( '' !== $sport && ! Outpost_Settings::workout_details_in_text() ) {
+			$post_title = sprintf(
+				/* translators: %s: sport name. */
+				__( 'Training — %s', 'outpost-mobile-publishing' ),
+				$sport
+			);
+		}
+		$content = '<p>' . esc_html( $post_title ) . '</p>';
 
 		// The start time picks the date and never leaves the server, with
 		// or without the exercise card (F-44).
@@ -316,7 +326,7 @@ final class Outpost_Fetch_Recent_Polar {
 			'fetched_at'   => '' !== $start ? self::short_date( $start ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'workout',
 			'post_payload' => array(
-				'title'                  => $title,
+				'title'                  => $post_title,
 				'content'                => $content,
 				'post_meta'              => $post_meta,
 				'syndication_source_url' => null,
