@@ -86,17 +86,16 @@ final class Outpost_Settings_Handler {
 		}
 
 		$fields = Outpost_Settings_Registry::get_fields( $tab_id );
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		// Keys and values are both sanitized where they're read (F-62); the
+		// registry stores field ids through sanitize_key() too.
 		$submitted = isset( $_POST['outpost_settings'] ) && is_array( $_POST['outpost_settings'] )
-			? array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings'] ) )
+			? self::with_sanitized_keys( array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings'] ) ) )
 			: array();
 
 		// "Remove the saved …" checkboxes (T10-S3-11): explicit deletion only.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
-		$clear_in = isset( $_POST['outpost_settings_clear'] ) && is_array( $_POST['outpost_settings_clear'] )
-			? array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings_clear'] ) )
+		$clear = isset( $_POST['outpost_settings_clear'] ) && is_array( $_POST['outpost_settings_clear'] )
+			? array_keys( self::with_sanitized_keys( array_map( 'sanitize_text_field', wp_unslash( $_POST['outpost_settings_clear'] ) ) ) )
 			: array();
-		$clear    = array_map( 'sanitize_key', array_keys( $clear_in ) );
 
 		self::save_submission( $tab_id, $submitted, $clear );
 
@@ -260,6 +259,21 @@ final class Outpost_Settings_Handler {
 		$out = array();
 		foreach ( $fields as $field_id => $config ) {
 			$out[ $field_id ] = self::decrypt_stored( $config, $stored[ $field_id ] ?? null );
+		}
+		return $out;
+	}
+
+	/**
+	 * Re-keys a submitted array with sanitize_key(), the form the settings
+	 * registry stores field ids in (F-62).
+	 *
+	 * @param array<mixed> $values Already-sanitized values.
+	 * @return array<string,mixed>
+	 */
+	private static function with_sanitized_keys( array $values ): array {
+		$out = array();
+		foreach ( $values as $key => $value ) {
+			$out[ sanitize_key( (string) $key ) ] = $value;
 		}
 		return $out;
 	}

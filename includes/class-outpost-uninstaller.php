@@ -272,6 +272,19 @@ final class Outpost_Uninstaller {
 		foreach ( array_unique( $options ) as $name ) {
 			delete_option( $name );
 		}
+		// Settings tabs a site added through `outpost_settings_tabs` store as
+		// `outpost_settings_{tab_id}` (F-61); the filter isn't loaded during
+		// uninstall, so find them by prefix.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- one-time uninstall cleanup; no options API covers a name prefix.
+		$tab_options = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+				$wpdb->esc_like( 'outpost_settings_' ) . '%'
+			)
+		);
+		foreach ( (array) $tab_options as $name ) {
+			delete_option( (string) $name );
+		}
 
 		// User meta — exact keys, deleted for every user.
 		foreach ( self::USER_META_KEYS as $key ) {

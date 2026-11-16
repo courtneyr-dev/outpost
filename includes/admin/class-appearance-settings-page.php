@@ -175,10 +175,8 @@ final class Outpost_Appearance_Settings_Page {
 		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( $_POST['style_source'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
-			? array_keys( array_filter( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) ) )
+			? self::checked_keys( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) )
 			: array();
-		$bypass_in = array_filter( $bypass_in, 'is_string' );
-		$bypass_in = array_values( array_map( static fn ( string $s ): string => sanitize_key( $s ), $bypass_in ) );
 
 		$payload = array(
 			'mode_preference' => $mode_pref,
@@ -762,5 +760,22 @@ JS;
 		}
 		wp_enqueue_style( 'outpost-appearance-inline' );
 		wp_add_inline_style( 'outpost-appearance-inline', $css );
+	}
+
+	/**
+	 * The sanitized names of the checked boxes in a `name[key]` checkbox
+	 * group, read in the same expression as the request value (F-62).
+	 *
+	 * @param array<mixed> $checked Key => rest_sanitize_boolean() result.
+	 * @return list<string>
+	 */
+	private static function checked_keys( array $checked ): array {
+		$keys = array();
+		foreach ( $checked as $key => $on ) {
+			if ( true === $on && is_string( $key ) ) {
+				$keys[] = sanitize_key( $key );
+			}
+		}
+		return $keys;
 	}
 }

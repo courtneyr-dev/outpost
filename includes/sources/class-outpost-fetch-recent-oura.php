@@ -12,9 +12,10 @@
  *
  * Membership-lapsed handling: Oura's API returns 403 with a body
  * containing "membership" when a previously-connected account no
- * longer has the active subscription required for v2 API access. In
- * that case the callback returns an empty list with reason
- * 'membership_lapsed' so the modal can render a graceful prompt.
+ * longer has the active subscription required for v2 API access.
+ * `api_get()` treats that, like every other non-2xx response, as no
+ * data, so the picker shows an empty list. No reason code reaches the
+ * modal (F-65).
  *
  * @package Outpost
  * @since   0.1.87
