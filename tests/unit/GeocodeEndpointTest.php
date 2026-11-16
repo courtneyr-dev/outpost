@@ -206,7 +206,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock above — mock_filters()'s wholesale apply_filters override is
 		// inert for this call (see "Scope source" in trait-bearer-auth.php).
-		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}

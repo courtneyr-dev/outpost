@@ -108,13 +108,13 @@ final class Outpost_Geocode_Endpoint {
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
 		// Read-only: proxies Nominatim, writes nothing but a rate-limit /
-		// result cache transient. A token scoped for `read` alone (as well
-		// as `create`/`update`) may use it.
+		// result cache transient. It serves the composer, so a token needs
+		// `create` or `update` (F-56).
 		$message = __( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' );
 		// Credential first, and it fails early: a cookie session without a
 		// valid REST nonce, or a token without an accepted scope, is refused
 		// here, before the capability check. No filter can change this.
-		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
 			// See Outpost_Preview_Endpoint::check_permission() for the
 			// 401-vs-403 rationale.
 			return new WP_Error(

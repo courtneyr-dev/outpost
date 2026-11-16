@@ -126,13 +126,13 @@ final class Outpost_Preview_Endpoint {
 	 */
 	public static function check_permission( WP_REST_Request $request ) {
 		// Read-only: fetches and sanitizes a target URL, writes nothing.
-		// A token scoped for `read` alone (as well as `create`/`update`)
-		// may use it.
+		// It serves the composer, so a token needs `create` or `update`
+		// (F-56).
 		$message = __( 'Outpost preview requires an authenticated user.', 'outpost-mobile-publishing' );
 		// Credential first, and it fails early: a cookie session without a
 		// valid REST nonce, or a token without an accepted scope, is refused
 		// here, before the capability check. No filter can change this.
-		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
 			// A capable user whose bearer token lacks scope is
 			// authenticated but forbidden (403); everyone else is
 			// simply not authenticated (401) — mirrors core's own

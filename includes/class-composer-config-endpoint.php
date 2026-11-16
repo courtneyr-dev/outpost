@@ -225,12 +225,12 @@ final class Outpost_Composer_Config_Endpoint {
 		// token-authenticated request needs no wp-admin cookie, so it never
 		// meets the cookie/nonce CSRF check the 1.0.4 fix closed.
 		// Read-only: aggregates companion-plugin status + taxonomy terms +
-		// settings, writes nothing but a rate-limit transient. A token
-		// scoped for `read` alone (as well as `create`/`update`) may use it.
+		// settings, writes nothing but a rate-limit transient. It serves
+		// the composer, so a token needs `create` or `update` (F-56).
 		// Credential first, and it fails early: a cookie session without a
 		// valid REST nonce, or a token without an accepted scope, is refused
 		// here, before the capability check. No filter can change this.
-		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
 			return false;
 		}
 		// Capability second, unfiltered: a request without `edit_posts`,
