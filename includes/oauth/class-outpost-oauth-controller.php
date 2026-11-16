@@ -103,6 +103,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_start' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -117,6 +118,12 @@ final class Outpost_OAuth_Controller {
 				// inside the handler before any side effects.
 				'permission_callback' => '__return_true',
 				'show_in_index'       => false,
+				'args'                => self::route_args(
+					array(
+						'code'  => array( 'type' => 'string' ),
+						'state' => array( 'type' => 'string' ),
+					)
+				),
 			)
 		);
 		register_rest_route(
@@ -127,6 +134,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_disconnect' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -137,8 +145,27 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_verify' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
+	}
+
+	/**
+	 * Declared arguments for the OAuth routes (F-63). A `type` makes
+	 * WordPress validate and cast each one (rest_parse_request_arg) before
+	 * the handler runs, as on Outpost's other routes; `?code[]=x` gets a
+	 * 400 instead of reaching a string cast.
+	 *
+	 * @param array<string, array<string, mixed>> $extra Route-specific arguments.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function route_args( array $extra = array() ): array {
+		return array(
+			'provider' => array(
+				'type'    => 'string',
+				'pattern' => '^[a-z0-9-]+$',
+			),
+		) + $extra;
 	}
 
 	/**
