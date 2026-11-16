@@ -16,3 +16,11 @@ The PWA tests (`pwa/src/lib/pkiw-moods.test.ts`,
 `pwa/src/components/modes/life-mode.test.tsx`) and the PHP stub
 (`mood-vocabulary-stub.php`) read these files, so both sides test against one
 copy of the response.
+
+## Comic card marker
+
+`comic-strip-stub.php` defines an empty `PKIW\Comic_Strip`. Every Post Kinds
+release that builds the `post-kinds-indieweb/comic-card` from a Micropub
+`read-of` entry ships that class, so Outpost treats it as the comics marker
+(`Outpost_Post_Kinds_Adapter::supports_comics()`). Tests load the stub only in
+a separate process.

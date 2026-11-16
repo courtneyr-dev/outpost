@@ -256,19 +256,22 @@ final class CookieNonceFailClosedTest extends TestCase {
 	}
 
 	/**
-	 * Control: the documented anonymous opt-in still works. With no cookie
-	 * session and no token, the filter decides the capability result.
+	 * F-47: the filter can only restrict, so the former anonymous opt-in is
+	 * gone. With no cookie session and no token, a filter returning true
+	 * still leaves the request refused, before any protected work.
 	 */
-	public function test_composer_config_filter_still_opts_in_anonymous_requests(): void {
+	public function test_composer_config_filter_cannot_open_the_route_to_anonymous_requests(): void {
 		add_filter( 'outpost_composer_config_permission', '__return_true' );
 		wp_set_current_user( 0 );
 		$GLOBALS['wp_rest_auth_cookie'] = false;
 		unset( $_REQUEST['_wpnonce'], $_SERVER['HTTP_X_WP_NONCE'], $_SERVER['HTTP_AUTHORIZATION'] );
+		$rows_before = $this->config_rate_limit_rows();
 
 		$result = $this->serve( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
 
 		$this->assertNotNull( $result['response'] );
-		$this->assertSame( 200, $result['response']->get_status() );
-		$this->assertArrayHasKey( 'companions', (array) $result['response']->get_data() );
+		$this->assertSame( 401, $result['response']->get_status() );
+		$this->assertArrayNotHasKey( 'companions', (array) $result['response']->get_data(), 'The handler must not build the config body.' );
+		$this->assertSame( $rows_before, $this->config_rate_limit_rows(), 'A refused request must not spend rate-limit budget.' );
 	}
 }

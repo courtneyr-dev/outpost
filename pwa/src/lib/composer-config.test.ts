@@ -181,3 +181,29 @@ describe('fetch_composer_config — site default terms', () => {
 		expect(result.siteSettings.defaultTags).toBeUndefined();
 	});
 });
+
+describe('fetch_composer_config — postKinds capabilities (#243)', () => {
+	it('carries postKinds.comics through', async () => {
+		const env = mock_env({ ok: true, status: 200 }, { ...valid_config, postKinds: { comics: true } });
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.postKinds).toEqual({ comics: true });
+	});
+
+	it('still accepts a server or cached config that predates postKinds', async () => {
+		const env = mock_env({ ok: true, status: 200 }, valid_config);
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.postKinds).toBeUndefined();
+	});
+
+	it.each([
+		['null', null],
+		['a boolean', true],
+		['an object without comics', {}],
+		['a non-boolean comics value', { comics: 'yes' }],
+	])('rejects postKinds when it is %s', async (_label, postKinds) => {
+		const env = mock_env({ ok: true, status: 200 }, { ...valid_config, postKinds });
+		await expect(fetch_composer_config('test-token', env)).rejects.toMatchObject({
+			code: 'invalid_response',
+		});
+	});
+});

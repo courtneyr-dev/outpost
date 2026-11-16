@@ -58,7 +58,7 @@ final class Outpost_Syndication_Admin_Column {
 		if ( self::COLUMN_KEY !== $column ) {
 			return;
 		}
-		echo self::render_badge_html( $post_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		self::print_badge( $post_id );
 	}
 
 	/**
@@ -68,6 +68,19 @@ final class Outpost_Syndication_Admin_Column {
 	 * @param int $post_id Post id.
 	 */
 	public static function render_badge_html( int $post_id ): string {
+		ob_start();
+		self::print_badge( $post_id );
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Print a status badge for a post, escaping each value as it prints.
+	 * The posts-list column and the pending-syndication notice both call
+	 * this.
+	 *
+	 * @param int $post_id Post id.
+	 */
+	public static function print_badge( int $post_id ): void {
 		$entries = Outpost_Manual_Share_Audit_Log::get_entries( $post_id );
 		$status  = Outpost_Manual_Share_Status_Computer::compute_status_for_entries( $entries );
 		$summary = Outpost_Manual_Share_Status_Computer::summarize_entries( $entries );
@@ -76,7 +89,7 @@ final class Outpost_Syndication_Admin_Column {
 		$label = self::aria_label( $status, $summary );
 		$text  = self::display_text( $status, $summary );
 
-		return sprintf(
+		printf(
 			'<span class="outpost-syndication-badge outpost-syndication-badge--%1$s" data-status="%1$s" aria-label="%2$s" role="img"><span class="outpost-syndication-badge__glyph" aria-hidden="true">%3$s</span> <span class="outpost-syndication-badge__text">%4$s</span></span>',
 			esc_attr( $status ),
 			esc_attr( $label ),

@@ -23,6 +23,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
 import { SignOutControl } from './sign-out-control';
 import { enqueue, list, type OfflineQueueEnvironment } from '../lib/offline-queue';
+import { PendingSharesError } from '../lib/share-target';
 
 const ALICE = 'https://example.test/alice/';
 const BOB = 'https://example.test/bob/';
@@ -30,6 +31,8 @@ const ALICE_ID = 'https://example.test/alice';
 
 const SIGN_IN_NOT_CLEARED =
 	'Couldn’t remove the sign-in from this device, so you’re still signed in and nothing was removed. Try again.';
+const SHARES_NOT_CLEARED =
+	'Couldn’t remove shared content waiting on this device, so you’re still signed in and nothing was removed. Try again.';
 const PARTIAL =
 	'You’re signed out of this device, but your queued posts couldn’t be removed and are still here. Try removing them again, or finish signing out and keep them.';
 
@@ -139,6 +142,21 @@ describe('direct sign-out (nothing of this account queued)', () => {
 		expect(steps).toEqual(['token']);
 		expect(finish_sign_out).not.toHaveBeenCalled();
 		expect(status()).toBe(SIGN_IN_NOT_CLEARED);
+		expect(button('Sign out of this device')).not.toBeNull();
+	});
+});
+
+describe('pending shares (F-46)', () => {
+	it('stays signed in and names the shared content when it can’t be cleared', async () => {
+		clear_sign_in.mockImplementation(async (): Promise<void> => {
+			steps.push('token');
+			throw new PendingSharesError('share inbox: open failed');
+		});
+		mount();
+		await click('Sign out of this device');
+
+		expect(finish_sign_out).not.toHaveBeenCalled();
+		expect(status()).toBe(SHARES_NOT_CLEARED);
 		expect(button('Sign out of this device')).not.toBeNull();
 	});
 });

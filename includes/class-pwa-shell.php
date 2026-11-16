@@ -65,6 +65,7 @@ final class Outpost_PWA_Shell {
 		// that nothing else paints it.
 		list( $style_handles, $script_handles ) = self::register_shell_assets( $entry_url, $css_urls );
 		?><!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -435,6 +436,7 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		?>
 		<!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -490,6 +492,7 @@ final class Outpost_PWA_Shell {
 		);
 		?>
 		<!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -883,6 +886,11 @@ async function handle_share_post(event) {
 			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
+			// A random identity, so a decision about this share can tell it
+			// from a later one that arrived in the same millisecond (P4I-01).
+			id: (self.crypto && typeof self.crypto.randomUUID === 'function')
+				? self.crypto.randomUUID()
+				: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
 		});
 		// The composer shows what is waiting for review; `refused` tells it
 		// this share wasn't kept because two were already waiting.
@@ -1014,6 +1022,55 @@ async function cache_first(request) {
 	}
 
 	/**
+	 * Tell page optimizers and page caches to leave this document alone.
+	 *
+	 * The shell's CSP allows no inline script, and optimizers rewrite pages
+	 * with inline handlers: Perfmatters' Remove Unused CSS and Autoptimize's
+	 * deferred CSS swap stylesheets in with `onload`, and delay-JS modes add
+	 * an inline loader. Blocked, they leave the composer unstyled or unbooted
+	 * (issue #320). The CSP stays as it is; the optimizers step aside, on
+	 * Outpost's HTML routes only.
+	 *
+	 * Each opt-out is one the optimizer reads at that point in the request,
+	 * checked in its source:
+	 * - Perfmatters 2.6.9 opens its buffer at after_setup_theme and asks
+	 *   `perfmatters_allow_buffer` when it flushes.
+	 * - WP Rocket 3.24 and Autoptimize 3.1.17 open their buffers at
+	 *   template_redirect priority 2, after the shell exits. WP Rocket's
+	 *   page-cache buffer still reads DONOTCACHEPAGE, and its optimizers read
+	 *   DONOTROCKETOPTIMIZE, at flush. Autoptimize reads DONOTMINIFY and
+	 *   `autoptimize_filter_noptimize` before buffering and the
+	 *   `<!-- noptimize-page -->` marker the documents print at flush.
+	 * - LiteSpeed Cache 7.9.3 opens its buffer at after_setup_theme and reads
+	 *   LITESPEED_NO_OPTM and LITESPEED_NO_PAGEOPTM at flush.
+	 */
+	private static function opt_out_of_page_optimizers(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTROCKETOPTIMIZE' ) ) {
+			define( 'DONOTROCKETOPTIMIZE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTMINIFY' ) ) {
+			define( 'DONOTMINIFY', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_OPTM' ) ) {
+			define( 'LITESPEED_NO_OPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_PAGEOPTM' ) ) {
+			define( 'LITESPEED_NO_PAGEOPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+
+		add_filter( 'perfmatters_allow_buffer', '__return_false', PHP_INT_MAX );
+		add_filter( 'perfmatters_remove_unused_css', '__return_false', PHP_INT_MAX );
+		add_filter( 'perfmatters_delay_js', '__return_false', PHP_INT_MAX );
+		add_filter( 'autoptimize_filter_noptimize', '__return_true', PHP_INT_MAX );
+
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- LiteSpeed Cache's own action.
+		do_action( 'litespeed_control_set_nocache', 'Outpost composer shell' );
+	}
+
+	/**
 	 * Send headers for an HTML response. Skipped when headers have already been
 	 * sent (e.g. WP startup printed something) so test output can still capture
 	 * the body via ob_start.
@@ -1030,6 +1087,7 @@ async function cache_first(request) {
 	 * to those.
 	 */
 	private static function send_html_header(): void {
+		self::opt_out_of_page_optimizers();
 		if ( ! headers_sent() ) {
 			nocache_headers();
 			header( 'Content-Type: text/html; charset=utf-8' );

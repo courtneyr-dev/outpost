@@ -212,9 +212,9 @@ final class Outpost_Composer_Config_Endpoint {
 	 * alike; a bare unvalidated bearer header never resolves a user
 	 * and never passes.
 	 *
-	 * Sites that need anonymous access (rare but supported for
-	 * build-time pre-fetching) can opt back in via the
-	 * `outpost_composer_config_permission` filter.
+	 * The `outpost_composer_config_permission` filter can only restrict
+	 * access: it runs after the credential and `edit_posts` checks pass,
+	 * so it can't open the route to anonymous requests.
 	 *
 	 * @return bool
 	 */
@@ -233,17 +233,25 @@ final class Outpost_Composer_Config_Endpoint {
 		if ( ! self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) ) ) {
 			return false;
 		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return false;
+		}
 		/**
-		 * Override the composer-config permission decision.
+		 * Filters whether a request may read or write the composer config.
 		 *
-		 * Decides the capability check only. The credential check above has
-		 * already passed, so returning true opens the route to anonymous
-		 * requests but never admits a cookie session without a valid REST
-		 * nonce or a token without an accepted scope.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused. Before 1.0.28 a
+		 * site could return true here to open the route to anonymous
+		 * requests; that no longer works.
 		 *
-		 * @param bool $allow Whether the current user has `edit_posts`.
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		return (bool) apply_filters( 'outpost_composer_config_permission', current_user_can( 'edit_posts' ) );
+		return (bool) apply_filters( 'outpost_composer_config_permission', true, $request );
 	}
 
 	/**
@@ -341,6 +349,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 *
 	 * @return array{
 	 *     companions: array<string, string>,
+	 *     postKinds: array{comics: bool},
 	 *     postFormats: array<int, string>|null,
 	 *     xfnRels: array<int, string>,
 	 *     existingCategories: array<int, array{slug: string, name: string}>,
@@ -384,6 +393,9 @@ final class Outpost_Composer_Config_Endpoint {
 
 		return array(
 			'companions'         => $companions,
+			'postKinds'          => array(
+				'comics' => 'active' === $companions['post-kinds'] && Outpost_Post_Kinds_Adapter::supports_comics(),
+			),
 			'postFormats'        => $post_formats,
 			'xfnRels'            => self::XFN_RELS,
 			'existingCategories' => self::list_terms( 'category' ),

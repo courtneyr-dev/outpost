@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { list_for_owner, remove_owned_entries, type OfflineQueueEnvironment } from '../lib/offline-queue';
+import { PendingSharesError } from '../lib/share-target';
 
 /**
  * "Sign out of this device", with a choice about queued posts (T10-S3-07).
@@ -31,7 +32,10 @@ export interface SignOutControlProps {
 	/** Canonical identity of the signed-in account. */
 	owner: string | null;
 	queueEnv?: OfflineQueueEnvironment;
-	/** Remove the sign-in (lib/sign-out.ts clear_sign_in); rejects when the token store fails. */
+	/**
+	 * Remove waiting shares and the sign-in (lib/sign-out.ts clear_sign_in);
+	 * rejects when either can't be removed.
+	 */
 	clearSignIn: () => Promise<void>;
 	/** Forget drafts and the appearance copy, then reload (lib/sign-out.ts finish_sign_out). */
 	finishSignOut: () => void;
@@ -40,6 +44,8 @@ export interface SignOutControlProps {
 const CHECK_FAILED = 'Couldn’t check this device for queued posts, so you’re still signed in. Try again.';
 const SIGN_IN_NOT_CLEARED =
 	'Couldn’t remove the sign-in from this device, so you’re still signed in and nothing was removed. Try again.';
+const SHARES_NOT_CLEARED =
+	'Couldn’t remove shared content waiting on this device, so you’re still signed in and nothing was removed. Try again.';
 const PARTIAL =
 	'You’re signed out of this device, but your queued posts couldn’t be removed and are still here. Try removing them again, or finish signing out and keep them.';
 
@@ -61,8 +67,8 @@ export function SignOutControl({ owner, queueEnv, clearSignIn, finishSignOut }: 
 		try {
 			await clearSignIn();
 			return true;
-		} catch (_err) {
-			setStatus(SIGN_IN_NOT_CLEARED);
+		} catch (err) {
+			setStatus(err instanceof PendingSharesError ? SHARES_NOT_CLEARED : SIGN_IN_NOT_CLEARED);
 			return false;
 		}
 	};

@@ -34,7 +34,9 @@ services:
       --verbose
       --global-response-templating
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/__admin/health || exit 1"]
+      # GET, not wget --spider: --spider sends HEAD, which /__admin/health
+      # answers with 404, so the container never reported healthy.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/__admin/health >/dev/null || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5

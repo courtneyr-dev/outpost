@@ -75,8 +75,8 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'Post Kinds for IndieWeb', $adapter->label() );
 		$slugs = $adapter->feature_slugs();
 		// One slug per kind in Post Kinds' default taxonomy registry.
-		$this->assertCount( 36, $slugs );
-		$this->assertCount( 36, array_unique( $slugs ), 'Feature slugs must not repeat.' );
+		$this->assertCount( 37, $slugs );
+		$this->assertCount( 37, array_unique( $slugs ), 'Feature slugs must not repeat.' );
 		foreach ( $slugs as $slug ) {
 			$this->assertStringStartsWith( 'post-kinds.', $slug );
 		}
@@ -88,6 +88,7 @@ final class CompanionRegistryTest extends \WP_Mock\Tools\TestCase {
 		$this->assertNotContains( 'post-kinds.quotation', $slugs );
 		$this->assertContains( 'post-kinds.event', $slugs );
 		$this->assertContains( 'post-kinds.craft', $slugs );
+		$this->assertContains( 'post-kinds.comics', $slugs );
 	}
 
 	public function test_xfn_adapter_shape(): void {

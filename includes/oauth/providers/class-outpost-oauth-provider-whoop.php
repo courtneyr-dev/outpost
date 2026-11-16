@@ -129,12 +129,14 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 		}
 		$response = wp_remote_get(
 			self::VERIFY_ENDPOINT,
-			array(
-				'timeout' => self::VERIFY_TIMEOUT,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . (string) $creds['access_token'],
-					'Accept'        => 'application/json',
-				),
+			self::credential_request_args(
+				array(
+					'timeout' => self::VERIFY_TIMEOUT,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . (string) $creds['access_token'],
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {
@@ -177,13 +179,15 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 		if ( is_array( $creds ) && ! empty( $creds['access_token'] ) ) {
 			$response = wp_remote_request(
 				self::REVOKE_ENDPOINT,
-				array(
-					'method'  => 'DELETE',
-					'timeout' => self::REVOKE_TIMEOUT,
-					'headers' => array(
-						'Authorization' => 'Bearer ' . (string) $creds['access_token'],
-						'Accept'        => 'application/json',
-					),
+				self::credential_request_args(
+					array(
+						'method'  => 'DELETE',
+						'timeout' => self::REVOKE_TIMEOUT,
+						'headers' => array(
+							'Authorization' => 'Bearer ' . (string) $creds['access_token'],
+							'Accept'        => 'application/json',
+						),
+					)
 				)
 			);
 			if ( is_wp_error( $response ) ) {

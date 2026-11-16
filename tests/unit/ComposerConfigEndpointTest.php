@@ -148,17 +148,16 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
-	public function test_permission_check_filter_can_open_anonymous(): void {
-		// A site that wants build-time pre-fetch can opt back into anonymous
-		// access via the filter.
+	public function test_permission_check_filter_cannot_open_anonymous(): void {
+		// F-47: the filter can only restrict. An anonymous request fails the
+		// capability check before the filter runs, so a filter that would
+		// return true never gets the chance.
 		WP_Mock::userFunction( 'current_user_can' )
 			->with( 'edit_posts' )
 			->andReturn( false );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::onFilter( 'outpost_composer_config_permission' )
-			->with( false )
-			->reply( true );
-		$this->assertTrue( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
+		WP_Mock::userFunction( 'apply_filters' )->never();
+		$this->assertFalse( Outpost_Composer_Config_Endpoint::permission_check( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	public function test_resolve_post_formats_returns_null_when_absent(): void {
@@ -223,8 +222,56 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertArrayHasKey( 'siteSettings', $payload );
 	}
 
-	private function mock_config_dependencies(): void {
-		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
+	// --- postKinds capabilities (outpost#243) -------------------------------
+
+	public function test_post_kinds_comics_is_false_when_post_kinds_is_inactive(): void {
+		$this->mock_config_dependencies();
+
+		$payload = Outpost_Composer_Config_Endpoint::build_payload();
+
+		$this->assertSame( array( 'comics' => false ), $payload['postKinds'] );
+	}
+
+	public function test_post_kinds_comics_is_false_without_the_comic_card_marker(): void {
+		$this->assertFalse( class_exists( '\PKIW\Comic_Strip' ), 'Precondition: older Post Kinds, no comic card.' );
+		$this->mock_config_dependencies( true );
+
+		$payload = Outpost_Composer_Config_Endpoint::build_payload();
+
+		$this->assertSame( 'active', $payload['companions']['post-kinds'] );
+		$this->assertSame( array( 'comics' => false ), $payload['postKinds'] );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_post_kinds_comics_is_true_with_post_kinds_active_and_the_marker(): void {
+		require_once __DIR__ . '/../fixtures/pkiw/comic-strip-stub.php';
+		$this->mock_config_dependencies( true );
+
+		$payload = Outpost_Composer_Config_Endpoint::build_payload();
+
+		$this->assertSame( array( 'comics' => true ), $payload['postKinds'] );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_post_kinds_comics_is_false_with_the_marker_but_post_kinds_inactive(): void {
+		require_once __DIR__ . '/../fixtures/pkiw/comic-strip-stub.php';
+		$this->mock_config_dependencies();
+
+		$payload = Outpost_Composer_Config_Endpoint::build_payload();
+
+		$this->assertSame( array( 'comics' => false ), $payload['postKinds'] );
+	}
+
+	private function mock_config_dependencies( bool $post_kinds_active = false ): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturnUsing(
+			static fn ( string $file ): bool => $post_kinds_active && OUTPOST_POST_KINDS_PLUGIN_FILE === $file
+		);
 		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
 		WP_Mock::userFunction( 'taxonomy_exists' )->andReturn( false );
 		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
