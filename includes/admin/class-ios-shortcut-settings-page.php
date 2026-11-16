@@ -215,6 +215,9 @@ final class Outpost_IOS_Shortcut_Settings_Page {
 						<p class="description">
 							<?php esc_html_e( 'Revoking deletes the password. You can also manage it under Users → Profile → Application Passwords.', 'outpost-mobile-publishing' ); ?>
 						</p>
+						<p class="description">
+							<?php esc_html_e( 'Outpost limits this password to its Shortcut endpoint only while Outpost is active. Deactivating or deleting Outpost from the Plugins screen deletes the password. If Outpost\'s folder is ever removed some other way, revoke the password under Users → Profile → Application Passwords, because it then works like any other application password.', 'outpost-mobile-publishing' ); ?>
+						</p>
 					</form>
 				<?php endif; ?>
 			<?php endif; ?>

@@ -66,6 +66,11 @@ final class NoticeScreenScopeTest extends TestCase {
 			'Outpost main page'     => array( 'toplevel_page_outpost' ),
 			'Outpost OAuth page'    => array( 'outpost_page_outpost-oauth' ),
 			'Outpost shortcut page' => array( 'settings_page_outpost-ios-shortcut' ),
+			'Outpost settings page' => array( 'outpost_page_outpost-settings' ),
+			'Outpost appearance'    => array( 'outpost_page_outpost-appearance' ),
+			// The parent menu title is translatable, and WordPress builds the
+			// submenu screen id from it (F-64).
+			'translated parent menu' => array( 'avant-poste_page_outpost-settings' ),
 		);
 	}
 
@@ -93,6 +98,10 @@ final class NoticeScreenScopeTest extends TestCase {
 			'themes'                 => array( 'themes' ),
 			'users'                  => array( 'users' ),
 			'another plugin"s page'  => array( 'settings_page_some-other-plugin' ),
+			// Ids that merely contain "outpost" belong to other plugins (F-64).
+			'other plugin, outpost in slug' => array( 'settings_page_my-outpost-tools' ),
+			'other plugin, outpost prefix'  => array( 'toplevel_page_outpost-competitor' ),
+			'other plugin, outpost parent'  => array( 'outpost-crm_page_reports' ),
 		);
 	}
 

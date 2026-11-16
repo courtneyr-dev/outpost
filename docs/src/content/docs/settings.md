@@ -94,6 +94,8 @@ iOS Safari doesn't support the Web Share Target API, so iOS users install a smal
 1. **Install the Shortcut:** in 1.0.24 this step reads "iCloud Shortcut link is not yet published. Check back after the next plugin release." The ready-made Shortcut isn't available yet. Build your own instead with the steps in [Share to Outpost from your phone](/outpost/common-tasks/#iphone-and-ipad); it needs no token.
 2. **Site URL, user name, and password:** the ready-made Shortcut signs in with a WordPress application password. **Create Shortcut password** makes one for you through WordPress and shows it once; copy it into the Shortcut. That password works only for Outpost's Shortcut endpoint. **Replace** stops the old password at once; **Revoke** deletes it. You can also see and revoke it under Users → Profile → Application Passwords. Application passwords need HTTPS (or a local development site); the page says so when they're unavailable.
 
+The limit to the Shortcut endpoint comes from Outpost's own code, so it holds only while Outpost is active. Deactivating or deleting Outpost from the Plugins screen deletes the password. If Outpost's folder is removed any other way, such as over SFTP or by a host's file manager, no Outpost code runs to enforce the limit, and the password works like any other application password: revoke it under Users → Profile → Application Passwords.
+
 Before 1.0.27 the page issued an Outpost token instead. Updating to 1.0.27 deletes those tokens, so a Shortcut set up with one needs a new password.
 
 ## Settings that don't exist

@@ -241,6 +241,23 @@ export interface ShareInboxState {
 	candidate: SharedPhotos | null;
 }
 
+/** A record id in the service worker's format: a UUID, or time plus random digits. */
+function new_record_id(): string {
+	const c = globalThis.crypto;
+	return c && typeof c.randomUUID === 'function'
+		? c.randomUUID()
+		: String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+}
+
+/** The record, with an id added when it is a photo record without one (P4J). */
+function with_record_id(record: unknown): { record: unknown; added: boolean } {
+	if (!record || typeof record !== 'object') return { record, added: false };
+	const v = record as Record<string, unknown>;
+	if (typeof v.id === 'string' && '' !== v.id) return { record, added: false };
+	if (!(Array.isArray(v.files) && v.files.some(is_photo_record))) return { record, added: false };
+	return { record: { ...v, id: new_record_id() }, added: true };
+}
+
 /**
  * Read both inbox slots without consuming them. A share waits here until
  * the person chooses: opening Photo never removes it.
@@ -260,7 +277,28 @@ export async function read_share_inbox(
 		const store = db.transaction(SHARE_INBOX_STORE, 'readonly').objectStore(SHARE_INBOX_STORE);
 		const pending: unknown = await await_request(store.get(SHARE_INBOX_KEY));
 		const candidate: unknown = await await_request(store.get(SHARE_INBOX_CANDIDATE_KEY));
-		return { status: 'ok', pending: from_record(pending), candidate: from_record(candidate) };
+		const read: ShareInboxState = { status: 'ok', pending: from_record(pending), candidate: from_record(candidate) };
+		if (!with_record_id(pending).added && !with_record_id(candidate).added) {
+			return read;
+		}
+		// A record from a pre-1.0.28 service worker has no id, and two of
+		// those received in the same millisecond can't be told apart (P4J).
+		// Give it one, re-reading inside a readwrite transaction so the
+		// service worker's own writes wait for this one. If this device
+		// can't write, no decision can delete anything either, so the
+		// read-only result is safe to show.
+		try {
+			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
+			const rw = tx.objectStore(SHARE_INBOX_STORE);
+			const p = with_record_id(await await_request(rw.get(SHARE_INBOX_KEY)));
+			const c = with_record_id(await await_request(rw.get(SHARE_INBOX_CANDIDATE_KEY)));
+			if (p.added) rw.put(p.record, SHARE_INBOX_KEY);
+			if (c.added) rw.put(c.record, SHARE_INBOX_CANDIDATE_KEY);
+			await await_transaction(tx);
+			return { status: 'ok', pending: from_record(p.record), candidate: from_record(c.record) };
+		} catch (_err) {
+			return read;
+		}
 	} catch (_err) {
 		return unavailable;
 	} finally {

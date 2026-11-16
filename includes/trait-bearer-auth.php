@@ -13,6 +13,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait Outpost_Bearer_Auth {
 
+	/**
+	 * Token scopes Outpost's composer helper routes accept (F-56).
+	 *
+	 * Outpost's PWA always asks for `create profile update media`. A token
+	 * another client got for `read`, `profile` or `draft` alone can't use
+	 * preview, geocode, media lookup, composer-config, syndicate-targets or
+	 * appearance.
+	 */
+	public const COMPOSER_SCOPES = array( 'create', 'update' );
+
 	/*
 	 * This trait never resolves or switches users. WordPress resolves the
 	 * current user once, through the `determine_current_user` filter chain,

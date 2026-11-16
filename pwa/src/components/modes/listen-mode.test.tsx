@@ -607,6 +607,35 @@ describe('ListenMode Comic variant (#243)', () => {
 		expect(body.has('mp-cover-image-alt')).toBe(false);
 	});
 
+	// F-55: the Micropub plugin downloads `photo` with download_url(), so a
+	// cover that isn't an http(s) URL never leaves the composer.
+	it.each(['javascript:alert(1)', 'file:///etc/passwd', 'ftp://files.example.test/cover.jpg', 'data:image/png;base64,AAAA'])(
+		'never sends a non-http(s) cover %s as photo',
+		async (bad_cover) => {
+			await share_and_fill({ 'p-name': 'A Book', 'u-photo': bad_cover });
+			expect(checked_variant()).toBe('read');
+			submit();
+			await flush(4);
+
+			expect(posted_bodies.length).toBe(1);
+			const body = posted();
+			expect(body.has('photo')).toBe(false);
+			expect(body.has('photo[]')).toBe(false);
+		}
+	);
+
+	it('never sends a non-http(s) cover as mp-cover-image', async () => {
+		await share_and_fill({ 'p-name': 'The Long Night', 'u-photo': 'javascript:alert(1)' });
+		await pick('comics');
+		submit();
+		await flush(4);
+
+		expect(posted_bodies.length).toBe(1);
+		const body = posted();
+		expect(body.has('mp-cover-image')).toBe(false);
+		expect(body.has('mp-cover-image-alt')).toBe(false);
+	});
+
 	it('opens a saved comics draft on Listen when the site cannot build comic cards', async () => {
 		write_draft(
 			'listen',

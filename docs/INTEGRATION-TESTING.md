@@ -49,6 +49,20 @@ wp-env run tests-cli --env-cwd=wp-content/plugins/outpost composer test:integrat
 
 Which runs `composer test:integration` inside the wp-env tests-cli container, with the working directory set to the Outpost plugin folder. PHPUnit picks up `tests/integration/bootstrap.php` (configured in `composer.json`'s `test:integration` script), which loads the WP core test suite from `/wordpress-phpunit` and registers Outpost on `muplugins_loaded`.
 
+### Testing another checkout or worktree
+
+`npm run test:integration` tests only the checkout that wp-env mounts. To test a different checkout or `git worktree` against an environment that's already running, use `bin/itest-worktree.sh`:
+
+```bash
+# The whole suite for the checkout this script lives in
+bin/itest-worktree.sh
+
+# Another checkout, one class
+bin/itest-worktree.sh ~/Developer/outpost-other -- --filter TelegraphRequestGateTest
+```
+
+The script finds the running Outpost wp-env (or takes `--env <id>`, the folder name under `~/.wp-env`), mounts the checkout as the plugin in a one-off tests-cli container, and points WireMock at `http://host.docker.internal:8080` (override with `MOCK_URL`). Each checkout gets its own database, `outpost_itest_<folder>`, so a run never wipes another checkout's tables or the environment's `tests-wordpress` database; `--db <name>` picks a different one. The checkout needs a real `vendor/` from `composer install`; a symlinked `vendor/` doesn't resolve inside the container.
+
 ## Status
 
 The `test-integration` job in `.github/workflows/ci.yml` runs `npm run test:integration` on every push and pull request against `main`; see [CI integration](#ci-integration) below. Not every test in `tests/integration/` runs its assertions yet: see [What's still skipped](#whats-still-skipped).

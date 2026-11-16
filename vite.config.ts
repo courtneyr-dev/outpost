@@ -43,6 +43,10 @@ export default defineConfig({
 		strictPort: true,
 	},
 	resolve: {
+		// Worktrees often symlink `node_modules` from another checkout to save
+		// disk. Without this, Vite resolves the link and writes that other
+		// checkout's path into the committed source map.
+		preserveSymlinks: true,
 		alias: {
 			// Preact compat is unused (we author against the Preact API directly),
 			// but the alias keeps any dependency that imports `react` working.
