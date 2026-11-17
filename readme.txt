@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.29
+Stable tag:        1.0.30
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -102,6 +102,10 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 
 == Changelog ==
 
+= 1.0.30 =
+* Fixed: "More options" opens only in the composer mode on screen, so Home scrolls on a phone again.
+* Fixed: text typed just before a reload or switching apps stays in the draft.
+
 = 1.0.29 =
 * Added: two write abilities, manual-share and capture-syndication, each off until you turn it on under Agent abilities, and a dry run by default.
 * Security: composer helper routes need a create or update token, the composer CSP is stricter, link previews and covers accept only HTTP(S) HTML up to 5 MB, and uninstall removes every settings tab.
@@ -110,5 +114,5 @@ Earlier versions: CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
 
-= 1.0.29 =
-Adds two agent abilities, both off by default. A token with only the read scope can no longer use the composer helper routes.
+= 1.0.30 =
+Fixes Home scrolling on phones and keeps the last words typed before a reload. Includes 1.0.29: two agent abilities, both off by default. A token with only the read scope can no longer use the composer helper routes.
