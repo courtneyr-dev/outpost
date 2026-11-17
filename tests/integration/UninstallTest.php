@@ -87,6 +87,8 @@ final class UninstallTest extends TestCase {
 		update_option( 'outpost_encryption_key', base64_encode( 'k' ) );
 		update_option( 'outpost_settings', array( 'x' => 1 ) );
 		update_option( 'outpost_settings_api_keys', array( 'beehiiv_api_key' => array( 'encrypted' => 'z' ) ) );
+		// A tab a site added through `outpost_settings_tabs` (F-61).
+		update_option( 'outpost_settings_newsletter', array( 'list_id' => '42' ) );
 		update_option( 'outpost_bridgy_silos_enabled', array( 'bluesky' => true ) );
 		update_option( 'outpost_creds_notion', 'cipher' );
 		update_option( 'outpost_telegraph_author_name', 'Me' );
@@ -96,6 +98,9 @@ final class UninstallTest extends TestCase {
 		update_user_meta( $this->user_id, 'outpost_appearance_source', 'site' );
 		update_user_meta( $this->user_id, 'outpost_start_screen', 'reply' );
 		update_option( 'outpost_appearance_schema', array( 'version' => 1, 'legacy_cutoff' => 0 ) );
+		update_option( 'outpost_ios_shortcut_legacy_purged', '1', false );
+		update_option( 'outpost_ability_manual_share', true );
+		update_option( 'outpost_ability_capture_syndication', true );
 		update_user_meta( $this->user_id, 'outpost_ios_shortcut_token', 'plain-token' );
 		update_user_meta( $this->user_id, 'outpost_ios_shortcut_first_seen', '2026-09-01' );
 		update_user_meta( $this->user_id, 'outpost_dismissed_encryption_key_notice_1.0.4', '1' );
@@ -131,6 +136,7 @@ final class UninstallTest extends TestCase {
 		$this->assertFalse( get_option( 'outpost_encryption_key', false ) );
 		$this->assertFalse( get_option( 'outpost_settings', false ) );
 		$this->assertFalse( get_option( 'outpost_settings_api_keys', false ) );
+		$this->assertFalse( get_option( 'outpost_settings_newsletter', false ), 'A site-added settings tab option must not outlive uninstall (F-61).' );
 		$this->assertFalse( get_option( 'outpost_bridgy_silos_enabled', false ) );
 		$this->assertFalse( get_option( 'outpost_creds_notion', false ) );
 		$this->assertFalse( get_option( 'outpost_telegraph_author_name', false ) );
@@ -140,6 +146,9 @@ final class UninstallTest extends TestCase {
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_appearance_source', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_start_screen', true ) );
 		$this->assertFalse( get_option( 'outpost_appearance_schema', false ) );
+		$this->assertFalse( get_option( 'outpost_ios_shortcut_legacy_purged', false ) );
+		$this->assertFalse( get_option( 'outpost_ability_manual_share', false ) );
+		$this->assertFalse( get_option( 'outpost_ability_capture_syndication', false ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_ios_shortcut_token', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_ios_shortcut_first_seen', true ) );
 		$this->assertSame( '', get_user_meta( $this->user_id, 'outpost_dismissed_encryption_key_notice_1.0.4', true ) );

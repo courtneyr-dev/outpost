@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -19,6 +19,7 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
 import { PublishButton } from '../publish-button';
@@ -55,6 +56,8 @@ export interface RecipeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 }
 
 type Status =
@@ -86,14 +89,33 @@ export function minutes_to_iso8601_duration(minutes: number): string {
 	return 'PT' + String(hours) + 'H' + String(remaining) + 'M';
 }
 
-export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModeProps) {
-	const [draft] = useState(() => read_draft('recipe', token.me));
-	const [name, setName] = useState(draft_text(draft?.fields.name));
+/**
+ * Claim a share released to the Recipe tab: the shared title becomes the
+ * recipe name and the shared text goes into Notes / story. Recipe has no
+ * link field, so a shared URL isn't imported (the review shows it first).
+ * One-shot, like the other modes: the stash clears when claimed.
+ */
+function consume_share_target_for_recipe(): { name?: string; content?: string } | null {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'recipe') return null;
+	consume_share_target();
+	return {
+		...(data.title ? { name: data.title } : {}),
+		...(data.content ? { content: data.content } : {}),
+	};
+}
+
+export function RecipeMode({ token, micropubEnv, composerConfig, onSignInExpired }: RecipeModeProps) {
+	const [initial_share] = useState(consume_share_target_for_recipe);
+	// A share is a new post the person just asked for, so it wins over an
+	// unsent draft; the draft is replaced on the next save.
+	const [draft] = useState(() => (initial_share ? null : read_draft('recipe', token.me)));
+	const [name, setName] = useState(initial_share?.name ?? draft_text(draft?.fields.name));
 	const [ingredients_text, setIngredientsText] = useState(draft_text(draft?.fields.ingredients));
 	const [instructions_text, setInstructionsText] = useState(draft_text(draft?.fields.instructions));
 	const [recipe_yield, setRecipeYield] = useState(draft_text(draft?.fields.yield));
 	const [duration_minutes, setDurationMinutes] = useState(draft_text(draft?.fields.duration));
-	const [content, setContent] = useState(draft_text(draft?.fields.content));
+	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
 	const error_ref = useRef<HTMLDivElement>(null);
 	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
@@ -257,13 +279,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			setMediaEntries([]);
 		} catch (err) {
 			const message =
-				err instanceof PhotoError
-					? err.message
-					: err instanceof MicropubError
-						? err.code + ': ' + err.message
-						: err instanceof Error
-							? err.message
-							: 'Unknown error';
+				err instanceof PhotoError ? err.message : report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};

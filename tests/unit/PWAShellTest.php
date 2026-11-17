@@ -340,7 +340,11 @@ final class PWAShellTest extends TestCase {
 		$this->assertLessThan( $get_gate, $post_branch, 'The share POST branch must run before the non-GET passthrough.' );
 		$this->assertStringContainsString( "'outpost-share-inbox'", $out );
 		$this->assertStringContainsString( "form.getAll('photos')", $out );
-		$this->assertStringContainsString( "?mode=photo&shared=photos', 303", $out );
+		$this->assertStringContainsString( "'?mode=photo&shared=photos' + refused, 303", $out );
+		// T10-S3-05 v1.1: two inbox slots, never overwritten; nothing else is parked.
+		$this->assertStringContainsString( "const SHARE_INBOX_CANDIDATE_KEY = 'candidate';", $out );
+		$this->assertStringNotContainsString( 'image/heic', $out );
+		$this->assertStringNotContainsString( '.put(payload', $out );
 	}
 
 	/** @test */
@@ -361,6 +365,67 @@ final class PWAShellTest extends TestCase {
 		$this->assertNotFalse( $static_branch );
 		$this->assertNotFalse( $shell_branch );
 		$this->assertLessThan( $shell_branch, $static_branch, 'Plugin assets must keep the cache-first branch.' );
+	}
+
+	/**
+	 * Render the service worker against a manifest written to a temp dir.
+	 *
+	 * @param array<string, mixed>|null $manifest Vite manifest, or null for no build.
+	 * @return string The rendered worker.
+	 */
+	private function render_worker_with_manifest( ?array $manifest ): string {
+		$root = sys_get_temp_dir() . '/outpost-pwa-shell-' . uniqid( '', true );
+		$path = $root . '/.vite/manifest.json';
+		if ( null !== $manifest ) {
+			mkdir( $root . '/.vite', 0700, true );
+			file_put_contents( $path, (string) json_encode( $manifest ) );
+		}
+		\Outpost_PWA_Assets::override_paths_for_tests( $path, 'http://example.test/wp-content/plugins/outpost/build/pwa/' );
+		try {
+			ob_start();
+			Outpost_PWA_Shell::render_service_worker();
+			return (string) ob_get_clean();
+		} finally {
+			\Outpost_PWA_Assets::override_paths_for_tests( null, null );
+			if ( null !== $manifest ) {
+				unlink( $path );
+				rmdir( $root . '/.vite' );
+				rmdir( $root );
+			}
+		}
+	}
+
+	/** @test */
+	public function render_service_worker_precaches_the_current_bundle_so_the_first_visit_works_offline(): void {
+		$out = $this->render_worker_with_manifest(
+			array(
+				'pwa/src/index.tsx' => array(
+					'file'    => 'assets/index-AbC123.js',
+					'isEntry' => true,
+					'css'     => array( 'assets/index-DeF456.css' ),
+				),
+			)
+		);
+
+		// The first page loads the bundle before the worker controls it, so
+		// the fetch handler never sees that request; only the install-time
+		// precache can store it (common-tasks "Post while offline").
+		$this->assertStringContainsString(
+			'const BUNDLE_URLS = ["http:\/\/example.test\/wp-content\/plugins\/outpost\/build\/pwa\/assets\/index-AbC123.js","http:\/\/example.test\/wp-content\/plugins\/outpost\/build\/pwa\/assets\/index-DeF456.css"];',
+			$out,
+			'The hashed JS bundle and stylesheet must be listed, JS first.'
+		);
+		$precache = substr( $out, (int) strpos( $out, 'const PRECACHE_URLS' ) );
+		$precache = substr( $precache, 0, (int) strpos( $precache, '];' ) );
+		$this->assertStringContainsString( '...BUNDLE_URLS,', $precache, 'The install-time precache must include the bundle.' );
+	}
+
+	/** @test */
+	public function render_service_worker_stays_valid_without_a_build(): void {
+		$out = $this->render_worker_with_manifest( null );
+
+		$this->assertStringContainsString( 'const PRECACHE_URLS', $out );
+		$this->assertStringContainsString( 'const BUNDLE_URLS = [];', $out, 'No build means no bundle URLs, never a null entry.' );
 	}
 
 	/** @test */

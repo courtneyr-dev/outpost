@@ -129,12 +129,14 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 		}
 		$response = wp_remote_get(
 			self::VERIFY_ENDPOINT,
-			array(
-				'timeout' => self::VERIFY_TIMEOUT,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . (string) $creds['access_token'],
-					'Accept'        => 'application/json',
-				),
+			self::credential_request_args(
+				array(
+					'timeout' => self::VERIFY_TIMEOUT,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . (string) $creds['access_token'],
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {
@@ -177,18 +179,19 @@ final class Outpost_OAuth_Provider_Whoop extends Outpost_OAuth_Provider_Base {
 		if ( is_array( $creds ) && ! empty( $creds['access_token'] ) ) {
 			$response = wp_remote_request(
 				self::REVOKE_ENDPOINT,
-				array(
-					'method'  => 'DELETE',
-					'timeout' => self::REVOKE_TIMEOUT,
-					'headers' => array(
-						'Authorization' => 'Bearer ' . (string) $creds['access_token'],
-						'Accept'        => 'application/json',
-					),
+				self::credential_request_args(
+					array(
+						'method'  => 'DELETE',
+						'timeout' => self::REVOKE_TIMEOUT,
+						'headers' => array(
+							'Authorization' => 'Bearer ' . (string) $creds['access_token'],
+							'Accept'        => 'application/json',
+						),
+					)
 				)
 			);
-			if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-				error_log( sprintf( 'Outpost WHOOP revocation failed: %s', $response->get_error_message() ) );
+			if ( is_wp_error( $response ) ) {
+				Outpost_Debug_Log::write( sprintf( 'OAuth whoop revocation failed: %s', Outpost_Debug_Log::error_code( $response ) ) );
 			}
 		}
 		return Outpost_Credentials_Store::delete( $this->id(), $user_id );

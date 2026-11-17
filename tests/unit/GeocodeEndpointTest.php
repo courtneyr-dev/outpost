@@ -206,7 +206,7 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock above — mock_filters()'s wholesale apply_filters override is
 		// inert for this call (see "Scope source" in trait-bearer-auth.php).
-		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
 		$this->assertTrue( Outpost_Geocode_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
@@ -352,5 +352,81 @@ final class GeocodeEndpointTest extends \WP_Mock\Tools\TestCase {
 			),
 			$result
 		);
+	}
+
+	/**
+	 * Arguments the last fetch passed to wp_safe_remote_get().
+	 *
+	 * @var array<string, mixed>
+	 */
+	private array $sent_args = array();
+
+	/** What the outpost_geocode_user_agent filter returns; null passes the default through. */
+	private ?string $ua_filter_value = null;
+
+	private const SITE_SENTINEL = 'https://site-sentinel.example/blog/';
+
+	/**
+	 * Run the private Nominatim fetch with HTTP stubbed out and capture the
+	 * arguments it hands to wp_safe_remote_get().
+	 */
+	private function send_fetch(): void {
+		WP_Mock::userFunction( 'add_query_arg' )->andReturn( 'https://nominatim.openstreetmap.org/search?q=Chicago' );
+		WP_Mock::userFunction( 'home_url' )->andReturn( self::SITE_SENTINEL );
+		WP_Mock::userFunction( 'get_user_locale' )->andReturn( 'en_US' );
+		WP_Mock::userFunction( '__' )->andReturnUsing( static fn( $s ) => $s );
+		WP_Mock::userFunction( 'is_wp_error' )->andReturnUsing( static fn( $v ) => $v instanceof WP_Error );
+		if ( null !== $this->ua_filter_value ) {
+			WP_Mock::onFilter( 'outpost_geocode_user_agent' )->withAnyArgs()->reply( $this->ua_filter_value );
+		}
+		WP_Mock::userFunction( 'wp_safe_remote_get' )->andReturnUsing(
+			function ( $url, $args ) {
+				$this->sent_args = $args;
+				return new WP_Error( 'http_request_failed', 'stubbed' );
+			}
+		);
+
+		$fetch = new \ReflectionMethod( Outpost_Geocode_Endpoint::class, 'fetch_from_nominatim' );
+		$fetch->invoke( null, 'Chicago' );
+	}
+
+	private static function expected_default_user_agent(): string {
+		$version = defined( 'OUTPOST_VERSION' ) ? OUTPOST_VERSION : 'unknown';
+		return 'Outpost/' . $version . ' WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)';
+	}
+
+	/**
+	 * T11 F-51: the default User-Agent names the plugin and its directory
+	 * page, never the site's own address (home_url()).
+	 */
+	public function test_default_user_agent_carries_no_site_address(): void {
+		$this->send_fetch();
+
+		$ua = (string) ( $this->sent_args['user-agent'] ?? '' );
+		$this->assertSame( self::expected_default_user_agent(), $ua );
+		$this->assertStringNotContainsString( 'site-sentinel.example', $ua, 'The site address is not sent to Nominatim.' );
+		$this->assertStringNotContainsString( 'site-sentinel.example', (string) json_encode( $this->sent_args ), 'No request argument carries the site address.' );
+	}
+
+	/**
+	 * A site can still identify itself through the filter.
+	 */
+	public function test_the_filter_can_replace_the_user_agent(): void {
+		$this->ua_filter_value = 'ExampleSite/1.0 (admin@example.test)';
+
+		$this->send_fetch();
+
+		$this->assertSame( 'ExampleSite/1.0 (admin@example.test)', $this->sent_args['user-agent'] ?? null );
+	}
+
+	/**
+	 * A filter value carrying CR or LF falls back to the default.
+	 */
+	public function test_a_filter_value_with_a_line_break_falls_back_to_the_default(): void {
+		$this->ua_filter_value = "ExampleSite/1.0\r\nX-Injected: 1";
+
+		$this->send_fetch();
+
+		$this->assertSame( self::expected_default_user_agent(), $this->sent_args['user-agent'] ?? null );
 	}
 }

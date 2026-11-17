@@ -391,6 +391,22 @@ if ( ! class_exists( 'WP_Error' ) ) {
 			}
 			return $this->error_data[ $code ] ?? null;
 		}
+
+		public function add( $code, $message, $data = '' ): void {
+			$this->errors[ $code ][] = $message;
+			if ( '' !== $data ) {
+				$this->error_data[ $code ] = $data;
+			}
+		}
+
+		public function has_errors(): bool {
+			return array() !== $this->errors;
+		}
+
+		/** @return string[] */
+		public function get_error_codes(): array {
+			return array_keys( $this->errors );
+		}
 	}
 }
 

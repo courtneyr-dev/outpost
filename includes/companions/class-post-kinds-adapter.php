@@ -45,6 +45,7 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 			'post-kinds.listen',
 			'post-kinds.watch',
 			'post-kinds.read',
+			'post-kinds.comics',
 			'post-kinds.event',
 			'post-kinds.photo',
 			'post-kinds.video',
@@ -73,6 +74,76 @@ final class Outpost_Post_Kinds_Adapter extends Outpost_Companion_Base {
 			'post-kinds.sleep',
 			'post-kinds.craft',
 		);
+	}
+
+	/**
+	 * The title Outpost may send to another service for a post.
+	 *
+	 * Post Kinds stores a generated check-in title ("Checked in at <venue>")
+	 * in post_title and prints "Check-in, <date>" in its place when the
+	 * location is hidden. `pkiw_get_safe_title()` (PKIW 1.9.0+) returns the
+	 * title the site prints, as raw text. Without it there is no title
+	 * privacy rule, so the raw stored title is the same value.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return string Raw (not texturized) title.
+	 */
+	public static function safe_title( \WP_Post $post ): string {
+		if ( function_exists( 'pkiw_get_safe_title' ) ) {
+			return (string) pkiw_get_safe_title( (int) $post->ID );
+		}
+		return (string) $post->post_title;
+	}
+
+	/**
+	 * Whether Post Kinds registered one of its card blocks on this site.
+	 *
+	 * The editor pickers insert a card only when its block type exists, so
+	 * a Post Kinds release without the card keeps the plain paragraph.
+	 *
+	 * @param string $name Block name, e.g. `post-kinds-indieweb/sleep-card`.
+	 */
+	public static function has_card_block( string $name ): bool {
+		return class_exists( 'WP_Block_Type_Registry' ) && WP_Block_Type_Registry::get_instance()->is_registered( $name );
+	}
+
+	/**
+	 * A Post Kinds kind term in the shape the block editor's `editPost()`
+	 * takes: term ids keyed by the `kind` taxonomy's REST base.
+	 *
+	 * Empty when the taxonomy or the term doesn't exist; Post Kinds then
+	 * files the post by its first card on save.
+	 *
+	 * @param string $slug Kind slug, e.g. `sleep`.
+	 * @return array<string, list<int>>
+	 */
+	public static function kind_terms( string $slug ): array {
+		$taxonomy = get_taxonomy( 'kind' );
+		if ( ! $taxonomy instanceof WP_Taxonomy ) {
+			return array();
+		}
+		$term = get_term_by( 'slug', $slug, 'kind' );
+		if ( ! $term instanceof WP_Term ) {
+			return array();
+		}
+		$base = is_string( $taxonomy->rest_base ) && '' !== $taxonomy->rest_base ? $taxonomy->rest_base : 'kind';
+		return array( $base => array( (int) $term->term_id ) );
+	}
+
+	/**
+	 * Whether the installed Post Kinds builds the comic card.
+	 *
+	 * Post Kinds turns a Micropub `read-of` entry that carries
+	 * `pkiw-kind: comics` into a `post-kinds-indieweb/comic-card`, and
+	 * `\PKIW\Comic_Strip` ships in every release that can do that. An older
+	 * Post Kinds still sets the comics term from the hint but builds a read
+	 * card, so the composer offers its Comic variant only when this returns
+	 * true.
+	 *
+	 * @return bool
+	 */
+	public static function supports_comics(): bool {
+		return class_exists( '\PKIW\Comic_Strip' );
 	}
 
 	/**

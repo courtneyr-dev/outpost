@@ -12,12 +12,13 @@ Outpost's POSSE-outbound foundation. Every direct-API syndication destination (B
 ## Lifecycle
 
 1. User publishes a post that has `_outpost_posse_targets` set. No editor UI sets it yet; see [Choosing destinations](#choosing-destinations).
-2. `transition_post_status` fires; dispatcher checks: new=='publish', old!=new (re-publish, not edit), the current user (when there is one) can `edit_post` this post, the post author has `publish_posts`, targets non-empty.
+2. `transition_post_status` fires; dispatcher checks: new=='publish', old!=new (re-publish, not edit), the post is public (no password, and its type is `post` or one the `outpost_posse_post_types` filter adds), the current user (when there is one) can `edit_post` this post, the post author has `publish_posts`, targets non-empty.
 3. For each target not already in `_outpost_posse_in_flight`:
    - `outpost_posse_should_dispatch` filter veto check (default true; site owners can skip per-destination).
    - Add to in-flight (idempotency seal).
    - Schedule wp-cron event `outpost_posse_dispatch` at +30s with `[ post_id, destination_id, attempt = 1 ]`.
 4. Cron fires → `handle_dispatch( $post_id, $destination_id, $attempt )`:
+   - Re-read the post. If it was deleted, exit without writing anything. If it's no longer public (status other than `publish`, a password, or a type outside `outpost_posse_post_types`), record the non-retrying failure `post_not_public`, remove it from in-flight, and exit. This runs on every attempt, retries included, so a post made draft, private, trashed or password-protected after scheduling is never sent.
    - Resolve destination via registry; missing → record failure, exit.
    - Fire `outpost_posse_before_dispatch` action.
    - Call `$destination->dispatch( $post_id )`.
@@ -61,6 +62,7 @@ After three attempts, the dispatcher records a permanent failure and the destina
 
 ## Filters and actions
 
+- **Filter `outpost_posse_post_types`** (scheduler, dispatcher and each destination): receives `string[] $types`, default `array( 'post' )`. Only posts of these types are scheduled or sent.
 - **Filter `outpost_posse_destinations`** (registry): accept `array<string,Outpost_POSSE_Destination_Base>` keyed by id; site owners can append, remove, or replace destinations.
 - **Filter `outpost_posse_should_dispatch`** (dispatcher, per-destination): receives `(bool $should, int $post_id, string $destination_id)`. Returning false skips that destination for that post.
 - **Action `outpost_posse_before_dispatch`** (`int $post_id, string $destination_id, int $attempt`): fires before each attempt. Useful for logging.
@@ -110,7 +112,7 @@ The four canonical keys, all keyed by post id:
 - **`_outpost_posse_failures`** (`array<{destination_id, error, attempted_at, attempt_count}>`) — permanent failures.
 - **`_outpost_posse_in_flight`** (`string[]`) — currently scheduled or retrying.
 
-All four are `register_post_meta`'d on `init` for the `post` post type with `show_in_rest`, the auth callback gating writes on `edit_post` cap.
+All four are `register_post_meta`'d on `init` for the `post` post type with `show_in_rest`, the auth callback gating writes on `edit_post` cap, and a sanitize callback on each. `_outpost_posse_failures` and `_outpost_posse_in_flight` appear only in `context=edit` responses, which the core posts route serves only to a user who can edit the post, so a public read of a published post never shows them.
 
 Nothing in Outpost reads `_outpost_posse_failures` back: no admin notice, list-table column, or editor panel shows POSSE failures. Read the meta with `get_post_meta( $post_id, '_outpost_posse_failures', true )`, `wp post meta get <id> _outpost_posse_failures --format=json`, or `GET /wp-json/wp/v2/posts/<id>?context=edit`.
 

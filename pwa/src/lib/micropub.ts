@@ -37,13 +37,77 @@ export class MicropubError extends Error {
 			| 'no_endpoint'
 			| 'post_failed'
 			| 'no_location'
-			| 'invalid_location',
+			| 'invalid_location'
+			| 'unauthorized',
 		/** HTTP status when the server answered; absent when fetch itself threw. */
 		public readonly status?: number,
 	) {
 		super(message);
 		this.name = 'MicropubError';
 	}
+}
+
+export type PostFailureKind =
+	| 'expired_sign_in'
+	| 'forbidden'
+	| 'server_error'
+	| 'not_accepted'
+	| 'no_endpoint'
+	| 'bad_link'
+	| 'unknown';
+
+export interface PostFailure {
+	kind: PostFailureKind;
+	/** Plain composer copy. Never carries the code, the status, or the server's body. */
+	message: string;
+}
+
+const POST_FAILURE_MESSAGES: Record<PostFailureKind, string> = {
+	expired_sign_in: "Your sign-in expired, so this wasn't posted. Everything you entered is still here. Sign in again, then post it.",
+	forbidden: "Your site didn't let this sign-in create posts, so this wasn't posted. Everything you entered is still here. About › Diagnostics shows what this sign-in can do.",
+	server_error: "Your site had a problem and didn't post this. Everything you entered is still here, so you can try again.",
+	not_accepted: "Your site didn't accept this post. Everything you entered is still here; check it and try again.",
+	no_endpoint: "Outpost couldn't find where your site accepts posts, so this wasn't posted. Everything you entered is still here, so you can try again.",
+	bad_link: "Your site answered, but its reply didn't include a link Outpost can use. Check your site before posting again, in case this is already there.",
+	unknown: "Something went wrong and this wasn't posted. Everything you entered is still here, so you can try again.",
+};
+
+/**
+ * Turn a failed submit into composer copy (implementation brief section 7):
+ * an expired sign-in (401), a refusal (403) and a server failure (5xx) each
+ * get their own message, and none of them shows the code, the HTTP status or
+ * the server's body. Callers log the error itself for debugging.
+ */
+export function describe_post_failure(err: unknown): PostFailure {
+	let kind: PostFailureKind = 'unknown';
+	if (err instanceof MicropubError) {
+		if (err.code === 'unauthorized' || err.status === 401) {
+			kind = 'expired_sign_in';
+		} else if (err.status === 403) {
+			kind = 'forbidden';
+		} else if (err.status !== undefined && err.status >= 500) {
+			kind = 'server_error';
+		} else if (err.code === 'no_endpoint' || err.code === 'discovery_failed') {
+			kind = 'no_endpoint';
+		} else if (err.code === 'no_location' || err.code === 'invalid_location') {
+			kind = 'bad_link';
+		} else {
+			kind = 'not_accepted';
+		}
+	}
+	return { kind, message: POST_FAILURE_MESSAGES[kind] };
+}
+
+/**
+ * The composer modes' catch handler for a failed submit: logs the raw error
+ * (the diagnostics stay in the console), asks the shell for a fresh sign-in
+ * on a 401, and returns the plain message to show.
+ */
+export function report_post_failure(err: unknown, onSignInExpired?: () => void): string {
+	const failure = describe_post_failure(err);
+	if (typeof console !== 'undefined') console.warn('Outpost: post failed', err);
+	if (failure.kind === 'expired_sign_in') onSignInExpired?.();
+	return failure.message;
 }
 
 export interface PostNoteParams {
@@ -197,6 +261,23 @@ export interface HEntryProperties {
 	 * sibling property — see listen-mode.tsx for the routing.
 	 */
 	'mp-place-name'?: string;
+	/**
+	 * Comic details Post Kinds' comic card reads from a `read-of` entry
+	 * sent with `pkiw-kind: comics`. Dates are `YYYY-MM-DD`.
+	 */
+	'mp-series'?: string;
+	'mp-volume'?: string;
+	'mp-issue-number'?: string;
+	'mp-publisher'?: string;
+	'mp-started-at'?: string;
+	'mp-finished-at'?: string;
+	/**
+	 * Cover image URL and its alt text for kinds whose card shows a cover
+	 * (comics). Unlike `photo`, the Micropub plugin doesn't download it into
+	 * the media library.
+	 */
+	'mp-cover-image'?: string;
+	'mp-cover-image-alt'?: string;
 }
 
 export interface SyndicationTarget {
@@ -404,19 +485,14 @@ async function safe_read_text(response: Response): Promise<string> {
 }
 
 /**
- * Run a Micropub `?q=` query, keeping the token out of the URL unless the
- * host makes that impossible.
+ * Run a Micropub `?q=` query with the bearer in the Authorization header.
  *
- * The bearer goes in the Authorization header. Some managed hosts strip that
- * header, and the Micropub spec allows a GET query to carry the bearer as an
- * `access_token` parameter instead — but a query string is logged by the
+ * The token never goes in the URL. The Micropub spec allows a GET query to
+ * carry it as an `access_token` parameter, but a query string is logged by the
  * origin, by any reverse proxy or CDN in front of it, and is part of the cache
- * key, so sending it unconditionally leaked a live credential into logs on
- * every host including the ones where the header arrives intact.
- *
- * So: header first, and fall back to the parameter only after a 401, which is
- * what a stripped header looks like from here. A 403 is a permissions answer,
- * not a missing credential, so it is not retried.
+ * key. A 401 means the site refused this token (expired, revoked, or a host
+ * that strips the header), so it raises `unauthorized` and the person signs in
+ * again; it is never retried.
  */
 async function micropub_query(
 	micropub_endpoint: string,
@@ -426,15 +502,18 @@ async function micropub_query(
 	context: string,
 ): Promise<Response> {
 	const separator = micropub_endpoint.includes('?') ? '&' : '?';
-	const base = micropub_endpoint + separator + 'q=' + encodeURIComponent(query);
-	const headers = {
-		Authorization: 'Bearer ' + access_token,
-		Accept: 'application/json',
-	};
+	const url = micropub_endpoint + separator + 'q=' + encodeURIComponent(query);
 
 	let response: Response;
 	try {
-		response = await env.fetch(base, { method: 'GET', headers, credentials: 'omit' });
+		response = await env.fetch(url, {
+			method: 'GET',
+			headers: {
+				Authorization: 'Bearer ' + access_token,
+				Accept: 'application/json',
+			},
+			credentials: 'omit',
+		});
 	} catch (err) {
 		throw new MicropubError(
 			context + ': fetch threw — ' + (err instanceof Error ? err.message : String(err)),
@@ -442,21 +521,15 @@ async function micropub_query(
 		);
 	}
 
-	if (response.status !== 401) {
-		return response;
-	}
-
-	// Header path rejected. Retry once with the token in the query string, the
-	// only option left on a host that strips Authorization.
-	const fallback_url = base + '&access_token=' + encodeURIComponent(access_token);
-	try {
-		return await env.fetch(fallback_url, { method: 'GET', headers, credentials: 'omit' });
-	} catch (err) {
+	if (response.status === 401) {
 		throw new MicropubError(
-			context + ': fetch threw — ' + (err instanceof Error ? err.message : String(err)),
-			'discovery_failed',
+			context + ': the site no longer accepts this sign-in (401).',
+			'unauthorized',
+			401,
 		);
 	}
+
+	return response;
 }
 
 /**

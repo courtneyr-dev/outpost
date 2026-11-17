@@ -1,0 +1,75 @@
+{
+  "name": "outpost",
+  "root": "../..",
+  "baseUrl": "http://localhost:8883",
+  "runsDir": "tests/web-testing/output",
+  "lifecycle": {
+    "start": ["studio", "start", "-p", "~/Studio/outpost-bombadil"],
+    "ready": "http://localhost:8883/post/",
+    "readyTimeoutSeconds": 120,
+    "reset": ["sh", "tests/web-testing/reset.sh"],
+    "stop": ["studio", "stop", "-p", "~/Studio/outpost-bombadil"],
+    "timeoutSeconds": 300
+  },
+  "checks": [
+    {
+      "id": "journeys",
+      "uses": "playwright",
+      "describe": "Home, tabs and footer navigation, draft save and restore, publish confirmed through WP-CLI, start screen, Light/Dark/System, style source, About, logo, subscriber permissions, expired sign-in.",
+      "command": ["npx", "-y", "-p", "node@24", "npx", "playwright", "test", "-c", "tests/web-testing/playwright.config.ts", "--grep", "@journey", "--project", "desktop", "--project", "pixel7"],
+      "results": "${RUN_DIR}/playwright/results.json",
+      "projects": ["desktop", "pixel7"],
+      "budgetMinutes": 15,
+      "coverageNote": "Each assertion cites its requirement document in specs/journeys.spec.ts. Server outcomes are read through WP-CLI on the Studio site."
+    },
+    {
+      "id": "a11y",
+      "uses": "playwright",
+      "tool": "axe-core",
+      "describe": "axe (WCAG 2.0-2.2 A/AA tags) at Home light and dark, the Post composer, the Preferences sheet, About, the expired sign-in banner, a rejected post, and the sign-in screen.",
+      "command": ["npx", "-y", "-p", "node@24", "npx", "playwright", "test", "-c", "tests/web-testing/playwright.config.ts", "--grep", "@a11y", "--project", "desktop", "--project", "pixel7"],
+      "projects": ["desktop", "pixel7"],
+      "budgetMinutes": 10,
+      "coverageNote": "Rule ids and targets per state are attached as axe-<state>.json. An axe pass is not WCAG conformance."
+    },
+    {
+      "id": "visual",
+      "uses": "playwright",
+      "describe": "Home in Light, Dark and System (device dark) and the Post composer in Light and Dark, against reviewed baselines in specs/__screenshots__.",
+      "command": ["npx", "-y", "-p", "node@24", "npx", "playwright", "test", "-c", "tests/web-testing/playwright.config.ts", "--grep", "@visual", "--project", "desktop", "--project", "pixel7"],
+      "projects": ["desktop", "pixel7"],
+      "budgetMinutes": 8,
+      "coverageNote": "Compares only; never writes baselines (updateSnapshots: none)."
+    },
+    {
+      "id": "network",
+      "uses": "playwright",
+      "tool": "msw",
+      "describe": "MSW (@msw/playwright) answers for Micropub posts and the composer config: success, 401, 403, 500, network failure, no answer. Service workers blocked; unhandled requests fail.",
+      "command": ["npx", "-y", "-p", "node@24", "npx", "playwright", "test", "-c", "tests/web-testing/playwright.config.ts", "--project", "network"],
+      "projects": ["network"],
+      "budgetMinutes": 8,
+      "coverageNote": "Mocked responses show what the UI does with them; they never prove the real backend."
+    },
+    {
+      "id": "pwa",
+      "uses": "playwright",
+      "describe": "The real service worker: registration and scope, install precache, offline launch, REST never cached, offline queue publishing on reconnect (server-confirmed), update to a new plugin version, manifest install and share-target fields.",
+      "command": ["npx", "-y", "-p", "node@24", "npx", "playwright", "test", "-c", "tests/web-testing/playwright.config.ts", "--project", "pwa"],
+      "projects": ["pwa"],
+      "budgetMinutes": 8,
+      "coverageNote": "No MSW. The update test edits OUTPOST_VERSION in the site's installed copy and restores it; reset.sh reinstalls HEAD regardless."
+    },
+    {
+      "id": "bombadil",
+      "uses": "bombadil",
+      "describe": "Bounded Bombadil exploration of /post/ with tests/bombadil/spec.ts properties (draft saved, scroll lock released, one drawer at a time, queue badge label).",
+      "options": {
+        "spec": "${ROOT}/tests/bombadil/spec.ts",
+        "origin": "http://localhost:8883/post/",
+        "allow": ["http://localhost:8883/post/*"]
+      },
+      "budgetMinutes": 8
+    }
+  ]
+}

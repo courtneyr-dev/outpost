@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { begin_login, handle_callback, AuthFlowError, type AuthFlowEnvironment } from './auth-flow';
-import { read_token } from './token-store';
+import { read_token, write_token } from './token-store';
+import {
+	SHARE_INBOX_CANDIDATE_KEY,
+	SHARE_INBOX_KEY,
+	read_share_inbox,
+	stash_shared_photos,
+} from './share-inbox';
 
 class MemoryStorage implements Storage {
 	private store = new Map<string, string>();
@@ -199,6 +205,27 @@ describe('handle_callback', () => {
 		).rejects.toMatchObject({ code: 'exchange_failed' });
 	});
 
+	it.each([
+		['user info', 'https://someone@courtneyr.dev/'],
+		['not a URL', 'courtneyr.dev'],
+	])('refuses, and stores nothing, when the verified me has no exact account identity (%s) (T10-S3-07)', async (_label, bad_me) => {
+		env.sessionStorage.setItem('outpost.auth.state', 's');
+		env.sessionStorage.setItem('outpost.auth.verifier', 'v');
+		env.sessionStorage.setItem('outpost.auth.token_endpoint', 'https://a/token');
+		env.indieauth.fetch = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ access_token: 'token-xyz', token_type: 'Bearer', scope: 'create', me: bad_me }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		);
+
+		await expect(handle_callback({ code: 'c', state: 's' }, client_id, redirect_uri, env)).rejects.toMatchObject({
+			code: 'me_mismatch',
+		});
+		expect(await read_token(env.tokenStore)).toBeNull();
+	});
+
 	it('throws when token endpoint returns 4xx', async () => {
 		env.sessionStorage.setItem('outpost.auth.state', 's');
 		env.sessionStorage.setItem('outpost.auth.verifier', 'v');
@@ -209,5 +236,111 @@ describe('handle_callback', () => {
 		await expect(
 			handle_callback({ code: 'c', state: 's' }, client_id, redirect_uri, env),
 		).rejects.toThrow(/400/);
+	});
+});
+
+/**
+ * F-46 defense in depth: a device that was never signed out (a dead token and
+ * "Sign in again", or a cleared site cookie) can still hold the earlier
+ * account's pending shares. The callback clears them before it stores the
+ * new account's token, and keeps no token when it can't.
+ */
+describe('handle_callback clears pending shares before storing the new account (F-46)', () => {
+	const client_id = 'https://courtneyr.dev/post/';
+	const redirect_uri = 'https://courtneyr.dev/post/auth/callback';
+	const me = 'https://b.example/';
+	const SESSION_KEYS = ['outpost.share_target', 'outpost.share_review', 'outpost.share_review_candidate'];
+
+	function photo(title: string): { files: File[]; title: string; text: string; received: number } {
+		return {
+			files: [new File([new Uint8Array([1, 2, 3])], title + '.jpg', { type: 'image/jpeg' })],
+			title,
+			text: '',
+			received: 1,
+		};
+	}
+
+	function ready_env(inbox_idb: IDBFactory | undefined): AuthFlowEnvironment {
+		const env = make_env(
+			vi.fn(
+				async () =>
+					new Response(
+						JSON.stringify({ access_token: 'token-b', token_type: 'Bearer', scope: 'create', me }),
+						{ status: 200, headers: { 'Content-Type': 'application/json' } },
+					),
+			),
+		);
+		env.shareInbox = { indexedDB: inbox_idb };
+		env.sessionStorage.setItem('outpost.auth.state', 'state-b');
+		env.sessionStorage.setItem('outpost.auth.verifier', 'verifier-b');
+		env.sessionStorage.setItem('outpost.auth.me', me);
+		env.sessionStorage.setItem('outpost.auth.token_endpoint', 'https://b.example/token');
+		env.sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'note', content: 'A text' }));
+		env.sessionStorage.setItem('outpost.share_review', JSON.stringify({ tab: 'reply', url: 'https://a.example/private' }));
+		env.sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'photo', sharedPhotos: true }));
+		return env;
+	}
+
+	it('empties the sessionStorage slots and both inbox records, then stores the token', async () => {
+		const inbox_idb = new IDBFactory();
+		await stash_shared_photos(photo('A-pending'), { indexedDB: inbox_idb }, SHARE_INBOX_KEY);
+		await stash_shared_photos(photo('A-held'), { indexedDB: inbox_idb }, SHARE_INBOX_CANDIDATE_KEY);
+		const env = ready_env(inbox_idb);
+
+		await handle_callback({ code: 'code-b', state: 'state-b' }, client_id, redirect_uri, env);
+
+		expect((await read_token(env.tokenStore))?.accessToken).toBe('token-b');
+		for (const key of SESSION_KEYS) expect(env.sessionStorage.getItem(key), key).toBeNull();
+		const state = await read_share_inbox({ indexedDB: inbox_idb });
+		expect(state.status).toBe('ok');
+		expect(state.pending).toBeNull();
+		expect(state.candidate).toBeNull();
+	});
+
+	it('doesn’t store the new token, and leaves the earlier sign-in alone, when the inbox can’t be cleared', async () => {
+		const broken = {
+			open: (): IDBOpenDBRequest => {
+				const req = { error: new DOMException('blocked'), onerror: null as null | (() => void) };
+				setTimeout(() => req.onerror?.(), 0);
+				return req as unknown as IDBOpenDBRequest;
+			},
+		} as unknown as IDBFactory;
+		const env = ready_env(broken);
+		await write_token({ accessToken: 'token-a', tokenType: 'Bearer', scope: 'create', me: 'https://a.example/' }, env.tokenStore);
+
+		const error = await handle_callback({ code: 'code-b', state: 'state-b' }, client_id, redirect_uri, env).then(
+			() => null,
+			(err: unknown) => err,
+		);
+
+		expect(error).toBeInstanceOf(AuthFlowError);
+		expect((await read_token(env.tokenStore))?.accessToken).toBe('token-a');
+	});
+
+	it('doesn’t store the new token when a share slot can’t be removed but stays readable (P4A-01)', async () => {
+		const env = ready_env(new IDBFactory());
+		const storage = env.sessionStorage;
+		env.sessionStorage = {
+			getItem: (k: string) => storage.getItem(k),
+			setItem: (k: string, v: string) => storage.setItem(k, v),
+			removeItem: (k: string) => {
+				if (SESSION_KEYS.includes(k)) throw new DOMException('removal refused');
+				storage.removeItem(k);
+			},
+			clear: () => storage.clear(),
+			key: (i: number) => storage.key(i),
+			get length() {
+				return storage.length;
+			},
+		};
+
+		const error = await handle_callback({ code: 'code-b', state: 'state-b' }, client_id, redirect_uri, env).then(
+			() => null,
+			(err: unknown) => err,
+		);
+
+		expect(error).toBeInstanceOf(AuthFlowError);
+		expect((error as AuthFlowError).code).toBe('shares_not_cleared');
+		expect(await read_token(env.tokenStore)).toBeNull();
 	});
 });

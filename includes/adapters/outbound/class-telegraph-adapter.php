@@ -107,21 +107,42 @@ final class Outpost_Telegraph_Adapter {
 	 * @param WP_Post $post       Post object.
 	 */
 	public static function maybe_syndicate_on_publish( string $new_status, string $old_status, $post ): void {
-		// Telegraph publishes a public copy of the post; a password
-		// protected post must never leave the site through it. Check the
-		// type first so a non-WP_Post value (the hook's $post argument is
-		// untyped) never reaches the property read below.
-		if ( ! $post instanceof \WP_Post || '' !== (string) $post->post_password ) {
-			return;
-		}
-		// Fail closed. Registration is gated too, but syndicate() is also
-		// reachable directly (WP-CLI, a site's own code), so consent is
-		// checked here rather than only at hook-registration time.
-		if ( ! self::is_enabled() ) {
+		// Check the type first so a non-WP_Post value (the hook's $post
+		// argument is untyped) never reaches a property read.
+		if ( ! $post instanceof \WP_Post ) {
 			return;
 		}
 		if ( 'publish' !== $new_status || 'publish' === $old_status ) {
 			return;
+		}
+		if ( ! self::may_syndicate( $post ) ) {
+			return;
+		}
+		// Already syndicated → defer to update path (out of G9 scope).
+		if ( '' !== (string) get_post_meta( $post->ID, self::POST_URL_META, true ) ) {
+			return;
+		}
+		self::syndicate( $post );
+	}
+
+	/**
+	 * Whether Telegraph may send this post. Telegraph publishes a public
+	 * copy, so it needs: Telegraph enabled (consent), a published post of an
+	 * allowed type, no password, and no per-post skip flag. The publish hook
+	 * and syndicate() both check this, because syndicate() is public and
+	 * reachable from WP-CLI or a site's own code (Phase 4 review P4A-06).
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param WP_Post $post Post object.
+	 * @return bool
+	 */
+	public static function may_syndicate( \WP_Post $post ): bool {
+		if ( ! self::is_enabled() ) {
+			return false;
+		}
+		if ( 'publish' !== $post->post_status || '' !== (string) $post->post_password ) {
+			return false;
 		}
 		/**
 		 * Filter the post types that Telegraph syndicates.
@@ -130,17 +151,9 @@ final class Outpost_Telegraph_Adapter {
 		 */
 		$allowed_types = apply_filters( 'outpost_telegraph_post_types', array( 'post' ) );
 		if ( ! in_array( $post->post_type, (array) $allowed_types, true ) ) {
-			return;
+			return false;
 		}
-		// Per-post skip override.
-		if ( '1' === (string) get_post_meta( $post->ID, self::SKIP_POST_META, true ) ) {
-			return;
-		}
-		// Already syndicated → defer to update path (out of G9 scope).
-		if ( '' !== (string) get_post_meta( $post->ID, self::POST_URL_META, true ) ) {
-			return;
-		}
-		self::syndicate( $post );
+		return '1' !== (string) get_post_meta( $post->ID, self::SKIP_POST_META, true );
 	}
 
 	/**
@@ -155,6 +168,9 @@ final class Outpost_Telegraph_Adapter {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public static function syndicate( \WP_Post $post ) {
+		if ( ! self::may_syndicate( $post ) ) {
+			return new \WP_Error( 'outpost_telegraph_not_allowed', __( 'Telegraph is off, or this post is not a published, unprotected post it may send.', 'outpost-mobile-publishing' ) );
+		}
 		$user_id = (int) $post->post_author;
 		if ( $user_id <= 0 ) {
 			return new \WP_Error( 'outpost_telegraph_no_author', __( 'Post has no author.', 'outpost-mobile-publishing' ) );
@@ -190,16 +206,18 @@ final class Outpost_Telegraph_Adapter {
 
 		$response = wp_remote_post(
 			self::API_BASE . '/createPage',
-			array(
-				'timeout' => 10,
-				'body'    => array(
-					'access_token'   => $token,
-					'title'          => (string) $post->post_title,
-					'author_name'    => $author_name,
-					'author_url'     => $author_url,
-					'content'        => wp_json_encode( $dom ),
-					'return_content' => 'false',
-				),
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout' => 10,
+					'body'    => array(
+						'access_token'   => $token,
+						'title'          => Outpost_Post_Kinds_Adapter::safe_title( $post ),
+						'author_name'    => $author_name,
+						'author_url'     => $author_url,
+						'content'        => wp_json_encode( $dom ),
+						'return_content' => 'false',
+					),
+				)
 			)
 		);
 
@@ -253,13 +271,15 @@ final class Outpost_Telegraph_Adapter {
 
 		$response = wp_remote_post(
 			self::API_BASE . '/createAccount',
-			array(
-				'timeout' => 10,
-				'body'    => array(
-					'short_name'  => $short_name,
-					'author_name' => $author,
-					'author_url'  => $author_url,
-				),
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout' => 10,
+					'body'    => array(
+						'short_name'  => $short_name,
+						'author_name' => $author,
+						'author_url'  => $author_url,
+					),
+				)
 			)
 		);
 		$parsed   = self::parse_response( $response );

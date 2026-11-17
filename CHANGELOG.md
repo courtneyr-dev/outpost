@@ -7,18 +7,102 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.0.27] - 2026-11-13
+## [1.0.30] - Unreleased
+
+### Fixed
+
+- Leaving "More options" open no longer opens it in all six composer modes on the next visit. Every mode is mounted at once, and each kept its own copy of the saved preference, so five hidden drawers stayed open and locked page scrolling: Home couldn't scroll on a phone. The drawer now opens only in the mode on screen, and opening or closing it in one mode applies to all of them.
+- Text typed in the last 600 ms before a reload, a closed tab, or switching away from the app is now kept in the draft. Drafts save 600 ms after typing stops, and a page that was leaving dropped the pending save. The composer now writes it as soon as the page hides.
+
+## [1.0.29] - Unreleased
 
 ### Added
 
-- Added three public, read-only WordPress abilities: `outpost/get-syndicate-targets`, `outpost/get-share-status`, and `outpost/get-composer-config`. They reuse the REST payload builders without applying REST permission filters, bearer-token scopes, or the composer-config route's rate-limit transient (#321).
+- Two non-public write abilities for the WordPress Abilities API, `outpost/manual-share` and `outpost/capture-syndication`. Each has its own switch (`outpost_ability_manual_share`, `outpost_ability_capture_syndication`), off by default, under the settings screen's "Agent abilities" section; a switch reads as on only for `true`, `1` and `"1"`. The permission check runs the switch first, then the same credential gate as the matching write routes (a cookie session needs a REST nonce, a token needs the `create` or `update` scope), then `edit_post` on an existing post; no route permission filter applies. Both default to `dry_run`, which writes nothing and stays on for `"true"`, `"1"` and `1`; only `false`, `0`, `"0"` or `"false"` writes. Manual share reports `written` only when the share log gained an entry. Capture keeps the REST route's order (URL check, share-log entry, platform-mismatch warning, dry run, write) and trims its input as the route does. Uninstall deletes both options.
+
+### Security
+
+- WordPress.org review T11 items deferred from 1.0.28 (#342):
+  - Preview, geocode, media lookup, composer-config, syndicate-targets and appearance routes need a `create` or `update` token; a token with only `read`, `profile` or `draft` is refused (F-56). Outpost's PWA asks for `create profile update media`, so it's unaffected. The read abilities keep their own scopes.
+  - The composer's Content Security Policy reads filtered directives case-insensitively, keeps the first copy, always sets `default-src`, `frame-ancestors`, `object-src` and `base-uri`, strips loosening tokens from `script-src`, and removes `script-src-elem` and `script-src-attr` (F-58).
+  - Link-preview fetches through `Og_Inbound::fetch()` read at most 5 MB and accept only HTML (F-59). Listen mode sends a cover only when it's an HTTP(S) URL (F-55).
+  - The Perfmatters defang list accepts only `perfmatters_*` hooks (F-60). Admin notices match Outpost's five page slugs only (F-64).
+  - Uninstall deletes every `outpost_settings_{tab_id}` option (F-61), and settings and appearance saves sanitize keys where they read them (F-62).
+  - A photo-inbox record from a pre-1.0.28 service worker gets an id, so two records received in the same millisecond no longer look identical.
+
+## [1.0.28] - Unreleased
+
+### Security
+
+- WordPress.org review T11 remediation, kept at 1.0.28:
+  - After a 401, the composer no longer repeats a Micropub query with the access token in the URL (the 1.0.12 fallback). It shows its sign-in-again message instead, and no request URL carries the token (F-45). On a host that strips the Authorization header, media-endpoint and syndication-target discovery now fail until the host passes the header through, as the documentation's sign-in fixes describe.
+  - Signing out clears shared content waiting for Use or Discard, in the tab, in any other open tab (through a share epoch in localStorage; a review left open there closes as expired) and in the service worker's share inbox, before it reports success, and reads each slot back; if a share can't be removed, sign-out says so and keeps the person signed in. Signing in clears anything left from an earlier session, so a share that arrived while signed out is discarded at the next sign-in (F-46).
+  - The eight `outpost_*_permission` filters can only refuse. They run after the credential and capability checks pass and start from `true`, and a request with no credential and no logged-in user is refused before any filter runs, so a filter can no longer admit an anonymous request (F-47).
+  - Syndication sends only a published post without a password, at scheduling and again at every attempt, retries included. A post made private, drafted, trashed or password-protected before it goes out stops with the non-retrying reason `post_not_public`, and Kit, Beehiiv, Buttondown and Write.as each refuse it on their own too. Only `post` is syndicated unless the new `outpost_posse_post_types` filter adds a type, so pages no longer are (F-48).
+  - `_outpost_posse_failures` and `_outpost_posse_in_flight` appear in REST responses only with `context=edit`, and both meta keys sanitize on save (F-49).
+  - The fetch-recent endpoint passes card payloads through only after checking them: at most five registered `post-kinds-indieweb/` blocks with their declared scalar attributes, existing terms of registered taxonomies, and a date at noon (F-43).
+  - Fetch-recent responses carry dates, not clock times: `fetched_at` is the day, no Oura, Polar or WHOOP item puts a start or creation time in post meta, and an item without an id gets a keyed `wp_hash()` id instead of an `md5()` of its start time (F-44).
+  - Requests that carry a stored provider token or a syndication API key, Telegraph's included, follow no redirect and read at most 5 MiB (F-54).
+  - Telegraph's `syndicate()` repeats the publish hook's checks (Telegraph on, a published post of an allowed type, no password, no skip flag) and sends nothing otherwise.
+  - A settings save always needs `manage_options`; the capability a tab sets through `outpost_settings_tabs` can only add to it. The Appearance save checks its nonce and capability at the top of its own handler.
+  - The fetch-recent route no longer returns a provider's `post_meta`, and the editor picker no longer applies it.
+- Posts sent to Telegraph, Kit, Beehiiv, Buttondown and Write.as, and the manual-share caption, use the title the site prints: Post Kinds' safe title (`pkiw_get_safe_title()`, Post Kinds 1.9.0+). A check-in with a hidden location no longer sends its stored "Checked in at <venue>" title off the site (#242).
+
+### Added
+
+- A Comic variant under Doing that sends a Post Kinds comic card: `read-of` with `pkiw-kind: comics`, creators, series, volume, issue number, publisher, started and finished dates, read status and rating. It shows only when the site's Post Kinds builds the comic card (`postKinds.comics` in the composer config, from `\PKIW\Comic_Strip`). A cover from the shared link goes out as `mp-cover-image`, never as `photo` (#243).
+- With Post Kinds active, the editor's Oura picker inserts a Post Kinds sleep card with the night's duration, files the post under the sleep kind and dates it at noon of the night. No bedtime, wake time or clock time reaches the card, the content or the meta (#260).
+- With Post Kinds active, the editor's Polar picker inserts a Post Kinds exercise card with the activity, distance and duration and files the post under the exercise kind. The card keeps distance and duration private until its author opts in; the start time and calories stay out of the card, the content and the meta (#259).
 
 ### Changed
 
+- The manual-share status badge escapes each part as it prints it, with no `phpcs:ignore` (F-50).
+- Nominatim requests identify as `Outpost/<version> WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)` instead of naming the site (F-51).
+- The POT includes the block-editor sidebar's strings from `build/index.js` (F-52).
+- `.distignore` leaves out source maps, `README.md`, `playwright.config.ts` and `webpack.config.js`, so the site deploy matches the WordPress.org package (F-53).
+- readme: External services says what Telegraph receives (the author name and URL, and the site's name and address at account creation) and that connecting Polar sends the WordPress user ID as its member ID. The offline FAQ, which repeated the description, is gone.
+
+### Fixed
+
+- The composer shell opts out of page optimizers on its own routes: Perfmatters, WP Rocket, Autoptimize and LiteSpeed Cache no longer rewrite its stylesheets or scripts into inline loaders its CSP blocks. The CSP is unchanged, and every other page keeps its optimizers (#320).
+- A stored share whose tab isn't a composer mode no longer opens a blank composer; the saved start screen opens instead (#323).
+- The Appearance settings preview draws the composer's two-row tab group with the composer's own rules, in both day and night previews (#324).
+
+## [1.0.27] - Unreleased
+
+### Security
+
+- WordPress.org review T10 remediation (Phase 3 Waves 1 to 3), kept at 1.0.27:
+  - Share intake holds shared content for an explicit Use or Discard; photo shares are size- and type-limited before they're stored.
+  - Cookie-authenticated REST requests fail closed without a valid nonce; preview binds a client-supplied `source_id` to the URL.
+  - Fetch-recent accepts only first-party wp-admin sessions; connected Notion content reaches only the Outpost PWA client.
+  - Offline queued posts are bound to the exact account that queued them; sign-out clears the sign-in before removing queued posts.
+  - The preview fetcher refuses IANA special-purpose ranges, 6to4, Teredo, and IPv6 multicast, and caps responses at 5 MiB in the transport.
+  - The Test fetch-recent provider and the WireMock rewriter are no longer shipped; logging is debug-only and carries no secrets.
+  - Stored API keys are never rendered into settings forms and are kept unless explicitly replaced or removed.
+  - Shared URLs are validated as URLs; query values are read as narrow scalars; the Appearance notice no longer reflects URL text.
+- The iOS Shortcut authenticates with a core WordPress Application Password that Outpost creates with a fixed `app_id` (`Outpost_IOS_Shortcut_App_Password`). Core's `wp_authenticate_application_password_errors` hook limits that password to the resolved `/outpost/v1/shortcut` route; Outpost no longer hooks `determine_current_user` or `rest_authentication_errors` for it. `Outpost_IOS_Shortcut_Token` and `Outpost_IOS_Shortcut_Token_Authenticator` are removed, and legacy plaintext tokens are purged once on `init`, the first request after upgrade. Deactivating Outpost deletes its Shortcut application passwords, and on multisite the password needs Outpost network-activated. The settings page shows a new password once and stores nothing; uninstall deletes only Outpost's application passwords.
+- Removed the composer-config `rest_authentication_errors` override (`allow_anonymous_for_self()`, priority 999). Another plugin's REST gate now stands on that route like any other.
+
+### Removed
+
+- The retired cookie-only `/post/shortcut` rewrite route and `Outpost_Shortcut_Controller`, which no client could pass and which read `php://input` with `json_decode()`.
+
+### Changed
+
+- The encryption-key notice renders only where `outpost_is_notice_screen()` allows (Plugins screens and Outpost pages), keeps its dismissal across versions (one key per reason), links to the public settings docs instead of an unregistered admin page, and uses its own `outpost_dismiss_key_notice` query key instead of core's `action`.
+- `outpost.php` declares `Requires Plugins: indieauth, micropub`, so core enforces the dependencies.
+- The preview fetcher's `curl_setopt( CURLOPT_RESOLVE )` DNS pin carries an inline `phpcs:ignore` with its reason, and `phpcs.xml.dist` no longer excludes the sniff for that file, so `composer lint` matches Plugin Check.
+- readme: External services covers the media-lookup services and cover-image hosts; the Threads terms link points at the Threads Terms of Use; Source Code documents `src/` and `npm run build:wp`; Preact's MIT license ships in `THIRD-PARTY-LICENSES.txt`.
 - The seven composer modes use two rows of native buttons instead of a scrolling tab strip (#316).
 - More options opens and closes even when a page optimizer blocks Outpost's stylesheet (#317).
 - Publish errors appear next to Publish, and Outpost accepts photos up to 50 MB before resizing them (#318).
 - Posts keep only the default category Outpost sets instead of also keeping WordPress's fallback category (#319).
+- The service worker's share intake accepts photos up to the same 50 MB per-file cap as the composer; the 50 MB total and the bounded body read are unchanged.
+
+### Added
+
+- Added three public, read-only WordPress abilities: `outpost/get-syndicate-targets`, `outpost/get-share-status`, and `outpost/get-composer-config`. They reuse the REST payload builders without applying REST permission filters, bearer-token scopes, or the composer-config route's rate-limit transient (#321).
 
 ### Fixed
 
@@ -219,6 +303,39 @@ WordPress.org plugin review, round T9.
 
 - `outpost_shell_style_handles` and `outpost_shell_script_handles` filters so a site integration can paint the composer shell (the shell prints only its own handles).
 - The composer shell body now carries the stored appearance mode class (`outpost-mode-day|night|system`, filterable through `outpost_shell_mode_class`); the tokens already keyed on it, but the class was never printed.
+
+## [1.0.14]
+
+_Moved from readme.txt (T10-S3-12); no release date was recorded._
+
+* Fixed: photo captions now appear under the photo. 1.0.13 saved them to the image in your media library, but WordPress only shows a caption that was typed into the block itself, so nothing appeared on the post. Captions written in Outpost, or edited later in the media library, now show wherever the image does. A caption you typed directly into a block still wins.
+
+## [1.0.13]
+
+_Moved from readme.txt (T10-S3-12); no release date was recorded._
+
+* Added: a caption for each photo, separate from its alt text and from the post title. Alt text says what an image is for someone who cannot see it; a caption is the line everyone reads under the photo. Captions are optional, start empty, and are saved as the image's caption in your media library, so the block editor and your theme both read the same value.
+
+## [1.0.12]
+
+_Moved from readme.txt (T10-S3-12); no release date was recorded._
+
+* Security: the composer sent your Micropub access token in the query string when it looked up the media endpoint and your syndication targets, on every host and every time. Query strings are written to server access logs, to any proxy or CDN in front of the site, and into cache keys, so a live token with permission to post was being recorded in places it should never appear. The token now travels in the Authorization header, and only falls back to the query string after a 401, which is what a host that strips that header looks like. Found in internal review.
+* Security: the Micropub bridges wrote a post's featured image, place name, categories, post format, focus keyphrase, and XFN values without checking that the acting user could edit that post. The bridges run on update as well as create, and the Micropub plugin resolves the target post from a URL in the request while checking only a site-wide capability, so an Author could set those values on posts and pages belonging to Editors and Administrators. The bridges now check edit_post on the target before writing anything. Found in internal review.
+* Security: creating a new category through Micropub now requires manage_categories. Any user who could post was able to create terms in the site's primary taxonomy, which WordPress otherwise reserves. Assigning existing categories is unchanged.
+* Security: POSSE syndication now checks that the user who triggered a post's transition to published can edit it. The check authorized the post's author rather than the acting user, so someone who could flip another author's post into published could syndicate content they could not edit. Scheduled posts and WP-CLI, which have no acting user, are unaffected.
+* Security: Telegraph syndication is now off unless the `outpost_telegraph_enabled` option is set. Its publish hook was registered unconditionally, so with the plugin merely active, publishing any post sent that post to api.telegra.ph — which creates a public copy of it — and the first publish also registered a Telegraph account carrying the site's name and address. There was no setting to turn it off and no chip to enable, contrary to what this readme described. Consent is now checked both where the hook is registered and inside the handler. Found in internal review.
+* Fixed: if OUTPOST_ENCRYPTION_KEY was defined in wp-config.php but was not exactly 32 raw bytes — what happens when the base64 string is pasted without base64_decode() — Outpost ignored it and used the key stored in the database, while the notice warning that the key is in the database was suppressed because the constant was defined. The site owner who took the trouble to move the key got no signal that it had not moved. The notice now reports the wrong-length constant and says how to fix it.
+* Security: seven REST endpoints accepted a request that carried a logged-in cookie and any non-empty access_token in the body, without the REST nonce WordPress requires for cookie authentication. Token validation was delegated to the determine_current_user filter, which is core's whole user-resolution chain, so the cookie validators on it re-authenticated the session core had deliberately dropped. Token resolution now runs with the cookie and application-password validators unhooked, so only a real token can authenticate. Found in internal review.
+* Security: the preview fetcher's address guard classified IPv6 addresses from their text form, so an internal address written in its expanded form (0:0:0:0:0:ffff:127.0.0.1) was not recognized as the internal address its compressed form (::ffff:127.0.0.1) already blocked. Any user who can write a post could make the site fetch a loopback, private, or cloud-metadata address and read the response. Addresses are now classified from their packed bytes, so every spelling of an address gets one verdict. Found in internal review.
+* Changed: "Tested up to" is declared only in readme.txt. It was also present in the plugin header, where it is not a supported field and can override the readme value.
+* Removed: the unused Apple Music enrichment path. It shipped an iTunes Lookup API call that no code reached, so the plugin no longer contacts Apple at all.
+* Removed: the Sefaria and SuttaCentral link sources. Outpost no longer recognizes those hosts or suggests a Quote post for them; pasted links from either site are handled by the generic page reader like any other URL.
+* Removed: three classes that shipped without a runtime path — the Ravelry and Ride With GPS URL-paste sources, whose authenticated preview branch was never built, and a duplicate RSS inbound extractor superseded by the one the source registry dispatches. Pasted Ravelry and Ride With GPS links keep the generic page preview they already had.
+* Changed: External services documents the Kit broadcast URL recorded on a post and the iCloud Shortcuts installer link, and explains that the built-in list of recognized link hosts is matched locally and contacts nothing.
+* Changed: the WHOOP entry links the API terms of use and their privacy and security section, both on developer.whoop.com, alongside the privacy policy itself. whoop.com refuses automated clients, so the policy link cannot be machine-checked; the developer-site links can be.
+* Fixed: the PWA web app manifest pointed its five icons at /wp-content/plugins/outpost/, the folder name used before the plugin was renamed. On any install the icons 404'd, so the install prompt and home-screen icon fell back to a generic placeholder. The manifest now builds those URLs from the plugin's own location.
+* Fixed: the Playground blueprint activated outpost/outpost.php, a path that no longer exists after the rename.
 
 ## [1.0.11] - 2026-09-02
 

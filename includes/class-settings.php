@@ -22,6 +22,10 @@
  *   - default_tags (string[], default []) — tag names the composer
  *     pre-selects in More options, and the bridge appends to a post
  *     whose request carried no `category[]`.
+ *   - workout_details_in_text (bool, default false) — whether a Polar or
+ *     Oura workout picked in the block editor puts its distance and
+ *     duration in the post title and paragraph. Off keeps them in private
+ *     post meta only (P4B-02); the picker list shows them either way.
  *
  * The options are exposed to the composer via the composer-config
  * REST endpoint (`siteSettings` field) so the client can react.
@@ -56,6 +60,7 @@ final class Outpost_Settings {
 	 *     default_post_format_inference: bool,
 	 *     default_categories: int[],
 	 *     default_tags: string[],
+	 *     workout_details_in_text: bool,
 	 * }
 	 */
 	public static function defaults(): array {
@@ -65,6 +70,7 @@ final class Outpost_Settings {
 			'default_post_format_inference' => true,
 			'default_categories'            => array(),
 			'default_tags'                  => array(),
+			'workout_details_in_text'       => false,
 		);
 	}
 
@@ -95,6 +101,26 @@ final class Outpost_Settings {
 				'sanitize_callback' => array( self::class, 'sanitize' ),
 				'default'           => self::defaults(),
 				'show_in_rest'      => false,
+			)
+		);
+		register_setting(
+			self::SETTINGS_GROUP,
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+				'show_in_rest'      => false,
+				'default'           => false,
+			)
+		);
+		register_setting(
+			self::SETTINGS_GROUP,
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+				'show_in_rest'      => false,
+				'default'           => false,
 			)
 		);
 
@@ -138,11 +164,42 @@ final class Outpost_Settings {
 		);
 
 		add_settings_field(
+			'workout_details_in_text',
+			__( 'Workout details in post text', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_workout_details_field' ),
+			'outpost-settings',
+			'outpost_settings_main'
+		);
+
+		add_settings_field(
 			'default_post_format_inference',
 			__( 'Auto Post-Format inference', 'outpost-mobile-publishing' ),
 			array( self::class, 'render_inference_field' ),
 			'outpost-settings',
 			'outpost_settings_main'
+		);
+
+		add_settings_section(
+			'outpost_settings_agent_abilities',
+			__( 'Agent abilities', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_agent_abilities_intro' ),
+			'outpost-settings'
+		);
+
+		add_settings_field(
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			__( 'Manual share', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_manual_share_ability_field' ),
+			'outpost-settings',
+			'outpost_settings_agent_abilities'
+		);
+
+		add_settings_field(
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			__( 'Capture syndication', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_capture_syndication_ability_field' ),
+			'outpost-settings',
+			'outpost_settings_agent_abilities'
 		);
 	}
 
@@ -167,6 +224,7 @@ final class Outpost_Settings {
 			'default_post_format_inference' => ! empty( $input['default_post_format_inference'] ),
 			'default_categories'            => self::sanitize_category_ids( $input['default_categories'] ?? array() ),
 			'default_tags'                  => self::sanitize_tag_names( $input['default_tags'] ?? '' ),
+			'workout_details_in_text'       => ! empty( $input['workout_details_in_text'] ),
 		);
 	}
 
@@ -395,6 +453,57 @@ final class Outpost_Settings {
 				'Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only.',
 				'outpost-mobile-publishing'
 			)
+		);
+	}
+
+	public static function render_workout_details_field(): void {
+		$settings = self::get();
+		printf(
+			'<label><input type="checkbox" name="%1$s[workout_details_in_text]" value="1"%2$s /> %3$s</label>',
+			esc_attr( self::OPTION_NAME ),
+			checked( ! empty( $settings['workout_details_in_text'] ), true, false ),
+			esc_html__(
+				'Put the distance and duration of a Polar or Oura workout in the post title and text. Off, they stay in private post meta; Post Kinds\' exercise card keeps them private until you choose to show them.',
+				'outpost-mobile-publishing'
+			)
+		);
+	}
+
+	/**
+	 * Whether workout posts carry distance and duration in their title and
+	 * text (P4B-02). Off by default.
+	 */
+	public static function workout_details_in_text(): bool {
+		return ! empty( self::get()['workout_details_in_text'] );
+	}
+
+	public static function render_agent_abilities_intro(): void {
+		echo '<p>' . esc_html__(
+			'Abilities that can change post data stay off until a site administrator enables each one.',
+			'outpost-mobile-publishing'
+		) . '</p>';
+	}
+
+	public static function render_manual_share_ability_field(): void {
+		self::render_ability_checkbox(
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			__( 'Let agents prepare a manual share for a post and record it in the post\'s share log.', 'outpost-mobile-publishing' )
+		);
+	}
+
+	public static function render_capture_syndication_ability_field(): void {
+		self::render_ability_checkbox(
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			__( 'Let agents record a silo URL as a post\'s syndication link.', 'outpost-mobile-publishing' )
+		);
+	}
+
+	private static function render_ability_checkbox( string $option, string $label ): void {
+		printf(
+			'<label><input type="checkbox" name="%1$s" value="1"%2$s /> %3$s</label>',
+			esc_attr( $option ),
+			checked( Outpost_Abilities::ability_is_enabled( $option ), true, false ),
+			esc_html( $label )
 		);
 	}
 

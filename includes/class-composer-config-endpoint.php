@@ -169,72 +169,6 @@ final class Outpost_Composer_Config_Endpoint {
 	 */
 	public static function register(): void {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
-		// Opt this route out of any global rest_authentication_errors
-		// gating that other plugins (Wordfence, "Disable REST API", any
-		// "API hardening" snippet) impose, so the request reaches this
-		// route's own edit_posts permission callback. Runs late (999) so
-		// it overrides whatever upstream callback added the error. Scoped
-		// to the route WordPress actually resolved — see
-		// allow_anonymous_for_self() for why the request path is not that.
-		add_filter( 'rest_authentication_errors', array( self::class, 'allow_anonymous_for_self' ), 999 );
-	}
-
-	/**
-	 * Clears a third-party rest_authentication_errors result for the
-	 * composer-config route — and only that route.
-	 *
-	 * Other plugins commonly add a blanket "must be logged in" error via this
-	 * filter; without an opt-out the request never reaches our own
-	 * permission_callback (edit_posts). Two things this deliberately does
-	 * NOT do:
-	 *
-	 *   - It never keys on REQUEST_URI, a path substring, or a hand-parsed
-	 *     query string. WordPress dispatches on the `rest_route` query var,
-	 *     which `$_GET`/`$_POST` override ahead of the `/wp-json/` rewrite,
-	 *     so the raw URI and the dispatched route can disagree. The pre-1.0.4
-	 *     audit fired that differential: a cookie-authenticated victim sent to
-	 *     `/wp-json/outpost/v1/composer-config?rest_route=/wp/v2/posts/N
-	 *     &_method=DELETE&_wpnonce=x` had core's invalid-nonce error cleared
-	 *     and the DELETE executed as them. Route identity now comes from
-	 *     {@see Outpost_Request_Headers::is_rest_route()}, which reads the
-	 *     value WordPress will serve and fails closed when none resolved.
-	 *   - It never clears core's `rest_cookie_invalid_nonce` error, even for
-	 *     this route. That error is WordPress's CSRF defense for cookie
-	 *     sessions; the opt-out exists for third-party blanket gates, not to
-	 *     disable core's own check.
-	 *   - It never clears ANY error for a cookie session that lacks a valid
-	 *     REST nonce. Core's own nonce check (rest_cookie_check_errors,
-	 *     priority 100) runs — and demotes the session to anonymous — ONLY
-	 *     when it is the first filter to see an error. An earlier
-	 *     rest_authentication_errors result short-circuits it: the iOS Shortcut
-	 *     authenticator's out-of-scope 401 (priority 10), a hardening plugin's
-	 *     blanket gate, any bearer-validation error. That leaves the wp-admin
-	 *     cookie user current with no nonce ever verified, so clearing the
-	 *     error would let a cross-origin request ride the cookie — the CSRF
-	 *     bypass core's nonce exists to stop (SEC-2026-09-21). Whitelisting
-	 *     only `rest_cookie_invalid_nonce` (above) misses this because that
-	 *     error is never the one raised. The guard returns `$result` unchanged,
-	 *     so it only ever preserves a decision the chain already made; the
-	 *     legitimate PWA bearer flow sends `credentials: 'omit'`, carries no
-	 *     cookie, and sets no earlier error, so `$result` is null there and the
-	 *     clear still happens for it.
-	 *
-	 * @param mixed $result Existing filter result (null, true, WP_Error).
-	 * @return mixed Cleared (null) when a third-party error stands on our own
-	 *               resolved route for a request that is not a nonce-less cookie
-	 *               session; unchanged otherwise.
-	 */
-	public static function allow_anonymous_for_self( $result ) {
-		if ( is_wp_error( $result ) && 'rest_cookie_invalid_nonce' === $result->get_error_code() ) {
-			return $result;
-		}
-		if ( ! Outpost_Request_Headers::is_rest_route( '/' . self::ROUTE_NAMESPACE . self::ROUTE_PATH ) ) {
-			return $result;
-		}
-		if ( is_user_logged_in() && ! wp_verify_nonce( Outpost_Request_Headers::rest_nonce(), 'wp_rest' ) ) {
-			return $result;
-		}
-		return null;
 	}
 
 	/**
@@ -278,9 +212,9 @@ final class Outpost_Composer_Config_Endpoint {
 	 * alike; a bare unvalidated bearer header never resolves a user
 	 * and never passes.
 	 *
-	 * Sites that need anonymous access (rare but supported for
-	 * build-time pre-fetching) can opt back in via the
-	 * `outpost_composer_config_permission` filter.
+	 * The `outpost_composer_config_permission` filter can only restrict
+	 * access: it runs after the credential and `edit_posts` checks pass,
+	 * so it can't open the route to anonymous requests.
 	 *
 	 * @return bool
 	 */
@@ -291,15 +225,33 @@ final class Outpost_Composer_Config_Endpoint {
 		// token-authenticated request needs no wp-admin cookie, so it never
 		// meets the cookie/nonce CSRF check the 1.0.4 fix closed.
 		// Read-only: aggregates companion-plugin status + taxonomy terms +
-		// settings, writes nothing but a rate-limit transient. A token
-		// scoped for `read` alone (as well as `create`/`update`) may use it.
-		$allow = current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, array( 'create', 'update', 'read' ) );
+		// settings, writes nothing but a rate-limit transient. It serves
+		// the composer, so a token needs `create` or `update` (F-56).
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
+			return false;
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return false;
+		}
 		/**
-		 * Override the composer-config permission decision.
+		 * Filters whether a request may read or write the composer config.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused. Before 1.0.28 a
+		 * site could return true here to open the route to anonymous
+		 * requests; that no longer works.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		return (bool) apply_filters( 'outpost_composer_config_permission', $allow );
+		return (bool) apply_filters( 'outpost_composer_config_permission', true, $request );
 	}
 
 	/**
@@ -397,6 +349,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 *
 	 * @return array{
 	 *     companions: array<string, string>,
+	 *     postKinds: array{comics: bool},
 	 *     postFormats: array<int, string>|null,
 	 *     xfnRels: array<int, string>,
 	 *     existingCategories: array<int, array{slug: string, name: string}>,
@@ -440,6 +393,9 @@ final class Outpost_Composer_Config_Endpoint {
 
 		return array(
 			'companions'         => $companions,
+			'postKinds'          => array(
+				'comics' => 'active' === $companions['post-kinds'] && Outpost_Post_Kinds_Adapter::supports_comics(),
+			),
 			'postFormats'        => $post_formats,
 			'xfnRels'            => self::XFN_RELS,
 			'existingCategories' => self::list_terms( 'category' ),

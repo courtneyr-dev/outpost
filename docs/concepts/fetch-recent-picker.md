@@ -14,7 +14,7 @@ The primitive is the REST endpoint, provider registry, sidebar panel, modal, and
 ### JS side (Gutenberg sidebar)
 
 - **`FetchRecentPanel`** — renders one button per registered provider inside the existing `OutpostSidebar` PluginSidebar (G3.5c). Fetches the provider list once on mount. The list endpoint filters providers only by each provider's `capability`, not by connection state, so a provider's button shows even when the user hasn't connected it.
-- **`FetchRecentPickerModal`** — opens when a button is clicked; fetches provider items via REST; renders states (loading / error / not-connected / items / empty); inserts the chosen item's payload into the editor as a paragraph block on selection.
+- **`FetchRecentPickerModal`** — opens when a button is clicked; fetches provider items via REST; renders states (loading / error / not-connected / items / empty); inserts the chosen item's payload on selection: its Post Kinds card blocks when the editor has them, else a paragraph block.
 - **`DefaultItemRenderer`** — provider-agnostic Card-style item renderer with optional icon, title, subtitle, and relative-time footer. Custom renderers per provider override via the `outpost.fetchRecent.itemRenderer.<provider_id>` `wp.hooks` filter.
 
 ## Canonical fetch-recent item shape
@@ -27,7 +27,7 @@ Every provider's callback returns items in this shape:
     "title": "Workout - Running 5.2 miles",
     "subtitle": "2026-05-04, 32 minutes, 478 kcal",
     "icon_url": "optional-thumbnail-url-or-null",
-    "fetched_at": "ISO 8601 timestamp",
+    "fetched_at": "YYYY-MM-DD",
     "post_kind": "workout",
     "post_payload": {
         "title": "post title to insert",
@@ -39,6 +39,18 @@ Every provider's callback returns items in this shape:
 ```
 
 `Outpost_Fetch_Recent_REST::normalize_item()` coerces partial entries into the canonical shape and drops malformed ones (missing `id` or `title`). The REST endpoint then caps to the requested `count` (1–50, default 10).
+
+`fetched_at` is the item's date. The route keeps the leading `YYYY-MM-DD` of whatever the provider sends, or today (UTC) when there isn't one, so a health event's clock time never reaches the editor. Providers sort by the event time on the server before mapping.
+
+A provider can also send three optional card parts in `post_payload`, which the picker inserts in place of the paragraph. `normalize_item()` checks each one and drops it when it doesn't pass:
+
+| Field | Passes when |
+|---|---|
+| `blocks` | A list of 1 to 5 entries. Every `name` matches `^post-kinds-indieweb/[a-z0-9-]+$` and is a registered block type; one bad entry drops the whole list. `attributes` keeps only scalar values whose keys the block type declares. |
+| `terms` | Keys are REST bases of registered REST taxonomies. Values are lists of positive integer ids of existing terms in that taxonomy; other keys and ids are dropped. |
+| `date` | Exactly `YYYY-MM-DDT12:00:00` on a real calendar day. Noon is the only time a provider can set, so no clock time travels with the post date. |
+
+The picker applies the same `post-kinds-indieweb/` check and inserts the blocks only when the editor has every block type registered; otherwise it inserts the paragraph and skips `terms` and `date`.
 
 ## Provider registration
 

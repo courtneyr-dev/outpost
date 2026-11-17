@@ -3,10 +3,15 @@ import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect } from 'vitest';
 import {
 	consume_shared_photos,
+	keep_shared_photos,
+	read_share_inbox,
 	stash_shared_photos,
+	SHARE_INBOX_CANDIDATE_KEY,
 	SHARE_INBOX_DB,
 	SHARE_INBOX_KEY,
 	SHARE_INBOX_STORE,
+	ShareInboxChangedError,
+	inbox_identity,
 } from './share-inbox';
 
 const png = (name = 'IMG_0001.png'): File =>
@@ -136,5 +141,185 @@ describe('share inbox', () => {
 		expect(await consume_shared_photos({ indexedDB: factory })).toBeNull();
 		// The bogus record was cleared, not left to come back on the next mount.
 		expect(await consume_shared_photos({ indexedDB: factory })).toBeNull();
+	});
+});
+
+/**
+ * A real fake-indexeddb factory that fails one way on demand (T10-S3-05 v1.2):
+ * the open request, a read request, the read-write transaction (a conflicting
+ * write makes it error and roll back), or an abort while work is queued.
+ */
+function failing(real: IDBFactory, mode: 'open' | 'read' | 'tx-error' | 'abort'): IDBFactory {
+	return {
+		open(name: string, version?: number): IDBOpenDBRequest {
+			if (mode === 'open') {
+				const req = { error: new DOMException('blocked'), onerror: null as null | (() => void) };
+				setTimeout(() => req.onerror?.(), 0);
+				return req as unknown as IDBOpenDBRequest;
+			}
+			const req = real.open(name, version);
+			req.addEventListener('success', () => {
+				const db = req.result;
+				const transaction = db.transaction.bind(db);
+				db.transaction = ((stores: string | string[], m?: IDBTransactionMode) => {
+					const t = transaction(stores, m);
+					const store_of = t.objectStore.bind(t);
+					t.objectStore = ((store_name: string) => {
+						const store = store_of(store_name);
+						if (mode === 'read' && m !== 'readwrite') {
+							store.get = ((): IDBRequest => {
+								const bad = { error: new DOMException('read failed'), onerror: null as null | (() => void) };
+								setTimeout(() => bad.onerror?.(), 0);
+								return bad as unknown as IDBRequest;
+							}) as IDBObjectStore['get'];
+						}
+						if (mode === 'tx-error' && m === 'readwrite') store.add('conflict', SHARE_INBOX_KEY);
+						if (mode === 'abort' && m === 'readwrite') queueMicrotask(() => t.abort());
+						return store;
+					}) as IDBTransaction['objectStore'];
+					return t;
+				}) as IDBDatabase['transaction'];
+			});
+			return req;
+		},
+	} as unknown as IDBFactory;
+}
+
+const parked = (title: string) => ({ files: [png(`${title}.png`)], title, text: '', received: 1 });
+
+describe('share inbox state and decisions (T10-S3-05 v1.2)', () => {
+	it('reports an empty inbox as ok, not as unavailable', async () => {
+		const state = await read_share_inbox({ indexedDB: new IDBFactory() });
+		expect(state).toEqual({ status: 'ok', pending: null, candidate: null });
+	});
+
+	it.each(['open', 'read'] as const)('reports a %s failure as unavailable, not as empty', async (mode) => {
+		const factory = new IDBFactory();
+		await stash_shared_photos(parked('A'), { indexedDB: factory });
+		const state = await read_share_inbox({ indexedDB: failing(factory, mode) });
+		expect(state.status).toBe('unavailable');
+		expect((await read_share_inbox({ indexedDB: factory })).pending?.title).toBe('A');
+	});
+
+	it('reports a missing IndexedDB as unavailable', async () => {
+		expect((await read_share_inbox({ indexedDB: undefined })).status).toBe('unavailable');
+	});
+
+	it('keeps the chosen record in pending and removes the other', async () => {
+		const factory = new IDBFactory();
+		await stash_shared_photos(parked('Earlier'), { indexedDB: factory }, SHARE_INBOX_KEY);
+		await stash_shared_photos(parked('Newer'), { indexedDB: factory }, SHARE_INBOX_CANDIDATE_KEY);
+		await keep_shared_photos(SHARE_INBOX_CANDIDATE_KEY, { indexedDB: factory });
+		const state = await read_share_inbox({ indexedDB: factory });
+		expect(state.pending?.title).toBe('Newer');
+		expect(state.candidate).toBeNull();
+	});
+
+	it('keeping none removes both records', async () => {
+		const factory = new IDBFactory();
+		await stash_shared_photos(parked('Earlier'), { indexedDB: factory }, SHARE_INBOX_KEY);
+		await stash_shared_photos(parked('Newer'), { indexedDB: factory }, SHARE_INBOX_CANDIDATE_KEY);
+		await keep_shared_photos(null, { indexedDB: factory });
+		expect(await read_share_inbox({ indexedDB: factory })).toEqual({ status: 'ok', pending: null, candidate: null });
+	});
+
+	it('rejects when there is no IndexedDB, like any other storage failure (v1.3)', async () => {
+		await expect(keep_shared_photos(null, { indexedDB: undefined })).rejects.toBeTruthy();
+		await expect(keep_shared_photos(SHARE_INBOX_KEY, { indexedDB: undefined })).rejects.toBeTruthy();
+	});
+
+	it.each(['open', 'tx-error', 'abort'] as const)('rejects on a %s failure and changes nothing', async (mode) => {
+		const factory = new IDBFactory();
+		await stash_shared_photos(parked('Earlier'), { indexedDB: factory }, SHARE_INBOX_KEY);
+		await stash_shared_photos(parked('Newer'), { indexedDB: factory }, SHARE_INBOX_CANDIDATE_KEY);
+		await expect(keep_shared_photos(SHARE_INBOX_CANDIDATE_KEY, { indexedDB: failing(factory, mode) })).rejects.toBeTruthy();
+		const state = await read_share_inbox({ indexedDB: factory });
+		expect(state.pending?.title).toBe('Earlier');
+		expect(state.candidate?.title).toBe('Newer');
+	});
+});
+
+/**
+ * P4H-01: a decision touches only the records the review showed. The
+ * service worker stamps each record with `received`; the review passes the
+ * stamps it saw, and the check runs inside the readwrite transaction, so a
+ * record another account wrote since (after a sign-out in another tab) is
+ * never deleted or overwritten by this review.
+ */
+describe('decisions apply only to the records the review saw (P4H-01, P4I-01)', () => {
+	const at = (title: string, received: number, id: string) => ({ ...parked(title), received, id });
+	const seen = (id: string, received: number): string => inbox_identity({ ...parked('x'), received, id }) ?? '';
+
+	it('discarding leaves a newer record in the reviewed slot alone', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account B', 2, 'b'), env, SHARE_INBOX_KEY);
+
+		await expect(keep_shared_photos(null, env, { pending: seen('a', 1), candidate: null })).rejects.toBeInstanceOf(
+			ShareInboxChangedError,
+		);
+		expect((await read_share_inbox(env)).pending?.title).toBe('Account B');
+	});
+
+	it('a record with the same received time but another id is still a different record (P4I-01)', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account B', 1, 'b'), env, SHARE_INBOX_KEY);
+
+		await expect(keep_shared_photos(null, env, { pending: seen('a', 1), candidate: null })).rejects.toBeInstanceOf(
+			ShareInboxChangedError,
+		);
+		expect((await read_share_inbox(env)).pending?.title).toBe('Account B');
+	});
+
+	it('keeping a photo fails when a slot holds a record the review never saw', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account A', 1, 'a'), env, SHARE_INBOX_KEY);
+		await stash_shared_photos(at('Account B', 2, 'b'), env, SHARE_INBOX_CANDIDATE_KEY);
+
+		await expect(keep_shared_photos(SHARE_INBOX_KEY, env, { pending: seen('a', 1), candidate: null })).rejects.toBeInstanceOf(
+			ShareInboxChangedError,
+		);
+		const state = await read_share_inbox(env);
+		expect(state.pending?.title).toBe('Account A');
+		expect(state.candidate?.title).toBe('Account B');
+	});
+
+	// P4J (deferred from 1.0.28): a record from a pre-1.0.28 service worker
+	// has no id, so two of them received in the same millisecond looked
+	// identical. Reading the inbox gives each id-less record an id first.
+	it('reading the inbox gives a record from an older service worker a stable id', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos({ ...parked('Legacy'), received: 1 }, env, SHARE_INBOX_KEY);
+
+		const first = await read_share_inbox(env);
+		const second = await read_share_inbox(env);
+
+		expect(typeof first.pending?.id).toBe('string');
+		expect(first.pending?.id).not.toBe('');
+		expect(second.pending?.id).toBe(first.pending?.id);
+	});
+
+	it('an id-less replacement with the same received time is a different record (P4J)', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos({ ...parked('Account A'), received: 1 }, env, SHARE_INBOX_KEY);
+		const reviewed = await read_share_inbox(env);
+		// An older worker replaces the share with another id-less record.
+		await stash_shared_photos({ ...parked('Account B'), received: 1 }, env, SHARE_INBOX_KEY);
+
+		await expect(
+			keep_shared_photos(null, env, { pending: inbox_identity(reviewed.pending), candidate: null }),
+		).rejects.toBeInstanceOf(ShareInboxChangedError);
+		expect((await read_share_inbox(env)).pending?.title).toBe('Account B');
+	});
+
+	it('applies when the slots hold exactly what the review saw', async () => {
+		const env = { indexedDB: new IDBFactory() };
+		await stash_shared_photos(at('Account A', 1, 'a'), env, SHARE_INBOX_KEY);
+		const state = await read_share_inbox(env);
+
+		await keep_shared_photos(null, env, { pending: inbox_identity(state.pending), candidate: inbox_identity(state.candidate) });
+
+		const after = await read_share_inbox(env);
+		expect(after.pending).toBeNull();
+		expect(after.candidate).toBeNull();
 	});
 });

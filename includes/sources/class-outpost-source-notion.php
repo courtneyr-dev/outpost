@@ -208,13 +208,15 @@ final class Outpost_Source_Notion extends Outpost_Source_Base {
 	private static function api_get( string $path, string $token ) {
 		$response = wp_remote_get(
 			self::API_BASE . $path,
-			array(
-				'timeout' => 10,
-				'headers' => array(
-					'Authorization'  => 'Bearer ' . $token,
-					'Notion-Version' => Outpost_OAuth_Provider_Notion::NOTION_API_VERSION,
-					'Accept'         => 'application/json',
-				),
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout' => 10,
+					'headers' => array(
+						'Authorization'  => 'Bearer ' . $token,
+						'Notion-Version' => Outpost_OAuth_Provider_Notion::NOTION_API_VERSION,
+						'Accept'         => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {

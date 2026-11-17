@@ -613,7 +613,7 @@ final class MediaLookupEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		// H6: the resolved token carries a scope this read-only route accepts.
-		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 		WP_Mock::onFilter( 'outpost_media_lookup_permission' )->with( true )->reply( true );
 
 		$this->assertTrue( Outpost_Media_Lookup_Endpoint::check_permission( $request ) );

@@ -2,12 +2,12 @@
 /**
  * Integration test: REST route identity for route-scoped security decisions.
  *
- * Drives WordPress's real `rest_authentication_errors` chain — core's
- * `rest_cookie_check_errors` (priority 100) followed by Outpost's
- * composer-config opt-out (priority 999) — exactly as
+ * Drives WordPress's real `rest_authentication_errors` chain (core's
+ * `rest_cookie_check_errors`, priority 100) exactly as
  * `WP_REST_Server::check_authentication()` runs it on a live request.
  *
- * The audited defect (pre-1.0.4 audit, 2026-09-01): the opt-out keyed on
+ * The audited defect (pre-1.0.4 audit, 2026-09-01): a composer-config
+ * authentication opt-out (removed in 1.0.27) keyed on
  * REQUEST_URI's path while WordPress dispatches on the `rest_route` query
  * var. A logged-in victim lured to
  *
@@ -19,13 +19,11 @@
  * same flow does delete when the nonce is genuine, so the survival assertion
  * is calibrated.
  *
- * The second audited defect (SEC-2026-09-21): the same opt-out only preserved
- * core's `rest_cookie_invalid_nonce` error. Any OTHER earlier error — e.g. the
- * iOS Shortcut authenticator's out-of-scope 401 (priority 10) — makes core's
- * cookie check short-circuit before it ever raises the invalid-nonce error, so
- * the opt-out cleared the out-of-scope error and revived a nonce-less cookie
- * session. Those tests drive the full priority 10 → 100 → 999 chain with a real
- * Shortcut token and assert the companion body is never built.
+ * The second audited defect (SEC-2026-09-21) lived in the same opt-out. 1.0.27
+ * removed the opt-out entirely: Outpost no longer clears any
+ * rest_authentication_errors result, so another plugin's REST gate now stands
+ * on the composer-config route as it does everywhere else. The tests below keep
+ * the route-identity and CSRF assertions and pin that the gate stands.
  *
  * @package Outpost\Tests\Integration
  */
@@ -166,67 +164,6 @@ final class RestRouteResolutionTest extends TestCase {
 	}
 
 	/**
-	 * The composer-config CSRF-defense bypass (SEC-2026-09-21).
-	 *
-	 * A cross-origin attacker who holds a valid iOS Shortcut token (their own)
-	 * presents it as a Bearer against composer-config while the victim's
-	 * wp-admin cookie rides along with NO REST nonce. The Shortcut
-	 * authenticator (priority 10) correctly rejects the out-of-scope token with
-	 * a 401, but that early error makes core's rest_cookie_check_errors
-	 * (priority 100) skip its nonce check and its wp_set_current_user( 0 ),
-	 * leaving the victim logged in. The opt-out (priority 999) must NOT clear
-	 * that error back to null: doing so revives a nonce-less cookie session and
-	 * serves the companion body — the CSRF defense core would otherwise apply.
-	 *
-	 * @test
-	 */
-	public function out_of_scope_shortcut_token_cannot_ride_a_nonceless_cookie_session_into_composer_config(): void {
-		$token                        = \Outpost_IOS_Shortcut_Token::regenerate( $this->admin_id );
-		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
-		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config', '/outpost/v1/composer-config', null );
-		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
-
-		$served = $this->serve_composer_config();
-
-		$this->assertInstanceOf(
-			\WP_Error::class,
-			$served['auth'],
-			'A nonce-less cookie session must not be revived by clearing the out-of-scope error.'
-		);
-		$this->assertSame( 'outpost_ios_shortcut_token_out_of_scope', $served['auth']->get_error_code() );
-		$this->assertSame( 401, $served['auth']->get_error_data()['status'] ?? null );
-		$this->assertNull( $served['response'], 'The composer-config handler must never build a body for the denied request.' );
-		$this->assertFalse(
-			get_transient( 'outpost_config_rl_u_' . $this->admin_id ),
-			'The rate-limited handler must never run for the denied request (no transient written).'
-		);
-	}
-
-	/**
-	 * Positive control for the CSRF-bypass test above: the SAME shape carrying
-	 * a genuine wp_rest nonce is a legitimate same-origin cookie request, so it
-	 * clears the opt-out, reaches edit_posts, and serves the companion body.
-	 * Without this, the denial assertion could pass for the wrong reason.
-	 *
-	 * @test
-	 */
-	public function valid_nonce_lets_the_cookie_session_reach_composer_config_which_calibrates_the_denial(): void {
-		$token                        = \Outpost_IOS_Shortcut_Token::regenerate( $this->admin_id );
-		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
-		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config', '/outpost/v1/composer-config', null );
-		$_REQUEST['_wpnonce'] = wp_create_nonce( 'wp_rest' );
-		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
-
-		$served = $this->serve_composer_config();
-		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
-
-		$this->assertNull( $served['auth'], 'A genuine nonce clears the opt-out and reaches the permission callback.' );
-		$this->assertInstanceOf( \WP_REST_Response::class, $served['response'] );
-		$this->assertSame( 200, $served['response']->get_status(), 'Positive control: the same flow serves with a real nonce.' );
-		$this->assertArrayHasKey( 'companions', (array) $served['response']->get_data() );
-	}
-
-	/**
 	 * @test
 	 */
 	public function bogus_nonce_delete_smuggled_through_composer_config_path_is_refused_and_post_survives(): void {
@@ -239,7 +176,7 @@ final class RestRouteResolutionTest extends TestCase {
 
 		$auth = $this->serve_delete( $post_id );
 
-		$this->assertInstanceOf( \WP_Error::class, $auth, 'Core\'s invalid-nonce error must survive the composer-config opt-out.' );
+		$this->assertInstanceOf( \WP_Error::class, $auth, 'Core\'s invalid-nonce error must stand on a request smuggled through the composer-config path.' );
 		$this->assertSame( 'rest_cookie_invalid_nonce', $auth->get_error_code() );
 		$this->assertSame( 'publish', get_post_status( $post_id ), 'The protected DELETE must not have run.' );
 	}
@@ -279,8 +216,7 @@ final class RestRouteResolutionTest extends TestCase {
 	 * @test
 	 */
 	public function bogus_nonce_on_composer_config_itself_is_still_refused(): void {
-		// The opt-out may clear third-party blanket gates for its own route, but
-		// never core's CSRF defense.
+		// Core's CSRF defense applies to composer-config like any other route.
 		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config?_wpnonce=bogus', '/outpost/v1/composer-config', 'bogus' );
 
 		$auth = rest_get_server()->check_authentication();
@@ -292,7 +228,7 @@ final class RestRouteResolutionTest extends TestCase {
 	/**
 	 * @test
 	 */
-	public function third_party_blanket_gate_is_cleared_only_for_the_composer_config_route(): void {
+	public function third_party_blanket_gate_stands_on_the_composer_config_route_too(): void {
 		// Simulate a REST-hardening plugin: anonymous requests are refused everywhere.
 		$gate = static function ( $result ) {
 			if ( null !== $result || is_user_logged_in() ) {
@@ -305,13 +241,16 @@ final class RestRouteResolutionTest extends TestCase {
 		$GLOBALS['wp_rest_auth_cookie'] = null;
 
 		try {
-			// Our own route: the gate is cleared so our permission_callback decides.
+			// Our own route: since 1.0.27 Outpost never clears another plugin's
+			// authentication decision, so the gate stands here too.
 			$wp = new \WP();
 			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- test harness.
 			$wp->query_vars         = array( 'rest_route' => '/outpost/v1/composer-config' );
 			$GLOBALS['wp']          = $wp;
 			$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/composer-config';
-			$this->assertNull( rest_get_server()->check_authentication(), 'Compatibility purpose preserved for the composer-config route.' );
+			$own                    = rest_get_server()->check_authentication();
+			$this->assertInstanceOf( \WP_Error::class, $own, 'Another plugin\'s gate must stand on composer-config.' );
+			$this->assertSame( 'rest_not_logged_in', $own->get_error_code() );
 
 			// Our path, another route: the gate must stand.
 			$wp->query_vars         = array( 'rest_route' => '/wp/v2/posts' );
@@ -329,7 +268,7 @@ final class RestRouteResolutionTest extends TestCase {
 	 */
 	public function composer_config_request_still_reaches_its_own_permission_callback(): void {
 		// Not a CSRF shape: a plain logged-in dispatch of the real route must
-		// keep working and be decided by edit_posts, not by the opt-out.
+		// keep working and be decided by edit_posts.
 		wp_set_current_user( $this->admin_id );
 		$GLOBALS['wp_rest_auth_cookie'] = null;
 		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );

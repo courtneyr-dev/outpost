@@ -4,12 +4,12 @@
  *
  * Companion to ComposerConfigPermissionTest.php's bearer-in-body coverage,
  * focused on the scope gate H6 added: an IndieAuth-authenticated bearer
- * request must carry a token scoped for `create`/`update` (or, on a
- * read-only route, also `read`). An under-scoped token is refused even
- * though the user can `edit_posts`.
+ * request must carry a token scoped for `create` or `update`
+ * (Outpost_Bearer_Auth::COMPOSER_SCOPES; `read` stopped counting in F-56).
+ * An under-scoped token is refused even though the user can `edit_posts`.
  *
- * Runs against `/wp-json/outpost/v1/composer-config` (read-only; accepts
- * `create`, `update` or `read`), the route ComposerConfigPermissionTest
+ * Runs against `/wp-json/outpost/v1/composer-config`, the route
+ * ComposerConfigPermissionTest
  * exercises. Tokens come from IndieAuthTokenFixture: real IndieAuth tokens
  * when IndieAuth is loaded, a stand-in otherwise.
  *
@@ -207,5 +207,36 @@ final class BearerScopePermissionTest extends TestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertArrayHasKey( 'companions', (array) $response->get_data() );
+	}
+
+	/**
+	 * F-56: a `draft` token passes IndieAuth's `edit_posts` mapping, so
+	 * this 403 comes from Outpost's scope gate. Before F-56 the appearance
+	 * route accepted `draft` and `profile` alone.
+	 *
+	 * @test
+	 */
+	public function appearance_refuses_a_draft_scoped_token(): void {
+		$token = $this->issue_indieauth_token( $this->editor_id, array( 'draft' ) );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->resolve_current_user_like_core();
+
+		$response = rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/appearance/tokens' ) );
+
+		$this->assertSame( 403, $response->get_status() );
+		$this->assertSame( 'outpost_appearance_scope', $response->as_error()->get_error_code() );
+	}
+
+	/**
+	 * @test
+	 */
+	public function appearance_allows_a_create_scoped_token(): void {
+		$token = $this->issue_indieauth_token( $this->editor_id, array( 'create' ) );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->resolve_current_user_like_core();
+
+		$response = rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/appearance/tokens' ) );
+
+		$this->assertSame( 200, $response->get_status() );
 	}
 }

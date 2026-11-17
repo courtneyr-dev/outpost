@@ -95,7 +95,8 @@ final class Outpost_Perfmatters_Defang {
 		/**
 		 * Filter the list of Perfmatters disable-filter names Outpost
 		 * targets when defanging on PWA routes. Site owners can extend
-		 * this list when Perfmatters adds new optimizations.
+		 * this list when Perfmatters adds new optimizations. Names that
+		 * don't match `perfmatters_[a-z0-9_]+` are dropped.
 		 *
 		 * @since 0.1.70
 		 *
@@ -106,7 +107,10 @@ final class Outpost_Perfmatters_Defang {
 		$filters = is_array( $raw ) ? $raw : array();
 		$out     = array();
 		foreach ( $filters as $f ) {
-			if ( is_string( $f ) && '' !== $f ) {
+			// Each name gets __return_true on Outpost routes, so only
+			// Perfmatters' own hooks qualify; `user_has_cap` from a site
+			// filter would otherwise grant every capability here (F-60).
+			if ( is_string( $f ) && 1 === preg_match( '/^perfmatters_[a-z0-9_]+$/', $f ) ) {
 				$out[] = $f;
 			}
 		}

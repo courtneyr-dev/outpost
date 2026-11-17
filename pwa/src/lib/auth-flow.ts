@@ -24,6 +24,7 @@
  *     shouldn't validate today's callback.
  */
 
+import { canonical_account } from './account-identity';
 import {
 	discover_endpoints,
 	generate_pkce,
@@ -33,6 +34,8 @@ import {
 	type IndieAuthEnvironment,
 } from './indieauth';
 import { write_token, type StoredToken, type TokenStoreEnvironment } from './token-store';
+import { type ShareInboxEnvironment } from './share-inbox';
+import { clear_pending_shares } from './share-target';
 import { is_safe_http_url } from './url-validation';
 
 const SESSION_KEY_VERIFIER = 'outpost.auth.verifier';
@@ -51,6 +54,8 @@ export interface AuthFlowEnvironment {
 	indieauth: IndieAuthEnvironment;
 	tokenStore: TokenStoreEnvironment;
 	sessionStorage: Storage;
+	/** The photo share inbox; defaults to this origin's IndexedDB. */
+	shareInbox?: ShareInboxEnvironment;
 }
 
 const default_env: AuthFlowEnvironment = {
@@ -129,7 +134,8 @@ export class AuthFlowError extends Error {
 			| 'missing_state'
 			| 'exchange_failed'
 			| 'no_code'
-			| 'me_mismatch',
+			| 'me_mismatch'
+			| 'shares_not_cleared',
 	) {
 		super(message);
 		this.name = 'AuthFlowError';
@@ -255,6 +261,34 @@ export async function handle_callback(
 					original_me +
 					'). Refusing to store the token.',
 				'me_mismatch',
+			);
+		}
+
+		// The token's account must have one exact identity (T10-S3-07): the
+		// offline queue binds each post to it. A `me` with user info, or one
+		// that isn't an absolute http(s) URL, has none, so the token isn't
+		// kept. This is in addition to the origin check above.
+		if (canonical_account(response.me) === null) {
+			throw new AuthFlowError(
+				'Authorization server returned an identity (' +
+					response.me +
+					') that is not an absolute http(s) URL without user info. Refusing to store the token.',
+				'me_mismatch',
+			);
+		}
+
+		// Defense in depth for a device that never signed out (F-46): shares
+		// waiting here belong to the earlier sign-in, so they go before this
+		// account is stored. When they can't, no token is kept.
+		try {
+			await clear_pending_shares({
+				shareInbox: env.shareInbox ?? { indexedDB: globalThis.indexedDB },
+				sessionStorage: env.sessionStorage,
+			});
+		} catch (_err) {
+			throw new AuthFlowError(
+				'Shared content from an earlier sign-in could not be removed from this device, so this sign-in was not kept. Start over to try again.',
+				'shares_not_cleared',
 			);
 		}
 

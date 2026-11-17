@@ -8,9 +8,10 @@
  *   GET  /wp-json/outpost/v1/oauth/{provider}/callback   → exchange code, store creds
  *   POST /wp-json/outpost/v1/oauth/{provider}/disconnect → revoke + delete creds
  *
- * The start, disconnect and verify routes require a logged-in user with
- * manage_options and refuse any request that carries an IndieAuth bearer
- * token (see permission_check()). The callback URL pattern is fixed; each
+ * The start, disconnect and verify routes require the person's own
+ * wp-admin session (a cookie with a valid REST nonce) and manage_options;
+ * bearer tokens and application passwords are refused (see
+ * permission_check()). The callback URL pattern is fixed; each
  * provider's app registration uses its own callback URL with the provider
  * id in the path.
  *
@@ -102,6 +103,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_start' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -116,6 +118,12 @@ final class Outpost_OAuth_Controller {
 				// inside the handler before any side effects.
 				'permission_callback' => '__return_true',
 				'show_in_index'       => false,
+				'args'                => self::route_args(
+					array(
+						'code'  => array( 'type' => 'string' ),
+						'state' => array( 'type' => 'string' ),
+					)
+				),
 			)
 		);
 		register_rest_route(
@@ -126,6 +134,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_disconnect' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -136,27 +145,46 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_verify' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 	}
 
 	/**
-	 * Permission for the start, disconnect and verify routes: a logged-in
-	 * user with manage_options, and never a bearer-token request.
+	 * Declared arguments for the OAuth routes (F-63). A `type` makes
+	 * WordPress validate and cast each one (rest_parse_request_arg) before
+	 * the handler runs, as on Outpost's other routes; `?code[]=x` gets a
+	 * 400 instead of reaching a string cast.
 	 *
-	 * IndieAuth's map_meta_cap does not restrict manage_options, so an
-	 * admin's token of any scope would pass the capability check alone.
-	 * These are wp-admin actions with no token use case, so the required
-	 * scope list is empty: bearer_has_scope() refuses every bearer request,
-	 * and a cookie session with a valid REST nonce, or a request with no
-	 * credential, is decided by the capability check.
+	 * @param array<string, array<string, mixed>> $extra Route-specific arguments.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function route_args( array $extra = array() ): array {
+		return array(
+			'provider' => array(
+				'type'    => 'string',
+				'pattern' => '^[a-z0-9-]+$',
+			),
+		) + $extra;
+	}
+
+	/**
+	 * Permission for the start, disconnect and verify routes: the person's
+	 * own wp-admin session (a cookie with a valid REST nonce) and
+	 * manage_options.
+	 *
+	 * These routes read or remove a connected-account credential and are
+	 * wp-admin actions only (the start link carries `_wpnonce`). Bearer
+	 * tokens and application passwords are refused, the same client
+	 * boundary as connected-account reads (T10-S3-06, T10-S4-11).
 	 *
 	 * @param \WP_REST_Request $request REST request.
 	 */
 	public static function permission_check( \WP_REST_Request $request ): bool {
-		return is_user_logged_in()
-			&& current_user_can( 'manage_options' )
-			&& self::bearer_has_scope( $request, array() );
+		if ( ! self::is_first_party_cookie_request( $request ) ) {
+			return false;
+		}
+		return current_user_can( 'manage_options' );
 	}
 
 	/**

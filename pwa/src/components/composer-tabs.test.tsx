@@ -424,17 +424,29 @@ describe('ComposerTabs: Home and the start screen', () => {
 		expect(root.querySelector('#outpost-home-title')?.textContent).toBe('What would you like to post?');
 	});
 
-	it('offers six cards, each a named button with a description', async () => {
+	it('offers six cards, each a button named by all of its visible text, title first', async () => {
 		mount_home();
 		await vi.waitFor(() => expect(home()).not.toBeNull());
 		const cards = Array.from(root.querySelectorAll<HTMLButtonElement>('.outpost-home-card'));
 		expect(cards.map((c) => c.dataset['mode'])).toEqual(['note', 'reply', 'photo', 'listen', 'life', 'recipe']);
 		for (const c of cards) {
 			expect(c.tagName).toBe('BUTTON');
-			const name = document.getElementById(c.getAttribute('aria-labelledby') ?? '')?.textContent;
-			const description = document.getElementById(c.getAttribute('aria-describedby') ?? '')?.textContent;
-			expect(name).toBeTruthy();
-			expect(description).toBeTruthy();
+			const ids = c.getAttribute('aria-labelledby')?.split(' ') ?? [];
+			const name = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+			const title = c.querySelector('.outpost-home-card__title')?.textContent ?? '';
+			const visible = Array.from(c.querySelectorAll('span:not([aria-hidden="true"]):not(.outpost-home-card__icon)'))
+				.map((s) => s.textContent ?? '')
+				.join(' ');
+			// WCAG 2.5.3 Label in Name: the name holds the text the button shows
+			// (axe label-content-name-mismatch), starting with the title.
+			expect(title).toBeTruthy();
+			expect(name.startsWith(title)).toBe(true);
+			expect(name).toBe(visible);
+			// The description is part of the name now, so it isn't repeated.
+			expect(c.hasAttribute('aria-describedby')).toBe(false);
+			// Text extraction that ignores layout must still see separate words:
+			// without a space, axe reads "PostArticles" and the name check fails.
+			expect(c.textContent?.startsWith(title + ' ')).toBe(true);
 		}
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Acquisition');
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Exercise');
@@ -489,7 +501,10 @@ describe('ComposerTabs: Home and the start screen', () => {
 		await vi.waitFor(() => expect(card('note').textContent).toContain('Unsent draft'));
 		expect(card('reply').textContent).not.toContain('Unsent draft');
 		const name_ids = card('note').getAttribute('aria-labelledby')?.split(' ') ?? [];
-		expect(name_ids.map((id) => document.getElementById(id)?.textContent)).toEqual(['Post', 'Unsent draft']);
+		const name_parts = name_ids.map((id) => document.getElementById(id)?.textContent);
+		expect(name_parts[0]).toBe('Post');
+		expect(name_parts.at(-1)).toBe('Unsent draft');
+		expect(name_parts).toHaveLength(3);
 		card('note').click();
 		await flush();
 		expect((root.querySelector('#outpost-note-content') as HTMLTextAreaElement).value).toBe('Half a thought');
@@ -517,11 +532,27 @@ describe('ComposerTabs: Home and the start screen', () => {
 		}
 	});
 
-	it('a share launch opens its tab even when another start screen is saved', () => {
+	it('a share launch opens its tab even when another start screen is saved', async () => {
 		prefer_start('reply');
 		stash_share_target({ tab: 'photo' });
 		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
-		expect(visible_panels()).toEqual(['outpost-panel-photo']);
+		// The share's decision comes first and is the only thing showing (T10-S3-05 v1.2)…
+		expect(root.querySelector('[data-outpost-share-review]')).not.toBeNull();
+		expect(visible_panels()).toEqual([]);
+		// …then its tab opens, not the saved start screen.
+		Array.from(root.querySelectorAll('button'))
+			.find((b) => (b.textContent ?? '').trim() === 'Discard shared content')
+			?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await vi.waitFor(() => expect(visible_panels()).toEqual(['outpost-panel-photo']));
+	});
+
+	it('a share with an unknown tab falls back to the saved start screen (#323)', () => {
+		prefer_start('reply');
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'checkin', content: 'old value' }));
+		mount_home({ fetch: (() => new Promise(() => {})) as typeof fetch });
+		expect(root.querySelector('[data-outpost-share-review]')).toBeNull();
+		expect(visible_panels()).toEqual(['outpost-panel-reply']);
+		expect(root.querySelector('#outpost-tab-reply')?.getAttribute('aria-current')).toBe('true');
 	});
 
 	it("uses the site's saved start screen on a device that hasn't stored one", async () => {
@@ -549,5 +580,86 @@ describe('ComposerTabs: Home and the start screen', () => {
 		expect(root.querySelector('#outpost-tab-about')?.getAttribute('aria-current')).toBe('true');
 		expect(document.body.classList.contains('outpost-mode-night')).toBe(true);
 		expect(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}').start).toBe('recipe');
+	});
+});
+
+describe('ComposerTabs: More options drawer', () => {
+	const KEY_MORE_OPEN = 'outpost.composer.more-open';
+	const config_env = {
+		fetch: ((): Promise<Response> =>
+			Promise.resolve(
+				new Response(
+					JSON.stringify({
+						companions: {},
+						postFormats: null,
+						xfnRels: [],
+						existingCategories: [],
+						existingTags: [],
+						bridgyHostMap: {},
+						siteSettings: { bridgyAutoSuggest: false, defaultPostVariant: 'note' },
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				),
+			)) as typeof fetch,
+	};
+
+	function mount_more(): void {
+		render(
+			<ComposerTabs
+				token={mock_token}
+				tokenStore={mock_token_store()}
+				composerConfigEnv={config_env}
+				queueEnv={{ indexedDB: new IDBFactory() }}
+				appearanceEnv={{ fetch: () => Promise.reject(new TypeError('offline')) }}
+			/>,
+			root,
+		);
+	}
+
+	/** Every "More options" drawer the modes rendered, open or closed. */
+	const more_drawers = (): HTMLElement[] =>
+		Array.from(root.querySelectorAll<HTMLElement>('.outpost-mode-panel .outpost-drawer')).filter(
+			(drawer) => drawer.querySelector('h2')?.textContent === 'More options',
+		);
+
+	/** The panels whose "More options" drawer is open. */
+	const panels_with_open_more = (): string[] =>
+		more_drawers()
+			.filter((drawer) => drawer.dataset.open === 'true')
+			.map((drawer) => drawer.closest('.outpost-mode-panel')?.id ?? '');
+
+	it('opens the remembered drawer only in the mode on screen', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		expect(panels_with_open_more()).toEqual(['outpost-panel-note']);
+	});
+
+	it('moves the open drawer with the mode on screen', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		root.querySelector<HTMLButtonElement>('#outpost-tab-photo')?.click();
+		await flush();
+
+		expect(panels_with_open_more()).toEqual(['outpost-panel-photo']);
+	});
+
+	it('closing the drawer in one mode keeps it closed in the others', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		root
+			.querySelector<HTMLButtonElement>('#outpost-panel-note .outpost-drawer[data-open="true"] button[aria-label="Close"]')
+			?.click();
+		await flush();
+		root.querySelector<HTMLButtonElement>('#outpost-tab-photo')?.click();
+		await flush();
+
+		expect(panels_with_open_more()).toEqual([]);
+		expect(localStorage.getItem(KEY_MORE_OPEN)).toBe('0');
 	});
 });

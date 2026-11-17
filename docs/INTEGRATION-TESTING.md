@@ -15,7 +15,7 @@ The first `wp-env start` pulls a few hundred MB of Docker images (PHP, MySQL, Wo
 
 `.wp-env.json` at the repo root configures:
 
-- **WordPress core:** `6.7`, pinned in `.wp-env.json`. This is the version the integration suite runs against, not the newest version Outpost supports: `readme.txt` declares `Tested up to: 7.1`.
+- **WordPress core:** `7.1.4`, pinned in `.wp-env.json`. This is the version the integration suite runs against; `readme.txt` declares `Tested up to: 7.1`, and `Requires at least: 6.5` is not exercised at runtime.
 - **Plugins installed:**
   - `.` — Outpost itself, mapped from the working tree
   - IndieAuth (from WordPress.org) — required dependency per the IndieAuth-first chain
@@ -48,6 +48,20 @@ wp-env run tests-cli --env-cwd=wp-content/plugins/outpost composer test:integrat
 ```
 
 Which runs `composer test:integration` inside the wp-env tests-cli container, with the working directory set to the Outpost plugin folder. PHPUnit picks up `tests/integration/bootstrap.php` (configured in `composer.json`'s `test:integration` script), which loads the WP core test suite from `/wordpress-phpunit` and registers Outpost on `muplugins_loaded`.
+
+### Testing another checkout or worktree
+
+`npm run test:integration` tests only the checkout that wp-env mounts. To test a different checkout or `git worktree` against an environment that's already running, use `bin/itest-worktree.sh`:
+
+```bash
+# The whole suite for the checkout this script lives in
+bin/itest-worktree.sh
+
+# Another checkout, one class
+bin/itest-worktree.sh ~/Developer/outpost-other -- --filter TelegraphRequestGateTest
+```
+
+The script finds the running Outpost wp-env (or takes `--env <id>`, the folder name under `~/.wp-env`), mounts the checkout as the plugin in a one-off tests-cli container, and points WireMock at `http://host.docker.internal:8080` (override with `MOCK_URL`). Each checkout gets its own database, `outpost_itest_<folder>`, so a run never wipes another checkout's tables or the environment's `tests-wordpress` database; `--db <name>` picks a different one. The checkout needs a real `vendor/` from `composer install`; a symlinked `vendor/` doesn't resolve inside the container.
 
 ## Status
 

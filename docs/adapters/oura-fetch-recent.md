@@ -27,6 +27,9 @@ The "Add from Oura" button shows for every user with `publish_posts`, connected 
 | Date range | last 14 days from request time |
 | Modal cap | 10 items per open (caller-supplied; clamped to [1, 50]) |
 | Combined? | yes — workouts + sleep merged into one list, sorted descending by start time |
+| `fetched_at` | the date only, `YYYY-MM-DD`: a workout's start date, a night's `day` |
+
+The start time and bedtime set the order on the server and never go out in the response: no item's `fetched_at`, subtitle or `post_meta` carries a clock time.
 
 ## Item shape mapping
 
@@ -39,7 +42,6 @@ subtitle: "2026-05-04, 32 min, 478 kcal"
 post_kind: "workout"
 post_meta:
   _outpost_oura_activity:   "running"
-  _outpost_oura_start_at:   "2026-05-04T07:30:00+00:00"
   _outpost_oura_duration_s: "1920"
   _outpost_oura_distance_m: "5200"
   _outpost_oura_calories:   "478"
@@ -58,6 +60,16 @@ post_meta:
 ```
 
 Sleep is `note` rather than `workout` because sleep is observational, not an active session.
+
+With Post Kinds active (its `post-kinds-indieweb/sleep-card` block registered), the payload adds what the picker inserts in place of the paragraph:
+
+```
+blocks: [ { name: "post-kinds-indieweb/sleep-card", attributes: { durationMinutes: 434 } } ]
+terms:  { kind: [ <id of the sleep term> ] }
+date:   "2026-05-03T12:00:00"
+```
+
+`date` is noon of the night the sleep began, in the site timezone: the bedtime minus twelve hours, the rule Post Kinds files sleep posts by. The bedtime picks the night and nothing else; no clock time goes into the card, the content, post meta or `fetched_at`, and Post Kinds keeps sleep posts at noon. The REST route checks `blocks`, `terms` and `date` before sending them (see [the fetch-recent picker](../concepts/fetch-recent-picker.md)), so a non-noon `date` never reaches the editor. `terms` is left out when the site has no `sleep` term yet, and Post Kinds files the post by its first card on save. The picker falls back to the paragraph when the editor doesn't have the block type.
 
 ## No icon URL
 

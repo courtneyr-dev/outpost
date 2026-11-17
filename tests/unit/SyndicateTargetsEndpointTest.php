@@ -82,7 +82,7 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
 		// mock mock_filters() sets up — that override is inert for this
 		// call (see "Scope source" in trait-bearer-auth.php).
-		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
 		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}

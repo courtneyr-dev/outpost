@@ -516,16 +516,16 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(JSON.stringify(rows)).not.toContain('secret-token-abc');
 	});
 
-	it('fails the entry with a sign-in-again status when no token is stored', async () => {
+	it('leaves every entry untouched when no token is stored (T10-S3-07)', async () => {
 		await enqueue(note_input(), env);
+		const before = await list(env);
 		// An empty token store (fresh IDBFactory, nothing ever written).
 		const empty_token_env: TokenStoreEnvironment = {
 			indexedDB: new IDBFactory(),
 			crypto: globalThis.crypto,
 		};
-		const [kept] = await flush(rejecting_fetch(), env, { tokenStore: empty_token_env });
-		expect(kept?.lastError).toContain('sign in again');
-		expect(kept?.retryable).toBe(false);
+		expect(await flush(rejecting_fetch(), env, { tokenStore: empty_token_env })).toEqual([]);
+		expect(await list(env)).toEqual(before);
 	});
 
 	it('sends the Authorization header for the currently stored token on a matching-site entry', async () => {
@@ -547,7 +547,7 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 		expect(auth_header).toBe('Bearer t');
 	});
 
-	it('fails an entry non-retryably, without sending anything, when the stored token belongs to a different site', async () => {
+	it('leaves an entry untouched, without sending anything, when the stored token belongs to a different site (T10-S3-07)', async () => {
 		await enqueue(
 			{
 				source: 'note',
@@ -570,12 +570,10 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			fetch_calls += 1;
 			return ok_response();
 		});
-		const [kept] = await flush(site, env, { tokenStore: other_site_token_env });
+		const before = await list(env);
+		expect(await flush(site, env, { tokenStore: other_site_token_env })).toEqual([]);
 		expect(fetch_calls).toBe(0);
-		expect(kept?.retryable).toBe(false);
-		expect(kept?.lastError).toContain('signed in as a different site');
-		expect(kept?.lastError).toContain('Retry all now or the next reconnect sends it');
-		expect(kept?.lastError).not.toMatch(/sign out/i);
+		expect(await list(env)).toEqual(before);
 	});
 
 	it('strips a legacy plaintext accessToken field left over from a 1.0.21-or-earlier row', async () => {
@@ -589,15 +587,26 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			attempts: 0,
 		});
 
-		// Fail the replay so the entry gets written back (via claim() then
-		// save()) instead of removed, exercising both of the two places that
-		// used to spread a legacy row's fields back unchanged.
-		await flush(rejecting_fetch(), env, { tokenStore: tokenEnv });
+		// A row this old has no owner, so it is locked and never replays
+		// (T10-S3-07); flush still removes its plaintext token and nothing else.
+		let fetch_calls = 0;
+		await flush(
+			fetch_env(() => {
+				fetch_calls += 1;
+				return ok_response();
+			}),
+			env,
+			{ tokenStore: tokenEnv },
+		);
 
 		const rows = await raw_queue_rows(env);
+		expect(fetch_calls).toBe(0);
 		expect(rows).toHaveLength(1);
 		expect(rows[0]).not.toHaveProperty('accessToken');
 		expect(JSON.stringify(rows)).not.toContain('LEGACY-PLAINTEXT');
+		expect(rows[0]).toMatchObject({ attempts: 0, properties: { content: 'queued before 1.0.22' } });
+		expect(rows[0]).not.toHaveProperty('lastError');
+		expect(rows[0]).not.toHaveProperty('claimedUntil');
 	});
 
 	it('keeps queued posts through a sign-out and sends them after signing back in to the same site', async () => {
@@ -618,16 +627,17 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			posts += 1;
 			return ok_response();
 		});
-		const [waiting] = await flush(site, queue_env, { tokenStore: token_env });
-		expect(waiting?.lastError).toContain('sign in again');
+		const before = await list(queue_env);
+		expect(await flush(site, queue_env, { tokenStore: token_env })).toEqual([]);
 		expect(posts).toBe(0);
+		expect(await list(queue_env)).toEqual(before);
 
 		await write_token(token, token_env);
 		expect(await flush(site, queue_env, { tokenStore: token_env })).toHaveLength(0);
 		expect(posts).toBe(1);
 	});
 
-	it('never sends an entry queued without a site, and fails it non-retryably', async () => {
+	it('never sends or changes an entry queued without a site (T10-S3-07: locked)', async () => {
 		await enqueue(
 			{
 				source: 'note',
@@ -641,9 +651,9 @@ describe('offline-queue: no plaintext token in storage (Task H5)', () => {
 			fetch_calls += 1;
 			return ok_response();
 		});
-		const [kept] = await flush(site, env, { tokenStore: tokenEnv });
+		const before = await list(env);
+		expect(await flush(site, env, { tokenStore: tokenEnv })).toEqual([]);
 		expect(fetch_calls).toBe(0);
-		expect(kept?.retryable).toBe(false);
-		expect(kept?.lastError).toContain('queued by an older version with no site recorded; re-create this post');
+		expect(await list(env)).toEqual(before);
 	});
 });
