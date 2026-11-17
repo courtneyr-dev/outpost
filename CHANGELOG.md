@@ -7,6 +7,10 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added `outpost/manual-share` and `outpost/capture-syndication` as non-public WordPress abilities. Each ability has its own disabled-by-default switch under Outpost's Agent abilities settings section, checks write-token scope and per-post edit access, and defaults to a no-write dry run.
+
 ## [1.0.28] - Unreleased
 
 ### Security

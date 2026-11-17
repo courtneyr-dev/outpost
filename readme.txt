@@ -14,9 +14,9 @@ Post notes, replies, photos, and life-tracking entries to your WordPress site fr
 
 == Description ==
 
-Outpost is a mobile composer for WordPress, installed as a Progressive Web App at `/post`. Write a note, reply, photo, recipe, or life-tracking entry on your phone; it publishes to your own site through the Micropub API, and syndication chips send it on to the destinations your site has configured.
+Outpost is a mobile WordPress PWA at `/post`. It publishes notes, replies, photos, recipes, and life-tracking entries through Micropub; syndication chips use the site's configured destinations.
 
-* Modes: Post (note to article), Reply and its kinds, Doing (listen, watch, read, and more), Life, Photo (alt text required), and Recipe.
+* Modes: Post, Reply, Doing, Life, Photo (alt text required), and Recipe.
 * Installs to your home screen, keeps unsent text on the device, and queues posts made offline for the account that wrote them.
 * Accepts shares from Android's share sheet and an Apple Shortcut; shared content waits until you choose Use or Discard.
 
@@ -24,7 +24,8 @@ Documentation: [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io
 
 = Abilities =
 
-With the Abilities API, Outpost registers three read-only abilities: `outpost/get-syndicate-targets` and `outpost/get-composer-config` (`edit_posts`) and `outpost/get-share-status` (`edit_post`).
+* No switch: `outpost/get-syndicate-targets` (`edit_posts`), `outpost/get-share-status` (existing-post `edit_post`), `outpost/get-composer-config` (`edit_posts`).
+* Switches default off; capability is existing-post `edit_post`: `outpost/manual-share` (`outpost_ability_manual_share`) and `outpost/capture-syndication` (`outpost_ability_capture_syndication`).
 
 == Installation ==
 

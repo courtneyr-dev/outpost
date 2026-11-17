@@ -52,10 +52,10 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'Outpost', $registered[1]['label'] );
 	}
 
-	public function test_registers_three_public_read_abilities_with_schemas(): void {
+	public function test_registers_all_five_abilities_with_schemas_and_metadata(): void {
 		$registered = array();
 		WP_Mock::userFunction( 'wp_register_ability' )
-			->times( 3 )
+			->times( 5 )
 			->andReturnUsing(
 				static function ( string $name, array $args ) use ( &$registered ): void {
 					$registered[ $name ] = $args;
@@ -64,12 +64,14 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 
 		Outpost_Abilities::register_abilities();
 
-		$this->assertCount( 3, $registered );
+		$this->assertCount( 5, $registered );
 		$this->assertSame(
 			array(
 				'outpost/get-syndicate-targets',
 				'outpost/get-share-status',
 				'outpost/get-composer-config',
+				'outpost/manual-share',
+				'outpost/capture-syndication',
 			),
 			array_keys( $registered )
 		);
@@ -80,6 +82,9 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 			$this->assertIsArray( $args['input_schema'] );
 			$this->assertIsArray( $args['output_schema'] );
 			$this->assertTrue( $args['meta']['show_in_rest'] );
+		}
+
+		foreach ( array_slice( $registered, 0, 3, true ) as $args ) {
 			$this->assertSame(
 				array(
 					'readonly'    => true,
@@ -90,6 +95,17 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 			);
 			$this->assertSame( array( 'public' => true ), $args['meta']['mcp'] );
 		}
+
+		$this->assertSame(
+			array( 'readonly' => false, 'destructive' => false, 'idempotent' => false ),
+			$registered['outpost/manual-share']['meta']['annotations']
+		);
+		$this->assertSame(
+			array( 'readonly' => false, 'destructive' => false, 'idempotent' => true ),
+			$registered['outpost/capture-syndication']['meta']['annotations']
+		);
+		$this->assertSame( array( 'public' => false ), $registered['outpost/manual-share']['meta']['mcp'] );
+		$this->assertSame( array( 'public' => false ), $registered['outpost/capture-syndication']['meta']['mcp'] );
 	}
 
 	public function test_input_schemas_reject_unknown_fields_and_constrain_post_id(): void {
@@ -110,6 +126,21 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( array(), $config['properties'] );
 		$this->assertFalse( $config['additionalProperties'] );
 		$this->assertSame( array(), $config['default'] );
+
+		$manual = $registered['outpost/manual-share']['input_schema'];
+		$this->assertSame( array( 'post_id', 'platform_id' ), $manual['required'] );
+		$this->assertSame( 1, $manual['properties']['post_id']['minimum'] );
+		$this->assertSame( array( 'android', 'ios', 'desktop' ), $manual['properties']['device']['enum'] );
+		$this->assertSame( 'desktop', $manual['properties']['device']['default'] );
+		$this->assertTrue( $manual['properties']['dry_run']['default'] );
+		$this->assertFalse( $manual['additionalProperties'] );
+
+		$capture = $registered['outpost/capture-syndication']['input_schema'];
+		$this->assertSame( array( 'post_id', 'audit_log_id', 'silo_url' ), $capture['required'] );
+		$this->assertSame( 1, $capture['properties']['post_id']['minimum'] );
+		$this->assertFalse( $capture['properties']['confirm_mismatch']['default'] );
+		$this->assertTrue( $capture['properties']['dry_run']['default'] );
+		$this->assertFalse( $capture['additionalProperties'] );
 	}
 
 	/**
@@ -196,7 +227,7 @@ final class AbilitiesTest extends \WP_Mock\Tools\TestCase {
 	private function registered_abilities(): array {
 		$registered = array();
 		WP_Mock::userFunction( 'wp_register_ability' )
-			->times( 3 )
+			->times( 5 )
 			->andReturnUsing(
 				static function ( string $name, array $args ) use ( &$registered ): void {
 					$registered[ $name ] = $args;

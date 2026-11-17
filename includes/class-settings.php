@@ -103,6 +103,26 @@ final class Outpost_Settings {
 				'show_in_rest'      => false,
 			)
 		);
+		register_setting(
+			self::SETTINGS_GROUP,
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+				'show_in_rest'      => false,
+				'default'           => false,
+			)
+		);
+		register_setting(
+			self::SETTINGS_GROUP,
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+				'show_in_rest'      => false,
+				'default'           => false,
+			)
+		);
 
 		add_settings_section(
 			'outpost_settings_main',
@@ -157,6 +177,29 @@ final class Outpost_Settings {
 			array( self::class, 'render_inference_field' ),
 			'outpost-settings',
 			'outpost_settings_main'
+		);
+
+		add_settings_section(
+			'outpost_settings_agent_abilities',
+			__( 'Agent abilities', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_agent_abilities_intro' ),
+			'outpost-settings'
+		);
+
+		add_settings_field(
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			__( 'Manual share', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_manual_share_ability_field' ),
+			'outpost-settings',
+			'outpost_settings_agent_abilities'
+		);
+
+		add_settings_field(
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			__( 'Capture syndication', 'outpost-mobile-publishing' ),
+			array( self::class, 'render_capture_syndication_ability_field' ),
+			'outpost-settings',
+			'outpost_settings_agent_abilities'
 		);
 	}
 
@@ -432,6 +475,36 @@ final class Outpost_Settings {
 	 */
 	public static function workout_details_in_text(): bool {
 		return ! empty( self::get()['workout_details_in_text'] );
+	}
+
+	public static function render_agent_abilities_intro(): void {
+		echo '<p>' . esc_html__(
+			'Abilities that can change post data stay off until a site administrator enables each one.',
+			'outpost-mobile-publishing'
+		) . '</p>';
+	}
+
+	public static function render_manual_share_ability_field(): void {
+		self::render_ability_checkbox(
+			Outpost_Abilities::OPTION_MANUAL_SHARE,
+			__( 'Let agents prepare a manual share for a post and record it in the post\'s share log.', 'outpost-mobile-publishing' )
+		);
+	}
+
+	public static function render_capture_syndication_ability_field(): void {
+		self::render_ability_checkbox(
+			Outpost_Abilities::OPTION_CAPTURE_SYNDICATION,
+			__( 'Let agents record a silo URL as a post\'s syndication link.', 'outpost-mobile-publishing' )
+		);
+	}
+
+	private static function render_ability_checkbox( string $option, string $label ): void {
+		printf(
+			'<label><input type="checkbox" name="%1$s" value="1"%2$s /> %3$s</label>',
+			esc_attr( $option ),
+			checked( Outpost_Abilities::ability_is_enabled( $option ), true, false ),
+			esc_html( $label )
+		);
 	}
 
 	/**

@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Unit;
 
+use Outpost_Abilities;
 use Outpost_Settings;
+use Outpost_Uninstaller;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
 use WP_Term;
@@ -139,5 +141,101 @@ final class SettingsTest extends TestCase {
 		$this->assertSame( 'note', $settings['default_post_variant'] );
 		$this->assertSame( array(), $settings['default_categories'] );
 		$this->assertSame( array(), $settings['default_tags'] );
+	}
+
+	public function test_registers_two_disabled_boolean_ability_options_and_fields(): void {
+		$settings = array();
+		$sections = array();
+		$fields   = array();
+		WP_Mock::userFunction( '__' )->andReturnUsing( static fn ( string $text ): string => $text );
+		WP_Mock::userFunction( 'register_setting' )
+			->times( 3 )
+			->andReturnUsing(
+				static function ( string $group, string $option, array $args ) use ( &$settings ): void {
+					$settings[ $option ] = array( $group, $args );
+				}
+			);
+		WP_Mock::userFunction( 'add_settings_section' )
+			->times( 2 )
+			->andReturnUsing(
+				static function ( string $id, string $title ) use ( &$sections ): void {
+					$sections[ $id ] = $title;
+				}
+			);
+		WP_Mock::userFunction( 'add_settings_field' )
+			->times( 8 )
+			->andReturnUsing(
+				static function ( string $id, string $title, $callback, string $page, string $section ) use ( &$fields ): void {
+					$fields[ $id ] = array( $title, $callback, $page, $section );
+				}
+			);
+
+		Outpost_Settings::register_settings();
+
+		foreach ( array( 'outpost_ability_manual_share', 'outpost_ability_capture_syndication' ) as $option ) {
+			$this->assertSame( 'outpost_settings_group', $settings[ $option ][0] );
+			$this->assertSame( 'boolean', $settings[ $option ][1]['type'] );
+			$this->assertSame( 'rest_sanitize_boolean', $settings[ $option ][1]['sanitize_callback'] );
+			$this->assertFalse( $settings[ $option ][1]['show_in_rest'] );
+			$this->assertFalse( $settings[ $option ][1]['default'] );
+			$this->assertSame( 'outpost_settings_agent_abilities', $fields[ $option ][3] );
+		}
+		$this->assertSame( 'Agent abilities', $sections['outpost_settings_agent_abilities'] );
+	}
+
+	/**
+	 * @dataProvider ability_option_value_provider
+	 *
+	 * @param mixed $stored Stored option value.
+	 */
+	public function test_ability_switch_reads_only_wordpress_boolean_values( $stored, bool $enabled ): void {
+		WP_Mock::userFunction( 'get_option' )->once()->andReturn( $stored );
+
+		$this->assertSame( $enabled, Outpost_Abilities::ability_is_enabled( Outpost_Abilities::OPTION_MANUAL_SHARE ) );
+	}
+
+	/**
+	 * @return array<string, array{mixed, bool}>
+	 */
+	public function ability_option_value_provider(): array {
+		return array(
+			'string false' => array( 'false', false ),
+			'no'           => array( 'no', false ),
+			'off'          => array( 'off', false ),
+			'string zero'  => array( '0', false ),
+			'empty string' => array( '', false ),
+			'integer zero' => array( 0, false ),
+			'boolean false' => array( false, false ),
+			'boolean true' => array( true, true ),
+			'integer one'  => array( 1, true ),
+			'string one'   => array( '1', true ),
+		);
+	}
+
+	public function test_renders_the_exact_ability_checkbox_labels_and_checks_a_stored_string_one(): void {
+		WP_Mock::userFunction( '__' )->andReturnUsing( static fn ( string $text ): string => $text );
+		WP_Mock::userFunction( 'get_option' )->andReturn( '1' );
+		WP_Mock::userFunction( 'esc_attr' )->andReturnUsing( static fn ( string $text ): string => $text );
+		WP_Mock::userFunction( 'esc_html' )->andReturnUsing( static fn ( string $text ): string => $text );
+		WP_Mock::userFunction( 'checked' )->with( true, true, false )->andReturn( ' checked="checked"' );
+
+		ob_start();
+		Outpost_Settings::render_manual_share_ability_field();
+		Outpost_Settings::render_capture_syndication_ability_field();
+		$output = (string) ob_get_clean();
+
+		$this->assertStringContainsString( 'name="outpost_ability_manual_share"', $output );
+		$this->assertStringContainsString( 'Let agents prepare a manual share for a post and record it in the post\'s share log.', $output );
+		$this->assertStringContainsString( 'name="outpost_ability_capture_syndication"', $output );
+		$this->assertStringContainsString( 'Let agents record a silo URL as a post\'s syndication link.', $output );
+		$this->assertSame( 2, substr_count( $output, 'checked="checked"' ) );
+	}
+
+	public function test_uninstaller_owns_both_ability_options(): void {
+		$reflection = new \ReflectionClass( Outpost_Uninstaller::class );
+		$options    = $reflection->getConstant( 'OPTIONS' );
+
+		$this->assertContains( 'outpost_ability_manual_share', $options );
+		$this->assertContains( 'outpost_ability_capture_syndication', $options );
 	}
 }
