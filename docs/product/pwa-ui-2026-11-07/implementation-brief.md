@@ -86,7 +86,7 @@ Preserve `outpost-icon.svg`, PNG manifest icons, maskable icons, and Apple touch
 
 Home is a launcher, not a form. It's a destination inside the composer, not a second router: the composer adds a `view` (Home or tabs) beside the existing selected tab, keeps the WAI-ARIA tab strip and all seven panels mounted, and hides them on Home. No URL changes.
 
-Home shows a compact connection line from runtime state (the same states as About, never a hard-coded "Connected"), the heading "What would you like to post?", six cards, an "Everything each tab can post" disclosure, and an About row. Each card is one native button with an icon, a title as its accessible name, and a short description as its accessible description. A card whose tab holds a saved draft adds the text "Unsent draft" to its name.
+Home shows a compact connection line from runtime state (the same states as About, never a hard-coded "Connected"), the heading "What would you like to post?", six cards, an "Everything each tab can post" disclosure, and an About row. Each card is one native button with an icon, a title and a short description, named by all of its visible text with the title first: title, then description (WCAG 2.5.3 Label in Name; amended 2026-11-17 after axe-core 4.14 flagged the title-only name with `label-content-name-mismatch`). A card whose tab holds a saved draft adds the text "Unsent draft" to the end of its name.
 
 | Card | Opens | Inventory (read from the mode files' variant tables) |
 | --- | --- | --- |
