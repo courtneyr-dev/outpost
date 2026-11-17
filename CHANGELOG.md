@@ -10,6 +10,7 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Leaving "More options" open no longer opens it in all six composer modes on the next visit. Every mode is mounted at once, and each kept its own copy of the saved preference, so five hidden drawers stayed open and locked page scrolling: Home couldn't scroll on a phone. The drawer now opens only in the mode on screen, and opening or closing it in one mode applies to all of them.
+- Text typed in the last 600 ms before a reload, a closed tab, or switching away from the app is now kept in the draft. Drafts save 600 ms after typing stops, and a page that was leaving dropped the pending save. The composer now writes it as soon as the page hides.
 
 ## [1.0.29] - Unreleased
 
