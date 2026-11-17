@@ -55,7 +55,30 @@ afterEach(() => {
 	root.remove();
 	vi.useRealTimers();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
+
+/**
+ * Swap in a localStorage whose `method` throws, as a blocked or full store
+ * does. happy-dom 21's Storage is a Proxy that vi.spyOn can't restore, so a
+ * spy on it would leak into every later test.
+ */
+function refuse_storage(method: 'getItem' | 'setItem'): void {
+	const real = localStorage;
+	vi.stubGlobal('localStorage', {
+		get length() {
+			return real.length;
+		},
+		key: (index: number) => real.key(index),
+		getItem: (key: string) => real.getItem(key),
+		setItem: (key: string, value: string) => real.setItem(key, value),
+		removeItem: (key: string) => real.removeItem(key),
+		clear: () => real.clear(),
+		[method]: () => {
+			throw new DOMException('denied', 'SecurityError');
+		},
+	});
+}
 
 function mount(me = ME): void {
 	render(<NoteMode token={token_for(me)} micropubEnv={online_micropub()} />, root);
@@ -170,9 +193,7 @@ describe('NoteMode drafts', () => {
 	});
 
 	it('keeps working without "Draft saved" when storage refuses writes', async () => {
-		vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-			throw new DOMException('denied', 'SecurityError');
-		});
+		refuse_storage('setItem');
 		mount();
 		type('outpost-note-title', 'Offline-proof');
 		type('outpost-note-content', 'Still postable');
@@ -187,9 +208,7 @@ describe('NoteMode drafts', () => {
 	});
 
 	it('mounts with an empty form when storage reads throw', async () => {
-		vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
-			throw new DOMException('denied', 'SecurityError');
-		});
+		refuse_storage('getItem');
 		mount();
 		await flush();
 		expect(field('outpost-note-content').value).toBe('');
