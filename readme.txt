@@ -3,7 +3,7 @@
 Contributors:      courane01
 Tags:              indieweb, micropub, posse, pwa, syndication
 Tested up to:      7.1
-Stable tag:        1.0.28
+Stable tag:        1.0.29
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 6.5
@@ -14,9 +14,9 @@ Post notes, replies, photos, and life-tracking entries to your WordPress site fr
 
 == Description ==
 
-Outpost is a mobile composer for WordPress, installed as a Progressive Web App at `/post`. Write a note, reply, photo, recipe, or life-tracking entry on your phone; it publishes to your own site through the Micropub API, and syndication chips send it on to the destinations your site has configured.
+Outpost is a mobile WordPress PWA at `/post`. It publishes notes, replies, photos, recipes, and life-tracking entries through Micropub; syndication chips use the site's configured destinations.
 
-* Modes: Post (note to article), Reply and its kinds, Doing (listen, watch, read, and more), Life, Photo (alt text required), and Recipe.
+* Modes: Post, Reply, Doing, Life, Photo (alt text required), and Recipe.
 * Installs to your home screen, keeps unsent text on the device, and queues posts made offline for the account that wrote them.
 * Accepts shares from Android's share sheet and an Apple Shortcut; shared content waits until you choose Use or Discard.
 
@@ -24,7 +24,8 @@ Documentation: [courtneyr-dev.github.io/outpost](https://courtneyr-dev.github.io
 
 = Abilities =
 
-With the Abilities API, Outpost registers three read-only abilities: `outpost/get-syndicate-targets` and `outpost/get-composer-config` (`edit_posts`) and `outpost/get-share-status` (`edit_post`).
+* No switch: `outpost/get-syndicate-targets` (`edit_posts`), `outpost/get-share-status` (existing-post `edit_post`), `outpost/get-composer-config` (`edit_posts`).
+* Switches default off; capability is existing-post `edit_post`: `outpost/manual-share` (`outpost_ability_manual_share`) and `outpost/capture-syndication` (`outpost_ability_capture_syndication`).
 
 == Installation ==
 
@@ -101,17 +102,13 @@ Builds on IndieWeb Press This (Matthias Pfefferle, David Shanske, Ryan Barrett),
 
 == Changelog ==
 
-= 1.0.28 =
-* Security: the iOS Shortcut uses an application password limited to its endpoint; upgrading deletes old tokens.
-* Security: shares wait for Use or Discard and clear on sign-out, cookie REST requests need a nonce, connected accounts stay first-party, offline posts stay with their account, previews refuse internal addresses, saved API keys never render, and syndication sends only public posts and hides check-in locations.
-* Added: three read-only abilities, a Comic type, and Post Kinds cards from Oura and Polar.
-* Changed: composer modes are two rows of buttons.
-* Fixed: page optimizers, More options without its stylesheet, publish errors, photo size, the fallback category, shared tabs, and the Appearance preview.
-* Removed: /post/shortcut and the sample fetch provider.
+= 1.0.29 =
+* Added: two write abilities, manual-share and capture-syndication, each off until you turn it on under Agent abilities, and a dry run by default.
+* Security: composer helper routes need a create or update token, the composer CSP is stricter, link previews and covers accept only HTTP(S) HTML up to 5 MB, and uninstall removes every settings tab.
 
 Earlier versions: CHANGELOG.md in the source repository.
 
 == Upgrade Notice ==
 
-= 1.0.28 =
-If you use the iOS Shortcut, create its new application password under Settings → Outpost iOS Shortcut.
+= 1.0.29 =
+Adds two agent abilities, both off by default. A token with only the read scope can no longer use the composer helper routes.

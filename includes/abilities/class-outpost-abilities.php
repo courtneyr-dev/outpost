@@ -22,6 +22,12 @@ final class Outpost_Abilities {
 	/** Token scopes the matching read routes accept. */
 	private const READ_SCOPES = array( 'create', 'update', 'read' );
 
+	/** Token scopes the matching write routes accept. */
+	private const WRITE_SCOPES = array( 'create', 'update' );
+
+	public const OPTION_MANUAL_SHARE        = 'outpost_ability_manual_share';
+	public const OPTION_CAPTURE_SYNDICATION = 'outpost_ability_capture_syndication';
+
 	/**
 	 * The REST requests whose handlers are running, innermost last.
 	 *
@@ -114,6 +120,8 @@ final class Outpost_Abilities {
 		self::register_get_syndicate_targets();
 		self::register_get_share_status();
 		self::register_get_composer_config();
+		self::register_manual_share();
+		self::register_capture_syndication();
 	}
 
 	/**
@@ -253,6 +261,120 @@ final class Outpost_Abilities {
 	}
 
 	/**
+	 * Register the switched manual-share writer.
+	 */
+	private static function register_manual_share(): void {
+		wp_register_ability(
+			'outpost/manual-share',
+			array(
+				'label'               => __( 'Prepare a manual share', 'outpost-mobile-publishing' ),
+				'description'         => __( 'Builds a device-specific manual-share payload and records it in the post share log.', 'outpost-mobile-publishing' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'post_id'     => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'platform_id' => array( 'type' => 'string' ),
+						'device'      => array(
+							'type'    => 'string',
+							'enum'    => array( 'android', 'ios', 'desktop' ),
+							'default' => 'desktop',
+						),
+						'in_pwa_mode' => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+						'dry_run'     => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+					),
+					'required'             => array( 'post_id', 'platform_id' ),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'post_id'     => array( 'type' => 'integer' ),
+						'platform_id' => array( 'type' => 'string' ),
+						'device'      => array(
+							'type' => 'string',
+							'enum' => array( 'android', 'ios', 'desktop' ),
+						),
+						'dry_run'     => array( 'type' => 'boolean' ),
+						'written'     => array( 'type' => 'boolean' ),
+						'payload'     => array( 'type' => array( 'object', 'null' ) ),
+					),
+					'required'   => array( 'post_id', 'platform_id', 'device', 'dry_run', 'written', 'payload' ),
+				),
+				'execute_callback'    => array( self::class, 'execute_manual_share' ),
+				'permission_callback' => array( self::class, 'can_manual_share' ),
+				'meta'                => self::write_meta( false ),
+			)
+		);
+	}
+
+	/**
+	 * Register the switched syndication-capture writer.
+	 */
+	private static function register_capture_syndication(): void {
+		wp_register_ability(
+			'outpost/capture-syndication',
+			array(
+				'label'               => __( 'Capture a syndication link', 'outpost-mobile-publishing' ),
+				'description'         => __( 'Records a silo URL as a post syndication link and completes its share-log entry.', 'outpost-mobile-publishing' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'post_id'          => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'audit_log_id'     => array( 'type' => 'string' ),
+						'silo_url'         => array( 'type' => 'string' ),
+						'confirm_mismatch' => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+						'dry_run'          => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+					),
+					'required'             => array( 'post_id', 'audit_log_id', 'silo_url' ),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'status'            => array(
+							'type' => 'string',
+							'enum' => array( 'recorded', 'mismatch_warning', 'dry_run' ),
+						),
+						'post_id'           => array( 'type' => 'integer' ),
+						'audit_log_id'      => array( 'type' => 'string' ),
+						'platform_id'       => array( 'type' => 'string' ),
+						'silo_url'          => array( 'type' => 'string' ),
+						'written'           => array( 'type' => 'boolean' ),
+						'syndication_links' => array(
+							'type'  => array( 'array', 'null' ),
+							'items' => array( 'type' => 'object' ),
+						),
+					),
+					'required'   => array( 'status', 'post_id', 'audit_log_id', 'platform_id', 'silo_url', 'written', 'syndication_links' ),
+				),
+				'execute_callback'    => array( self::class, 'execute_capture_syndication' ),
+				'permission_callback' => array( self::class, 'can_capture_syndication' ),
+				'meta'                => self::write_meta( true ),
+			)
+		);
+	}
+
+	/**
 	 * Execute the syndication target reader.
 	 *
 	 * @param array<string, mixed> $input Validated ability input.
@@ -301,6 +423,144 @@ final class Outpost_Abilities {
 	}
 
 	/**
+	 * Execute a manual share without dispatching through REST.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public static function execute_manual_share( array $input ) {
+		if ( ! self::ability_is_enabled( self::OPTION_MANUAL_SHARE ) ) {
+			return self::disabled_error();
+		}
+
+		$post_id     = (int) $input['post_id'];
+		$platform_id = trim( (string) $input['platform_id'] );
+		$device      = isset( $input['device'] ) ? (string) $input['device'] : Outpost_Manual_Share_Controller::PLATFORM_DESKTOP;
+		$in_pwa_mode = isset( $input['in_pwa_mode'] ) && self::is_true( $input['in_pwa_mode'] );
+		$dry_run     = self::is_dry_run( $input );
+		$platform    = self::find_platform( $platform_id );
+
+		if ( ! $platform instanceof Outpost_Manual_Share_Platform_Config ) {
+			return new WP_Error(
+				'outpost_unknown_platform_id',
+				sprintf(
+					/* translators: %s: platform id supplied by the caller. */
+					__( 'Unknown manual-share platform: %s', 'outpost-mobile-publishing' ),
+					$platform_id
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		$result = array(
+			'post_id'     => $post_id,
+			'platform_id' => $platform_id,
+			'device'      => $device,
+			'dry_run'     => $dry_run,
+			'written'     => false,
+			'payload'     => null,
+		);
+		if ( $dry_run ) {
+			return $result;
+		}
+
+		$entries_before = count( Outpost_Manual_Share_Audit_Log::get_entries( $post_id ) );
+		if ( Outpost_Manual_Share_Controller::PLATFORM_ANDROID === $device ) {
+			$result['payload'] = Outpost_Manual_Share_Intent_Payload_Builder::build_for_android( $platform, $post_id );
+		} elseif ( Outpost_Manual_Share_Controller::PLATFORM_IOS === $device ) {
+			$result['payload'] = Outpost_Manual_Share_Intent_Payload_Builder::build_for_ios( $platform, $post_id, $in_pwa_mode );
+		} else {
+			$result['payload'] = Outpost_Manual_Share_Intent_Payload_Builder::build_stub_response( $platform_id, $post_id );
+		}
+
+		$entries_after     = count( Outpost_Manual_Share_Audit_Log::get_entries( $post_id ) );
+		$result['written'] = $entries_after > $entries_before;
+		return $result;
+	}
+
+	/**
+	 * Execute the syndication writeback flow without dispatching through REST.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public static function execute_capture_syndication( array $input ) {
+		if ( ! self::ability_is_enabled( self::OPTION_CAPTURE_SYNDICATION ) ) {
+			return self::disabled_error();
+		}
+
+		$post_id          = (int) $input['post_id'];
+		$audit_log_id     = trim( (string) $input['audit_log_id'] );
+		$silo_url         = trim( (string) $input['silo_url'] );
+		$confirm_mismatch = isset( $input['confirm_mismatch'] ) && self::is_true( $input['confirm_mismatch'] );
+		$dry_run          = self::is_dry_run( $input );
+		if ( '' === $audit_log_id ) {
+			return new WP_Error(
+				'outpost_invalid_audit_log_id',
+				__( 'audit_log_id is required.', 'outpost-mobile-publishing' ),
+				array( 'status' => 400 )
+			);
+		}
+		$validity = Outpost_Manual_Share_Syndication_Writeback::validate_url( $silo_url );
+		if ( is_wp_error( $validity ) ) {
+			return new WP_Error(
+				'outpost_' . $validity->get_error_code(),
+				$validity->get_error_message(),
+				array( 'status' => 400 )
+			);
+		}
+
+		$entry = self::find_audit_entry( $post_id, $audit_log_id );
+		if ( null === $entry ) {
+			return new WP_Error(
+				'outpost_audit_log_entry_not_found',
+				__( 'No matching audit log entry.', 'outpost-mobile-publishing' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$platform_id = (string) ( $entry['platform_id'] ?? '' );
+		$result      = array(
+			'status'            => 'dry_run',
+			'post_id'           => $post_id,
+			'audit_log_id'      => $audit_log_id,
+			'platform_id'       => $platform_id,
+			'silo_url'          => $silo_url,
+			'written'           => false,
+			'syndication_links' => null,
+		);
+
+		$mismatch = Outpost_Manual_Share_Syndication_Writeback::is_platform_mismatch( $platform_id, $silo_url );
+		if ( $mismatch && ! $confirm_mismatch ) {
+			$result['status'] = 'mismatch_warning';
+			return $result;
+		}
+
+		if ( $dry_run ) {
+			return $result;
+		}
+
+		$result['syndication_links'] = Outpost_Manual_Share_Syndication_Writeback::add_or_update_link(
+			$post_id,
+			$platform_id,
+			$silo_url
+		);
+		Outpost_Manual_Share_Audit_Log::update_entry(
+			$post_id,
+			$audit_log_id,
+			array(
+				'silo_url'     => $silo_url,
+				'completed_at' => gmdate( 'c' ),
+				'outcome'      => Outpost_Manual_Share_Audit_Log::OUTCOME_FIRED,
+			)
+		);
+		$result['status']  = 'recorded';
+		$result['written'] = true;
+
+		return $result;
+	}
+
+	/**
 	 * Check the gate the matching read routes apply: edit_posts, plus the
 	 * credential check every Outpost route makes (a cookie session needs a
 	 * valid REST nonce; a token needs create, update or read scope). Core's
@@ -343,6 +603,26 @@ final class Outpost_Abilities {
 	}
 
 	/**
+	 * Check whether the caller may prepare a manual share.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 * @return bool|WP_Error
+	 */
+	public static function can_manual_share( array $input ) {
+		return self::can_write_post( self::OPTION_MANUAL_SHARE, $input );
+	}
+
+	/**
+	 * Check whether the caller may capture a syndication link.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 * @return bool|WP_Error
+	 */
+	public static function can_capture_syndication( array $input ) {
+		return self::can_write_post( self::OPTION_CAPTURE_SYNDICATION, $input );
+	}
+
+	/**
 	 * Shared metadata for public, read-only abilities.
 	 *
 	 * @return array{show_in_rest: bool, annotations: array{readonly: bool, destructive: bool, idempotent: bool}, mcp: array{public: bool}}
@@ -357,6 +637,115 @@ final class Outpost_Abilities {
 			),
 			'mcp'          => array( 'public' => true ),
 		);
+	}
+
+	/**
+	 * Shared metadata for switched write abilities.
+	 *
+	 * @return array{show_in_rest: bool, annotations: array{readonly: bool, destructive: bool, idempotent: bool}, mcp: array{public: bool}}
+	 */
+	private static function write_meta( bool $idempotent ): array {
+		return array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'readonly'    => false,
+				'destructive' => false,
+				'idempotent'  => $idempotent,
+			),
+			'mcp'          => array( 'public' => false ),
+		);
+	}
+
+	/**
+	 * Check the switch, write credential, post existence, and capability.
+	 *
+	 * @param string               $option Option controlling the ability.
+	 * @param array<string, mixed> $input  Validated ability input.
+	 * @return bool|WP_Error
+	 */
+	private static function can_write_post( string $option, array $input ) {
+		if ( ! self::ability_is_enabled( $option ) ) {
+			return self::disabled_error();
+		}
+
+		$request = array() === self::$requests ? new WP_REST_Request( 'POST' ) : end( self::$requests );
+		if ( ! self::bearer_has_scope( $request, self::WRITE_SCOPES ) ) {
+			return false;
+		}
+
+		if ( ! isset( $input['post_id'] ) || ! is_int( $input['post_id'] ) || $input['post_id'] < 1 ) {
+			return false;
+		}
+
+		$post_id = $input['post_id'];
+		if ( null === get_post( $post_id ) ) {
+			return false;
+		}
+
+		return current_user_can( 'edit_post', $post_id );
+	}
+
+	/**
+	 * Whether a switched ability is enabled by its stored boolean value.
+	 */
+	public static function ability_is_enabled( string $option ): bool {
+		$value = get_option( $option, false );
+		return in_array( $value, array( true, 1, '1' ), true );
+	}
+
+	/**
+	 * Whether a write should stay a dry run. Core validates `dry_run` as a
+	 * boolean but doesn't cast it, so "true", "1" and 1 arrive as given;
+	 * only an explicit false value turns the write on.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 */
+	private static function is_dry_run( array $input ): bool {
+		if ( ! array_key_exists( 'dry_run', $input ) ) {
+			return true;
+		}
+		$value = is_string( $input['dry_run'] ) ? strtolower( $input['dry_run'] ) : $input['dry_run'];
+		return ! in_array( $value, array( false, 0, '0', 'false' ), true );
+	}
+
+	/**
+	 * Whether a validated boolean input is true. Core accepts "true", "1"
+	 * and 1 as booleans without casting them.
+	 *
+	 * @param mixed $value Validated boolean input.
+	 */
+	private static function is_true( $value ): bool {
+		$value = is_string( $value ) ? strtolower( $value ) : $value;
+		return in_array( $value, array( true, 1, '1', 'true' ), true );
+	}
+
+	private static function disabled_error(): WP_Error {
+		return new WP_Error(
+			'outpost_ability_disabled',
+			__( 'This Outpost ability is disabled.', 'outpost-mobile-publishing' ),
+			array( 'status' => 403 )
+		);
+	}
+
+	private static function find_platform( string $platform_id ): ?Outpost_Manual_Share_Platform_Config {
+		foreach ( Outpost_Manual_Share_Platform_Registry::all_platforms() as $platform ) {
+			if ( $platform->id() === $platform_id ) {
+				return $platform;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private static function find_audit_entry( int $post_id, string $audit_log_id ): ?array {
+		foreach ( Outpost_Manual_Share_Audit_Log::get_entries( $post_id ) as $entry ) {
+			if ( ( $entry['id'] ?? '' ) === $audit_log_id ) {
+				return $entry;
+			}
+		}
+		return null;
 	}
 
 	/**
