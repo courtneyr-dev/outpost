@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { build_photo_properties, type PhotoProperties } from '../../lib/photo-properties';
 import {
-	MicropubError,
+	report_post_failure,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { process_photo, PhotoError } from '../../lib/photo';
@@ -67,6 +67,8 @@ export interface PhotoModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 	/** Injectable IndexedDB for the share inbox (tests pass fake-indexeddb). */
 	shareInboxEnv?: ShareInboxEnvironment;
 }
@@ -120,6 +122,7 @@ export function PhotoMode({
 	token,
 	micropubEnv,
 	composerConfig,
+	onSignInExpired,
 	shareInboxEnv,
 }: PhotoModeProps) {
 	// A share wins over an unsent draft, as in NoteMode.
@@ -376,12 +379,8 @@ export function PhotoMode({
 			let message: string;
 			if (err instanceof PhotoError) {
 				message = err.code + ': ' + err.message;
-			} else if (err instanceof MicropubError) {
-				message = err.code + ': ' + err.message;
-			} else if (err instanceof Error) {
-				message = err.message;
 			} else {
-				message = 'Unknown error';
+				message = report_post_failure(err, onSignInExpired);
 			}
 			setStatus({ kind: 'error', message });
 		}
