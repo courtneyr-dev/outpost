@@ -1,21 +1,25 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
+import { useMoodSuggestions, type MoodsEnvironment } from '../../lib/pkiw-moods';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
+import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -42,13 +46,20 @@ import {
  *
  * Each variant has a primary text input that becomes the property value, plus
  * an optional `content` body for additional context. No URL field.
+ *
+ * Mood offers Post Kinds' mood labels as native <datalist> suggestions
+ * (pwa/src/lib/pkiw-moods.ts). The field stays free text and posts exactly
+ * what was typed or picked.
  */
 
 export interface LifeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	moodsEnv?: MoodsEnvironment;
 }
+
+const MOOD_SUGGESTIONS_ID = 'outpost-life-mood-suggestions';
 
 type Variant = 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 
@@ -56,6 +67,8 @@ interface VariantConfig {
 	label: string;
 	property: 'mood' | 'weather' | 'sleep' | 'trip' | 'itinerary' | 'question';
 	primaryLabel: string;
+	/** Short name the publish hint uses for the primary field. */
+	primaryName: string;
 	primaryPlaceholder: string;
 	contentLabel: string;
 	submitLabel: string;
@@ -66,6 +79,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Mood',
 		property: 'mood',
 		primaryLabel: 'How are you feeling?',
+		primaryName: 'Mood',
 		primaryPlaceholder: 'e.g., focused, tired, hopeful',
 		contentLabel: 'More context (optional)',
 		submitLabel: 'Post mood',
@@ -74,6 +88,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Weather',
 		property: 'weather',
 		primaryLabel: 'Conditions',
+		primaryName: 'Conditions',
 		primaryPlaceholder: 'e.g., 72°F and sunny, light breeze',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post weather',
@@ -84,6 +99,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Sleep',
 		property: 'sleep',
 		primaryLabel: 'How did you sleep?',
+		primaryName: 'Sleep',
 		primaryPlaceholder: 'e.g., 7h 40m, restless after 3am',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post sleep',
@@ -94,6 +110,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Trip',
 		property: 'trip',
 		primaryLabel: 'Where are you headed?',
+		primaryName: 'Destination',
 		primaryPlaceholder: 'e.g., Chicago to Detroit by train',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post trip',
@@ -104,6 +121,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Itinerary',
 		property: 'itinerary',
 		primaryLabel: 'Legs',
+		primaryName: 'Legs',
 		primaryPlaceholder: 'e.g., ORD → DTW 9:05am, DTW → YYZ 1:20pm',
 		contentLabel: 'Notes (optional)',
 		submitLabel: 'Post itinerary',
@@ -115,6 +133,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		label: 'Question',
 		property: 'question',
 		primaryLabel: "What's your question?",
+		primaryName: 'Question',
 		primaryPlaceholder: 'e.g., Best static-site host in 2026?',
 		contentLabel: 'Details (optional)',
 		submitLabel: 'Post question',
@@ -122,6 +141,13 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 };
 
 const VARIANT_ORDER: Variant[] = ['mood', 'weather', 'sleep', 'trip', 'itinerary', 'question'];
+
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const LIFE_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
 
 type Status =
 	| { kind: 'idle' }
@@ -147,20 +173,46 @@ function consume_share_target_for_life(): { variant?: Variant; content?: string 
 	return out;
 }
 
-export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) {
+export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeModeProps) {
 	const initial_share = consume_share_target_for_life();
-	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'mood');
-	const [title, setTitle] = useState('');
-	const [primary_value, setPrimaryValue] = useState('');
-	const [content, setContent] = useState(initial_share.content ?? '');
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		initial_share.variant || initial_share.content ? null : read_draft('life', token.me),
+	);
+	const draft_variant = draft?.meta.variant;
+	const [variant, setVariant] = useState<Variant>(
+		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'mood'),
+	);
+	const [title, setTitle] = useState(draft_text(draft?.fields.title));
+	const [primary_value, setPrimaryValue] = useState(draft_text(draft?.fields.primary));
+	const [content, setContent] = useState(initial_share.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'life',
+		me: token.me,
+		fields: { title, primary: primary_value, content, venue: venue_name },
+		meta: { variant },
+		restored: draft !== null,
+	});
 
 	const config = VARIANTS[variant];
+	const mood_suggestions = useMoodSuggestions(
+		composerConfig === undefined
+			? 'unknown'
+			: composerConfig.companions['post-kinds'] === 'active'
+				? 'active'
+				: 'inactive',
+		token.accessToken,
+		moodsEnv,
+	);
+	const show_mood_suggestions = variant === 'mood' && mood_suggestions.length > 0;
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
 	const handle_submit = async (event: Event): Promise<void> => {
@@ -170,13 +222,6 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 		if (!trimmed_primary) return;
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
 			const trimmed_venue = venue_name.trim();
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
@@ -193,48 +238,40 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 			};
 			const properties = merge_more_values(base, more_values);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
-				setTitle('');
+			const result = await post_or_queue(
+				{
+					source: 'life',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({
+							kind: stage.kind === 'discovering' ? 'discovering-endpoint' : 'posting',
+						}),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			saved_draft.discard();
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setPrimaryValue('');
 				setContent('');
 				resetMoreValues();
-				setPickedLocation(null);
-				setVenueName('');
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'life',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setPrimaryValue('');
-						setContent('');
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; surface the original post error below.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setTitle('');
+			setPrimaryValue('');
+			setContent('');
+			resetMoreValues();
+			setPickedLocation(null);
+			setVenueName('');
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -254,6 +291,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				? 'Posting…'
 				: config.submitLabel;
 	const can_submit = !!primary_value.trim();
+	const missing: string[] = can_submit ? [] : [config.primaryName];
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-life-mode-title">
@@ -261,7 +299,7 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 				Life
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Log your mood, weather, sleep, a trip, an itinerary, or a question.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -313,9 +351,17 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						setPrimaryValue((event.target as HTMLInputElement).value)
 					}
 					placeholder={config.primaryPlaceholder}
+					{...(show_mood_suggestions ? { list: MOOD_SUGGESTIONS_ID } : {})}
 					required
 					disabled={submitting}
 				/>
+				{show_mood_suggestions && (
+					<datalist id={MOOD_SUGGESTIONS_ID}>
+						{mood_suggestions.map((label) => (
+							<option key={label} value={label} />
+						))}
+					</datalist>
+				)}
 
 				<div class="outpost-textarea-row">
 					<label class="outpost-label" for="outpost-life-content">
@@ -352,56 +398,14 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
-				<div
-					class="outpost-error"
-					role="alert"
-					aria-live="assertive"
-					hidden={status.kind !== 'error'}
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class="outpost-status"
-					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
-								{a11y_active && (
-									<>
-										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											View accessibility report
-										</a>
-									</>
-								)}
-							</>
-						) : (
-							'Posted, but the server did not return a link. Check your site to confirm it published.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-life"
 					>
 						<MorePanel
 							token={token}
@@ -417,15 +421,8 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -434,8 +431,56 @@ export function LifeMode({ token, micropubEnv, composerConfig }: LifeModeProps) 
 						>
 							More options
 						</button>
-					)}
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
 				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
+
+				<PublishButton
+					idPrefix="outpost-life"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

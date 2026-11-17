@@ -12,8 +12,8 @@
  *   (b) Outpost_Route_Handler is concrete (A2 shipped); WP_Rewrite is
  *       core. All branches reach concrete code.
  *   (c) Original docblock listed 5 routes; Outpost_Route_Handler::rules()
- *       now returns 6 (F6 added /post/shortcut). Test asserts the
- *       complete current 6-rule table, not the pre-F6 list — keeps the
+ *       returns 5 (F6 added /post/shortcut; 1.0.27 removed it). Test asserts the
+ *       complete current 5-rule table — keeps the
  *       assertion tied to the SUT's actual contract.
  *   (d) No fetches; pure WP_Rewrite inspection.
  *
@@ -69,10 +69,10 @@ final class RouteHandlerIntegrationTest extends TestCase {
 	 * WP_Rewrite's runtime rule set, with each rule rewriting to
 	 * `index.php?outpost_route=<target>`.
 	 *
-	 * Asserts the COMPLETE current 6-rule table:
-	 *   - manifest / sw / share-target / shortcut / auth-callback / composer
+	 * Asserts the COMPLETE current 5-rule table:
+	 *   - manifest / sw / share-target / auth-callback / composer
 	 *
-	 * (The original A2 docblock listed 5; F6 added /post/shortcut.)
+	 * (F6 added /post/shortcut; 1.0.27 removed it again.)
 	 *
 	 * @test
 	 */
@@ -85,13 +85,12 @@ final class RouteHandlerIntegrationTest extends TestCase {
 		$this->assertNotEmpty( $rewrite_rules, 'Rewrite rules must be populated after flush.' );
 
 		$declared = Outpost_Route_Handler::rules();
-		$this->assertCount( 6, $declared, 'Outpost_Route_Handler::rules() must declare 6 routes.' );
+		$this->assertCount( 5, $declared, 'Outpost_Route_Handler::rules() must declare 5 routes.' );
 
 		$expected_targets = array(
 			'^post/manifest\.json$'  => 'manifest',
 			'^post/sw/?$'            => 'sw',
 			'^post/share-target/?$'  => 'share-target',
-			'^post/shortcut/?$'      => 'shortcut',
 			'^post/auth/callback/?$' => 'auth-callback',
 			'^post/?$'               => 'composer',
 		);

@@ -1,7 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -10,7 +8,7 @@ import { fetch_preview, PreviewError, type PreviewResult } from '../../lib/previ
 import { is_safe_http_url } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
@@ -19,6 +17,11 @@ import { CharCounter } from '../char-counter';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
+import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -239,7 +242,18 @@ const VARIANT_ORDER: Variant[] = [
 	'issue',
 ];
 
+/** Variant labels in picker order; Home lists them as the tab's inventory. */
+export const REPLY_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.map((id) => VARIANTS[id].label);
+
 type RsvpValue = 'yes' | 'no' | 'maybe' | 'interested';
+
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
+function is_rsvp(value: unknown): value is RsvpValue {
+	return value === 'yes' || value === 'no' || value === 'maybe' || value === 'interested';
+}
 const RSVP_VALUES: RsvpValue[] = ['yes', 'no', 'maybe', 'interested'];
 
 type Status =
@@ -275,18 +289,33 @@ function consume_share_target_for_reply(): {
 
 export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
 	const initial_share = consume_share_target_for_reply();
-	const [variant, setVariant] = useState<Variant>(initial_share?.variant ?? 'reply');
-	const [target_url, setTargetUrl] = useState(initial_share?.url ?? '');
-	const [title, setTitle] = useState(initial_share?.title ?? '');
-	const [content, setContent] = useState(initial_share?.content ?? '');
-	const [rsvp_value, setRsvpValue] = useState<RsvpValue>('yes');
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() => (initial_share ? null : read_draft('reply', token.me)));
+	const draft_variant = draft?.meta.variant;
+	const draft_rsvp = draft?.meta.rsvp;
+	const [variant, setVariant] = useState<Variant>(
+		initial_share?.variant ?? (is_variant(draft_variant) ? draft_variant : 'reply'),
+	);
+	const [target_url, setTargetUrl] = useState(initial_share?.url ?? draft_text(draft?.fields.target));
+	const [title, setTitle] = useState(initial_share?.title ?? draft_text(draft?.fields.title));
+	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
+	const [rsvp_value, setRsvpValue] = useState<RsvpValue>(is_rsvp(draft_rsvp) ? draft_rsvp : 'yes');
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PreviewResult | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'reply',
+		me: token.me,
+		fields: { target: target_url, title, content, venue: venue_name },
+		meta: { variant, rsvp: rsvp_value },
+		restored: draft !== null,
+	});
 
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
@@ -329,13 +358,6 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 		}
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
 			const trimmed_venue = venue_name.trim();
 			const trimmed_title = title.trim();
 			const base: HEntryProperties = {
@@ -351,50 +373,42 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			};
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
+			const result = await post_or_queue(
+				{
+					source: 'reply',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					micropubEndpoint: endpoint,
+					onStage: (stage): void =>
+						setStatus({
+							kind: stage.kind === 'discovering' ? 'discovering-endpoint' : 'posting',
+						}),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			saved_draft.discard();
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				setContent('');
-				setTitle('');
 				setTargetUrl('');
-				setPickedLocation(null);
-				setVenueName('');
 				setPreview(null);
 				resetMoreValues();
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'reply',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setContent('');
-						setTargetUrl('');
-						setPreview(null);
-						resetMoreValues();
-						return;
-					} catch (_q_err) {
-						// Queue write failed; fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setContent('');
+			setTitle('');
+			setTargetUrl('');
+			setPickedLocation(null);
+			setVenueName('');
+			setPreview(null);
+			resetMoreValues();
 		} catch (err) {
 			const message =
 				err instanceof MicropubError
@@ -410,6 +424,11 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 	const fetching_preview = status.kind === 'fetching-preview';
 	const can_submit =
 		!!target_url.trim() && (!config.contentRequired || !!content.trim());
+	// The hint names a target by its label when that label is a noun
+	// ("Event URL"); "In reply to" and "Like of" read as "URL".
+	const missing: string[] = [];
+	if (!target_url.trim()) missing.push(/URL$/.test(config.targetLabel) ? config.targetLabel : 'URL');
+	if (config.contentRequired && !content.trim()) missing.push(config.contentLabel);
 	const submit_label =
 		status.kind === 'discovering-endpoint'
 			? 'Finding endpoint…'
@@ -423,11 +442,11 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				{config.label}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Reply, like, repost, bookmark, RSVP, follow, and more.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
-				<fieldset class="outpost-variant-picker">
+				<fieldset class="outpost-variant-picker outpost-variant-picker--compact">
 					<legend class="outpost-label">Type</legend>
 					{VARIANT_ORDER.map((id) => (
 						<label key={id} class="outpost-radio">
@@ -505,9 +524,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						<p>
 							<strong>{preview.title ?? 'Untitled page'}</strong>
 							<br />
-							<a href={preview.finalUrl} target="_blank" rel="noopener noreferrer">
-								{preview.finalUrl}
-							</a>
+							<ExternalLink href={preview.finalUrl}>View source page</ExternalLink>
 						</p>
 					</aside>
 				)}
@@ -554,56 +571,14 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
-				<div
-					class="outpost-error"
-					role="alert"
-					aria-live="assertive"
-					hidden={status.kind !== 'error'}
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class="outpost-status"
-					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
-								{a11y_active && (
-									<>
-										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											View accessibility report
-										</a>
-									</>
-								)}
-							</>
-						) : (
-							'Posted, but the server did not return a link. Check your site to confirm it published.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-reply"
 					>
 						<MorePanel
 							token={token}
@@ -620,13 +595,6 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 				)}
 
 				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || fetching_preview || !can_submit}
-					>
-						{submit_label}
-					</button>
 					<button
 						class="outpost-button outpost-button--secondary"
 						type="button"
@@ -646,6 +614,54 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 						</button>
 					)}
 				</div>
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
+				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
+
+				<PublishButton
+					idPrefix="outpost-reply"
+					label={submit_label}
+					disabled={submitting || fetching_preview || !can_submit}
+					missing={missing}
+					busy={submitting || fetching_preview}
+				/>
 			</form>
 		</section>
 	);

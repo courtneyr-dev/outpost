@@ -1,6 +1,6 @@
 # Maintaining the Outpost documentation
 
-The user docs site at <https://courtneyr-dev.github.io/outpost/> builds from this directory with [Astro Starlight](https://starlight.astro.build/). This guide covers day-to-day updates. The full cross-plugin standard (page templates, writing style, accessibility and SEO rules) lives in the maintainer's docs workspace: `plugin-docs/wiki/standards/plugin-docs-standard.md`.
+The user docs site at <https://courtneyr-dev.github.io/outpost/> builds from this directory with [Astro Starlight](https://starlight.astro.build/). This guide covers day-to-day updates, and it's all a contributor needs. The maintainer keeps a cross-plugin docs standard outside this repository; the checks under "Preview and validate locally" enforce the parts that apply here.
 
 ## Layout
 
@@ -35,7 +35,7 @@ Open a PR. CI (`.github/workflows/docs.yml`) builds and runs every check on the 
 
 ## When plugin behavior changes
 
-Follow the release checklist in the PR template: update affected pages, recapture affected screenshots (`npm run screenshots:docs` at the repo root), keep `src/site-meta.mjs` and the landing page's version/requirements text matching the plugin header, and check README.md and readme.txt links still hold.
+Follow the Documentation checklist in `.github/PULL_REQUEST_TEMPLATE.md`: update affected pages, recapture affected screenshots (`npm run screenshots:docs` at the repo root), keep `src/site-meta.mjs` and the landing page's version/requirements text matching the plugin header, and check README.md and readme.txt links still hold.
 
 ## Add a page
 

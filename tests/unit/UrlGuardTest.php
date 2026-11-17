@@ -102,6 +102,70 @@ final class UrlGuardTest extends \WP_Mock\Tools\TestCase {
 		);
 	}
 
+	/**
+	 * T10-S3-08: IANA special-purpose ranges that are never a public web
+	 * destination, and IPv6 forms that carry or tunnel to other address space.
+	 *
+	 * @dataProvider special_purpose_ips
+	 */
+	public function test_blocks_special_purpose_ranges( string $ip ): void {
+		$this->assertTrue( Outpost_Url_Guard::is_blocked_ip( $ip ), "$ip must be blocked" );
+	}
+
+	/**
+	 * @return array<string, array{0:string}>
+	 */
+	public function special_purpose_ips(): array {
+		return array(
+			'192.0.2/24 TEST-NET-1 low'      => array( '192.0.2.0' ),
+			'192.0.2/24 TEST-NET-1 high'     => array( '192.0.2.255' ),
+			'198.18/15 benchmark low'        => array( '198.18.0.1' ),
+			'198.18/15 benchmark high'       => array( '198.19.255.255' ),
+			'198.51.100/24 TEST-NET-2'       => array( '198.51.100.7' ),
+			'203.0.113/24 TEST-NET-3'        => array( '203.0.113.9' ),
+			'192.0.0/24 IETF assignments'    => array( '192.0.0.8' ),
+			'192.88.99/24 6to4 relay'        => array( '192.88.99.1' ),
+			'mapped TEST-NET-1'              => array( '::ffff:192.0.2.1' ),
+			'NAT64 of TEST-NET-1'            => array( '64:ff9b::c000:201' ),
+			'v6 multicast ff02'              => array( 'ff02::1' ),
+			'v6 multicast ff0e'              => array( 'ff0e::1' ),
+			'fec0::/10 site-local low'       => array( 'fec0::1' ),
+			'fec0::/10 site-local high'      => array( 'feff:ffff::1' ),
+			'2002::/16 6to4 of private'      => array( '2002:c0a8:101::1' ),
+			'2002::/16 6to4 of loopback'     => array( '2002:7f00:1::1' ),
+			'2002::/16 6to4 of public'       => array( '2002:5db8:d822::1' ),
+			'2001::/32 Teredo'               => array( '2001:0:4136:e378::1' ),
+			'2001:db8::/32 documentation'    => array( '2001:db8::1' ),
+			'100::/64 discard'               => array( '100::1' ),
+		);
+	}
+
+	/**
+	 * Neighbours of the new ranges stay reachable.
+	 *
+	 * @dataProvider special_purpose_neighbours
+	 */
+	public function test_allows_neighbours_of_special_purpose_ranges( string $ip ): void {
+		$this->assertFalse( Outpost_Url_Guard::is_blocked_ip( $ip ), "$ip must be allowed" );
+	}
+
+	/**
+	 * @return array<string, array{0:string}>
+	 */
+	public function special_purpose_neighbours(): array {
+		return array(
+			'just above 192.0.2/24'   => array( '192.0.3.0' ),
+			'just below 198.18/15'    => array( '198.17.255.255' ),
+			'just above 198.18/15'    => array( '198.20.0.0' ),
+			'just below 198.51.100'   => array( '198.51.99.255' ),
+			'just below 203.0.113'    => array( '203.0.112.255' ),
+			'2003::/16 public'        => array( '2003::1' ),
+			'2001:4860 public'        => array( '2001:4860:4860::8888' ),
+			'2001:db9 public'         => array( '2001:db9::1' ),
+			'2606 public'             => array( '2606:4700::1111' ),
+		);
+	}
+
 	public function test_garbage_is_blocked_fail_closed(): void {
 		$this->assertTrue( Outpost_Url_Guard::is_blocked_ip( 'not-an-ip' ) );
 		$this->assertTrue( Outpost_Url_Guard::is_blocked_ip( '' ) );
@@ -140,6 +204,44 @@ final class UrlGuardTest extends \WP_Mock\Tools\TestCase {
 			->reply( array() );
 
 		$this->assertTrue( Outpost_Url_Guard::host_is_blocked( 'nxdomain.example' ) );
+	}
+
+	// =====================================================================
+	// H9: resolve_safe_ip() — the address a caller must pin its connection
+	// to, so a second DNS lookup at connect time cannot answer differently
+	// (DNS rebinding) from the one this guard vetted.
+	// =====================================================================
+
+	public function test_resolve_safe_ip_returns_null_for_a_blocked_literal_ip(): void {
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( '169.254.169.254' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_the_literal_ip_when_public(): void {
+		$this->assertSame( '93.184.216.34', Outpost_Url_Guard::resolve_safe_ip( '93.184.216.34' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_the_first_resolved_address_when_all_are_public(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'good.example' )
+			->reply( array( '93.184.216.34', '8.8.8.8' ) );
+
+		$this->assertSame( '93.184.216.34', Outpost_Url_Guard::resolve_safe_ip( 'good.example' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_null_when_any_resolved_address_is_blocked(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'rebind.example' )
+			->reply( array( '93.184.216.34', '169.254.169.254' ) );
+
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( 'rebind.example' ) );
+	}
+
+	public function test_resolve_safe_ip_returns_null_when_resolution_returns_nothing(): void {
+		\WP_Mock::onFilter( 'outpost_resolve_host_ips' )
+			->with( array(), 'nxdomain.example' )
+			->reply( array() );
+
+		$this->assertNull( Outpost_Url_Guard::resolve_safe_ip( 'nxdomain.example' ) );
 	}
 
 	/**

@@ -1,4 +1,6 @@
-# Accessibility Checklist (WCAG 2.1/2.2 Level AA)
+# Accessibility checklist (WCAG 2.1/2.2 Level AA)
+
+> **Status note (2026-11-08):** the status sections below reflect v0.1.8. Outpost 1.0.24 has seven composer tabs, a Settings sheet, and the Outpost Default design, none of which this file audits. A re-audit is pending; until it lands, treat the forward-looking checklists as the contract and the status sections as history.
 
 Per-surface accessibility audit and forward-looking checklist for Outpost. Pairs with `docs/security/PHP-SURFACE-CHECKLIST.md` and `docs/performance/PERFORMANCE-CHECKLIST.md`.
 
@@ -32,17 +34,18 @@ The PWA shell + Preact components meet most WCAG 2.1 AA criteria today. One acti
 - [ ] Verify `--outpost-input-bg` / `--outpost-input-fg` defaults meet 4.5:1.
 - [ ] Verify `--outpost-error-bg` / `--outpost-error-fg` defaults meet 4.5:1 (errors are critical text).
 - [ ] Verify focus ring color (`--outpost-focus`) has 3:1 contrast against adjacent backgrounds.
-- [ ] Document the *theme contract*: themes that override these tokens MUST themselves meet 4.5:1, since Outpost's structural CSS only enforces non-paint defaults. Captured in `THEME-INTEGRATION.md` (Phase J).
+- [ ] Document the *theme contract*: themes that override these tokens MUST themselves meet 4.5:1, since Outpost's structural CSS only enforces non-paint defaults. `THEME-INTEGRATION.md` was planned for this and never written. The contract now lives in [docs/decisions/session-pwa-ui-appearance.md](../decisions/session-pwa-ui-appearance.md): under Use Site Theme, the resolver checks every final token pair against WCAG 2.2 AA (CHANGELOG 1.0.24).
 
 A3-REQUIREMENTS.md should add a contrast verification item.
 
 ### Phase C — Composer mode focus management
 
-**WCAG 2.4.3 Focus Order** requires that tab order matches the visual reading order. When Phase C lands the mode tabs (Note → Reply → Photo → Listen group → Article):
+**WCAG 2.4.3 Focus Order** requires that tab order matches the visual reading order. The [Wave O decision](../decisions/session-wave-o.md) replaces the former tab pattern with seven native mode buttons:
 
-- [ ] Tabs implement WAI-ARIA's [tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/): `role="tablist"` on the container, `role="tab"` on each tab button, `role="tabpanel"` on each mode body, `aria-controls`/`aria-labelledby` linking them.
-- [ ] Arrow-key navigation between tabs (left/right arrows move focus, Tab moves out of the tablist).
-- [ ] When a mode is selected, focus moves to the first interactive element of that mode's panel (or stays on the tab — both are valid; pick one and document).
+- [ ] The container has `role="group"` and the accessible name "Composer modes".
+- [ ] The group contains seven native buttons, and exactly one has `aria-current="true"`.
+- [ ] Tab reaches every mode button in visual order; Enter and Space select the focused mode.
+- [ ] Arrow keys do not move focus or change the selected mode.
 - [ ] When a mode is opened from the More pull-out, focus moves to the mode's content; closing the pull-out returns focus to the trigger.
 
 ### Phase D — Reduced motion + offline announcements
@@ -78,18 +81,18 @@ test('login screen passes axe', async ({ page }) => {
 });
 ```
 
-- [ ] Run pa11y CLI as part of the deploy ritual against staging URLs. Catches regressions that unit tests can't.
+- [ ] Run pa11y CLI against a test site's `/post/` URLs before each release (see [RELEASING.md](../RELEASING.md)). Catches regressions that unit tests can't.
 
 ### Phase J — Real-device screen reader testing
 
 **Test matrix (sign off before WordPress.org submission):**
 
-- [ ] iPhone Safari + VoiceOver — primary user platform (per Courtney's smoke-test workflow memory)
+- [ ] iPhone Safari + VoiceOver — primary user platform (Outpost is iOS-primary)
 - [ ] macOS Safari + VoiceOver — desktop equivalent
 - [ ] Android Chrome + TalkBack — secondary
 - [ ] Windows Chrome + NVDA — desktop secondary
 
-For each, walk the SMOKE-TESTS.md scenarios and verify:
+For each, walk the shell, login, and Post tab cases in [UX-TESTS.md](../UX-TESTS.md) (sections A–C) and verify:
 - Login flow announces the form labels and the "Sign in" button purpose
 - Auth-callback transient states announce ("Signing you in", then "Signed in")
 - NoteForm announces posted state with the new post URL as a focusable link
@@ -119,7 +122,7 @@ Before any session that touches user-facing rendering closes:
 
 ```bash
 # Manual spot-checks, current state
-cd ~/projects/outpost
+# from the repository root
 composer lint        # PHPCS clean
 composer test        # PHPUnit clean
 npm test             # Vitest clean

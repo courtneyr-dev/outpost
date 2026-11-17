@@ -1,9 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	discover_media_endpoint,
-	upload_media,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -16,12 +12,18 @@ import {
 } from '../media-picker';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { peek_share_target, consume_share_target } from '../../lib/share-target';
+import { DraftStatus } from '../draft-status';
+import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -85,19 +87,55 @@ export function minutes_to_iso8601_duration(minutes: number): string {
 	return 'PT' + String(hours) + 'H' + String(remaining) + 'M';
 }
 
+/**
+ * Claim a share released to the Recipe tab: the shared title becomes the
+ * recipe name and the shared text goes into Notes / story. Recipe has no
+ * link field, so a shared URL isn't imported (the review shows it first).
+ * One-shot, like the other modes: the stash clears when claimed.
+ */
+function consume_share_target_for_recipe(): { name?: string; content?: string } | null {
+	const data = peek_share_target();
+	if (!data || data.tab !== 'recipe') return null;
+	consume_share_target();
+	return {
+		...(data.title ? { name: data.title } : {}),
+		...(data.content ? { content: data.content } : {}),
+	};
+}
+
 export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModeProps) {
-	const [name, setName] = useState('');
-	const [ingredients_text, setIngredientsText] = useState('');
-	const [instructions_text, setInstructionsText] = useState('');
-	const [recipe_yield, setRecipeYield] = useState('');
-	const [duration_minutes, setDurationMinutes] = useState('');
-	const [content, setContent] = useState('');
+	const [initial_share] = useState(consume_share_target_for_recipe);
+	// A share is a new post the person just asked for, so it wins over an
+	// unsent draft; the draft is replaced on the next save.
+	const [draft] = useState(() => (initial_share ? null : read_draft('recipe', token.me)));
+	const [name, setName] = useState(initial_share?.name ?? draft_text(draft?.fields.name));
+	const [ingredients_text, setIngredientsText] = useState(draft_text(draft?.fields.ingredients));
+	const [instructions_text, setInstructionsText] = useState(draft_text(draft?.fields.instructions));
+	const [recipe_yield, setRecipeYield] = useState(draft_text(draft?.fields.yield));
+	const [duration_minutes, setDurationMinutes] = useState(draft_text(draft?.fields.duration));
+	const [content, setContent] = useState(initial_share?.content ?? draft_text(draft?.fields.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'recipe',
+		me: token.me,
+		fields: {
+			name,
+			ingredients: ingredients_text,
+			instructions: instructions_text,
+			yield: recipe_yield,
+			duration: duration_minutes,
+			content,
+			venue: venue_name,
+		},
+		restored: draft !== null,
+	});
 	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 
@@ -153,66 +191,23 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 		const iso_duration = minutes_to_iso8601_duration(minutes_num);
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
-			// Process + upload any attached photo. Same pipeline as PhotoMode
-			// and Doing: EXIF strip + downscale + JPEG re-encode, then a POST
-			// per photo to the media endpoint, collecting Location URLs.
-			const uploaded_photo_urls: string[] = [];
-			let alt_values: string[] = [];
+			// Process any attached photo: EXIF strip + downscale + JPEG re-encode,
+			// same pipeline as PhotoMode and Doing. post_or_queue uploads it and
+			// sends the URL as `photo`, or queues the bytes when offline.
+			const processed_blobs: Blob[] = [];
 			if (media_entries.length > 0) {
 				setStatus({ kind: 'processing-photo' });
-				const processed_blobs: Blob[] = [];
 				for (const entry of media_entries) {
 					const processed = await process_photo(entry.file);
 					processed_blobs.push(processed.blob);
 				}
-
-				let resolved_media_endpoint = media_endpoint;
-				if (!resolved_media_endpoint) {
-					setStatus({ kind: 'discovering-endpoint' });
-					resolved_media_endpoint = await discover_media_endpoint(
-						micropub_endpoint,
-						token.accessToken,
-						micropubEnv,
-					);
-					setMediaEndpoint(resolved_media_endpoint);
-				}
-
-				for (let i = 0; i < processed_blobs.length; i++) {
-					setStatus({
-						kind: 'uploading-photo',
-						current: i + 1,
-						total: processed_blobs.length,
-					});
-					const upload = await upload_media(
-						{
-							blob: processed_blobs[i]!,
-							filename: `photo-${String(i + 1)}.jpg`,
-							accessToken: token.accessToken,
-							mediaEndpoint: resolved_media_endpoint,
-						},
-						micropubEnv,
-					);
-					uploaded_photo_urls.push(upload.location);
-				}
-				alt_values = media_entries.map((e) => (e.decorative ? '' : e.alt.trim()));
 			}
+			const alt_values = media_entries.map((e) => (e.decorative ? '' : e.alt.trim()));
 
 			const photo_props: Partial<HEntryProperties> =
-				uploaded_photo_urls.length === 0
+				processed_blobs.length === 0
 					? {}
-					: uploaded_photo_urls.length === 1
-						? {
-								photo: uploaded_photo_urls[0]!,
-								'mp-photo-alt': alt_values[0] ?? '',
-							}
-						: { photo: uploaded_photo_urls, 'mp-photo-alt': alt_values };
+					: { 'mp-photo-alt': alt_values.length === 1 ? (alt_values[0] ?? '') : alt_values };
 
 			const trimmed_venue = venue_name.trim();
 			const base: HEntryProperties = {
@@ -231,52 +226,55 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			};
 			const properties = merge_more_values(base, more_values);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
-				setStatus({
-					kind: 'posted',
-					...(result.location ? { location: result.location } : {}),
-				});
-				mark_posted_once();
-				setName('');
-				setIngredientsText('');
-				setInstructionsText('');
-				setRecipeYield('');
-				setDurationMinutes('');
-				setContent('');
-				resetMoreValues();
-				setPickedLocation(null);
-				setVenueName('');
-				for (const entry of media_entries) {
-					URL.revokeObjectURL(entry.preview_url);
-				}
-				setMediaEntries([]);
+			const result = await post_or_queue(
+				{
+					source: 'recipe',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					photos: processed_blobs.map((blob, i) => ({
+						blob,
+						filename: `photo-${String(i + 1)}.jpg`,
+					})),
+					micropubEndpoint: endpoint,
+					mediaEndpoint: media_endpoint,
+					onStage: (stage): void =>
+						setStatus(
+							stage.kind === 'uploading'
+								? { kind: 'uploading-photo', current: stage.current, total: stage.total }
+								: stage.kind === 'discovering'
+									? { kind: 'discovering-endpoint' }
+									: { kind: 'posting' },
+						),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			// Published or held in the offline queue: the draft is done.
+			saved_draft.discard();
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
 				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'recipe',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						return;
-					} catch (_q_err) {
-						// Fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setStatus({
+				kind: 'posted',
+				...(result.location ? { location: result.location } : {}),
+			});
+			mark_posted_once();
+			setName('');
+			setIngredientsText('');
+			setInstructionsText('');
+			setRecipeYield('');
+			setDurationMinutes('');
+			setContent('');
+			resetMoreValues();
+			setPickedLocation(null);
+			setVenueName('');
+			for (const entry of media_entries) {
+				URL.revokeObjectURL(entry.preview_url);
+			}
+			setMediaEntries([]);
 		} catch (err) {
 			const message =
 				err instanceof PhotoError
@@ -310,6 +308,13 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 		ingredients_text.trim().length > 0 &&
 		instructions_text.trim().length > 0 &&
 		(media_entries.length === 0 || all_entries_have_alt(media_entries));
+	const missing: string[] = [];
+	if (!name.trim()) missing.push('Recipe title');
+	if (ingredients_text.trim().length === 0) missing.push('Ingredients');
+	if (instructions_text.trim().length === 0) missing.push('Instructions');
+	if (media_entries.length > 0 && !all_entries_have_alt(media_entries)) {
+		missing.push('Alt text for the photo');
+	}
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-recipe-mode-title">
@@ -317,7 +322,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 				Recipe
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a recipe with ingredients, steps, and times.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -432,56 +437,14 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
-				<div
-					class="outpost-error"
-					role="alert"
-					aria-live="assertive"
-					hidden={status.kind !== 'error'}
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class="outpost-status"
-					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
-								{a11y_active && (
-									<>
-										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											View accessibility report
-										</a>
-									</>
-								)}
-							</>
-						) : (
-							'Recipe posted.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-recipe"
 					>
 						<MorePanel
 							token={token}
@@ -497,15 +460,8 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -514,8 +470,56 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 						>
 							More options
 						</button>
-					)}
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
 				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Recipe posted.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
+
+				<PublishButton
+					idPrefix="outpost-recipe"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

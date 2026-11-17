@@ -1,9 +1,5 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-	discover_micropub_endpoint,
-	discover_media_endpoint,
-	upload_media,
-	post_h_entry,
 	MicropubError,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -18,6 +14,7 @@ import {
 import { GeocodePicker } from '../geocode-picker';
 import { MediaLookup } from '../media-lookup';
 import type { MediaLookupResult, MediaLookupEnvironment } from '../../lib/media-lookup';
+import { ExternalLink } from '../external-link';
 import {
 	MediaPicker,
 	all_entries_have_alt,
@@ -26,14 +23,18 @@ import {
 import { is_safe_http_url, is_safe_location_value } from '../../lib/url-validation';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig, type PostKindSlug } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import { peek_share_target, consume_share_target } from '../../lib/share-target';
 import type { DoingVariant } from '../../lib/share-target';
-import { fetch_source_preview, PreviewError } from '../../lib/preview';
+import { fetch_source_preview, PreviewError, type PreviewEnvironment } from '../../lib/preview';
 import { VoiceButton } from '../voice-button';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
+import { useRevealError } from '../../lib/use-reveal-error';
+import { PublishButton } from '../publish-button';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -44,9 +45,10 @@ import {
  * Doing group — life-tracking posts that point at media, places, and
  * activities.
  *
- * Fifteen sub-modes under one tab, picked via radio. Three shapes:
- *   - URL-anchored: Listen (listen-of), Watch (watch-of), Read (read-of),
- *     Play/Game (play-of), Jam (jam-of), Review (item), Video (video),
+ * Fifteen sub-modes under one tab, picked via radio, plus Comic when the
+ * site's Post Kinds builds comic cards. Three shapes:
+ *   - URL-anchored: Listen (listen-of), Watch (watch-of), Read and Comic
+ *     (read-of), Play/Game (play-of), Jam (jam-of), Review (item), Video (video),
  *     Audio (audio) — target URL required, optional title/creator/rating.
  *   - Person-primary: Eat (eat-of), Drink (drink-of), Exercise
  *     (exercise), Craft (craft-of) — the what-was-it input is the primary
@@ -68,12 +70,15 @@ export interface ListenModeProps {
 	composerConfig?: ComposerConfig;
 	/** Injectable environment for the metadata lookup (tests pass a stub). */
 	mediaLookupEnv?: MediaLookupEnvironment;
+	/** Injectable environment for the source preview (tests pass a stub). */
+	previewEnv?: PreviewEnvironment;
 }
 
 type Variant =
 	| 'listen'
 	| 'watch'
 	| 'read'
+	| 'comics'
 	| 'play'
 	| 'game'
 	| 'jam'
@@ -102,6 +107,15 @@ type VariantProperty =
 	| 'video'
 	| 'audio';
 
+/** Comic card properties, sent only when non-empty. */
+type ComicDetailProperty =
+	| 'mp-series'
+	| 'mp-volume'
+	| 'mp-issue-number'
+	| 'mp-publisher'
+	| 'mp-started-at'
+	| 'mp-finished-at';
+
 /**
  * Per-variant feature flags drive conditional rendering and submit-payload
  * shape. Adding a feature is a row-level edit on VARIANTS rather than another
@@ -122,6 +136,9 @@ interface VariantConfig {
 	/** Show the per-kind primary input (artist for listen/jam, director for
 	 *  watch, author for read, food/drink for eat/drink, place for checkin). */
 	personLabel?: string;
+	/** Short name the publish hint uses when the person field is the
+	 *  required one and its label is a question. Defaults to personLabel. */
+	personName?: string;
 	/** Property the personLabel maps to in the Micropub payload. */
 	personProperty?: 'author' | 'name';
 	/** Show the read-status dropdown (Read kind only). */
@@ -138,6 +155,16 @@ interface VariantConfig {
 	/** Show the start / end datetime inputs (Event only). */
 	hasStart?: boolean;
 	hasEnd?: boolean;
+	/** Show Series, Volume, Issue number, Publisher, Started and Finished,
+	 *  sent as the `mp-*` properties Post Kinds' comic card reads. */
+	hasComicDetails?: boolean;
+	/** Send a looked-up or source-preview cover as `mp-cover-image` (plus
+	 *  alt text) instead of `photo`. The Micropub plugin downloads every
+	 *  `photo` into the media library; Post Kinds reads the cover URL. */
+	coverAsCoverImage?: boolean;
+	/** Post Kinds capability the server must report in
+	 *  `composerConfig.postKinds` before the picker offers this variant. */
+	requiresPostKinds?: keyof NonNullable<ComposerConfig['postKinds']>;
 	/** Post Kinds metadata lookup category. When set, the mode shows the
 	 *  one-tap MediaLookup search that fills title/creator/cover from Post
 	 *  Kinds' lookup APIs. Eat/Drink/Exercise have no catalog to search. */
@@ -206,6 +233,27 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasReadStatus: true,
 		hasRating: true,
 		lookup: 'book',
+	},
+	comics: {
+		// Post Kinds builds a comic card from a `read-of` entry carrying
+		// `pkiw-kind: comics`. Only offered when the installed Post Kinds can
+		// build it; an older one would set the term but render a read card.
+		label: 'Comic',
+		property: 'read-of',
+		kind: 'comics',
+		targetLabel: 'Comic URL',
+		contentLabel: 'Optional comment',
+		submitLabel: 'Post comic',
+		hasPhoto: true,
+		targetRequired: true,
+		hasTitle: true,
+		personLabel: 'Creators',
+		personProperty: 'author',
+		hasReadStatus: true,
+		hasRating: true,
+		hasComicDetails: true,
+		coverAsCoverImage: true,
+		requiresPostKinds: 'comics',
 	},
 	play: {
 		label: 'Play',
@@ -283,6 +331,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you eat?',
+		personName: 'Food',
 		personProperty: 'name', // posted as eat-of via property mapping below
 		hasGeocode: true,
 	},
@@ -296,6 +345,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you drink?',
+		personName: 'Drink',
 		personProperty: 'name',
 		hasGeocode: true,
 	},
@@ -313,6 +363,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What activity?',
+		personName: 'Activity',
 		personProperty: 'name', // routed to `exercise` via the eat/drink-shaped branch below
 		hasGeocode: true,
 	},
@@ -330,6 +381,7 @@ const VARIANTS: Record<Variant, VariantConfig> = {
 		hasPhoto: true,
 		targetRequired: false,
 		personLabel: 'What did you make?',
+		personName: 'Project',
 		personProperty: 'name', // routed to `craft-of` via the person-primary branch below
 		hasGeocode: true,
 	},
@@ -398,6 +450,7 @@ const VARIANT_ORDER: Variant[] = [
 	'listen',
 	'watch',
 	'read',
+	'comics',
 	'play',
 	'game',
 	'jam',
@@ -411,6 +464,31 @@ const VARIANT_ORDER: Variant[] = [
 	'video',
 	'audio',
 ];
+
+/**
+ * Variant labels in picker order; Home lists them as the tab's inventory.
+ * Variants that depend on a Post Kinds capability are left out, because
+ * Home can't promise them on every site.
+ */
+export const DOING_VARIANT_LABELS: readonly string[] = VARIANT_ORDER.filter(
+	(id) => !VARIANTS[id].requiresPostKinds,
+).map((id) => VARIANTS[id].label);
+
+/** Variants the picker offers on this site, in picker order. */
+function available_variants(config: ComposerConfig | undefined): Variant[] {
+	return VARIANT_ORDER.filter((id) => {
+		const capability = VARIANTS[id].requiresPostKinds;
+		return !capability || config?.postKinds?.[capability] === true;
+	});
+}
+
+function is_variant(value: unknown): value is Variant {
+	return typeof value === 'string' && (VARIANT_ORDER as string[]).includes(value);
+}
+
+function is_read_status(value: unknown): value is '' | 'to-read' | 'reading' | 'finished' {
+	return value === '' || value === 'to-read' || value === 'reading' || value === 'finished';
+}
 
 type Status =
 	| { kind: 'idle' }
@@ -514,35 +592,69 @@ function is_embeddable_media_url(url: string): boolean {
 	return EMBEDDABLE_MEDIA_HOSTS.some((provider) => host === provider || host.endsWith('.' + provider));
 }
 
-export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv }: ListenModeProps) {
+export function ListenMode({
+	token,
+	micropubEnv,
+	composerConfig,
+	mediaLookupEnv,
+	previewEnv,
+}: ListenModeProps) {
 	const initial_share = consume_share_target_for_doing();
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		initial_share.variant || initial_share.url || initial_share.content
+			? null
+			: read_draft('listen', token.me),
+	);
+	const d = draft?.fields;
+	const draft_variant = draft?.meta.variant;
+	const draft_read_status = draft?.meta.readStatus;
 
-	const [variant, setVariant] = useState<Variant>(initial_share.variant ?? 'listen');
-	const [target_url, setTargetUrl] = useState(initial_share.url ?? '');
-	// Source-id from share-target dispatch — drives the auto-preview
-	// fetch on mount and gets passed through to the submission so
+	// The variant the person (or a draft or share) picked. A variant the site
+	// can't offer yet falls back to Listen; the pick is kept, so a Comic
+	// draft reopens on Comic once the composer config confirms support.
+	const [picked_variant, setVariant] = useState<Variant>(
+		initial_share.variant ?? (is_variant(draft_variant) ? draft_variant : 'listen'),
+	);
+	const variant_options = available_variants(composerConfig);
+	const variant: Variant = variant_options.includes(picked_variant) ? picked_variant : 'listen';
+	const [target_url, setTargetUrl] = useState(initial_share.url ?? draft_text(d?.target));
+	// Source-id from share-target dispatch. It enables the "Fill in details
+	// from this link" action and is passed through to the submission so
 	// downstream filters (e.g., post-format inference) can see it.
 	const [source_id] = useState(initial_share.sourceId ?? '');
-	// Cover URL + publication populated by the auto-preview fetch.
+	const [filling_details, setFillingDetails] = useState(false);
+	// Cover URL + publication populated by the source preview.
 	// User-invisible state — they round-trip into the h-entry submission
 	// as `u-photo` and `p-publication` respectively.
-	const [cover_url, setCoverUrl] = useState('');
-	const [publication, setPublication] = useState('');
+	const [cover_url, setCoverUrl] = useState(draft_text(draft?.meta.cover));
+	const [publication, setPublication] = useState(draft_text(draft?.meta.publication));
 	// Unified per-variant primary input. The `personLabel` config decides
 	// what the user sees ("Artist" / "Director" / "Author" / "Place name" /
 	// "What did you eat?"). The submit handler below routes the value to
 	// the appropriate h-entry property based on `personProperty`.
-	const [person_name, setPersonName] = useState('');
-	const [watch_title, setWatchTitle] = useState('');
-	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>('');
+	const [person_name, setPersonName] = useState(draft_text(d?.person));
+	const [watch_title, setWatchTitle] = useState(draft_text(d?.watchTitle));
+	const [read_status, setReadStatus] = useState<'' | 'to-read' | 'reading' | 'finished'>(
+		is_read_status(draft_read_status) ? draft_read_status : '',
+	);
 	// Event start/end — datetime-local values, submitted as h-event
 	// `start`/`end`. Only read by the event branch (gated on hasStart /
 	// hasEnd), so stale values never leak into other variants.
-	const [event_start, setEventStart] = useState('');
-	const [event_end, setEventEnd] = useState('');
-	const [rating, setRating] = useState('');
-	const [content, setContent] = useState(initial_share.content ?? '');
+	const [event_start, setEventStart] = useState(draft_text(d?.eventStart));
+	const [event_end, setEventEnd] = useState(draft_text(d?.eventEnd));
+	const [rating, setRating] = useState(draft_text(d?.rating));
+	// Comic details, read only when the variant has hasComicDetails.
+	const [comic_series, setComicSeries] = useState(draft_text(d?.comicSeries));
+	const [comic_volume, setComicVolume] = useState(draft_text(d?.comicVolume));
+	const [comic_issue, setComicIssue] = useState(draft_text(d?.comicIssue));
+	const [comic_publisher, setComicPublisher] = useState(draft_text(d?.comicPublisher));
+	const [comic_started, setComicStarted] = useState(draft_text(d?.comicStarted));
+	const [comic_finished, setComicFinished] = useState(draft_text(d?.comicFinished));
+	const [content, setContent] = useState(initial_share.content ?? draft_text(d?.content));
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [endpoint, setEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
@@ -560,7 +672,7 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	// "everywhere else" pattern matches the picker used in Note / Reply /
 	// Photo / Life / Recipe — venue name + optional OSM coordinates.
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(null);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(d?.venue));
 
 	// User-attached media for the snapshot-shaped variants (Checkin / Eat /
 	// Drink / Exercise — every variant whose config has hasGeocode: true).
@@ -570,7 +682,30 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 	// client-side upload — the URL gets posted verbatim as the `video`
 	// h-entry property and downstream consumers handle embedding).
 	const [media_entries, setMediaEntries] = useState<MediaEntry[]>([]);
-	const [video_url, setVideoUrl] = useState('');
+	const [video_url, setVideoUrl] = useState(draft_text(d?.video));
+	const saved_draft = useDraft({
+		mode: 'listen',
+		me: token.me,
+		fields: {
+			target: target_url,
+			person: person_name,
+			watchTitle: watch_title,
+			eventStart: event_start,
+			eventEnd: event_end,
+			rating,
+			comicSeries: comic_series,
+			comicVolume: comic_volume,
+			comicIssue: comic_issue,
+			comicPublisher: comic_publisher,
+			comicStarted: comic_started,
+			comicFinished: comic_finished,
+			content,
+			video: video_url,
+			venue: venue_name,
+		},
+		meta: { variant: picked_variant, readStatus: read_status, cover: cover_url, publication },
+		restored: draft !== null,
+	});
 	// Media endpoint is discovered once per session and cached, matching
 	// PhotoMode's pattern. Discovery only fires when the submit handler
 	// actually needs to upload images.
@@ -598,48 +733,38 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		setGeoError(null);
 	}, [variant]);
 
-	// Auto-fetch source preview when ListenMode mounts via a share-target
-	// dispatch with sourceId set (Spotify/YouTube/etc.). Best-effort:
-	// errors are logged but don't surface to the user — pre-fill is a
-	// nice-to-have and the user can always type fields manually. Only
-	// fires on first mount; subsequent variant switches don't re-fetch.
-	useEffect(() => {
-		if (!source_id || !target_url) return;
-		let cancelled = false;
-		(async (): Promise<void> => {
-			try {
-				const result = await fetch_source_preview({
-					url: target_url,
-					accessToken: token.accessToken,
-					sourceId: source_id,
-				});
-				if (cancelled) return;
-				const e = result.extracted;
-				const name = e['p-name'] ?? e.name ?? '';
-				const author = e['p-author'] ?? e.author ?? '';
-				const photo = e['u-photo'] ?? e.photo ?? '';
-				const pub = e['p-publication'] ?? e.publication ?? '';
-				if (name && !watch_title) setWatchTitle(name);
-				if (author && !person_name) setPersonName(author);
-				if (photo) setCoverUrl(photo);
-				if (pub) setPublication(pub);
-			} catch (err) {
-				if (cancelled) return;
-				if (typeof console !== 'undefined') {
-					const code = err instanceof PreviewError ? err.code : 'unknown';
-					console.warn('Outpost: source preview pre-fill failed (' + code + ')');
-				}
+	// Fill Title / Artist / cover from the shared link's source, only when
+	// the person asks (T10). A share or a link that lands here may come
+	// from any page, so arrival prefills the visible fields but never sends
+	// a request on the person's behalf. Best-effort: a failure leaves the
+	// fields for the person to type.
+	const handle_fill_from_link = async (): Promise<void> => {
+		const url = target_url.trim();
+		if (!source_id || !url || filling_details) return;
+		setFillingDetails(true);
+		try {
+			const result = await fetch_source_preview(
+				{ url, accessToken: token.accessToken, sourceId: source_id },
+				...(previewEnv ? [previewEnv] : []),
+			);
+			const e = result.extracted;
+			const name = e['p-name'] ?? e.name ?? '';
+			const author = e['p-author'] ?? e.author ?? '';
+			const photo = e['u-photo'] ?? e.photo ?? '';
+			const pub = e['p-publication'] ?? e.publication ?? '';
+			if (name && !watch_title) setWatchTitle(name);
+			if (author && !person_name) setPersonName(author);
+			if (photo) setCoverUrl(photo);
+			if (pub) setPublication(pub);
+		} catch (err) {
+			if (typeof console !== 'undefined') {
+				const code = err instanceof PreviewError ? err.code : 'unknown';
+				console.warn('Outpost: source preview pre-fill failed (' + code + ')');
 			}
-		})();
-		return (): void => {
-			cancelled = true;
-		};
-		// Mount-only effect; intentional empty-ish deps to avoid re-firing
-		// on user input. The `source_id` and `target_url` are captured at
-		// mount via consume_share_target_for_doing() and don't change in
-		// this component's lifetime.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+		} finally {
+			setFillingDetails(false);
+		}
+	};
 
 	const handle_geocode_search = async (event?: Event): Promise<void> => {
 		event?.preventDefault();
@@ -797,59 +922,19 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		}
 
 		try {
-			let micropub_endpoint = endpoint;
-			if (!micropub_endpoint) {
-				setStatus({ kind: 'discovering-endpoint' });
-				micropub_endpoint = await discover_micropub_endpoint(token.me, micropubEnv);
-				setEndpoint(micropub_endpoint);
-			}
-
-			// Process + upload any user-attached photos. The pipeline mirrors
-			// PhotoMode: EXIF strip + canvas downscale + JPEG re-encode →
-			// per-photo POST to the Micropub media endpoint → collect Location
-			// header URLs for the final h-entry submission.
-			const uploaded_photo_urls: string[] = [];
-			let alt_values: string[] = [];
+			// Process any user-attached photos: EXIF strip + canvas downscale +
+			// JPEG re-encode, same pipeline as PhotoMode. post_or_queue uploads
+			// them to the media endpoint and sends their URLs as `photo`, or
+			// queues the processed bytes when the network is down.
+			const processed_blobs: Blob[] = [];
 			if (active_media.length > 0) {
 				setStatus({ kind: 'processing-photo' });
-				const processed_blobs: Blob[] = [];
 				for (const entry of active_media) {
 					const processed = await process_photo(entry.file);
 					processed_blobs.push(processed.blob);
 				}
-
-				let resolved_media_endpoint = media_endpoint;
-				if (!resolved_media_endpoint) {
-					setStatus({ kind: 'discovering-endpoint' });
-					resolved_media_endpoint = await discover_media_endpoint(
-						micropub_endpoint,
-						token.accessToken,
-						micropubEnv,
-					);
-					setMediaEndpoint(resolved_media_endpoint);
-				}
-
-				for (let i = 0; i < processed_blobs.length; i++) {
-					setStatus({
-						kind: 'uploading-photo',
-						current: i + 1,
-						total: processed_blobs.length,
-					});
-					const upload = await upload_media(
-						{
-							blob: processed_blobs[i]!,
-							filename: `photo-${String(i + 1)}.jpg`,
-							accessToken: token.accessToken,
-							mediaEndpoint: resolved_media_endpoint,
-						},
-						micropubEnv,
-					);
-					uploaded_photo_urls.push(upload.location);
-				}
-				alt_values = active_media.map((e) =>
-					e.decorative ? '' : e.alt.trim(),
-				);
 			}
+			const alt_values = active_media.map((e) => (e.decorative ? '' : e.alt.trim()));
 
 			// Build the h-entry properties. Routing is variant-aware:
 			//
@@ -922,24 +1007,51 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			if (config.hasRating && trimmed_rating !== '') {
 				base.rating = trimmed_rating;
 			}
+			if (config.hasComicDetails) {
+				const comic_details: [ComicDetailProperty, string][] = [
+					['mp-series', comic_series],
+					['mp-volume', comic_volume],
+					['mp-issue-number', comic_issue],
+					['mp-publisher', comic_publisher],
+					['mp-started-at', comic_started],
+					['mp-finished-at', comic_finished],
+				];
+				for (const [key, value] of comic_details) {
+					const trimmed = value.trim();
+					if (trimmed) {
+						base[key] = trimmed;
+					}
+				}
+			}
 			// Photo property: user-attached uploads win over source-preview
 			// cover. hasGeocode variants (Checkin / Eat / Drink / Exercise)
 			// always have cover_url empty (no source-preview flow), so the
 			// fallback only matters for URL-anchored variants like Listen /
 			// Watch / Read where cover_url comes from Spotify/YouTube oEmbed.
-			if (uploaded_photo_urls.length > 0) {
-				base.photo =
-					uploaded_photo_urls.length === 1
-						? uploaded_photo_urls[0]!
-						: uploaded_photo_urls;
+			if (processed_blobs.length > 0) {
 				base['mp-photo-alt'] =
 					alt_values.length === 1 ? alt_values[0]! : alt_values;
-			} else if (cover_url && !is_embeddable_media_url(trimmed_url)) {
+			} else if (
+				cover_url &&
+				// The Micropub plugin downloads `photo` with download_url(),
+				// so only an http(s) cover leaves the composer (F-55).
+				is_safe_http_url(cover_url) &&
+				!is_embeddable_media_url(trimmed_url)
+			) {
 				// Skip the looked-up cover when the target is a streaming URL
 				// (Spotify / YouTube / Apple Music …): Post Kinds oEmbeds the
 				// URL into a player that already shows album art, so attaching
 				// the cover too duplicated it as a stray gallery below the card.
-				base.photo = cover_url;
+				if (config.coverAsCoverImage) {
+					// Post Kinds reads the cover URL; `photo` would be downloaded
+					// into the media library by the Micropub plugin.
+					base['mp-cover-image'] = cover_url;
+					if (config.hasTitle && trimmed_watch_title) {
+						base['mp-cover-image-alt'] = 'Cover of ' + trimmed_watch_title;
+					}
+				} else {
+					base.photo = cover_url;
+				}
 			}
 			// Video URL: paste-only (no client-side upload pipeline). Submitted
 			// verbatim as the Micropub spec's standard `video` property;
@@ -974,65 +1086,61 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 			}
 			const properties = merge_more_values(base, more_values, trimmed_url);
 
-			setStatus({ kind: 'posting' });
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: micropub_endpoint,
-					},
-					micropubEnv,
-				);
+			const result = await post_or_queue(
+				{
+					source: 'listen',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					photos: processed_blobs.map((blob, i) => ({
+						blob,
+						filename: `photo-${String(i + 1)}.jpg`,
+					})),
+					micropubEndpoint: endpoint,
+					mediaEndpoint: media_endpoint,
+					onStage: (stage): void =>
+						setStatus(
+							stage.kind === 'uploading'
+								? { kind: 'uploading-photo', current: stage.current, total: stage.total }
+								: stage.kind === 'discovering'
+									? { kind: 'discovering-endpoint' }
+									: { kind: 'posting' },
+						),
+				},
+				micropubEnv,
+			);
+			if (result.micropubEndpoint) setEndpoint(result.micropubEndpoint);
+			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			saved_draft.discard();
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
+			} else {
 				setStatus({
 					kind: 'posted',
 					...(result.location ? { location: result.location } : {}),
 				});
 				mark_posted_once();
-				setTargetUrl('');
-				setPersonName('');
-				setWatchTitle('');
-				setReadStatus('');
-				setRating('');
-				setContent('');
-				resetMoreValues();
 				setPickedLocation(null);
 				setVenueName('');
-				for (const entry of media_entries) {
-					URL.revokeObjectURL(entry.preview_url);
-				}
-				setMediaEntries([]);
-				setVideoUrl('');
-				return;
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					try {
-						await enqueue({
-							source: 'listen',
-							properties,
-							accessToken: token.accessToken,
-							micropubEndpoint: micropub_endpoint,
-						});
-						setStatus({ kind: 'queued' });
-						setTargetUrl('');
-						setPersonName('');
-						setWatchTitle('');
-						setReadStatus('');
-						setRating('');
-						setContent('');
-						resetMoreValues();
-						for (const entry of media_entries) {
-							URL.revokeObjectURL(entry.preview_url);
-						}
-						setMediaEntries([]);
-						setVideoUrl('');
-						return;
-					} catch (_q_err) {
-						// Queue write failed; fall through to error display.
-					}
-				}
-				throw post_err;
 			}
+			setTargetUrl('');
+			setPersonName('');
+			setWatchTitle('');
+			setReadStatus('');
+			setRating('');
+			setComicSeries('');
+			setComicVolume('');
+			setComicIssue('');
+			setComicPublisher('');
+			setComicStarted('');
+			setComicFinished('');
+			setContent('');
+			resetMoreValues();
+			for (const entry of media_entries) {
+				URL.revokeObjectURL(entry.preview_url);
+			}
+			setMediaEntries([]);
+			setVideoUrl('');
 		} catch (err) {
 			const message =
 				err instanceof PhotoError
@@ -1078,6 +1186,15 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 		media_entries.length === 0 ||
 		all_entries_have_alt(media_entries);
 	const can_submit = base_can_submit && media_complete;
+	const missing: string[] = [];
+	if (!base_can_submit) {
+		missing.push(
+			config.targetRequired
+				? config.targetLabel
+				: (config.personName ?? config.personLabel ?? 'Details'),
+		);
+	}
+	if (!media_complete) missing.push('Alt text for each photo');
 
 	return (
 		<section class="outpost-card" aria-labelledby="outpost-listen-mode-title">
@@ -1085,13 +1202,13 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 				Doing
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share what you're listening to, watching, reading, playing, eating, and more.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
-				<fieldset class="outpost-variant-picker">
+				<fieldset class="outpost-variant-picker outpost-variant-picker--compact">
 					<legend class="outpost-label">Type</legend>
-					{VARIANT_ORDER.map((id) => (
+					{variant_options.map((id) => (
 						<label key={id} class="outpost-radio">
 							<input
 								type="radio"
@@ -1138,6 +1255,20 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					spellcheck={false}
 					required={config.targetRequired}
 				/>
+				{source_id && target_url.trim() && (
+					<div class="outpost-form-actions">
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							onClick={(): void => {
+								void handle_fill_from_link();
+							}}
+							disabled={submitting || filling_details}
+						>
+							{filling_details ? 'Fetching…' : 'Fill in details from this link'}
+						</button>
+					</div>
+				)}
 
 				{config.lookup && (
 					<MediaLookup
@@ -1274,6 +1405,89 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 							value={rating}
 							onInput={(event): void =>
 								setRating((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+					</>
+				)}
+
+				{config.hasComicDetails && (
+					<>
+						<label class="outpost-label" for="outpost-listen-comic-series">
+							Series (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-series"
+							class="outpost-input"
+							type="text"
+							value={comic_series}
+							onInput={(event): void =>
+								setComicSeries((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-volume">
+							Volume (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-volume"
+							class="outpost-input"
+							type="text"
+							value={comic_volume}
+							onInput={(event): void =>
+								setComicVolume((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-issue">
+							Issue number (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-issue"
+							class="outpost-input"
+							type="text"
+							value={comic_issue}
+							onInput={(event): void =>
+								setComicIssue((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-publisher">
+							Publisher (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-publisher"
+							class="outpost-input"
+							type="text"
+							value={comic_publisher}
+							onInput={(event): void =>
+								setComicPublisher((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-started">
+							Started (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-started"
+							class="outpost-input"
+							type="date"
+							value={comic_started}
+							onInput={(event): void =>
+								setComicStarted((event.target as HTMLInputElement).value)
+							}
+							disabled={submitting}
+						/>
+						<label class="outpost-label" for="outpost-listen-comic-finished">
+							Finished (optional)
+						</label>
+						<input
+							id="outpost-listen-comic-finished"
+							class="outpost-input"
+							type="date"
+							value={comic_finished}
+							onInput={(event): void =>
+								setComicFinished((event.target as HTMLInputElement).value)
 							}
 							disabled={submitting}
 						/>
@@ -1441,59 +1655,14 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					/>
 				)}
 
-				{/* Live regions are rendered unconditionally so iOS VoiceOver
-				    reliably picks up announcements; previously these mounted
-				    only on state change, which the iOS AT misses. The empty
-				    string content stays in the DOM as the no-op state. */}
-				<div
-					class="outpost-error"
-					role="alert"
-					aria-live="assertive"
-					hidden={status.kind !== 'error'}
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class="outpost-status"
-					aria-live="polite"
-					hidden={status.kind !== 'posted' && status.kind !== 'queued'}
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<a href={status.location} target="_blank" rel="noopener noreferrer">
-									{status.location}
-								</a>
-								{a11y_active && (
-									<>
-										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											View accessibility report
-										</a>
-									</>
-								)}
-							</>
-						) : (
-							'Posted, but the server did not return a link. Check your site to confirm it published.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-listen"
 					>
 						<MorePanel
 							token={token}
@@ -1509,15 +1678,8 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={submitting || !can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -1526,8 +1688,56 @@ export function ListenMode({ token, micropubEnv, composerConfig, mediaLookupEnv 
 						>
 							More options
 						</button>
-					)}
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
 				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
+
+				<PublishButton
+					idPrefix="outpost-listen"
+					label={submit_label}
+					disabled={submitting || !can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

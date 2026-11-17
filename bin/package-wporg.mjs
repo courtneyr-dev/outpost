@@ -56,16 +56,18 @@ const run = ( cmd, args, cwd = root ) =>
 console.log( `Packaging ${ slug } ${ version }…` );
 run( 'npx', [ 'wp-scripts', 'plugin-zip' ] );
 
-const built = join( root, 'outpost.zip' );
+// plugin-zip names its archive, and the folder inside it, after the npm package.
+const pkgName = JSON.parse( readFileSync( join( root, 'package.json' ), 'utf8' ) ).name;
+const built = join( root, `${ pkgName }.zip` );
 if ( ! existsSync( built ) ) {
-	throw new Error( 'plugin-zip did not produce outpost.zip' );
+	throw new Error( `plugin-zip did not produce ${ pkgName }.zip` );
 }
 
 const stage = mkdtempSync( join( tmpdir(), 'outpost-pkg-' ) );
 run( 'unzip', [ '-q', built, '-d', stage ], stage );
 
 // npm names the folder after the package; WordPress.org wants the slug.
-const packed = join( stage, 'outpost' );
+const packed = join( stage, pkgName );
 const target = join( stage, slug );
 if ( packed !== target ) {
 	renameSync( packed, target );

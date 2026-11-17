@@ -18,6 +18,10 @@ final class PerfmattersDefangTest extends TestCase {
 	public function setUp(): void {
 		parent::setUp();
 		WP_Mock::setUp();
+		// WP_Mock 1.x leaks Filter::$filtersWithAnyArgs across tests.
+		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
+		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
+		$prop->setValue( null, array() );
 	}
 
 	private function passthrough_apply_filters(): void {

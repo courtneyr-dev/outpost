@@ -14,63 +14,192 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait Outpost_Bearer_Auth {
 
 	/**
-	 * Resolve a bearer token to a real WP user before the capability check.
+	 * Token scopes Outpost's composer helper routes accept (F-56).
 	 *
-	 * Delegates validation to the `determine_current_user` filter (the same
-	 * hook IndieAuth's plugin uses to authenticate bearer tokens), so an
-	 * unvalidated token can never authorize the request. On managed-WP hosts
-	 * that strip the Authorization header (GoDaddy), the Micropub-spec body
-	 * `access_token` is restored to the header first so IndieAuth can read it.
+	 * Outpost's PWA always asks for `create profile update media`. A token
+	 * another client got for `read`, `profile` or `draft` alone can't use
+	 * preview, geocode, media lookup, composer-config, syndicate-targets or
+	 * appearance.
 	 */
-	private static function authenticate_bearer_token(): void {
-		if ( is_user_logged_in() ) {
-			return;
+	public const COMPOSER_SCOPES = array( 'create', 'update' );
+
+	/*
+	 * This trait never resolves or switches users. WordPress resolves the
+	 * current user once, through the `determine_current_user` filter chain,
+	 * before it dispatches a REST route: IndieAuth's callback (priority 15)
+	 * reads a bearer token from the Authorization header or from a
+	 * form-encoded `access_token` body field, the two places RFC 6750 and the
+	 * Micropub spec put it. Every Outpost permission callback checks the user
+	 * WordPress resolved and the scope of the token that authenticated it.
+	 * A token sent anywhere else (a JSON body, the query string) does not
+	 * authenticate the request.
+	 */
+
+	/**
+	 * Whether this request may use a route that needs one of the given
+	 * IndieAuth scopes. Every Outpost REST permission callback calls this
+	 * after its own capability check. The checks run top to bottom and each
+	 * one returns:
+	 *
+	 * 1. Cookie session: WordPress authenticated the request with the
+	 *    wp-admin cookie (core sets `$wp_rest_auth_cookie` to true). A cookie
+	 *    request needs a valid REST nonce, its CSRF protection, so this fails
+	 *    closed when the nonce is missing or `wp_verify_nonce()` returns false.
+	 *    Outpost checks this itself rather than relying on core's
+	 *    `rest_cookie_check_errors()`, which any `rest_authentication_errors`
+	 *    callback that returns a non-empty value first can skip. A valid
+	 *    nonce (`wp_verify_nonce()` returns 1 or 2) passes: a first-party
+	 *    browser session has no token scopes.
+	 * 2. Bearer token: a token in the Authorization header or the
+	 *    form-encoded `access_token` field, or an IndieAuth-verified response.
+	 *    The token must carry one of `$any_of`. A token whose scopes can't be
+	 *    read fails closed. A token-authenticated request never sets
+	 *    `$wp_rest_auth_cookie` (IndieAuth resolves the user before core
+	 *    validates the cookie), so it never needs a cookie nonce.
+	 * 3. Anything else (an Application Password over Basic auth, or no
+	 *    credential at all) has no scope to check, so the caller's capability
+	 *    check decides.
+	 *
+	 * This method never resolves or switches users; it reads the user
+	 * WordPress already resolved and IndieAuth's `indieauth_response` and
+	 * `indieauth_scopes` accessors (null when IndieAuth is inactive).
+	 *
+	 * @param WP_REST_Request    $request Current REST request.
+	 * @param array<int, string> $any_of  Scopes to accept; any one present authorizes.
+	 */
+	protected static function bearer_has_scope( WP_REST_Request $request, array $any_of ): bool {
+		global $wp_rest_auth_cookie;
+
+		// 1. Cookie session: a missing or invalid REST nonce fails here.
+		if ( true === $wp_rest_auth_cookie ) {
+			$nonce = Outpost_Request_Headers::rest_nonce();
+			if ( '' === $nonce ) {
+				return false;
+			}
+			if ( false === wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+				return false;
+			}
+			return true;
 		}
-		$token = self::bearer_token();
-		if ( '' === $token ) {
-			return;
+
+		// 2. Bearer token: the token must carry an accepted scope.
+		$is_bearer = '' !== self::bearer_token( $request )
+			|| ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null );
+		if ( $is_bearer ) {
+			$scopes = function_exists( 'indieauth_get_scopes' ) ? indieauth_get_scopes() : null;
+			if ( ! is_array( $scopes ) || array() === $scopes ) {
+				return false;
+			}
+			foreach ( $any_of as $scope ) {
+				if ( in_array( $scope, $scopes, true ) ) {
+					return true;
+				}
+			}
+			return false;
 		}
-		// Restore a stripped Authorization header so IndieAuth's
-		// determine_current_user callback can read and validate the token.
-		if ( '' === Outpost_Request_Headers::authorization() ) {
-			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
-		}
-		$user_id = Outpost_Request_Headers::resolve_token_user();
-		if ( $user_id > 0 ) {
-			wp_set_current_user( $user_id );
-		}
+
+		// 3. No cookie session and no token: the capability check decides.
+		return true;
 	}
 
 	/**
-	 * Extract the bearer token from the Authorization header, or the
-	 * Micropub-spec `access_token` request body on hosts that strip the
-	 * header. Returns '' when no token is present.
+	 * Whether this is a first-party wp-admin browser request: WordPress
+	 * authenticated the logged-in cookie, the REST nonce is present and
+	 * valid, and no other credential rides along (no bearer token, no
+	 * IndieAuth-verified response, no Application Password).
 	 *
-	 * Bodies don't appear in access logs, browser history, or CDN cache
-	 * keys, unlike query strings, so the body fallback is spec-compliant
-	 * and leak-safe.
+	 * Routes that return a person's connected-account data accept only this
+	 * (T10-S3-06). It fails closed on its own instead of relying on core's
+	 * `rest_cookie_check_errors()`, which an earlier
+	 * `rest_authentication_errors` callback can skip.
+	 *
+	 * @param WP_REST_Request $request Current REST request.
 	 */
-	private static function bearer_token(): string {
+	protected static function is_first_party_cookie_request( WP_REST_Request $request ): bool {
+		global $wp_rest_auth_cookie;
+		if ( true !== $wp_rest_auth_cookie || ! is_user_logged_in() ) {
+			return false;
+		}
+		if ( '' !== self::bearer_token( $request ) ) {
+			return false;
+		}
+		if ( ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null ) ) {
+			return false;
+		}
+		if ( function_exists( 'rest_get_authenticated_app_password' ) && null !== rest_get_authenticated_app_password() ) {
+			return false;
+		}
+		$nonce = Outpost_Request_Headers::rest_nonce();
+		if ( '' === $nonce ) {
+			return false;
+		}
+		if ( false === wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Whether IndieAuth authenticated this request for the Outpost PWA
+	 * itself: a verified token response whose `client_id` is exactly this
+	 * site's Outpost client identifier (Outpost_Client_Identity). A cookie
+	 * session or an Application Password never counts, and neither does a
+	 * missing, malformed, or different client identifier.
+	 */
+	protected static function is_outpost_pwa_bearer(): bool {
+		global $wp_rest_auth_cookie;
+		if ( true === $wp_rest_auth_cookie ) {
+			return false;
+		}
+		if ( function_exists( 'rest_get_authenticated_app_password' ) && null !== rest_get_authenticated_app_password() ) {
+			return false;
+		}
+		$response = function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null;
+		if ( ! is_array( $response ) || ! isset( $response['client_id'] ) ) {
+			return false;
+		}
+		return Outpost_Client_Identity::is_outpost_client( $response['client_id'] );
+	}
+
+	/**
+	 * Find a bearer token in the Authorization header or an `access_token`
+	 * body field. Returns '' when no token is present.
+	 *
+	 * This only decides whether a scope check applies; it never
+	 * authenticates anything. A JSON-body token counts here so that a
+	 * request presenting one is held to the scope gate (fail closed), even
+	 * though IndieAuth only authenticates header and form-encoded tokens.
+	 *
+	 * The header pattern matches every header text IndieAuth's
+	 * `Authorize::get_token_from_bearer_header()` matches. IndieAuth's
+	 * pattern, `/Bearer ([\x20-\x7E]+)/`, is unanchored, so it reads a token
+	 * after any prefix (`X Bearer <token>`); this one is unanchored too, and
+	 * case-insensitive. A `Basic` credential never matches: its base64
+	 * payload contains no whitespace, so `Bearer` followed by whitespace
+	 * cannot appear in it. IndieAuth reads the header raw while
+	 * `Outpost_Request_Headers::authorization()` sanitizes it, which can
+	 * drop tag-like text or invalid UTF-8; for those, the
+	 * `indieauth_response` signal in bearer_has_scope() marks the request.
+	 *
+	 * The body is read through WP_REST_Request, which WordPress has already
+	 * parsed (form-encoded or JSON). Query-string parameters are never
+	 * consulted: bodies don't appear in access logs, browser history, or CDN
+	 * cache keys, unlike query strings.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 */
+	private static function bearer_token( WP_REST_Request $request ): string {
 		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
+		if ( '' !== $header && preg_match( '/Bearer\s+(\S+)/i', $header, $matches ) ) {
 			return $matches[1];
 		}
-		// Bearer-token auth path; nonces don't apply to token-authenticated
-		// requests, and managed-WP hosts strip the header so the token rides
-		// in the body.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
-		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
-		if ( null === $body_token ) {
-			$raw = file_get_contents( 'php://input' );
-			if ( false !== $raw && '' !== $raw ) {
-				$decoded = json_decode( $raw, true );
-				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
-					$body_token = sanitize_text_field( $decoded['access_token'] );
+		foreach ( array( $request->get_body_params(), $request->get_json_params() ) as $body ) {
+			if ( is_array( $body ) && isset( $body['access_token'] ) && is_string( $body['access_token'] ) ) {
+				$body_token = sanitize_text_field( $body['access_token'] );
+				if ( '' !== $body_token ) {
+					return $body_token;
 				}
 			}
-		}
-		if ( is_string( $body_token ) && '' !== $body_token ) {
-			return $body_token;
 		}
 		return '';
 	}

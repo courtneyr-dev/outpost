@@ -1,11 +1,11 @@
 # Gutenberg sidebar (G3.5c)
 
-Outpost ships a single block-editor `PluginSidebar` that future Outpost surfaces hang panels off. The first scaffolding ships in G3.5c with a placeholder card; real components — the POSSE destination selector (G5), the fetch-recent picker (next batch), headless-send config (G7) — land in follow-up PRs as additional `<PanelBody>` sections inside this same sidebar.
+Outpost ships a single block-editor `PluginSidebar` named `outpost-sidebar`. Today it holds two `<PanelBody>` sections: a placeholder card ("Outpost sidebar is loaded. Components will appear here as features ship.") and the fetch-recent panel ("Add from connected platforms"; see [Fetch-recent picker](fetch-recent-picker.md)). It has no POSSE destination selector; to choose destinations, set `_outpost_posse_targets` through the REST API as described in [POSSE outbound base class](posse-base-class.md).
 
 ## Components
 
-- **`src/index.js`** — entry point. Calls `registerPlugin( 'outpost-sidebar', { render, icon } )`. Imports the @wordpress/icons `share` icon (already bundled, no extra dep).
-- **`src/sidebar/outpost-sidebar.js`** — the `<PluginSidebar>` component. Renders a `<PluginSidebarMoreMenuItem>` (the entry in the editor's More-menu dropdown) plus the sidebar itself with one `<PanelBody>` containing the placeholder card.
+- **`src/index.js`** — entry point. Calls `registerPlugin( 'outpost-sidebar', { render, icon } )`. Uses Outpost's own `fingerpost` icon from `src/icons/fingerpost.js`. It also calls `registerPendingSyndicationNotice()`, which shows the manual-share pending-syndication reminder as a `core/notices` notice.
+- **`src/sidebar/outpost-sidebar.js`** — the `<PluginSidebar>` component. Renders a `<PluginSidebarMoreMenuItem>` (the entry in the editor's More-menu dropdown) plus the sidebar itself with the placeholder `<PanelBody>` and `<FetchRecentPanel />`.
 - **`includes/class-outpost-sidebar-assets.php`** — PHP enqueue. Hooks `enqueue_block_editor_assets`, reads `build/index.asset.php` for dependencies + version, calls `wp_enqueue_script`. Skips with a debug-log warning when the build artifact is missing (dev environment without a local `npm run build:wp`).
 
 ## Build pipeline
@@ -25,7 +25,7 @@ The Vite/Preact PWA pipeline (`pwa/src/`) and the @wordpress/scripts pipeline (`
 
 ## Build artifacts are committed
 
-`build/index.js` + `build/index.asset.php` (+ optional `build/index.css`) ship in version control alongside `build/pwa/`. Same reason: the `gd-wordpress-deployer` rsync reflects the working tree, so production-shaped staging tests need the bundle on disk. CI doesn't build — it lints and tests, and the developer runs `npm run build:wp` locally before committing.
+`build/index.js` + `build/index.asset.php` (+ optional `build/index.css`) ship in version control alongside `build/pwa/`, so a git clone or a ZIP of the repository runs without a build step. CI runs `npm run build:wp` in `.github/workflows/ci.yml` (the "Editor bundle build keeps the PWA bundle" step) to check that the editor build doesn't delete or change `build/pwa/`, then discards the output. Run `npm run build:wp` locally and commit the result whenever you change `src/`.
 
 The `.gitignore` re-includes the relevant `build/index.*` paths to allow the artifacts through despite the broader `build/*` ignore. See `.gitignore` for the full list.
 
@@ -39,13 +39,13 @@ The `.gitignore` re-includes the relevant `build/index.*` paths to allow the art
 
 ## What this PR is NOT
 
-- The fetch-recent picker (separate PR; stacks on this branch).
-- The POSSE destination selector (G5).
-- Headless-send UI (G7).
-- Persistence of sidebar state to post-meta (will surface as we add real components).
+- The fetch-recent picker (shipped later as its own PR; it's in the sidebar now).
+- A POSSE destination selector. Not available yet.
+- Headless-send UI. Not available.
+- Persistence of sidebar state to post-meta.
 - Storybook / component playground (deferred indefinitely; not worth the maintenance cost for an indie plugin).
 - Bundling third-party UI libraries beyond what `@wordpress/components` provides.
 
 ## Why JavaScript, not TypeScript
 
-Outpost is a single-developer indie project. TS adds tooling overhead with limited return at this scale. F-phase has no TS. JSDoc comments serve where type hints help. If TS becomes warranted later, @wordpress/scripts supports it via a single config flag — the migration is mechanical.
+The sidebar bundle is small, and TS would add a second type-check setup next to the PWA's. JSDoc comments serve where type hints help. The PWA under `pwa/src/` is TypeScript; the editor bundle under `src/` is JavaScript. @wordpress/scripts supports TypeScript if the editor bundle needs it.

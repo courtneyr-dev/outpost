@@ -37,6 +37,9 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		Outpost_Manual_Share_Platform_Registry::reset_for_tests();
 		Outpost_Companion_Registry::reset_for_tests();
 		// F2 #10 / A2 #8 static-state reset.
@@ -119,7 +122,7 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Manual_Share_Controller::check_permission();
+		$result = Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -129,10 +132,52 @@ final class ManualShareControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see "Scope source" in trait-bearer-auth.php). POST is now
+		// always the mutating branch on this controller (Critical 2 fix:
+		// both POST routes mutate), so `create`/`update` only.
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
-		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission() );
+		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Important: method-split controller coverage — a
+	 * `read`-only token authorizes the read-only GET /manual-share-chips
+	 * route.
+	 */
+	public function test_permission_read_scope_authorizes_get_chips(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$this->assertTrue( Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'GET', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Critical 2 + Important: a `read`-only token does NOT
+	 * authorize either mutating POST route. /intent looks like a computed
+	 * payload but its Android/iOS builders write an audit log entry (see
+	 * Outpost_Manual_Share_Intent_Payload_Builder::build_for_android()/
+	 * build_for_ios()), so it is mutating exactly like /intent/log.
+	 */
+	public function test_permission_read_scope_alone_refused_on_post(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$result = Outpost_Manual_Share_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	/**

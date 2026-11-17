@@ -24,6 +24,16 @@
  * Both endpoints are gated on `edit_posts` so contributor-level
  * users can manage their own appearance preferences.
  *
+ * The PWA calls POST with only its bearer token in the body (hosts that
+ * strip the Authorization header lose a GET's credentials) to read its
+ * state without writing anything, and with `style_source` /
+ * `mode_preference` / `start_screen` to save. Both responses carry
+ * `style_source`, the stored `mode_preference`, `start_screen` (the
+ * screen a normal launch opens to; see Outpost_Start_Screen), and
+ * `css`: the component tokens for the
+ * user's source in both schemes, scoped to `.outpost-source-*`.
+ * Responses are per-user and never cacheable.
+ *
  * @package Outpost
  */
 
@@ -36,6 +46,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_Appearance_REST_Controller {
+
+	use Outpost_Bearer_Auth;
 
 	/** REST route registered under outpost/v1 namespace. */
 	public const ROUTE = '/appearance/tokens';
@@ -76,12 +88,22 @@ final class Outpost_Appearance_REST_Controller {
 	/**
 	 * @return bool|\WP_Error
 	 */
-	public static function permission_check() {
+	public static function permission_check( \WP_REST_Request $request ) {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error(
 				'outpost_appearance_unauthorized',
 				__( 'Authentication required.', 'outpost-mobile-publishing' ),
 				array( 'status' => 401 )
+			);
+		}
+		// Credential before capability, and it fails early: a cookie session
+		// needs a valid REST nonce, and a token needs `create` or `update`;
+		// `profile` or `draft` alone isn't enough (F-56).
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
+			return new \WP_Error(
+				'outpost_appearance_scope',
+				__( 'This sign-in does not allow changing appearance preferences.', 'outpost-mobile-publishing' ),
+				array( 'status' => 403 )
 			);
 		}
 		if ( ! current_user_can( 'edit_posts' ) ) {
@@ -92,6 +114,59 @@ final class Outpost_Appearance_REST_Controller {
 			);
 		}
 		return true;
+	}
+
+	/**
+	 * Response body shared by GET and POST.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private static function state_payload( int $user_id, string $mode ): array {
+		$source   = Outpost_Style_Source::get_source( $user_id );
+		$resolved = Outpost_Token_Resolver::resolve( $user_id, $mode, $source );
+		$day      = Outpost_Token_Resolver::resolve( $user_id, 'day', $source );
+		$night    = Outpost_Token_Resolver::resolve( $user_id, 'night', $source );
+		$css      = 'site' === $source || self::has_overrides( $user_id )
+			? Outpost_Token_Resolver::to_scoped_css( $source, $day, $night )
+			: '';
+		return array(
+			'mode'                => $resolved['mode'],
+			'mode_preference'     => Outpost_Mode_Controller::get_mode( $user_id ),
+			'style_source'        => $source,
+			'style_source_stored' => Outpost_Style_Source::has_stored_source( $user_id ),
+			'start_screen'        => Outpost_Start_Screen::get( $user_id ),
+			'start_screen_stored' => Outpost_Start_Screen::has_stored( $user_id ),
+			'css'                 => $css,
+			'colors'              => $resolved['colors'],
+			'fonts'               => $resolved['fonts'],
+			'sizes'               => $resolved['sizes'],
+			'sources'             => $resolved['sources'],
+			'adjusted'            => array_merge( $day['adjusted'], $night['adjusted'] ),
+		);
+	}
+
+	/**
+	 * Per-user preferences must not land in a shared cache.
+	 *
+	 * @param array<string,mixed> $body
+	 */
+	private static function private_response( array $body, int $status = 200 ): \WP_REST_Response {
+		$response = new \WP_REST_Response( $body, $status );
+		$response->header( 'Cache-Control', 'no-store, private, max-age=0' );
+		$response->header( 'Vary', 'Authorization, Cookie' );
+		return $response;
+	}
+
+	private static function has_overrides( int $user_id ): bool {
+		$overrides = self::read_overrides( $user_id );
+		foreach ( array( 'day', 'night' ) as $mode ) {
+			foreach ( array( 'colors', 'fonts' ) as $kind ) {
+				if ( ! empty( $overrides[ $mode ][ $kind ] ) ) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -117,20 +192,7 @@ final class Outpost_Appearance_REST_Controller {
 
 		$mode = self::normalize_mode_param( (string) $request->get_param( 'mode' ) );
 
-		$resolved = Outpost_Token_Resolver::resolve( $user_id, $mode );
-
-		return new \WP_REST_Response(
-			array(
-				'mode'            => $resolved['mode'],
-				'mode_preference' => Outpost_Mode_Controller::get_mode( $user_id ),
-				'colors'          => $resolved['colors'],
-				'fonts'           => $resolved['fonts'],
-				'sizes'           => $resolved['sizes'],
-				'sources'         => $resolved['sources'],
-				'adjusted'        => $resolved['adjusted'],
-			),
-			200
-		);
+		return self::private_response( self::state_payload( $user_id, $mode ) );
 	}
 
 	/**
@@ -164,6 +226,15 @@ final class Outpost_Appearance_REST_Controller {
 				array( 'status' => 401 )
 			);
 		}
+		// The route and the settings page check this too; the method is
+		// public, so it doesn't rely on its callers (T10-S4-06).
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new \WP_Error(
+				'outpost_appearance_forbidden',
+				__( 'You are not allowed to change appearance settings.', 'outpost-mobile-publishing' ),
+				array( 'status' => 403 )
+			);
+		}
 
 		$body = $request->get_json_params();
 		if ( ! is_array( $body ) ) {
@@ -177,21 +248,26 @@ final class Outpost_Appearance_REST_Controller {
 			);
 		}
 
-		// Mode preference update is independent of override updates.
-		// An empty string means "no change requested" — only validate
-		// when the caller actually supplied a value.
-		if ( isset( $body['mode_preference'] ) && is_string( $body['mode_preference'] ) ) {
-			$mode_value = trim( $body['mode_preference'] );
-			if ( '' !== $mode_value ) {
-				$saved = Outpost_Mode_Controller::set_mode( $user_id, $mode_value );
-				if ( ! $saved ) {
-					return new \WP_Error(
-						'outpost_appearance_invalid_mode',
-						__( 'Invalid mode_preference value.', 'outpost-mobile-publishing' ),
-						array( 'status' => 400 )
-					);
-				}
+		// Validate every field before writing any, so a request with one bad
+		// value changes nothing. An empty string means "no change".
+		$preferences = array();
+		$checks      = array(
+			'style_source'    => array( Outpost_Style_Source::VALID_SOURCES, 'outpost_appearance_invalid_source', __( 'Invalid style_source value.', 'outpost-mobile-publishing' ) ),
+			'mode_preference' => array( Outpost_Mode_Controller::VALID_MODES, 'outpost_appearance_invalid_mode', __( 'Invalid mode_preference value.', 'outpost-mobile-publishing' ) ),
+			'start_screen'    => array( Outpost_Start_Screen::VALID_SCREENS, 'outpost_appearance_invalid_start_screen', __( 'Invalid start_screen value.', 'outpost-mobile-publishing' ) ),
+		);
+		foreach ( $checks as $field => $check ) {
+			if ( ! isset( $body[ $field ] ) || ! is_string( $body[ $field ] ) ) {
+				continue;
 			}
+			$value = strtolower( trim( $body[ $field ] ) );
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( ! in_array( $value, $check[0], true ) ) {
+				return new \WP_Error( $check[1], $check[2], array( 'status' => 400 ) );
+			}
+			$preferences[ $field ] = $value;
 		}
 
 		$existing = self::read_overrides( $user_id );
@@ -220,27 +296,27 @@ final class Outpost_Appearance_REST_Controller {
 			$updated['bypass_contrast'] = $bypass_validated;
 		}
 
-		update_user_meta( $user_id, Outpost_Token_Resolver::OVERRIDE_META_KEY, $updated );
+		// Each preference is stored independently of the others.
+		if ( isset( $preferences['style_source'] ) ) {
+			Outpost_Style_Source::set_source( $user_id, $preferences['style_source'] );
+		}
+		if ( isset( $preferences['mode_preference'] ) ) {
+			Outpost_Mode_Controller::set_mode( $user_id, $preferences['mode_preference'] );
+		}
+		if ( isset( $preferences['start_screen'] ) ) {
+			Outpost_Start_Screen::set( $user_id, $preferences['start_screen'] );
+		}
+
+		// A body with no override changes (the PWA's token-only read, or a
+		// mode/source-only save) leaves the override meta untouched.
+		if ( $updated !== $existing ) {
+			update_user_meta( $user_id, Outpost_Token_Resolver::OVERRIDE_META_KEY, $updated );
+		}
 		Outpost_Token_Resolver::invalidate_cache_for_user( $user_id );
 
-		// Re-resolve at requested mode (or day default) to return the
-		// up-to-date token map for the UI.
 		$mode_param = self::normalize_mode_param( (string) $request->get_param( 'mode' ) );
-		$resolved   = Outpost_Token_Resolver::resolve( $user_id, $mode_param );
 
-		return new \WP_REST_Response(
-			array(
-				'saved'           => true,
-				'mode'            => $resolved['mode'],
-				'mode_preference' => Outpost_Mode_Controller::get_mode( $user_id ),
-				'colors'          => $resolved['colors'],
-				'fonts'           => $resolved['fonts'],
-				'sizes'           => $resolved['sizes'],
-				'sources'         => $resolved['sources'],
-				'adjusted'        => $resolved['adjusted'],
-			),
-			200
-		);
+		return self::private_response( array( 'saved' => true ) + self::state_payload( $user_id, $mode_param ) );
 	}
 
 	/**

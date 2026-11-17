@@ -208,6 +208,7 @@ final class Outpost_Micropub_Bridges {
 		self::apply_default_terms( $post_id, $properties );
 		self::apply_place_name( $post_id, $properties );
 		self::apply_photo_alt_text( $post_id, $properties );
+		self::apply_photo_captions( $post_id, $properties );
 		self::apply_featured_image( $post_id, $properties );
 	}
 
@@ -260,6 +261,92 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map from `extract_properties()`.
+	 */
+	/**
+	 * Bridge: photo caption → the attachment's `post_excerpt`.
+	 *
+	 * WordPress stores an image caption as the attachment post's excerpt, which
+	 * is what the media library shows and what core's Image block renders. Alt
+	 * text answers "what is this image" for someone who cannot see it; a caption
+	 * is prose everyone reads. They are separate fields and neither is derived
+	 * from the other.
+	 *
+	 * @param int                  $post_id    Post the photos belong to.
+	 * @param array<string, mixed> $properties Flat properties map.
+	 */
+	private static function apply_photo_captions( int $post_id, array $properties ): void {
+		$photo = $properties['photo'] ?? null;
+		if ( null === $photo ) {
+			return;
+		}
+		$entries = is_array( $photo ) ? array_values( $photo ) : array( $photo );
+
+		// Two shapes reach here. Other clients send a structured object per
+		// photo, `{value, alt, caption}`. Outpost's own composer sends a flat
+		// `photo[]` of URLs alongside parallel `mp-photo-alt[]` and
+		// `mp-photo-caption[]` arrays, paired by index — so a bridge that read
+		// only the structured shape would never fire for a post made in Outpost.
+		$parallel = $properties['mp-photo-caption'] ?? null;
+		if ( is_array( $parallel ) ) {
+			$parallel = array_values( $parallel );
+		} elseif ( is_string( $parallel ) ) {
+			$parallel = array( $parallel );
+		} else {
+			$parallel = array();
+		}
+
+		$seen = array();
+		foreach ( $entries as $index => $entry ) {
+			if ( is_array( $entry ) && isset( $entry['value'] ) ) {
+				$url     = is_string( $entry['value'] ) ? $entry['value'] : '';
+				$caption = isset( $entry['caption'] ) && is_string( $entry['caption'] )
+					? $entry['caption']
+					: '';
+			} elseif ( is_string( $entry ) ) {
+				$url     = $entry;
+				$caption = isset( $parallel[ $index ] ) && is_string( $parallel[ $index ] )
+					? $parallel[ $index ]
+					: '';
+			} else {
+				continue;
+			}
+
+			$url     = trim( $url );
+			$caption = trim( $caption );
+			// An absent or empty caption writes nothing, so a photo without one
+			// keeps whatever excerpt the attachment already has.
+			if ( '' === $url || '' === $caption ) {
+				continue;
+			}
+			// The Micropub plugin appends each photo's canonical URL back onto
+			// the property after sideloading, so the same URL arrives twice. Keep
+			// the first caption seen for a URL, the way the alt bridge does.
+			if ( isset( $seen[ $url ] ) ) {
+				continue;
+			}
+			$seen[ $url ] = true;
+
+			$attachment_id = (int) attachment_url_to_postid( $url );
+			if ( $attachment_id <= 0 ) {
+				continue;
+			}
+			if ( ! self::actor_owns_post_attachment( $attachment_id, $post_id ) ) {
+				continue;
+			}
+			wp_update_post(
+				array(
+					'ID'           => $attachment_id,
+					'post_excerpt' => sanitize_text_field( $caption ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Bridge: photo alt text → `_wp_attachment_image_alt` on each attachment.
+	 *
+	 * @param int                  $post_id    Post the photos belong to.
+	 * @param array<string, mixed> $properties Flat properties map.
 	 */
 	private static function apply_photo_alt_text( int $post_id, array $properties ): void {
 		$pairs = self::collect_photo_alt_pairs( $properties );
@@ -517,9 +604,10 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * Each value is looked up by name, then by slug, in the `category`
 	 * taxonomy. Existing terms are reused; new terms are created on the
-	 * fly via wp_insert_term. Append-mode is used so any categories the
-	 * Micropub plugin already assigned (from the `category[]` lookup)
-	 * stay in place.
+	 * fly via wp_insert_term. When the post holds only core's fallback
+	 * category and the request did not name it, the resolved categories
+	 * replace that fallback. Otherwise they append so categories the
+	 * Micropub plugin already assigned stay in place.
 	 *
 	 * Runs unconditionally — `category` is a core WordPress taxonomy on
 	 * every site, no companion-plugin gating needed.
@@ -563,7 +651,32 @@ final class Outpost_Micropub_Bridges {
 		if ( empty( $ids ) ) {
 			return;
 		}
-		wp_set_post_categories( $post_id, $ids, true );
+		$current = wp_get_post_categories( $post_id );
+		$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
+		$core    = (int) get_option( 'default_category' );
+		$append  = array( $core ) !== $current || in_array( $core, $ids, true ) || self::request_names_category( $properties, $core );
+		wp_set_post_categories( $post_id, $ids, $append );
+	}
+
+	/**
+	 * Whether the standard Micropub category property names a category.
+	 *
+	 * @param array<string, mixed> $properties Flat properties map.
+	 * @param int                  $term_id    Category term ID to match.
+	 */
+	private static function request_names_category( array $properties, int $term_id ): bool {
+		$raw    = $properties['category'] ?? null;
+		$values = is_array( $raw ) ? $raw : array( $raw );
+		foreach ( $values as $value ) {
+			if ( ! is_string( $value ) ) {
+				continue;
+			}
+			$term = get_category_by_slug( sanitize_title( $value ) );
+			if ( $term instanceof \WP_Term && $term_id === (int) $term->term_id ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -577,12 +690,11 @@ final class Outpost_Micropub_Bridges {
 	 * Settings > Writing default category, which is not what a site that
 	 * configured Outpost defaults asked for.
 	 *
-	 * Categories apply only when the request carried no `mp-categories`
-	 * AND the post holds nothing but core's fallback category (or none),
-	 * so a category the Micropub plugin resolved from `category[]` is
-	 * left alone. They replace rather than append, so core's fallback
-	 * doesn't ride along. Tags append only when the request carried no
-	 * `category[]` at all.
+	 * Categories apply only when the request carried no `mp-categories`,
+	 * the post holds nothing but core's fallback category (or none), and
+	 * `category[]` did not name that fallback. They replace rather than
+	 * append, so an unrequested core fallback doesn't ride along. Tags
+	 * append only when the request carried no `category[]` at all.
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map.
@@ -598,7 +710,7 @@ final class Outpost_Micropub_Bridges {
 				$current = wp_get_post_categories( $post_id );
 				$current = is_array( $current ) ? array_map( 'intval', $current ) : array();
 				$core    = (int) get_option( 'default_category' );
-				if ( empty( $current ) || array( $core ) === $current ) {
+				if ( empty( $current ) || ( array( $core ) === $current && ! self::request_names_category( $properties, $core ) ) ) {
 					wp_set_post_categories( $post_id, $ids, false );
 				}
 			}

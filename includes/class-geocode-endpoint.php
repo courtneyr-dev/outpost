@@ -31,6 +31,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Outpost_Geocode_Endpoint {
 
+	use Outpost_Bearer_Auth;
+
 	private const ROUTE_NAMESPACE = 'outpost/v1';
 	private const ROUTE_PATH      = '/geocode';
 
@@ -52,6 +54,9 @@ final class Outpost_Geocode_Endpoint {
 	 * Nominatim's p99 is well under 2s, so 3s gives a fast failure on the
 	 * user side without sacrificing realistic responses. */
 	private const HTTP_TIMEOUT = 3;
+
+	/** Largest Nominatim response body parsed (1 MB). */
+	private const MAX_RESPONSE_BYTES = 1048576;
 
 	/** Cap on result count returned to the client. */
 	private const MAX_RESULTS = 5;
@@ -101,82 +106,55 @@ final class Outpost_Geocode_Endpoint {
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
-
-		$allow = current_user_can( 'edit_posts' );
+	public static function check_permission( WP_REST_Request $request ) {
+		// Read-only: proxies Nominatim, writes nothing but a rate-limit /
+		// result cache transient. It serves the composer, so a token needs
+		// `create` or `update` (F-56).
+		$message = __( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the geocode-endpoint permission decision.
+		 * Filters whether a request may use the geocode endpoint.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_geocode_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_geocode_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost geocode requires an authenticated user.', 'outpost-mobile-publishing' ),
+				$message,
 				array( 'status' => 401 )
 			);
 		}
 		return true;
 	}
 
-	/**
-	 * Validate a bearer token (Authorization header or, on managed-WP hosts
-	 * that strip the header, the request body) into a real WordPress user
-	 * before the permission check runs. Mirrors the preview endpoint: mere
-	 * presence of a bearer never authorizes — the token must resolve to a user
-	 * via IndieAuth's determine_current_user, and current_user_can('edit_posts')
-	 * is the sole gate. A token is never read from the query string (that turned
-	 * the endpoint into an anonymous open proxy and leaked the token).
-	 */
-	private static function authenticate_bearer_token(): void {
-		if ( is_user_logged_in() ) {
-			return;
-		}
-		$token = self::bearer_token();
-		if ( '' === $token ) {
-			return;
-		}
-		// Restore a stripped Authorization header so IndieAuth's
-		// determine_current_user callback can read and validate the token.
-		if ( '' === Outpost_Request_Headers::authorization() ) {
-			$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
-		}
-		$user_id = Outpost_Request_Headers::resolve_token_user();
-		if ( $user_id > 0 ) {
-			wp_set_current_user( $user_id );
-		}
-	}
 
-	/**
-	 * The bearer token from the Authorization header, or (on hosts that strip
-	 * it) the `access_token` in a form-encoded or JSON request body. '' when absent.
-	 */
-	private static function bearer_token(): string {
-		$header = Outpost_Request_Headers::authorization();
-		if ( '' !== $header && preg_match( '/^\s*Bearer\s+(\S+)/i', $header, $matches ) ) {
-			return $matches[1];
-		}
-		// Bearer-token auth path; nonces don't apply to token-authenticated
-		// requests, and managed-WP hosts strip the header so the token rides
-		// in the body.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.NonceVerification.Recommended
-		$body_token = isset( $_POST['access_token'] ) ? sanitize_text_field( wp_unslash( $_POST['access_token'] ) ) : null;
-		if ( null === $body_token ) {
-			$raw = file_get_contents( 'php://input' );
-			if ( false !== $raw && '' !== $raw ) {
-				$decoded = json_decode( $raw, true );
-				if ( is_array( $decoded ) && isset( $decoded['access_token'] ) && is_string( $decoded['access_token'] ) ) {
-					$body_token = sanitize_text_field( $decoded['access_token'] );
-				}
-			}
-		}
-		if ( is_string( $body_token ) && '' !== $body_token ) {
-			return $body_token;
-		}
-		return '';
-	}
 
 	/**
 	 * Handle the geocode request. Validate, rate-limit, cache, fetch, normalize.
@@ -361,12 +339,12 @@ final class Outpost_Geocode_Endpoint {
 		);
 
 		// User-Agent identifies the application per Nominatim usage policy.
-		// Sites can override via the `outpost_geocode_user_agent` filter
-		// (e.g., to add an admin contact email).
+		// It names the plugin and its directory page, not the site, so the
+		// site address isn't sent. Sites can identify themselves through the
+		// `outpost_geocode_user_agent` filter (e.g., to add a contact email).
 		$default_ua = sprintf(
-			'Outpost/%s WordPress plugin (%s)',
-			defined( 'OUTPOST_VERSION' ) ? OUTPOST_VERSION : 'unknown',
-			home_url( '/' )
+			'Outpost/%s WordPress plugin (+https://wordpress.org/plugins/outpost-mobile-publishing/)',
+			defined( 'OUTPOST_VERSION' ) ? OUTPOST_VERSION : 'unknown'
 		);
 		/**
 		 * Filter the User-Agent string sent to OpenStreetMap Nominatim.
@@ -418,14 +396,36 @@ final class Outpost_Geocode_Endpoint {
 			);
 		}
 
-		$body    = (string) wp_remote_retrieve_body( $response );
-		$decoded = json_decode( $body, true );
-		if ( ! is_array( $decoded ) ) {
-			return new WP_Error(
-				'geocode_failed',
-				__( 'Geocoding service returned invalid JSON.', 'outpost-mobile-publishing' ),
-				array( 'status' => 502 )
-			);
+		return self::parse_results( (string) wp_remote_retrieve_body( $response ) );
+	}
+
+	/**
+	 * Decode and validate a Nominatim search response.
+	 *
+	 * The body comes from a third-party server, so nothing in it is trusted:
+	 * invalid JSON or a payload that isn't a list of places fails closed
+	 * with a WP_Error. Each place needs numeric `lat`/`lon` inside the valid
+	 * coordinate ranges and a non-empty string `display_name`; any other
+	 * entry is skipped. String fields are sanitized before they reach the
+	 * REST response.
+	 *
+	 * @internal Public for unit tests.
+	 *
+	 * @param string $body Raw response body.
+	 * @return array<int, array{lat: float, lon: float, displayName: string, type: string}>|WP_Error
+	 */
+	public static function parse_results( string $body ) {
+		$invalid = new WP_Error(
+			'geocode_failed',
+			__( 'Geocoding service returned invalid JSON.', 'outpost-mobile-publishing' ),
+			array( 'status' => 502 )
+		);
+		if ( '' === $body || strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
+			return $invalid;
+		}
+		$decoded = json_decode( $body, true, 16 );
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) || ! array_is_list( $decoded ) ) {
+			return $invalid;
 		}
 
 		$results = array();
@@ -433,18 +433,24 @@ final class Outpost_Geocode_Endpoint {
 			if ( ! is_array( $entry ) ) {
 				continue;
 			}
-			$lat          = isset( $entry['lat'] ) ? (string) $entry['lat'] : '';
-			$lon          = isset( $entry['lon'] ) ? (string) $entry['lon'] : '';
-			$display_name = isset( $entry['display_name'] ) ? (string) $entry['display_name'] : '';
-			if ( '' === $lat || '' === $lon || '' === $display_name ) {
+			$lat          = $entry['lat'] ?? null;
+			$lon          = $entry['lon'] ?? null;
+			$display_name = $entry['display_name'] ?? null;
+			if ( ! is_numeric( $lat ) || ! is_numeric( $lon ) || ! is_string( $display_name ) ) {
 				continue;
 			}
-			// Lat/lon are returned as strings; cast to float to normalize.
+			$lat          = (float) $lat;
+			$lon          = (float) $lon;
+			$display_name = sanitize_text_field( $display_name );
+			if ( $lat < -90.0 || $lat > 90.0 || $lon < -180.0 || $lon > 180.0 || '' === $display_name ) {
+				continue;
+			}
+			$type      = isset( $entry['type'] ) && is_string( $entry['type'] ) ? sanitize_key( $entry['type'] ) : '';
 			$results[] = array(
-				'lat'         => (float) $lat,
-				'lon'         => (float) $lon,
+				'lat'         => $lat,
+				'lon'         => $lon,
 				'displayName' => $display_name,
-				'type'        => isset( $entry['type'] ) ? (string) $entry['type'] : '',
+				'type'        => $type,
 			);
 		}
 

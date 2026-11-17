@@ -125,7 +125,7 @@ final class ShareTargetDispatchTest extends TestCase {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->query(
-			"DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%' OR option_name LIKE '_transient_timeout_outpost_prefill_%'"
+			"DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%' OR option_name LIKE '_transient_timeout_outpost_prefill_%' OR option_name LIKE '_transient_outpost_preview_rl_%' OR option_name LIKE '_transient_timeout_outpost_preview_rl_%'"
 		);
 	}
 
@@ -198,9 +198,7 @@ final class ShareTargetDispatchTest extends TestCase {
 		);
 
 		// Side-effect absence assertion: no prefill transient written.
-		// The warm-up spends the user's preview rate-limit budget, so it
-		// stays cookie-gated. Brute-force LIKE check because anonymous
-		// user has user_id=0 which the transient key would include.
+		// Share intake keeps no server-side state for anyone (T10-S3-01).
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$transient_count = (int) $wpdb->get_var(
@@ -209,8 +207,7 @@ final class ShareTargetDispatchTest extends TestCase {
 		$this->assertSame(
 			0,
 			$transient_count,
-			'Anonymous dispatch must not enqueue a prefill: no outpost_prefill_* transient should exist. '
-			. 'A nonzero count means the is_authenticated() gate was dropped from the enqueue path.'
+			'Share intake must not write an outpost_prefill_* transient.'
 		);
 	}
 
@@ -275,9 +272,11 @@ final class ShareTargetDispatchTest extends TestCase {
 	}
 
 	/**
-	 * Test 4: Custom unambiguous source registration — when a fake
-	 * source claims an example.test URL, dispatch is auto-routed and
-	 * the prefill transient is written before the redirect.
+	 * Test 4 (T10-S3-01): custom unambiguous source registration — a
+	 * logged-in user's auto-routed share redirects to the composer and
+	 * writes no server-side state: no prefill transient, no preview
+	 * rate-limit entry, no outbound request. The former prefill transient
+	 * had no reader anywhere, so it was removed rather than gated.
 	 *
 	 * Per assertion-discipline Rule 3, the fake-source registration is
 	 * SCOPED to this single test method via try/finally so it does not
@@ -286,7 +285,7 @@ final class ShareTargetDispatchTest extends TestCase {
 	 *
 	 * @test
 	 */
-	public function unambiguous_dispatch_writes_prefill_transient(): void {
+	public function unambiguous_dispatch_writes_no_server_state(): void {
 		require_once dirname( __DIR__ ) . '/fixtures/source-test-fakes.php';
 
 		// Register fake source via outpost_sources_init action so the
@@ -311,22 +310,32 @@ final class ShareTargetDispatchTest extends TestCase {
 		do_action( 'outpost_sources_init' );
 		Outpost_Source_Registry::mark_bootstrapped_for_tests();
 
+		$outbound = 0;
+		$count    = static function ( $pre ) use ( &$outbound ) {
+			++$outbound;
+			return $pre;
+		};
+		add_filter( 'pre_http_request', $count, 1 );
+
 		try {
 			$redirect_url = $this->dispatch_share_target_post( array( 'url' => self::FAKE_URL ) );
+			remove_filter( 'pre_http_request', $count, 1 );
 
 			$this->assertNotNull( $redirect_url );
 			$this->assertStringContainsString( 'mode=bookmark', $redirect_url );
 			$this->assertStringContainsString( 'source=' . self::FAKE_SOURCE_ID, $redirect_url );
 
-			// The prefill transient must be present within the same request.
-			$token       = substr( md5( self::FAKE_URL ), 0, 16 );
-			$expected_key = 'outpost_prefill_' . $this->test_user_id . '_' . $token;
-			$transient   = get_transient( $expected_key );
-			$this->assertIsArray( $transient, 'Auto-route dispatch must write a prefill transient.' );
-			$this->assertSame( 'pending', $transient['status'] );
-			$this->assertSame( self::FAKE_URL, $transient['url'] );
-			$this->assertSame( self::FAKE_SOURCE_ID, $transient['source_id'] );
+			$this->assertStringNotContainsString( 'cached_for=', $redirect_url, 'No server-side cache exists for the composer to look up.' );
+
+			global $wpdb;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$state_rows = (int) $wpdb->get_var(
+				"SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_outpost_prefill_%' OR option_name LIKE '_transient_outpost_preview_rl_%'"
+			);
+			$this->assertSame( 0, $state_rows, 'A logged-in share must write no prefill transient and spend no preview rate-limit budget.' );
+			$this->assertSame( 0, $outbound, 'Share intake must not make an outbound request.' );
 		} finally {
+			remove_filter( 'pre_http_request', $count, 1 );
 			// Constraint Rule 3: clean up. Fake source MUST NOT persist.
 			remove_action( 'outpost_sources_init', $fake_init, 5 );
 			Outpost_Source_Registry::reset_for_tests();
@@ -371,5 +380,90 @@ final class ShareTargetDispatchTest extends TestCase {
 			'Layer B: wp_safe_remote_get must block loopback at the HTTP layer — '
 			. 'this is the SSRF defense the preview endpoint relies on, independent of dispatch.'
 		);
+	}
+
+	/**
+	 * The `url=` value a redirect carries, decoded once — what the PWA
+	 * reads from its query string.
+	 */
+	private function redirected_url_param( string $redirect_url ): ?string {
+		parse_str( (string) wp_parse_url( $redirect_url, PHP_URL_QUERY ), $query );
+		return isset( $query['url'] ) && is_string( $query['url'] ) ? $query['url'] : null;
+	}
+
+	/**
+	 * Android share sheets put the link in `text`, often mid-sentence.
+	 * Real core here, no mocks: sanitize_text_field() deletes %XX octets,
+	 * and after an unclosed `<` core entity-encodes the `&` in the link.
+	 *
+	 * @test
+	 * @dataProvider encoded_links_in_text
+	 */
+	public function link_in_text_field_reaches_the_composer_byte_for_byte( string $text, string $expected ): void {
+		$redirect_url = $this->dispatch_share_target_post( array( 'text' => $text ) );
+
+		$this->assertNotNull( $redirect_url, 'A link inside share text must produce a redirect.' );
+		$this->assertSame( 303, $this->captured_redirects[0]['status'] );
+		$this->assertSame( $expected, $this->redirected_url_param( $redirect_url ) );
+	}
+
+	/**
+	 * @return array<string, array{0:string, 1:string}>
+	 */
+	public function encoded_links_in_text(): array {
+		return array(
+			'sentence with an encoded link'  => array(
+				'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+				'https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+			),
+			'unclosed less-than before the link' => array(
+				'I <3 this https://example.com/a%20b?x=1&y=2',
+				'https://example.com/a%20b?x=1&y=2',
+			),
+		);
+	}
+
+	/**
+	 * wp_kses() and esc_url_raw() are a fatal TypeError on an array in real
+	 * core, so `?text[]=` must stop at the is_string() guard.
+	 *
+	 * @test
+	 */
+	public function array_valued_fields_carry_no_share_data(): void {
+		$redirect_url = $this->dispatch_share_target_post(
+			array(
+				'url'   => array( 'https://example.com/a%20b' ),
+				'text'  => array( 'https://example.com/a%20b' ),
+				'title' => array( 'https://example.com/a%20b' ),
+			)
+		);
+
+		$this->assertNull( $redirect_url, 'Array-valued fields are not share data.' );
+		$this->assertSame( array(), $this->captured_redirects );
+	}
+
+	/**
+	 * wp.org review 2026-09-14, tightened by T10-S3-13 (F-14): a url field
+	 * with markup appended is a malformed URL. It is denied, not repaired by
+	 * stripping tags, so nothing from it reaches the composer.
+	 */
+	public function test_hostile_url_field_is_denied_before_dispatch(): void {
+		$location = $this->dispatch_share_target_post(
+			array( 'url' => 'https://example.com/a%20b"><script>alert(1)</script>' )
+		);
+
+		$this->assertNull( $location, 'A malformed url field is not share data.' );
+		$this->assertSame( array(), $this->captured_redirects );
+	}
+
+	/**
+	 * The encoded link survives when the url field is a clean URL.
+	 */
+	public function test_a_clean_encoded_url_field_survives_dispatch(): void {
+		$location = $this->dispatch_share_target_post( array( 'url' => 'https://example.com/a%20b' ) );
+
+		$this->assertNotNull( $location );
+		parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $query );
+		$this->assertStringContainsString( 'https://example.com/a%20b', implode( ' ', array_filter( $query, 'is_string' ) ) );
 	}
 }

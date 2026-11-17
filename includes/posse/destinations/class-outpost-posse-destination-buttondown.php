@@ -60,9 +60,14 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 		if ( null === $post ) {
 			return self::failure_result( __( 'Post not found.', 'outpost-mobile-publishing' ), false );
 		}
+		// Defense in depth: the dispatcher already stops a post that isn't
+		// public, but dispatch() is public and callable directly.
+		if ( ! Outpost_POSSE_Dispatcher::post_is_public( $post ) ) {
+			return self::failure_result( __( 'Only a published post without a password can be syndicated.', 'outpost-mobile-publishing' ), false );
+		}
 
 		$payload = array(
-			'subject'       => (string) $post->post_title,
+			'subject'       => Outpost_Post_Kinds_Adapter::safe_title( $post ),
 			'body'          => Outpost_POSSE_Content_Transformer::to_markdown_only( $post_id ),
 			'status'        => $settings['send_as_draft'] ? 'draft' : 'about_to_send',
 			'canonical_url' => (string) get_permalink( $post_id ),
@@ -70,15 +75,17 @@ final class Outpost_POSSE_Destination_Buttondown extends Outpost_POSSE_Destinati
 
 		$response = wp_safe_remote_post(
 			self::API_ENDPOINT,
-			array(
-				'timeout'   => 10,
-				'headers'   => array(
-					'Authorization' => 'Token ' . $settings['api_key'],
-					'Content-Type'  => 'application/json',
-					'Accept'        => 'application/json',
-				),
-				'body'      => (string) wp_json_encode( $payload ),
-				'sslverify' => true,
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout'   => 10,
+					'headers'   => array(
+						'Authorization' => 'Token ' . $settings['api_key'],
+						'Content-Type'  => 'application/json',
+						'Accept'        => 'application/json',
+					),
+					'body'      => (string) wp_json_encode( $payload ),
+					'sslverify' => true,
+				)
 			)
 		);
 

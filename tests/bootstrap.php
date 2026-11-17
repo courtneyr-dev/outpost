@@ -263,10 +263,7 @@ if ( ! function_exists( 'add_filter' ) ) {
 	}
 }
 if ( ! function_exists( 'has_filter' ) ) {
-	// Unit tests register no core cookie validators, so nothing is
-	// hooked and Outpost_Request_Headers::resolve_token_user() has
-	// nothing to unhook — it falls through to the mocked
-	// determine_current_user filter the tests already expect.
+	// Unit tests register no core filters, so nothing is hooked.
 	function has_filter( ...$args ) {
 		return false;
 	}
@@ -344,6 +341,21 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 	}
 }
 
+// IndieAuth's accessors, as IndieAuth 4.7.2 defines them (functions.php):
+// each is exactly an apply_filters() call. Outpost_Bearer_Auth reads scopes
+// and the token response through them, so tests keep driving both with
+// WP_Mock::onFilter( 'indieauth_scopes' / 'indieauth_response' ).
+if ( ! function_exists( 'indieauth_get_scopes' ) ) {
+	function indieauth_get_scopes() {
+		return apply_filters( 'indieauth_scopes', null );
+	}
+}
+if ( ! function_exists( 'indieauth_get_response' ) ) {
+	function indieauth_get_response() {
+		return apply_filters( 'indieauth_response', null );
+	}
+}
+
 // Minimal WP_Error stub for unit tests. Real WP supplies the full class via
 // wp-includes/class-wp-error.php; here we just need code/message/data round-trip.
 if ( ! class_exists( 'WP_Error' ) ) {
@@ -378,6 +390,22 @@ if ( ! class_exists( 'WP_Error' ) ) {
 				$code = $this->get_error_code();
 			}
 			return $this->error_data[ $code ] ?? null;
+		}
+
+		public function add( $code, $message, $data = '' ): void {
+			$this->errors[ $code ][] = $message;
+			if ( '' !== $data ) {
+				$this->error_data[ $code ] = $data;
+			}
+		}
+
+		public function has_errors(): bool {
+			return array() !== $this->errors;
+		}
+
+		/** @return string[] */
+		public function get_error_codes(): array {
+			return array_keys( $this->errors );
 		}
 	}
 }
@@ -458,11 +486,21 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 			return is_array( $decoded ) ? $decoded : null;
 		}
 
+		/** @var array<string, mixed> */
+		private $body_params = array();
+
+		/**
+		 * @param array<string, mixed> $params Form-encoded body parameters.
+		 */
+		public function set_body_params( array $params ): void {
+			$this->body_params = $params;
+		}
+
 		/**
 		 * @return array<string, mixed>
 		 */
 		public function get_body_params(): array {
-			return array();
+			return $this->body_params;
 		}
 	}
 }
@@ -480,6 +518,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public string $post_type      = '';
 		public int $post_parent       = 0;
 		public string $post_mime_type = '';
+		public string $post_password  = '';
 
 		public function __construct( array $fields = array() ) {
 			foreach ( $fields as $key => $value ) {
@@ -543,6 +582,14 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 		public function get_headers(): array {
 			return $this->headers;
 		}
+	}
+}
+
+// Minimal WP_REST_Server stub: route registration reads its method constants.
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE  = 'GET';
+		const CREATABLE = 'POST';
 	}
 }
 

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-	list as list_queue,
+	list_for_owner,
 	flush as flush_queue,
-	remove as remove_from_queue,
+	dismiss_owned,
+	subscribe_queue_changes,
 	type QueueEntry,
 	type OfflineQueueEnvironment,
 } from '../lib/offline-queue';
@@ -13,54 +14,136 @@ import { Drawer } from './drawer';
  * Queue badge — small affordance in the composer header showing
  * the number of queued offline posts.
  *
- * Phase DS-3b. Replaces the full-width QueueBanner. The badge is
- * always present in the DOM but visually hidden when the queue is
- * empty (preserves layout, avoids reflow on auto-flush). Tapping it
- * opens a Drawer with the existing per-entry list (retry-now,
- * per-entry dismiss).
+ * Phase DS-3b. Replaces the full-width QueueBanner. The badge renders
+ * nothing when the queue is empty. Tapping it opens a Drawer with the
+ * per-entry list (retry-now, per-entry dismiss).
  *
- * Auto-flush triggers identical to the prior banner: the browser's
- * `online` event AND first mount.
+ * Only the signed-in account's posts are counted, listed, retried, or
+ * dismissed (T10-S3-07). Posts another account or an older version left on
+ * this device appear only as a count, never with their content.
+ *
+ * The count re-reads IndexedDB whenever any tab writes the queue
+ * (offline-queue.ts notifies this tab and the others), so a post queued
+ * a moment ago shows up without a reload.
+ *
+ * Replays run on first mount when the browser reports online, on the
+ * browser's `online` event, shortly after a post is queued while the
+ * browser still reports online (a network blip), and on a bounded backoff
+ * while retryable failures remain. The claim in flush() keeps two open
+ * composers from publishing the same entry.
  *
  * Per Design System Section 5.26: aria-label announces the count;
  * `aria-live="polite"` on the badge text so screen readers narrate
  * count changes.
  */
 
+/** Waits between automatic replays while retryable failures remain; `online` starts over. */
+export const QUEUE_RETRY_DELAYS_MS = [5_000, 15_000, 45_000, 120_000];
+
+/** Wait before replaying a post queued while the browser still reports online. */
+export const NEW_ENTRY_REPLAY_DELAY_MS = 3_000;
+
 export interface QueueBadgeProps {
+	/** Canonical identity of the signed-in account (canonical_account(token.me)). */
+	owner: string | null;
 	micropubEnv?: MicropubEnvironment;
 	queueEnv?: OfflineQueueEnvironment;
 }
 
-export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
+function browser_online(): boolean {
+	return typeof navigator === 'undefined' || navigator.onLine !== false;
+}
+
+export function QueueBadge({ owner, micropubEnv, queueEnv }: QueueBadgeProps) {
 	const [entries, setEntries] = useState<QueueEntry[]>([]);
+	// Other accounts' and locked entries on this device: a count only.
+	const [others, setOthers] = useState(0);
 	const [busy, setBusy] = useState(false);
 	const [open, setOpen] = useState(false);
+	// Refs, not state: the window listeners are attached once and must see
+	// the current values.
+	const busy_ref = useRef(false);
+	// Set when a replay is requested mid-flush (an `online` event, Retry all
+	// now); the running flush starts one more pass instead of dropping it.
+	const rerun_ref = useRef(false);
+	const retry_step = useRef(0);
+	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const refresh = async (): Promise<void> => {
+	const refresh = async (): Promise<QueueEntry[]> => {
 		try {
-			const next = await list_queue(queueEnv);
-			setEntries(next);
+			const next = await list_for_owner(owner, queueEnv);
+			setEntries(next.own);
+			setOthers(next.others);
+			return next.own;
 		} catch (_err) {
-			// Queue read failures are non-fatal — badge stays hidden.
+			// Queue read failures are non-fatal — badge stays as it was.
+			return [];
 		}
 	};
 
-	const try_flush = async (): Promise<void> => {
-		if (busy) return;
-		setBusy(true);
-		try {
-			await flush_queue(micropubEnv, queueEnv);
-		} catch (_err) {
-			// flush() handles per-entry errors internally.
+	const cancel_timer = (): void => {
+		if (timer.current !== null) {
+			clearTimeout(timer.current);
+			timer.current = null;
 		}
-		await refresh();
+	};
+
+	const schedule = (delay: number): void => {
+		if (timer.current !== null) return;
+		timer.current = setTimeout(() => {
+			timer.current = null;
+			void try_flush();
+		}, delay);
+	};
+
+	const try_flush = async (): Promise<void> => {
+		if (busy_ref.current) {
+			rerun_ref.current = true;
+			return;
+		}
+		busy_ref.current = true;
+		setBusy(true);
+		cancel_timer();
+		let left: QueueEntry[];
+		try {
+			left = await flush_queue(micropubEnv, queueEnv);
+			setEntries(left);
+			await refresh();
+		} catch (_err) {
+			// flush() records per-entry failures itself; this is IndexedDB.
+			left = await refresh();
+		}
+		busy_ref.current = false;
 		setBusy(false);
+		if (rerun_ref.current) {
+			rerun_ref.current = false;
+			void try_flush();
+			return;
+		}
+		if (left.length === 0) {
+			retry_step.current = 0;
+			return;
+		}
+		const delay = QUEUE_RETRY_DELAYS_MS[retry_step.current];
+		if (delay !== undefined && browser_online() && left.some((e) => e.retryable !== false)) {
+			retry_step.current += 1;
+			schedule(delay);
+		}
+	};
+
+	const on_queue_change = async (): Promise<void> => {
+		const next = await refresh();
+		const fresh = next.some(
+			(e) => e.attempts === 0 && (e.claimedUntil ?? 0) <= Date.now(),
+		);
+		if (fresh && !busy_ref.current && browser_online()) {
+			schedule(NEW_ENTRY_REPLAY_DELAY_MS);
+		}
 	};
 
 	const dismiss = async (id: number): Promise<void> => {
 		try {
-			await remove_from_queue(id, queueEnv);
+			await dismiss_owned(id, owner, queueEnv);
 		} catch (_err) {
 			// no-op — refresh shows current persisted state.
 		}
@@ -68,20 +151,42 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 	};
 
 	useEffect(() => {
-		void refresh();
+		void (async (): Promise<void> => {
+			const initial = await refresh();
+			if (browser_online() && initial.some((e) => e.retryable !== false)) {
+				await try_flush();
+			}
+		})();
 		const on_online = (): void => {
+			retry_step.current = 0;
 			void try_flush();
 		};
+		const on_offline = (): void => cancel_timer();
 		window.addEventListener('online', on_online);
+		window.addEventListener('offline', on_offline);
+		const unsubscribe = subscribe_queue_changes(() => {
+			void on_queue_change();
+		});
 		return (): void => {
 			window.removeEventListener('online', on_online);
+			window.removeEventListener('offline', on_offline);
+			unsubscribe();
+			cancel_timer();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-time setup
 	}, []);
 
 	const count = entries.length;
+	const others_note =
+		others > 0 ? (
+			<p class="outpost-status outpost-queue-others">
+				{others === 1
+					? '1 queued post on this device belongs to another account or an older version of Outpost. It stays here and isn’t shown.'
+					: `${String(others)} queued posts on this device belong to another account or an older version of Outpost. They stay here and aren’t shown.`}
+			</p>
+		) : null;
 	if (count === 0) {
-		return null;
+		return others_note;
 	}
 
 	const aria_label =
@@ -91,6 +196,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 
 	return (
 		<>
+			{others_note}
 			<button
 				type="button"
 				class="outpost-queue-badge"
@@ -109,6 +215,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 				open={open}
 				onClose={(): void => setOpen(false)}
 				title={count === 1 ? '1 post saved for later' : `${String(count)} posts saved for later`}
+				idPrefix="outpost-queue"
 			>
 				<div class="outpost-queue-inspector">
 					<div class="outpost-queue-inspector__actions">
@@ -116,6 +223,7 @@ export function QueueBadge({ micropubEnv, queueEnv }: QueueBadgeProps) {
 							class="outpost-button"
 							type="button"
 							onClick={(): void => {
+								retry_step.current = 0;
 								void try_flush();
 							}}
 							disabled={busy}
@@ -163,8 +271,10 @@ function summarize_entry(entry: QueueEntry): string {
 	const props = entry.properties as Record<string, unknown>;
 	const name = typeof props.name === 'string' ? props.name : null;
 	const content = typeof props.content === 'string' ? props.content : null;
+	const photos = entry.media?.length ?? 0;
 	const text = name ?? content ?? '';
-	if (text.length === 0) return '(no preview)';
-	if (text.length <= 200) return text;
-	return text.slice(0, 197) + '…';
+	const suffix = photos === 0 ? '' : photos === 1 ? ' (1 photo)' : ` (${String(photos)} photos)`;
+	if (text.length === 0) return photos === 0 ? '(no preview)' : suffix.trim();
+	if (text.length <= 200) return text + suffix;
+	return text.slice(0, 197) + '…' + suffix;
 }

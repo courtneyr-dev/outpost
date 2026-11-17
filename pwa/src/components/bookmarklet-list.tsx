@@ -107,7 +107,7 @@ function BookmarkletCard({ config, bookmarklet }: BookmarkletCardProps): preact.
 					class="outpost-button outpost-bookmarklet__link"
 					draggable
 					onClick={(event) => event.preventDefault()}
-					aria-label={`${config.label} bookmarklet — drag to bookmarks bar on desktop, or tap Copy source on mobile`}
+					aria-describedby={`outpost-bookmarklet-${config.variant}-instructions`}
 				>
 					Outpost: {config.label}
 				</a>
@@ -120,6 +120,9 @@ function BookmarkletCard({ config, bookmarklet }: BookmarkletCardProps): preact.
 					{copied ? 'Copied!' : 'Copy source'}
 				</button>
 			</div>
+			<p id={`outpost-bookmarklet-${config.variant}-instructions`} class="outpost-visually-hidden">
+				Drag to your bookmarks bar on desktop, or use Copy source on mobile.
+			</p>
 		</article>
 	);
 }
@@ -153,7 +156,7 @@ export function BookmarkletList(): preact.JSX.Element {
 				on iOS via the multi-step workaround.
 			</aside>
 
-			<div class="outpost-bookmarklets" role="list">
+			<div class="outpost-bookmarklets">
 				{VARIANTS.map((config) => (
 					<BookmarkletCard
 						key={config.variant}

@@ -42,7 +42,7 @@ final class PWAShellTest extends TestCase {
 		// poison every subsequent apply_filters() call for that filter name —
 		// the static gets read on apply() and the input value is replaced with
 		// a random integer, which then fails any downstream array lookup.
-		$ref = new \ReflectionClass( \WP_Mock\Filter::class );
+		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
 		$prop = $ref->getProperty( 'filtersWithAnyArgs' );
 		$prop->setValue( null, array() );
 	}
@@ -105,10 +105,42 @@ final class PWAShellTest extends TestCase {
 	/** @test */
 	public function render_emits_composer_shell_when_ready(): void {
 		$this->stub_ready_environment();
+		// The shell prints the stored appearance mode as a body class; the
+		// unit bootstrap defines neither user function, so stub both.
+		WP_Mock::userFunction( 'get_current_user_id' )
+			->andReturnUsing( static fn(): int => 7 );
+		WP_Mock::userFunction( 'get_user_meta' )
+			->andReturnUsing(
+				static fn( int $user_id, string $key ): string => array(
+					'outpost_appearance_mode'   => 'night',
+					'outpost_appearance_source' => 'outpost',
+				)[ $key ] ?? ''
+			);
 
 		ob_start();
 		Outpost_PWA_Shell::render();
 		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-source-outpost',
+			$out,
+			'The stored style source must reach the shell body class.'
+		);
+		$this->assertStringNotContainsString(
+			'outpost-appearance-user',
+			$out,
+			'Outpost Default without overrides prints no per-user token CSS.'
+		);
+		$this->assertStringContainsString(
+			'assets/js/appearance-boot.js',
+			$out,
+			'The appearance boot script must load before the composer root.'
+		);
+		$this->assertLessThan(
+			strpos( $out, 'id="outpost-root"' ),
+			strpos( $out, 'appearance-boot.js' ),
+			'The boot script must run before the composer root is parsed.'
+		);
 
 		$this->assertStringContainsString(
 			'outpost-composer-shell',
@@ -119,6 +151,66 @@ final class PWAShellTest extends TestCase {
 			'outpost-install-prompt',
 			$out,
 			'Ready state must NOT render the install-prompt fallback.'
+		);
+		$this->assertStringContainsString(
+			'outpost-mode-night',
+			$out,
+			'The stored per-user mode must reach the shell body class.'
+		);
+	}
+
+	/** @test */
+	public function render_uses_system_mode_class_when_current_user_id_is_null(): void {
+		$this->stub_ready_environment();
+		WP_Mock::userFunction( 'get_current_user_id' )
+			->andReturnUsing( static fn() => null );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-system',
+			$out,
+			'Null current-user IDs must fall back to system mode without errors.'
+		);
+	}
+
+	/** @test */
+	public function render_preserves_valid_filtered_mode_class(): void {
+		$this->stub_ready_environment();
+
+		WP_Mock::onFilter( 'outpost_shell_mode_class' )
+			->withAnyArgs()
+			->reply( 'outpost-mode-night' );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-night',
+			$out,
+			'Valid mode-class filter values must be preserved.'
+		);
+	}
+
+	/** @test */
+	public function render_falls_back_to_system_for_invalid_filtered_mode_class(): void {
+		$this->stub_ready_environment();
+
+		WP_Mock::onFilter( 'outpost_shell_mode_class' )
+			->withAnyArgs()
+			->reply( 'outpost-mode-invalid' );
+
+		ob_start();
+		Outpost_PWA_Shell::render();
+		$out = ob_get_clean();
+
+		$this->assertStringContainsString(
+			'outpost-mode-system',
+			$out,
+			'Invalid mode-class filter values must collapse to system mode.'
 		);
 	}
 
@@ -180,6 +272,21 @@ final class PWAShellTest extends TestCase {
 	}
 
 	/** @test */
+	public function render_manifest_keeps_json_default_escaping(): void {
+		WP_Mock::userFunction( 'home_url' )
+			->andReturnUsing( static fn( string $path = '' ): string => 'https://example.test' . $path );
+
+		ob_start();
+		Outpost_PWA_Shell::render_manifest();
+		$out = (string) ob_get_clean();
+
+		// No JSON_UNESCAPED_* flag: slashes leave the encoder escaped, so a
+		// filtered value can never close a surrounding script context.
+		$this->assertStringContainsString( '"scope":"\/post\/"', $out );
+		$this->assertStringNotContainsString( '"/post/"', $out );
+	}
+
+	/** @test */
 	public function render_manifest_ships_raster_icons_for_webapk_minting(): void {
 		WP_Mock::userFunction( 'home_url' )
 			->andReturnUsing( static fn( string $path = '' ): string => 'https://example.test' . $path );
@@ -233,7 +340,31 @@ final class PWAShellTest extends TestCase {
 		$this->assertLessThan( $get_gate, $post_branch, 'The share POST branch must run before the non-GET passthrough.' );
 		$this->assertStringContainsString( "'outpost-share-inbox'", $out );
 		$this->assertStringContainsString( "form.getAll('photos')", $out );
-		$this->assertStringContainsString( "?mode=photo&shared=photos', 303", $out );
+		$this->assertStringContainsString( "'?mode=photo&shared=photos' + refused, 303", $out );
+		// T10-S3-05 v1.1: two inbox slots, never overwritten; nothing else is parked.
+		$this->assertStringContainsString( "const SHARE_INBOX_CANDIDATE_KEY = 'candidate';", $out );
+		$this->assertStringNotContainsString( 'image/heic', $out );
+		$this->assertStringNotContainsString( '.put(payload', $out );
+	}
+
+	/** @test */
+	public function render_service_worker_keeps_shell_scripts_from_outside_the_plugin_for_offline_use(): void {
+		ob_start();
+		Outpost_PWA_Shell::render_service_worker();
+		$out = ob_get_clean();
+
+		// A theme's appearance bridge rides outpost_shell_script_handles from the
+		// theme directory, outside the plugin's cache-first asset paths. Without a
+		// cached copy, a shell opened offline loses the site's light/dark preference.
+		$this->assertStringContainsString( "request.destination === 'script' || request.destination === 'style'", $out );
+		$this->assertStringContainsString( "url.pathname.startsWith('/wp-json/')", $out, 'REST responses must never match the shell-asset branch.' );
+		$this->assertStringContainsString( 'event.respondWith(network_first_asset(request))', $out );
+
+		$static_branch = strpos( $out, 'if (is_static_asset(url))' );
+		$shell_branch  = strpos( $out, 'if (is_shell_subresource(request, url))' );
+		$this->assertNotFalse( $static_branch );
+		$this->assertNotFalse( $shell_branch );
+		$this->assertLessThan( $shell_branch, $static_branch, 'Plugin assets must keep the cache-first branch.' );
 	}
 
 	/** @test */

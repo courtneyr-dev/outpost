@@ -78,6 +78,43 @@ describe('process_photo validation', () => {
 		});
 	});
 
+	it('accepts a JPEG exactly at the 50 MB default cap', async () => {
+		const original_image = globalThis.Image;
+		const original_create_object_url = URL.createObjectURL;
+		const original_revoke_object_url = URL.revokeObjectURL;
+		class FailingImage {
+			onload: ((event: Event) => void) | null = null;
+			onerror: ((event: Event) => void) | null = null;
+
+			set src(_value: string) {
+				queueMicrotask(() => this.onerror?.(new Event('error')));
+			}
+		}
+		Object.defineProperty(globalThis, 'Image', {
+			configurable: true,
+			value: FailingImage,
+		});
+		URL.createObjectURL = () => 'blob:test-photo';
+		URL.revokeObjectURL = () => undefined;
+
+		try {
+			const file = make_file('image/jpeg', 50 * 1024 * 1024);
+			await expect(process_photo(file)).rejects.toMatchObject({ code: 'load_failed' });
+		} finally {
+			Object.defineProperty(globalThis, 'Image', {
+				configurable: true,
+				value: original_image,
+			});
+			URL.createObjectURL = original_create_object_url;
+			URL.revokeObjectURL = original_revoke_object_url;
+		}
+	});
+
+	it('rejects a JPEG over the 50 MB default cap', async () => {
+		const file = make_file('image/jpeg', 50 * 1024 * 1024 + 1);
+		await expect(process_photo(file)).rejects.toMatchObject({ code: 'too_large' });
+	});
+
 	it('error is an instance of PhotoError', async () => {
 		const file = make_file('application/pdf', 100);
 		await expect(process_photo(file)).rejects.toBeInstanceOf(PhotoError);

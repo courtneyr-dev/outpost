@@ -5,7 +5,7 @@ description: "Gallery of Outpost's documented screens, plus capture specificatio
 
 The screens Outpost adds to WordPress, captured from a fresh install. Every screenshot has a text equivalent in the page that documents the task, so you never need the image to follow the instructions.
 
-Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. The pending-syndication capture also came from a local wp-env site, against a post seeded with two pending share entries. One capture is still outstanding; its specification and the reason are at the end of this page.
+Screenshots come from two sources. The repeatable capture script (`npm run screenshots:docs`, which runs against a disposable WordPress Playground — no Docker needed) generates the admin screens and the composer views, completing a real IndieAuth sign-in against the disposable site for the signed-in captures. The media lookup, install prompt, and editor-sidebar captures were taken against a local wp-env site running WordPress 7.1 with the Post Kinds companion, since they need a companion plugin and live lookup services. The pending-syndication capture also came from a local wp-env site, against a post seeded with two pending share entries. Two captures are still outstanding; they are listed at the end of this page.
 
 ## Admin screens
 
@@ -19,11 +19,11 @@ The main **Outpost** admin page: per-variant bookmarklets and the phone install 
 
 ![Outpost Appearance page with the day/night mode choice and token override fields](../../assets/screenshots/admin-appearance-settings.png)
 
-**Outpost → Appearance**: choose the composer's day/night mode and override its design tokens. See [Settings](/outpost/settings/).
+**Outpost → Appearance**: choose Light, Dark, or System and override individual design tokens. This capture predates 1.0.24, so it doesn't show the **Style source** choice (Outpost Default or Use Site Theme) that now sits above them. See [Settings → Appearance](/outpost/settings/#appearance).
 
 ![OAuth Connections page listing providers with Connect actions](../../assets/screenshots/admin-oauth-connections.png)
 
-**Outpost → OAuth Connections**: connect Oura, WHOOP, Polar Flow, Ravelry, or Ride With GPS. Select **Connect** next to a provider to start its authorization flow. See [Supported services](/outpost/supported-services/).
+**Outpost → OAuth Connections**: connect Notion, Oura, WHOOP, Polar Flow, Ravelry, or Ride With GPS. Select **Connect** next to a provider to start its authorization flow. See [Supported services](/outpost/supported-services/).
 
 ![Outpost iOS Shortcut settings page with the per-user token controls](../../assets/screenshots/admin-ios-shortcut.png)
 
@@ -55,19 +55,23 @@ The Outpost sidebar in the block editor: **Add from connected platforms** opens 
 
 The composer at `/post` before sign-in: enter your site address to start the IndieAuth flow. See [Getting started](/outpost/getting-started/).
 
-![Outpost composer on a phone showing Note mode with a text field and syndication chips](../../assets/screenshots/frontend-composer-note-mode.png)
+![Outpost Home screen on a phone: the connection status, the question What would you like to post?, six cards for Post, Reply, Photo, Doing, Life, and Recipe, and an About Outpost row](../../assets/screenshots/frontend-composer-home.png)
+
+Home, where Outpost opens after sign-in: one card per tab, the connection status, and About. Each person can choose a different start screen in Preferences. See [Common tasks](/outpost/common-tasks/#choose-which-screen-outpost-opens-to).
+
+![Outpost on a phone with the Note style selected and More options open on the Send to list of syndication destinations](../../assets/screenshots/frontend-composer-note-mode.png)
 
 Note mode, signed in: write a note and pick syndication targets before posting. See [Common tasks](/outpost/common-tasks/).
 
-![Reply mode showing the pasted target URL context and syndication chips](../../assets/screenshots/frontend-composer-reply-mode.png)
+![Reply mode on a phone with its eleven types as wrapping tiles, a target URL in In reply to, and a reply being written](../../assets/screenshots/frontend-composer-reply-mode.png)
 
-Reply mode: paste a URL and Outpost shows what you're replying to. See [Common tasks](/outpost/common-tasks/).
+Reply mode: pick a type, paste the URL you're replying to, and write your reply. See [Common tasks](/outpost/common-tasks/).
 
 ![Photo mode with an uploaded image and the required alt text field](../../assets/screenshots/frontend-composer-photo-mode.png)
 
 Photo mode: every photo post asks for alt text before publishing. See [Common tasks](/outpost/common-tasks/).
 
-![Composer showing the offline connection banner and a queued draft badge](../../assets/screenshots/frontend-offline-queue.png)
+![Composer showing the offline connection banner and a 1 queued badge above the Post tab](../../assets/screenshots/frontend-offline-queue.png)
 
 The composer offline: posts made offline wait in the queue until you reconnect. See [Common tasks](/outpost/common-tasks/).
 
@@ -81,7 +85,10 @@ Install the composer like an app. After your first post, Outpost offers the Add 
 
 ## Screenshots still needed
 
-One capture remains, and it is blocked on code rather than on tooling: the composer-side paste-URL form. `SyndicationCaptureForm`, inside `SyndicationDetailView`, is built and tested, but nothing mounts it — it doesn't render anywhere in the running app. The pending-syndication reminder above links to the composer, but the form it links to isn't there yet. The row below is its specification for when it is (a phone-sized viewport, as with the other composer captures).
+Two captures are outstanding.
+
+- **Appearance with Style source.** Recapture `admin-appearance-settings.png` on 1.0.24 so it shows the Style source choice.
+- **The composer's paste-URL form.** This one is blocked on code, not tooling. `SyndicationCaptureForm` is built and tested and is used inside `SyndicationDetailView` and `PendingSyndicationsPanel`, but the composer mounts neither, so the form doesn't render in the running app. The pending-syndication reminder above links to the composer, but the form isn't there yet. The row below is its specification for when it is (a phone-sized viewport, as with the other composer captures).
 
 | Filename | Screen and state | What to highlight | Alt text | Caption |
 | --- | --- | --- | --- | --- |

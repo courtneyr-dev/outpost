@@ -23,6 +23,7 @@ import type { ComponentChildren } from 'preact';
  * Drawer renders unconditionally (always in the DOM) — the open prop
  * toggles a data attribute that drives the slide CSS. Keeps animation
  * smooth on close, and lets focus-restore reliably target the trigger.
+ * Native `hidden` is the fallback when a page optimizer blocks the CSS.
  */
 
 export interface DrawerProps {
@@ -30,9 +31,20 @@ export interface DrawerProps {
 	onClose: () => void;
 	title: string;
 	children: ComponentChildren;
+	/**
+	 * Distinguishes this drawer's derived title id from another drawer's when
+	 * both share the same `title` text. All composer modes render eagerly
+	 * (toggled via `hidden`, not unmounted — Session C0), and every mode's
+	 * "More options" drawer used the same literal title, so without a
+	 * per-instance prefix every mode produced the exact same
+	 * `id="outpost-drawer-title-more-options"`, a duplicate-id bug that left
+	 * `aria-labelledby` pointing at whichever instance happened to match
+	 * first in the DOM. Pass a mode-specific prefix (e.g. `outpost-note`).
+	 */
+	idPrefix?: string;
 }
 
-export function Drawer({ open, onClose, title, children }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps) {
 	const drawer_ref = useRef<HTMLDivElement>(null);
 
 	// Esc closes; Tab/Shift-Tab cycles focus inside the drawer (focus trap).
@@ -101,6 +113,8 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 	// when the user drags inside the drawer.
 	useEffect(() => {
 		if (!open) return;
+		const drawer = drawer_ref.current;
+		if (!drawer || getComputedStyle(drawer).position !== 'fixed') return;
 		const original_overflow = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return (): void => {
@@ -110,9 +124,10 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 
 	// Derive a per-instance title id so multiple drawers (e.g., More
 	// options + Queue) can coexist without `id` collisions breaking
-	// `aria-labelledby` assignments.
+	// `aria-labelledby` assignments. `idPrefix` further disambiguates
+	// drawers that share the same `title` text (see DrawerProps.idPrefix).
 	const title_id =
-		'outpost-drawer-title-' +
+		(idPrefix ? `${idPrefix}-drawer-title-` : 'outpost-drawer-title-') +
 		title
 			.toLowerCase()
 			.replace(/\s+/g, '-')
@@ -120,9 +135,11 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 
 	return (
 		<>
+			{/* On 2026-10-28 a page optimizer blocked the stylesheet; hidden keeps a closed drawer out of view. */}
 			<div
 				class="outpost-drawer-scrim"
 				data-open={open ? 'true' : 'false'}
+				hidden={!open}
 				onClick={onClose}
 				aria-hidden="true"
 			/>
@@ -130,10 +147,12 @@ export function Drawer({ open, onClose, title, children }: DrawerProps) {
 				ref={drawer_ref}
 				class="outpost-drawer"
 				data-open={open ? 'true' : 'false'}
+				hidden={!open}
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby={title_id}
 				tabIndex={-1}
+				inert={!open}
 			>
 				<header class="outpost-drawer__header">
 					<h2 id={title_id} class="outpost-drawer__title">

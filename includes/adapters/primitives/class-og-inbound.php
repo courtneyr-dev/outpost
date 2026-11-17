@@ -67,6 +67,12 @@ final class Outpost_Og_Inbound {
 
 	private const MAX_REDIRECTS = 5;
 
+	/** Largest body parsed; matches the preview fetcher (F-59). */
+	private const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+	/** Content-Type prefixes the parser accepts (F-59). */
+	private const ALLOWED_CONTENT_TYPES = array( 'text/html', 'application/xhtml+xml' );
+
 	/**
 	 * Schema extractors registered via Outpost_Og_Inbound::register_extractor.
 	 *
@@ -132,12 +138,16 @@ final class Outpost_Og_Inbound {
 		$response = wp_safe_remote_get(
 			$url,
 			array(
-				'timeout'     => self::filter_timeout(),
-				'redirection' => self::MAX_REDIRECTS,
-				'user-agent'  => self::filter_user_agent(),
-				'headers'     => array(
+				'timeout'             => self::filter_timeout(),
+				'redirection'         => self::MAX_REDIRECTS,
+				'user-agent'          => self::filter_user_agent(),
+				'headers'             => array(
 					'Accept' => 'text/html,application/xhtml+xml',
 				),
+				// One byte past the cap: the transport stops reading there,
+				// and a body that reaches it is refused below instead of
+				// being parsed as a truncated document (F-59).
+				'limit_response_size' => self::MAX_RESPONSE_BYTES + 1,
 			)
 		);
 
@@ -163,7 +173,30 @@ final class Outpost_Og_Inbound {
 			);
 		}
 
+		$content_type = strtolower( trim( (string) wp_remote_retrieve_header( $response, 'content-type' ) ) );
+		$is_html      = false;
+		foreach ( self::ALLOWED_CONTENT_TYPES as $allowed ) {
+			if ( str_starts_with( $content_type, $allowed ) ) {
+				$is_html = true;
+				break;
+			}
+		}
+		if ( ! $is_html ) {
+			return new WP_Error(
+				'outpost_og_bad_content_type',
+				__( 'OG fetch returned something other than an HTML page.', 'outpost-mobile-publishing' ),
+				array( 'url' => $url )
+			);
+		}
+
 		$body = (string) wp_remote_retrieve_body( $response );
+		if ( strlen( $body ) > self::MAX_RESPONSE_BYTES ) {
+			return new WP_Error(
+				'outpost_og_too_large',
+				__( 'OG fetch returned a page larger than 5 MB.', 'outpost-mobile-publishing' ),
+				array( 'url' => $url )
+			);
+		}
 		if ( '' === $body ) {
 			return new WP_Error(
 				'outpost_og_parse_failed',
@@ -277,8 +310,10 @@ final class Outpost_Og_Inbound {
 		$blocks = array();
 		if ( preg_match_all( '~<script\b[^>]*\btype\s*=\s*"application/ld\+json"[^>]*>(.*?)</script>~is', $body, $matches ) ) {
 			foreach ( $matches[1] as $raw ) {
-				$decoded = json_decode( trim( $raw ), true );
-				if ( is_array( $decoded ) ) {
+				// Third-party markup: skip any block that isn't valid JSON
+				// decoding to an object or list.
+				$decoded = json_decode( trim( $raw ), true, 64 );
+				if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
 					// Some sites wrap in @graph; flatten one level.
 					if ( isset( $decoded['@graph'] ) && is_array( $decoded['@graph'] ) ) {
 						foreach ( $decoded['@graph'] as $item ) {

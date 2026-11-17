@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace Outpost\Tests\Unit;
 
+use Outpost\Tests\Helpers\CoreSanitizerMocks;
 use Outpost_Source_Detector;
 use Outpost_Source_Registry;
 use Outpost_Source_Unknown;
@@ -151,6 +152,164 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertNull( $out );
 	}
 
+	// --- shared-field sanitizers -----------------------------------------
+
+	/**
+	 * @return array<string, array{0:string, 1:string}> raw field value, expected clean value
+	 */
+	public function shared_text_cases(): array {
+		return array(
+			'encoded link inside a sentence' => array(
+				'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+				'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world',
+			),
+			'query string ampersand'         => array(
+				'Two params https://example.com/s?a=1&b=2 done',
+				'Two params https://example.com/s?a=1&b=2 done',
+			),
+			// wp_strip_all_tags() returns "I" for this one: everything after an
+			// unclosed "<" goes, link included.
+			'unclosed less-than before the link' => array(
+				'I <3 this https://example.com/a%20b?x=1&y=2',
+				'I &lt;3 this https://example.com/a%20b?x=1&y=2',
+			),
+			'apostrophe in a link after an unclosed less-than' => array(
+				'I <3 it https://example.com/it\'s?a=1&b=2',
+				'I &lt;3 it https://example.com/it\'s?a=1&b=2',
+			),
+			'tags are removed'               => array(
+				'<b>bold</b> https://example.com/a%20b <i>tail</i>',
+				'bold https://example.com/a%20b tail',
+			),
+			'control characters and newlines' => array(
+				"nul\x00esc\x1bdel\x7F line\r\nbreak\ttab https://example.com/a%20b",
+				'nulescdel line break tab https://example.com/a%20b',
+			),
+			'invalid UTF-8 is rejected whole' => array(
+				"bad \xC3\x28 seq https://example.com/a%20b",
+				'',
+			),
+			'percent-encoded tag stays inert text' => array(
+				'%3Cscript%3Ealert(1)%3C/script%3E',
+				'%3Cscript%3Ealert(1)%3C/script%3E',
+			),
+			'surrounding whitespace'         => array(
+				"  padded \n",
+				'padded',
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider shared_text_cases
+	 */
+	public function test_sanitize_shared_text( string $raw, string $expected ): void {
+		CoreSanitizerMocks::register();
+
+		$this->assertSame( $expected, Outpost_Source_Detector::sanitize_shared_text( $raw ) );
+	}
+
+	/**
+	 * @dataProvider shared_text_cases
+	 */
+	public function test_sanitize_shared_text_never_returns_a_raw_angle_bracket( string $raw ): void {
+		CoreSanitizerMocks::register();
+
+		$this->assertDoesNotMatchRegularExpression( '/[<>]/', Outpost_Source_Detector::sanitize_shared_text( $raw ) );
+	}
+
+	public function test_sanitize_shared_text_restoring_entities_cannot_rebuild_a_tag(): void {
+		CoreSanitizerMocks::register();
+
+		// Only &amp; &#039; &quot; are restored. A double-encoded tag comes out
+		// single-encoded, never as markup.
+		$this->assertSame(
+			'&lt;script&gt;alert(1)&lt;/script&gt;',
+			Outpost_Source_Detector::sanitize_shared_text( '&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;' )
+		);
+	}
+
+	/**
+	 * @return array<string, array{0:mixed}>
+	 */
+	public function non_string_values(): array {
+		return array(
+			'array'  => array( array( 'https://example.com/a%20b' ) ),
+			'nested' => array( array( array( 'x' ) ) ),
+			'int'    => array( 12345 ),
+			'null'   => array( null ),
+			'bool'   => array( true ),
+			'object' => array( new \stdClass() ),
+		);
+	}
+
+	/**
+	 * wp_kses() and esc_url_raw() are a fatal TypeError on an array, so a
+	 * non-string has to stop before either one.
+	 *
+	 * @dataProvider non_string_values
+	 * @param mixed $value Non-string field value.
+	 */
+	public function test_shared_field_sanitizers_return_empty_for_a_non_string( $value ): void {
+		CoreSanitizerMocks::register();
+
+		$this->assertSame( '', Outpost_Source_Detector::sanitize_shared_text( $value ) );
+		$this->assertSame( '', Outpost_Source_Detector::sanitize_shared_url( $value ) );
+	}
+
+	public function test_sanitize_shared_url_keeps_a_bare_url_byte_for_byte(): void {
+		CoreSanitizerMocks::register();
+		$url = 'https://example.com/a%20b/caf%C3%A9?q=hello%20world&x=1#frag';
+
+		$this->assertSame( $url, Outpost_Source_Detector::sanitize_shared_url( $url ) );
+	}
+
+	public function test_the_url_field_adapter_keeps_the_link_inside_a_text_blob(): void {
+		CoreSanitizerMocks::register();
+
+		// iOS apps put a quote plus the link in the url field. The URL-only
+		// sanitizer refuses prose (T10-S3-13 v1.1); the field adapter keeps it
+		// as text so the link inside can be found and validated.
+		$blob = "A good line.\n\nhttps://example.com/a%20b/caf%C3%A9";
+		$this->assertSame( '', Outpost_Source_Detector::sanitize_shared_url( $blob ) );
+		$clean = Outpost_Source_Detector::sanitize_shared_url_field( $blob );
+
+		$this->assertSame( 'A good line. https://example.com/a%20b/caf%C3%A9', $clean );
+		$this->assertSame(
+			'https://example.com/a%20b/caf%C3%A9',
+			Outpost_Source_Detector::extract_url_from_payload( array( 'url' => $clean ) )
+		);
+	}
+
+	public function test_sanitize_shared_url_does_not_pass_other_schemes_through_as_a_url(): void {
+		CoreSanitizerMocks::register();
+
+		Outpost_Source_Detector::sanitize_shared_url( 'https://example.com/page' );
+
+		$this->assertSame(
+			array( array( 'https://example.com/page', array( 'http', 'https' ) ) ),
+			CoreSanitizerMocks::$esc_url_raw_calls,
+			'esc_url_raw() must be limited to http and https.'
+		);
+		$this->assertNull(
+			Outpost_Source_Detector::extract_url_from_payload(
+				array( 'url' => Outpost_Source_Detector::sanitize_shared_url( 'javascript:alert(1)' ) )
+			)
+		);
+	}
+
+	public function test_sanitized_text_field_yields_the_encoded_link(): void {
+		CoreSanitizerMocks::register();
+
+		$out = Outpost_Source_Detector::extract_url_from_payload(
+			array(
+				'text' => Outpost_Source_Detector::sanitize_shared_text( 'Check this out https://example.com/a%20b/caf%C3%A9?q=hello%20world' ),
+			)
+		);
+
+		$this->assertSame( 'https://example.com/a%20b/caf%C3%A9?q=hello%20world', $out );
+	}
+
 	// --- dispatch with Source_Unknown only --------------------------------
 
 	public function test_dispatch_falls_back_to_picker_with_only_unknown_registered(): void {
@@ -185,7 +344,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$decision = Outpost_Source_Detector::dispatch( 'https://example.com/page' );
 
-		$this->assertNull( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision );
 		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'] );
 	}
 
@@ -211,10 +370,10 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'auto', $decision['route_type'] );
 		$this->assertSame( 'listen', $decision['mode'] );
 		$this->assertSame( 'fake-spotify', $decision['source_id'] );
-		$this->assertNotEmpty( $decision['prefill_token'] );
+		$this->assertArrayNotHasKey( 'prefill_token', $decision, 'T10-S3-01: no server-side prefill state.' );
 	}
 
-	public function test_dispatch_auto_redirect_url_includes_mode_and_token(): void {
+	public function test_dispatch_auto_redirect_url_includes_mode_and_source(): void {
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( false );
 		WP_Mock::userFunction( 'get_plugins' )->andReturn( array() );
 
@@ -233,7 +392,7 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 
 		$this->assertStringContainsString( 'mode=watch', $decision['redirect_url'] );
 		$this->assertStringContainsString( 'source=fake', $decision['redirect_url'] );
-		$this->assertStringContainsString( 'cached_for=', $decision['redirect_url'] );
+		$this->assertStringNotContainsString( 'cached_for=', $decision['redirect_url'], 'T10-S3-01: no server-side cache to look up.' );
 	}
 
 	public function test_dispatch_redirect_url_is_absolute(): void {
@@ -288,20 +447,6 @@ final class SourceDetectorTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'specific', $decision['source_id'] );
 	}
 
-	// --- prefill_token determinism ---------------------------------------
-
-	public function test_prefill_token_is_deterministic_for_a_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/x' );
-		$this->assertSame( $a, $b );
-		$this->assertSame( 16, strlen( $a ) );
-	}
-
-	public function test_prefill_token_varies_by_url(): void {
-		$a = Outpost_Source_Detector::prefill_token( 'https://example.com/a' );
-		$b = Outpost_Source_Detector::prefill_token( 'https://example.com/b' );
-		$this->assertNotSame( $a, $b );
-	}
 
 	// --- per-request memoization -----------------------------------------
 

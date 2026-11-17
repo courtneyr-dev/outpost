@@ -31,6 +31,11 @@
 	</rule>
 	<rule ref="PHPCompatibilityWP"/>
 
+	<!-- No file-level sniff exclusions: Plugin Check runs its own ruleset and
+	     ignores this file, so an exclusion here would hide what reviewers see.
+	     Justified exceptions carry an inline phpcs:ignore with the reason
+	     (for example the curl_setopt DNS pin in class-preview-endpoint.php). -->
+
 	<config name="testVersion" value="8.2-"/>
 	<config name="minimum_wp_version" value="6.5"/>
 

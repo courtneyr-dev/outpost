@@ -3,9 +3,10 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.12
+ * Version:           1.0.29
  * Requires at least: 6.5
  * Requires PHP:      8.2
+ * Requires Plugins:  indieauth, micropub
  * Author:            Courtney Robertson
  * Author URI:        https://courtneyr.dev
  * License:           GPLv2 or later
@@ -22,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.12' );
+define( 'OUTPOST_VERSION', '1.0.29' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -55,13 +56,14 @@ define( 'OUTPOST_RSS_CHAT_ROUTING_PLUGIN_FILE', 'rss-chat-routing/rss-chat-routi
 
 // Load the detector class and the companion-adapter base class up front so the
 // rest of this bootstrap file can stay procedural shims that delegate to them.
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-debug-log.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-request-headers.php';
+// Before every class that uses it: Outpost_OAuth_Controller (below) and the
+// REST endpoints further down.
+require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-outpost-client-identity.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/trait-bearer-auth.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-url-guard.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-companion-detector.php';
-// G99-mock-server — test-time HTTP rewriter. No-op in production
-// because OUTPOST_TEST_MOCK_SERVER_URL is never defined outside the
-// integration-test bootstrap.
-require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-mock-server-filter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-companion-base.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-kinds-adapter.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/class-post-formats-adapter.php';
@@ -127,7 +129,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-registry.php';
 // Phase F6 dispatcher + share-target / Shortcut bridge controllers.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-share-target-controller.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-shortcut-controller.php';
 // Phase F7 first concrete inbound source.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-spotify.php';
 // Phase F15 second concrete inbound source.
@@ -200,7 +201,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-sidebar-assets.php';
 // platforms (Oura, WHOOP, Polar). Real provider classes register
 // against the picker's filter in follow-up PRs.
 require_once OUTPOST_PLUGIN_DIR . 'includes/rest/class-outpost-fetch-recent-rest.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-test-provider.php';
 // G11a-consumer — Oura fetch-recent provider.
 require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-outpost-fetch-recent-oura.php';
 // G11b-consumer — WHOOP fetch-recent provider.
@@ -220,7 +220,6 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/sources/class-source-mataroa.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-route-handler.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-assets.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-pwa-shell.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/trait-bearer-auth.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-preview-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-composer-config-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-geocode-endpoint.php';
@@ -234,21 +233,28 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-pending-syndication-notice.php
 // Phase F13 audit-log surfacing.
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-admin-column.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/abilities/class-outpost-abilities.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
 // FX iOS Shortcut bridge.
-require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token.php';
-require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-token-authenticator.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/auth/class-ios-shortcut-app-password.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-ios-shortcut-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-ios-shortcut-settings-page.php';
 // FY Theming — token resolver, theme.json reader, contrast, mode controller.
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-contrast.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-theme-json-reader.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-mode-controller.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-style-source.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-start-screen.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/theming/class-token-resolver.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-appearance-rest-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/admin/class-appearance-settings-page.php';
+
+// Hook before init so an earlier consumer cannot initialize the lazy ability
+// registries before Outpost attaches its category and ability callbacks.
+Outpost_Abilities::register();
 
 /**
  * Wire up Outpost's component registrations at `init` priority 0.
@@ -327,8 +333,8 @@ add_action(
 		Outpost_Admin_Page::register();
 		// Register Settings API options (Phase H).
 		Outpost_Settings::register();
-		// FX iOS Shortcut bridge — REST endpoint + auth filter + admin page.
-		Outpost_IOS_Shortcut_Token_Authenticator::register();
+		// FX iOS Shortcut bridge — application-password scope + REST endpoint + admin page.
+		Outpost_IOS_Shortcut_App_Password::register();
 		Outpost_IOS_Shortcut_REST_Controller::register();
 		Outpost_IOS_Shortcut_Settings_Page::register();
 		// FY Theming — REST endpoint + appearance settings sub-menu.
@@ -429,10 +435,6 @@ add_action(
 		// G5b — Register Kit (v3 API secret) + write.as destinations.
 		Outpost_POSSE_Destination_Kit::register();
 		Outpost_POSSE_Destination_WriteAs::register();
-		// G99-mock-server — register the pre_http_request rewriter. Safe
-		// in production: rewrite is gated on OUTPOST_TEST_MOCK_SERVER_URL,
-		// which is only defined by integration-test bootstrap.
-		Outpost_Mock_Server_Filter::register();
 		Outpost_Encryption_Key_Notice::register();
 		// Defang Perfmatters' Delay JS / Lazy CSS / Remove Unused CSS on
 		// Outpost PWA routes — those features postpone JS/CSS until first
@@ -442,7 +444,6 @@ add_action(
 		Outpost_Sidebar_Assets::register();
 		// G-fetch-recent-picker.
 		Outpost_Fetch_Recent_REST::register();
-		Outpost_Fetch_Recent_Test_Provider::register();
 		// G11a-consumer — Oura fetch-recent provider.
 		Outpost_Fetch_Recent_Oura::register();
 		// G11b-consumer — WHOOP fetch-recent provider.
@@ -763,11 +764,23 @@ function outpost_is_notice_screen(): bool {
 		return true;
 	}
 
-	// Outpost's own pages. WordPress builds a screen id from the menu slug
-	// it was registered under, and every Outpost menu slug starts with the
-	// plugin name, so the prefix identifies them all — top-level pages and
-	// submenu pages alike, wherever they hang in the admin menu.
-	return str_contains( $screen->id, 'outpost' );
+	// Outpost's own pages. A screen id ends in `_page_<menu slug>`; the part
+	// before it comes from the parent menu's title, which can be translated,
+	// so match the slug only. A substring match would also catch other
+	// plugins' pages whose ids contain "outpost" (F-64).
+	$outpost_slugs = array(
+		'outpost',
+		'outpost-settings',
+		'outpost-appearance',
+		'outpost-ios-shortcut',
+		'outpost-oauth',
+	);
+	foreach ( $outpost_slugs as $slug ) {
+		if ( str_ends_with( $screen->id, '_page_' . $slug ) ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**
@@ -853,6 +866,11 @@ function outpost_maybe_flush_rewrite_rules(): void {
 }
 add_action( 'init', 'outpost_maybe_flush_rewrite_rules', 11 );
 
+// Records whether this site predates per-user style sources. Runs before
+// the rewrite flush above writes `outpost_rewrite_version` for a new
+// version, so an upgraded site is still recognized as one.
+add_action( 'init', array( 'Outpost_Style_Source', 'ensure_schema' ), 10 );
+
 /**
  * Activation hook. Registers the rewrite rules immediately, then flushes so
  * the freshly-registered rules land in the rewrite rule cache without
@@ -861,6 +879,7 @@ add_action( 'init', 'outpost_maybe_flush_rewrite_rules', 11 );
  * @since 0.1.0
  */
 function outpost_activate(): void {
+	Outpost_Style_Source::ensure_schema();
 	Outpost_Route_Handler::register_rewrite_rules();
 	flush_rewrite_rules();
 }
@@ -870,6 +889,11 @@ register_activation_hook( __FILE__, 'outpost_activate' );
 // it publishes a public copy of each post to a third-party service.
 // Registered on plugins_loaded, like the POSSE destinations, so the
 // option read happens once WordPress is available.
+// Render image captions from the attachment. Core's Image block only emits a
+// figcaption when one is in the block markup, so a caption stored on the
+// attachment would otherwise never appear.
+Outpost_Image_Caption_Renderer::register();
+
 add_action(
 	'plugins_loaded',
 	static function (): void {
@@ -880,14 +904,33 @@ add_action(
 );
 
 /**
- * Deactivation hook. Flushes rewrite rules so /post/* rules are dropped from
- * the cache. The rules themselves don't need explicit removal — they're
- * regenerated on every `init` and naturally disappear when this plugin is
- * inactive (the `init` hook stops firing).
+ * Deactivation hook. Deletes the iOS Shortcut's application passwords: the
+ * rule that limits them to the Shortcut route is Outpost code, so a password
+ * left behind would work on every route core accepts application passwords
+ * for (T10-S4-09). If one survives, it stops instead (T10-S4-27). The
+ * person's other application passwords stay. Then removes Outpost's
+ * rewrite rules and flushes: this hook runs while the rules registered at
+ * `init` are still in place, so a flush alone would write them back into
+ * the stored table (T10-S5-02). A network deactivation also clears every
+ * other site's stored table (F5-02).
  *
  * @since 0.1.0
+ *
+ * @param bool $network_wide Whether this is a network deactivation.
  */
-function outpost_deactivate(): void {
+function outpost_deactivate( bool $network_wide = false ): void {
+	// Application passwords are network-wide, so the cleanup is the same for both scopes.
+	require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-uninstaller.php';
+	// WordPress saves the plugin as inactive only after this hook returns,
+	// so stopping here keeps Outpost and its route rule loaded (T10-S4-27).
+	if ( ! Outpost_Uninstaller::delete_shortcut_application_passwords() ) {
+		Outpost_Uninstaller::stop_deactivation();
+		return;
+	}
+	Outpost_Route_Handler::unregister_rewrite_rules();
 	flush_rewrite_rules();
+	if ( $network_wide && is_multisite() ) {
+		Outpost_Uninstaller::delete_rewrite_rules_on_other_sites();
+	}
 }
 register_deactivation_hook( __FILE__, 'outpost_deactivate' );

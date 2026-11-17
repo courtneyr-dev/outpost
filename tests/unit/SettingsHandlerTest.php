@@ -31,6 +31,48 @@ final class SettingsHandlerTest extends TestCase {
 		WP_Mock::tearDown();
 	}
 
+	/**
+	 * Mock wp_die() to stop the handler by throwing with its message.
+	 */
+	private function die_throws(): void {
+		WP_Mock::userFunction( 'esc_html__' )->andReturnUsing( static fn ( $s ) => (string) $s );
+		WP_Mock::userFunction( 'wp_die' )->andReturnUsing(
+			static function ( $message ): void {
+				throw new \RuntimeException( (string) $message );
+			}
+		);
+	}
+
+	/**
+	 * Phase 4 review P4B-03: the `outpost_settings_tabs` filter controls a
+	 * tab's capability, so it could lower the API-keys save to `read`.
+	 * `manage_options` applies to every save whatever the tab says, and the
+	 * refusal comes before the nonce is read.
+	 */
+	public function test_a_filtered_tab_capability_cannot_go_below_manage_options(): void {
+		$this->die_throws();
+		WP_Mock::userFunction( 'current_user_can' )->andReturnUsing( static fn ( $cap ) => 'read' === $cap );
+		WP_Mock::userFunction( 'wp_verify_nonce' )->never();
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessage( 'You do not have permission to update these settings.' );
+		Outpost_Settings_Handler::handle_save( 'api_keys', array( 'capability' => 'read' ) );
+	}
+
+	/**
+	 * Control: an administrator passes the capability step and reaches the
+	 * nonce check, which a missing nonce fails.
+	 */
+	public function test_an_administrator_passes_the_capability_step_and_meets_the_nonce(): void {
+		$this->die_throws();
+		WP_Mock::userFunction( 'current_user_can' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_verify_nonce' )->once()->andReturn( false );
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessage( 'Security check failed. Please reload and try again.' );
+		Outpost_Settings_Handler::handle_save( 'api_keys', array( 'capability' => 'read' ) );
+	}
+
 	public function test_nonce_action_string(): void {
 		$this->assertSame(
 			'outpost_settings_save_api_keys',
@@ -90,7 +132,7 @@ final class SettingsHandlerTest extends TestCase {
 		$this->assertNotEquals( 'sk-test-' . str_repeat( 'a', 16 ), $saved['api_key']['encrypted'] );
 	}
 
-	public function test_sanitize_and_encrypt_skips_empty_sensitive(): void {
+	public function test_sanitize_and_encrypt_stores_nothing_for_an_empty_sensitive_field_with_nothing_saved(): void {
 		$fields = array(
 			'api_key' => array(
 				'label'     => 'API key',
@@ -104,8 +146,9 @@ final class SettingsHandlerTest extends TestCase {
 			array( 'api_key' => '' )
 		);
 
-		// Empty sensitive field stays as the empty string (NOT wrapped in encrypted envelope).
-		$this->assertSame( '', $saved['api_key'] );
+		// T10-S3-11: a blank secret with nothing saved stores nothing (a blank
+		// with something saved keeps it; SettingsSecretsTest covers that).
+		$this->assertArrayNotHasKey( 'api_key', $saved );
 	}
 
 	public function test_decrypt_stored_returns_raw_value_for_nonsensitive(): void {

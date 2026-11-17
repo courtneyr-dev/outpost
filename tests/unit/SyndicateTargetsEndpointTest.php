@@ -27,6 +27,9 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		Outpost_Companion_Registry::reset_for_tests();
 		// WP_Mock filtersWithAnyArgs leak workaround (CLAUDE.md A2 #8).
 		$ref  = new \ReflectionClass( \WP_Mock\Filter::class );
@@ -63,7 +66,7 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Syndicate_Targets_Endpoint::check_permission();
+		$result = Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -72,11 +75,34 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		$this->mock_filters( 42 );
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see "Scope source" in trait-bearer-auth.php).
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
-		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Important: an under-scoped (but otherwise validated)
+	 * bearer token is refused, distinct from an unvalidated-token refusal.
+	 */
+	public function test_permission_refuses_under_scoped_bearer_token(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+
+		$result = Outpost_Syndicate_Targets_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function make_request( ?string $mode ): WP_REST_Request {
@@ -101,6 +127,19 @@ final class SyndicateTargetsEndpointTest extends \WP_Mock\Tools\TestCase {
 
 		$ids = array_column( $payload['chips'], 'id' );
 		$this->assertContains( 'activitypub', $ids );
+	}
+
+	public function test_rest_response_is_identical_to_builder_payload(): void {
+		WP_Mock::userFunction( 'is_plugin_active' )->andReturn( true );
+
+		$response = Outpost_Syndicate_Targets_Endpoint::handle_request(
+			$this->make_request( 'photo' )
+		);
+
+		$this->assertSame(
+			Outpost_Syndicate_Targets_Endpoint::build_payload( 'photo' ),
+			$response->get_data()
+		);
 	}
 
 	public function test_handle_request_with_unknown_mode_fails_open(): void {

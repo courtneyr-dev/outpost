@@ -4,7 +4,7 @@ You are implementing from a frozen spec in a codex-first split (see `~/AGENTS.md
 
 ## Non-negotiables (from CLAUDE.md, condensed)
 
-- **Hard Contract:** plugin owns layout, theme owns paint. Structural CSS references colors/fonts only through `var(--outpost-*)` — component CSS carries NO hex values, not even fallbacks (the B6 lint fails CI on any hex in `pwa/src/styles/structure.css`).
+- **Hard Contract (amended 2026-11-07, [decision](docs/decisions/session-pwa-ui-appearance.md)):** plugin owns layout and the Outpost Default tokens; the person's selected style source (Outpost Default or Use Site Theme) supplies paint. Structural CSS references colors/fonts only through `var(--outpost-*)` — component CSS carries NO hex values, not even fallbacks (the B6 lint fails CI on any hex in `pwa/src/styles/structure.css`).
 - WordPress PHP/JS coding standards: tabs, Yoda conditions, `outpost_`/`Outpost_`/`OUTPOST_` prefixes, text domain `outpost`, escape at render, `$wpdb->prepare()`, nonces + capability checks.
 - TypeScript strict mode, no `any`. Kebab-case filenames (`class-*.php`, `*-mode.tsx`); adapter classes match `Outpost_*_Adapter`.
 - §5 audit lint (`composer lint:section5`) rejects case-study handles, credentials, non-allowlisted instance hosts, untranslated adapter strings, and non-stock fixture names — run it before reporting done.

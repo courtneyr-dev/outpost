@@ -31,6 +31,9 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 		$this->meta_store         = array();
 		$this->transient_store    = array();
 		$this->user_can_edit_post = true;
@@ -124,7 +127,7 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->user_logged_in             = false;
 		$this->mock_filters( false );
 
-		$result = Outpost_Manual_Share_Status_Controller::check_permission();
+		$result = Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
@@ -135,10 +138,48 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 	public function test_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
 		$this->user_logged_in             = false;
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
+		// H6: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock mock_filters() sets up — that override is inert for this
+		// call (see "Scope source" in trait-bearer-auth.php). POST is the
+		// mutating branch on this controller, so `create`/`update` only.
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
-		$this->assertTrue( Outpost_Manual_Share_Status_Controller::check_permission() );
+		$this->assertTrue( Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Important: method-split controller coverage — a
+	 * `read`-only token authorizes the GET routes (status, pending-summary).
+	 */
+	public function test_permission_read_scope_authorizes_get(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$this->assertTrue( Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'GET', '/' ) ) );
+	}
+
+	/**
+	 * H6 fix round 1, Important: method-split controller coverage — a
+	 * `read`-only token does NOT authorize the mutating POST routes
+	 * (dismiss-reminder, snooze-all — both write reminder_dismissed_until).
+	 */
+	public function test_permission_read_scope_alone_refused_on_post(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$this->user_logged_in             = false;
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		$this->mock_filters( 42 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'read' ) );
+
+		$result = Outpost_Manual_Share_Status_Controller::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	private function build_request( array $params ): WP_REST_Request {
@@ -175,6 +216,19 @@ final class ManualShareStatusControllerTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 'pending', $payload['status'] );
 		$this->assertSame( 2, $payload['summary']['total'] );
 		$this->assertSame( 0, $payload['summary']['complete'] );
+	}
+
+	public function test_status_rest_response_is_identical_to_builder_payload(): void {
+		$this->seed_entry( 42, 'instagram-feed' );
+
+		$response = Outpost_Manual_Share_Status_Controller::handle_status_request(
+			$this->build_request( array( 'post_id' => 42 ) )
+		);
+
+		$this->assertSame(
+			Outpost_Manual_Share_Status_Controller::build_status_payload( 42 ),
+			$response->get_data()
+		);
 	}
 
 	public function test_status_endpoint_403_for_user_without_edit(): void {

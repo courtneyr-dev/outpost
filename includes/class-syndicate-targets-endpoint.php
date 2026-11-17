@@ -75,25 +75,53 @@ final class Outpost_Syndicate_Targets_Endpoint {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability. Filterable.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
-
-		$allow = current_user_can( 'edit_posts' );
+	public static function check_permission( WP_REST_Request $request ) {
+		// Read-only: static companion-chip metadata, writes nothing. It
+		// serves the composer, so a token needs `create` or `update`
+		// (F-56).
+		$message = __( 'Outpost syndication targets require an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the syndicate-targets endpoint permission decision.
+		 * Filters whether a request may use the syndicate-targets endpoint.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_syndicate_targets_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_syndicate_targets_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost syndication targets require an authenticated user.', 'outpost-mobile-publishing' ),
+				$message,
 				array( 'status' => 401 )
 			);
 		}
@@ -116,18 +144,27 @@ final class Outpost_Syndicate_Targets_Endpoint {
 			? $raw_mode
 			: null;
 
+		return new WP_REST_Response( self::build_payload( $mode ), 200 );
+	}
+
+	/**
+	 * Build the mode-aware syndication target payload.
+	 *
+	 * @param string|null $mode Requested composer mode, or null for all modes.
+	 * @return array{mode_requested: string|null, mode_applied: string|null, mode_recognized: bool, chips: array<int, array<string, mixed>>}
+	 */
+	public static function build_payload( ?string $mode ): array {
+
 		$known_modes     = Outpost_Companion_Registry::known_modes();
 		$mode_recognized = null !== $mode && in_array( $mode, $known_modes, true );
 		$applied_filter  = $mode_recognized ? $mode : null;
 		$chips           = Outpost_Companion_Registry::chips_for_mode( $mode );
 
-		$payload = array(
+		return array(
 			'mode_requested'  => $mode,
 			'mode_applied'    => $applied_filter,
 			'mode_recognized' => $mode_recognized || null === $mode,
 			'chips'           => $chips,
 		);
-
-		return new WP_REST_Response( $payload, 200 );
 	}
 }

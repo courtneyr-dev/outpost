@@ -1,0 +1,208 @@
+{
+  "after-note-light-320.png": [],
+  "after-note-light-320.png:geometry": {
+    "picker_h": 146,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-reply-light-320.png": [],
+  "after-reply-light-320.png:geometry": {
+    "picker_h": 318,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-listen-light-320.png": [],
+  "after-listen-light-320.png:geometry": {
+    "picker_h": 418,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-photo-light-320.png": [],
+  "after-photo-light-320.png:geometry": {
+    "picker_h": null,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-life-light-320.png": [],
+  "after-life-light-320.png:geometry": {
+    "picker_h": 226,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-recipe-light-320.png": [],
+  "after-recipe-light-320.png:geometry": {
+    "picker_h": null,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-note-light-390.png": [],
+  "after-note-light-390.png:geometry": {
+    "picker_h": 82,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-reply-light-390.png": [],
+  "after-reply-light-390.png:geometry": {
+    "picker_h": 218,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-listen-light-390.png": [],
+  "after-listen-light-390.png:geometry": {
+    "picker_h": 268,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-photo-light-390.png": [],
+  "after-photo-light-390.png:geometry": {
+    "picker_h": null,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-life-light-390.png": [],
+  "after-life-light-390.png:geometry": {
+    "picker_h": 226,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-recipe-light-390.png": [],
+  "after-recipe-light-390.png:geometry": {
+    "picker_h": null,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-note-dark-320.png": [],
+  "after-note-dark-320.png:geometry": {
+    "picker_h": 146,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-reply-dark-320.png": [],
+  "after-reply-dark-320.png:geometry": {
+    "picker_h": 318,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-listen-dark-320.png": [],
+  "after-listen-dark-320.png:geometry": {
+    "picker_h": 418,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-photo-dark-320.png": [],
+  "after-photo-dark-320.png:geometry": {
+    "picker_h": null,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-life-dark-320.png": [],
+  "after-life-dark-320.png:geometry": {
+    "picker_h": 226,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-recipe-dark-320.png": [],
+  "after-recipe-dark-320.png:geometry": {
+    "picker_h": null,
+    "header_h": 119,
+    "submit_w": 248,
+    "form_w": 248,
+    "overflow_x": false
+  },
+  "after-note-dark-390.png": [],
+  "after-note-dark-390.png:geometry": {
+    "picker_h": 82,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-reply-dark-390.png": [],
+  "after-reply-dark-390.png:geometry": {
+    "picker_h": 218,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-listen-dark-390.png": [],
+  "after-listen-dark-390.png:geometry": {
+    "picker_h": 268,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-photo-dark-390.png": [],
+  "after-photo-dark-390.png:geometry": {
+    "picker_h": null,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-life-dark-390.png": [],
+  "after-life-dark-390.png:geometry": {
+    "picker_h": 226,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "after-recipe-dark-390.png": [],
+  "after-recipe-dark-390.png:geometry": {
+    "picker_h": null,
+    "header_h": 70,
+    "submit_w": 318,
+    "form_w": 318,
+    "overflow_x": false
+  },
+  "geometry-360": {
+    "style_rows": 1,
+    "tile_w": 53,
+    "header_h": 119,
+    "header_one_row": false,
+    "overflow_x": false
+  },
+  "geometry-375": {
+    "style_rows": 1,
+    "tile_w": 56,
+    "header_h": 70,
+    "header_one_row": true,
+    "overflow_x": false
+  }
+}

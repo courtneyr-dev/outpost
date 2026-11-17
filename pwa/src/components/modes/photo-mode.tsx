@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { build_photo_properties, type PhotoProperties } from '../../lib/photo-properties';
 import {
-	discover_micropub_endpoint,
-	discover_media_endpoint,
-	upload_media,
-	post_h_entry,
 	MicropubError,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
 import { process_photo, PhotoError } from '../../lib/photo';
 import type { StoredToken } from '../../lib/token-store';
 import { pkiw_kind_hint, type ComposerConfig } from '../../lib/composer-config';
-import { enqueue, is_network_error } from '../../lib/offline-queue';
+import { post_or_queue } from '../../lib/post-or-queue';
 import { mark_posted_once } from '../../lib/install-prompt-state';
 import { useMoreOpen } from '../../lib/composer-prefs';
 import {
@@ -25,6 +22,11 @@ import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { draft_text, read_draft, useDraft, type DraftFields } from '../../lib/drafts';
+import { DraftStatus } from '../draft-status';
+import { ExternalLink } from '../external-link';
+import { PublishButton } from '../publish-button';
+import { useRevealError } from '../../lib/use-reveal-error';
 import {
 	MorePanel,
 	useMorePanelValues,
@@ -75,6 +77,7 @@ interface PhotoEntry {
 	preview_url: string;
 	alt: string;
 	decorative: boolean;
+	caption: string;
 }
 
 type Status =
@@ -90,20 +93,64 @@ type Status =
 let next_id = 1;
 const make_id = (): string => `photo-${String(next_id++)}`;
 
+/**
+ * What a draft keeps of each photo. The File itself isn't saved, so after a
+ * reload the person adds the photos again and these fill in, in order.
+ */
+interface SavedPhoto {
+	alt: string;
+	caption: string;
+	decorative: boolean;
+}
+
+function saved_photos(value: unknown): SavedPhoto[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((item: unknown) => {
+		if (!item || typeof item !== 'object') return [];
+		const r = item as Record<string, unknown>;
+		return [{ alt: draft_text(r.alt), caption: draft_text(r.caption), decorative: r.decorative === true }];
+	});
+}
+
+function describe_photo(photo: SavedPhoto): DraftFields {
+	return { alt: photo.alt, caption: photo.caption, decorative: photo.decorative };
+}
+
 export function PhotoMode({
 	token,
 	micropubEnv,
 	composerConfig,
 	shareInboxEnv,
 }: PhotoModeProps) {
+	// A share wins over an unsent draft, as in NoteMode.
+	const [draft] = useState(() =>
+		peek_share_target()?.tab === 'photo' ? null : read_draft('photo', token.me),
+	);
 	const [entries, setEntries] = useState<PhotoEntry[]>([]);
-	const [name, setName] = useState('');
-	const [content, setContent] = useState('');
+	// Descriptions from the draft still waiting for their photo.
+	const [pending_photos, setPendingPhotos] = useState<SavedPhoto[]>(() =>
+		saved_photos(draft?.fields.photos),
+	);
+	const [name, setName] = useState(draft_text(draft?.fields.name));
+	const [content, setContent] = useState(draft_text(draft?.fields.content));
 	const [picked_location, setPickedLocation] = useState<GeocodeResult | null>(
 		null
 	);
-	const [venue_name, setVenueName] = useState('');
+	const [venue_name, setVenueName] = useState(draft_text(draft?.fields.venue));
+	const saved_draft = useDraft({
+		mode: 'photo',
+		me: token.me,
+		fields: {
+			name,
+			content,
+			venue: venue_name,
+			photos: [...entries, ...pending_photos].map(describe_photo),
+		},
+		restored: draft !== null,
+	});
 	const [status, setStatus] = useState<Status>({ kind: 'idle' });
+	const error_ref = useRef<HTMLDivElement>(null);
+	useRevealError(error_ref, status.kind === 'error' ? status.message : null);
 	const [micropub_endpoint, setMicropubEndpoint] = useState<string | null>(
 		null
 	);
@@ -132,13 +179,18 @@ export function PhotoMode({
 
 	const add_files = (files: File[]): void => {
 		if (files.length === 0) return;
-		const new_entries: PhotoEntry[] = files.map((file) => ({
-			id: make_id(),
-			file,
-			preview_url: URL.createObjectURL(file),
-			alt: '',
-			decorative: false,
-		}));
+		const new_entries: PhotoEntry[] = files.map((file, i) => {
+			const saved = pending_photos[i];
+			return {
+				id: make_id(),
+				file,
+				preview_url: URL.createObjectURL(file),
+				alt: saved?.alt ?? '',
+				caption: saved?.caption ?? '',
+				decorative: saved?.decorative ?? false,
+			};
+		});
+		setPendingPhotos((prev) => prev.slice(files.length));
 		setEntries((prev) => [...prev, ...new_entries]);
 	};
 
@@ -244,64 +296,19 @@ export function PhotoMode({
 				processed_blobs.push(processed.blob);
 			}
 
-			let mp = micropub_endpoint;
-			let media = media_endpoint;
-			if (!mp || !media) {
-				setStatus({ kind: 'discovering-endpoints' });
-				if (!mp) {
-					mp = await discover_micropub_endpoint(
-						token.me,
-						micropubEnv
-					);
-					setMicropubEndpoint(mp);
-				}
-				if (!media) {
-					media = await discover_media_endpoint(
-						mp,
-						token.accessToken,
-						micropubEnv
-					);
-					setMediaEndpoint(media);
-				}
-			}
-
-			// Upload each processed blob in sequence so the user sees
-			// progress and a single failure doesn't cascade.
-			const uploaded_urls: string[] = [];
-			for (let i = 0; i < processed_blobs.length; i++) {
-				setStatus({
-					kind: 'uploading-photo',
-					current: i + 1,
-					total: processed_blobs.length,
-				});
-				const upload = await upload_media(
-					{
-						blob: processed_blobs[i]!,
-						filename: `photo-${String(i + 1)}.jpg`,
-						accessToken: token.accessToken,
-						mediaEndpoint: media,
-					},
-					micropubEnv
-				);
-				uploaded_urls.push(upload.location);
-			}
-
-			setStatus({ kind: 'posting' });
-			// Single-photo posts retain the string-shape for back-compat.
-			// Multi-photo posts use the array shape per Micropub spec.
-			const photo_value =
-				uploaded_urls.length === 1 ? uploaded_urls[0]! : uploaded_urls;
-			const alt_array = entries.map((e) =>
-				e.decorative ? '' : e.alt.trim()
+			// Alt text and captions pair with the photos by index, so they are
+			// built now; post_or_queue adds the uploaded URLs as `photo`, or
+			// queues the processed bytes when the network is down.
+			const photo_meta: Partial<PhotoProperties> = build_photo_properties(
+				entries.map(() => ''),
+				entries
 			);
-			const alt_value =
-				alt_array.length === 1 ? alt_array[0]! : alt_array;
+			delete photo_meta.photo;
 			const trimmed_content = content.trim();
 			const trimmed_name = name.trim();
 			const trimmed_venue = venue_name.trim();
 			const base = {
-				photo: photo_value,
-				'mp-photo-alt': alt_value,
+				...photo_meta,
 				...pkiw_kind_hint(composerConfig, 'photo'),
 				...(trimmed_name ? { name: trimmed_name } : {}),
 				...(trimmed_content ? { content: trimmed_content } : {}),
@@ -316,32 +323,45 @@ export function PhotoMode({
 				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
-			try {
-				const result = await post_h_entry(
-					{
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: mp,
-					},
-					micropubEnv
-				);
+			const result = await post_or_queue(
+				{
+					source: 'photo',
+					me: token.me,
+					accessToken: token.accessToken,
+					properties,
+					photos: processed_blobs.map((blob, i) => ({
+						blob,
+						filename: `photo-${String(i + 1)}.jpg`,
+					})),
+					micropubEndpoint: micropub_endpoint,
+					mediaEndpoint: media_endpoint,
+					onStage: (stage): void =>
+						setStatus(
+							stage.kind === 'uploading'
+								? {
+										kind: 'uploading-photo',
+										current: stage.current,
+										total: stage.total,
+									}
+								: stage.kind === 'discovering'
+									? { kind: 'discovering-endpoints' }
+									: { kind: 'posting' }
+						),
+				},
+				micropubEnv
+			);
+			if (result.micropubEndpoint) setMicropubEndpoint(result.micropubEndpoint);
+			if (result.mediaEndpoint) setMediaEndpoint(result.mediaEndpoint);
+			saved_draft.discard();
+			setPendingPhotos([]);
+			if (result.kind === 'queued') {
+				setStatus({ kind: 'queued' });
+			} else {
 				setStatus({
 					kind: 'posted',
 					...(result.location ? { location: result.location } : {}),
 				});
 				mark_posted_once();
-			} catch (post_err) {
-				if (is_network_error(post_err)) {
-					await enqueue({
-						source: 'photo',
-						properties,
-						accessToken: token.accessToken,
-						micropubEndpoint: mp,
-					});
-					setStatus({ kind: 'queued' });
-				} else {
-					throw post_err;
-				}
 			}
 
 			// Reset for next post.
@@ -390,6 +410,8 @@ export function PhotoMode({
 		(entry) => entry.decorative || entry.alt.trim().length > 0
 	);
 	const can_submit = entries.length > 0 && all_have_alt && !submitting;
+	const missing: string[] =
+		entries.length === 0 ? ['A photo'] : all_have_alt ? [] : ['Alt text for each photo'];
 
 	return (
 		<section
@@ -400,7 +422,7 @@ export function PhotoMode({
 				{entries.length > 1 ? 'Gallery' : 'Photo'}
 			</h2>
 			<p class="outpost-card__lede">
-				Signed in as <code>{token.me || '—'}</code>
+				Share a photo or a gallery, with alt text for each image.
 			</p>
 
 			<form class="outpost-form-row" onSubmit={handle_submit} novalidate>
@@ -416,6 +438,13 @@ export function PhotoMode({
 					onChange={handle_file_change}
 					disabled={submitting}
 				/>
+				{pending_photos.length > 0 && (
+					<p class="outpost-help outpost-draft-photos">
+						{pending_photos.length === 1
+							? 'Your draft had 1 photo. Add it again and Outpost fills in its alt text and caption.'
+							: `Your draft had ${String(pending_photos.length)} photos. Add them again in the same order and Outpost fills in their alt text and captions.`}
+					</p>
+				)}
 
 				{entries.length > 0 && (
 					<ul class="outpost-photo-list">
@@ -424,10 +453,8 @@ export function PhotoMode({
 								<img
 									class="outpost-photo-list__thumb"
 									src={entry.preview_url}
-									alt={
-										entry.alt ||
-										`Photo ${String(index + 1)} (alt text not yet entered)`
-									}
+									alt={entry.alt}
+									aria-hidden={!entry.alt}
 								/>
 								<div class="outpost-photo-list__fields">
 									<label
@@ -475,6 +502,27 @@ export function PhotoMode({
 											Decorative (no alt text needed)
 										</span>
 									</label>
+									<label
+										class="outpost-label"
+										for={`outpost-photo-caption-${entry.id}`}
+									>
+										Caption
+									</label>
+									<textarea
+										id={`outpost-photo-caption-${entry.id}`}
+										class="outpost-textarea"
+										rows={2}
+										value={entry.caption}
+										onInput={(event): void =>
+											update_entry(entry.id, {
+												caption: (
+													event.target as HTMLTextAreaElement
+												).value,
+											})
+										}
+										placeholder="Shown under the photo. Leave empty for none."
+										disabled={submitting}
+									/>
 								</div>
 								<div class="outpost-photo-list__actions">
 									<button
@@ -570,62 +618,14 @@ export function PhotoMode({
 					disabled={submitting}
 				/>
 
-				{/* Persistent live regions so iOS VoiceOver picks up announcements. */}
-				<div
-					class="outpost-error"
-					role="alert"
-					aria-live="assertive"
-					hidden={status.kind !== 'error'}
-				>
-					{status.kind === 'error' ? status.message : ''}
-				</div>
-
-				<p
-					class="outpost-status"
-					aria-live="polite"
-					hidden={
-						status.kind !== 'posted' && status.kind !== 'queued'
-					}
-				>
-					{status.kind === 'posted' ? (
-						status.location ? (
-							<>
-								Posted to{' '}
-								<a
-									href={status.location}
-									target="_blank"
-									rel="noopener noreferrer"
-								>
-									{status.location}
-								</a>
-								{a11y_active && (
-									<>
-										{' · '}
-										<a
-											href={`${status.location}?edac_view=1`}
-											target="_blank"
-											rel="noopener noreferrer"
-										>
-											View accessibility report
-										</a>
-									</>
-								)}
-							</>
-						) : (
-							'Posted, but the server did not return a link. Check your site to confirm it published.'
-						)
-					) : status.kind === 'queued' ? (
-						"Saved for later. Outpost will post this when you're back online."
-					) : (
-						''
-					)}
-				</p>
+				<DraftStatus state={saved_draft.state} />
 
 				{composerConfig && (
 					<Drawer
 						open={more_open}
 						onClose={(): void => setMoreOpen(false)}
 						title="More options"
+						idPrefix="outpost-photo"
 					>
 						<MorePanel
 							token={token}
@@ -640,15 +640,8 @@ export function PhotoMode({
 					</Drawer>
 				)}
 
-				<div class="outpost-form-actions">
-					<button
-						class="outpost-button"
-						type="submit"
-						disabled={!can_submit}
-					>
-						{submit_label}
-					</button>
-					{composerConfig && (
+				{composerConfig && (
+					<div class="outpost-form-actions">
 						<button
 							class="outpost-button outpost-button--secondary"
 							type="button"
@@ -657,8 +650,56 @@ export function PhotoMode({
 						>
 							More options
 						</button>
-					)}
+					</div>
+				)}
+
+				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
+				<div
+					ref={error_ref}
+					class={`outpost-error${status.kind === 'error' ? '' : ' outpost-error--empty'}`}
+					role="alert"
+					aria-live="assertive"
+				>
+					{status.kind === 'error' ? status.message : ''}
 				</div>
+
+				<p
+					class={`outpost-status${
+						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+					}`}
+					aria-live="polite"
+				>
+					{status.kind === 'posted' ? (
+						status.location ? (
+							<>
+								Posted to{' '}
+								<ExternalLink href={status.location}>View published post</ExternalLink>
+								{a11y_active && (
+									<>
+										{' · '}
+										<ExternalLink href={`${status.location}?edac_view=1`}>
+											View accessibility report
+										</ExternalLink>
+									</>
+								)}
+							</>
+						) : (
+							'Posted, but the server did not return a link. Check your site to confirm it published.'
+						)
+					) : status.kind === 'queued' ? (
+						"Saved for later. Outpost will post this when you're back online."
+					) : (
+						''
+					)}
+				</p>
+
+				<PublishButton
+					idPrefix="outpost-photo"
+					label={submit_label}
+					disabled={!can_submit}
+					missing={missing}
+					busy={submitting}
+				/>
 			</form>
 		</section>
 	);

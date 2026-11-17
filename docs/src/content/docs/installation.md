@@ -3,7 +3,7 @@ title: Installation
 description: "Install Outpost from a GitHub release ZIP, activate the required IndieAuth and Micropub plugins, and confirm the /post composer loads on your site."
 ---
 
-How to install Outpost from GitHub and get its required plugins in place. Outpost is not confirmed to be in the WordPress.org directory, so installation is from the GitHub repository.
+How to install Outpost from GitHub and get its required plugins in place. Outpost isn't in the WordPress.org plugin directory yet, so you install it from its GitHub repository.
 
 ## Before you start
 
@@ -14,29 +14,36 @@ How to install Outpost from GitHub and get its required plugins in place. Outpos
 
 Outpost needs two plugins from the WordPress.org directory, activated in this order:
 
-1. **IndieAuth** — go to Plugins → Add New, search for "IndieAuth" (by Matthias Pfefferle and David Shanske), install, and activate. This is the sign-in layer; Micropub requires it.
+1. **IndieAuth** — go to **Plugins** → **Add New Plugin**, search for "IndieAuth" (by Matthias Pfefferle and David Shanske), install, and activate. This is the sign-in layer; Micropub requires it.
 2. **Micropub** — same screen, search for "Micropub" (by David Shanske), install, and activate. This is the publishing endpoint Outpost posts through.
 
 If you skip either one, Outpost stays inert: administrators see a notice such as "Outpost needs the IndieAuth plugin" with an install or activate link, and visiting `/post` shows a setup prompt naming the missing plugin instead of the composer. That notice appears on the Plugins and Add Plugins screens and on Outpost's own pages — the places you would fix it — rather than following you around the rest of wp-admin.
 
 ## Step 2: Install Outpost from GitHub
 
-The repository commits its compiled PWA bundle (`build/pwa/`), so you do not need Node, npm, or any build step — a plain clone or ZIP of the repo is ready to activate.
+The repository's `main` branch holds the current release, version 1.0.24, with its compiled files (`build/`) committed. You don't need Node, npm, or a build step: a clone or ZIP of `main` is ready to activate.
+
+The repository's Releases page hasn't been updated for the 1.0 series; its newest entry is v0.2.0 from May 2026. Install from `main` as shown below, not from that release.
+
+Pick one folder name and keep it. WordPress identifies a plugin by its folder, so a later update only replaces this install if the folder name matches. These steps use `outpost-mobile-publishing`, the plugin's slug.
 
 ### Option A: Clone with git
 
+Use this if you have shell access to your server. Updating later is one `git pull`.
+
 ```bash
 cd wp-content/plugins
-git clone https://github.com/courtneyr-dev/outpost.git
+git clone https://github.com/courtneyr-dev/outpost.git outpost-mobile-publishing
 ```
 
 ### Option B: Upload a ZIP
 
-1. On the GitHub repository page, choose Code → Download ZIP (or download a release ZIP from the Releases page if one is available).
-2. In wp-admin, go to Plugins → Add New → Upload Plugin.
-3. Choose the ZIP and click Install Now.
+1. On the [Outpost repository page](https://github.com/courtneyr-dev/outpost), choose **Code** → **Download ZIP**. You get `outpost-main.zip`, which unpacks to a folder named `outpost-main`.
+2. Unzip it, rename the folder to `outpost-mobile-publishing`, and zip that folder again.
+3. In wp-admin, go to **Plugins** → **Add New Plugin** → **Upload Plugin**.
+4. Choose your ZIP and select **Install Now**.
 
-Note: GitHub's "Download ZIP" produces a folder named `outpost-main`. The plugin works from that folder, but if you later switch to a git clone or release ZIP the folder name will differ and WordPress will treat it as a separate plugin. Renaming the folder to `outpost-mobile-publishing` before uploading keeps things tidy, and matches the name the plugin uses in the WordPress.org directory.
+If you skip the rename, the plugin still works from `outpost-main`. Keep using that name for every later update.
 
 ## Step 3: Activate
 
@@ -51,4 +58,4 @@ If `/post` returns a 404, deactivate and reactivate the plugin (activation re-re
 
 ## Next step
 
-Head to [Getting started](/outpost/getting-started/) to sign in and post your first note.
+Head to [Getting started](/outpost/getting-started/) to sign in and post your first note. When a new version comes out, follow [Update Outpost](/outpost/update/).

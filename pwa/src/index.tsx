@@ -16,8 +16,6 @@
 
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { register, propsFor } from 'prop-for-that';
-import { online, network } from 'prop-for-that/plugins';
 import './styles/structure.css';
 import { LoginScreen } from './components/login-screen';
 import { AuthCallback } from './components/auth-callback';
@@ -55,7 +53,7 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 	const route = detect_route(window.location.pathname);
 
 	// F6: when the share-target dispatcher 303-redirects to the composer
-	// with dispatch params (?mode=, ?picker=, ?source=, ?cached_for=,
+	// with dispatch params (?mode=, ?picker=, ?source=,
 	// ?url=, etc.), parse them into a ShareTargetData stash so the
 	// composer's existing mode-mount logic picks the right tab + variant
 	// + pre-fill. Falls through silently on direct /post/ navigation.
@@ -145,14 +143,6 @@ function App({ clientId, redirectUri, composerUrl, tokenStore }: AppProps) {
 
 export function mount(root: Element, props: AppProps): void {
 	root.classList.add('outpost-app');
-	// Sample connectivity once and expose it to CSS on :root as
-	// --live-online / --live-net-* so the connection banner reacts in pure
-	// CSS (see connection-banner.tsx + structure.css). No JS in the reaction
-	// path. network is Chromium-only and no-ops elsewhere; online works
-	// everywhere via navigator.onLine.
-	register(online);
-	register(network);
-	propsFor(['online', 'network']);
 	render(
 		<>
 			<ConnectionBanner />

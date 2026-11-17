@@ -38,7 +38,7 @@ The apex `mataroa.blog` is NOT claimed.
 
 ## RSS-as-primary deferred
 
-Same note as Bear Blog: ships og_tags-only; RSS-as-primary lands when the F-phase RSS extractor stub gets a concrete implementation.
+Same note as Bear Blog: the source uses og_tags only. The RSS extractor is still a stub, so RSS-as-primary isn't available yet.
 
 ## Open-source recommendation
 

@@ -12,9 +12,10 @@
  *
  * Membership-lapsed handling: Oura's API returns 403 with a body
  * containing "membership" when a previously-connected account no
- * longer has the active subscription required for v2 API access. In
- * that case the callback returns an empty list with reason
- * 'membership_lapsed' so the modal can render a graceful prompt.
+ * longer has the active subscription required for v2 API access.
+ * `api_get()` treats that, like every other non-2xx response, as no
+ * data, so the picker shows an empty list. No reason code reaches the
+ * modal (F-65).
  *
  * @package Outpost
  * @since   0.1.87
@@ -115,21 +116,23 @@ final class Outpost_Fetch_Recent_Oura {
 		$workouts = self::fetch_workouts( $token, $start_date, $end_date );
 		$sleep    = self::fetch_sleep( $token, $start_date, $end_date );
 
-		$items = array_merge(
-			array_map( array( __CLASS__, 'map_workout_item' ), $workouts ),
-			array_map( array( __CLASS__, 'map_sleep_item' ), $sleep )
-		);
-
+		// Items carry only a date (F-44), so the newest-first order comes
+		// from each record's start time, which stays in this function.
+		$entries = array();
+		foreach ( $workouts as $workout ) {
+			$entries[] = array( self::sort_key( (string) ( $workout['start_datetime'] ?? '' ) ), self::map_workout_item( $workout ) );
+		}
+		foreach ( $sleep as $night ) {
+			$entries[] = array( self::sort_key( (string) ( $night['bedtime_start'] ?? $night['day'] ?? '' ) ), self::map_sleep_item( $night ) );
+		}
 		usort(
-			$items,
+			$entries,
 			static function ( array $a, array $b ): int {
-				$at = isset( $a['fetched_at'] ) ? (string) $a['fetched_at'] : '';
-				$bt = isset( $b['fetched_at'] ) ? (string) $b['fetched_at'] : '';
-				return strcmp( $bt, $at );
+				return $b[0] <=> $a[0];
 			}
 		);
 
-		return array_slice( $items, 0, $count );
+		return array_slice( array_column( $entries, 1 ), 0, $count );
 	}
 
 	/**
@@ -205,21 +208,30 @@ final class Outpost_Fetch_Recent_Oura {
 			);
 		}
 
-		$content = '<p>' . esc_html( $title ) . '</p>';
+		// The picker list shows the distance; the post shows it only when the
+		// site turns on "Workout details in post text" (P4B-02).
+		$post_title = Outpost_Settings::workout_details_in_text()
+			? $title
+			: sprintf(
+				/* translators: %s: activity name. */
+				__( 'Workout — %s', 'outpost-mobile-publishing' ),
+				$activity
+			);
+		$content = '<p>' . esc_html( $post_title ) . '</p>';
 
 		return array(
-			'id'           => isset( $workout['id'] ) ? 'oura-workout-' . (string) $workout['id'] : 'oura-workout-' . md5( $start_at ),
+			'id'           => isset( $workout['id'] ) ? 'oura-workout-' . (string) $workout['id'] : 'oura-workout-' . wp_hash( 'outpost-fetch-recent|' . $start_at ),
 			'title'        => $title,
 			'subtitle'     => implode( ', ', $subtitle_parts ),
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $start_at ? $start_at : gmdate( 'c' ),
+			// The date alone: the start time never leaves the server (F-44).
+			'fetched_at'   => '' !== $start_at ? self::short_date( $start_at ) : gmdate( 'Y-m-d' ),
 			'post_kind'    => 'workout',
 			'post_payload' => array(
-				'title'                  => $title,
+				'title'                  => $post_title,
 				'content'                => $content,
 				'post_meta'              => array(
 					'_outpost_oura_activity'   => isset( $workout['activity'] ) ? (string) $workout['activity'] : '',
-					'_outpost_oura_start_at'   => $start_at,
 					'_outpost_oura_duration_s' => (string) $duration_s,
 					'_outpost_oura_distance_m' => (string) $distance_m,
 					'_outpost_oura_calories'   => (string) $kcal,
@@ -272,7 +284,8 @@ final class Outpost_Fetch_Recent_Oura {
 			'title'        => $title,
 			'subtitle'     => implode( ', ', $subtitle_parts ),
 			'icon_url'     => null,
-			'fetched_at'   => '' !== $bedtime ? $bedtime : ( '' !== $day ? $day . 'T00:00:00+00:00' : gmdate( 'c' ) ),
+			// The night's day, never the bedtime (F-44).
+			'fetched_at'   => 1 === preg_match( '/\A\d{4}-\d{2}-\d{2}\z/', $day ) ? $day : ( '' !== $bedtime ? self::short_date( $bedtime ) : gmdate( 'Y-m-d' ) ),
 			'post_kind'    => 'note',
 			'post_payload' => array(
 				'title'                  => $title,
@@ -283,8 +296,67 @@ final class Outpost_Fetch_Recent_Oura {
 					'_outpost_oura_sleep_score'   => (string) $score,
 				),
 				'syndication_source_url' => null,
+			) + self::post_kinds_sleep_parts( $total_s, $bedtime ),
+		);
+	}
+
+	/** Post Kinds' sleep card block. */
+	private const SLEEP_CARD = 'post-kinds-indieweb/sleep-card';
+
+	/**
+	 * With Post Kinds' sleep card registered (#260): the card, the sleep
+	 * kind term keyed by the taxonomy's REST base, and noon of the night as
+	 * the post date. The picker inserts these instead of the paragraph.
+	 *
+	 * The bedtime only picks the night and never leaves the server: the
+	 * card gets the duration alone, and the date is noon, the time Post
+	 * Kinds gives every sleep post.
+	 *
+	 * @return array<string,mixed> Empty without Post Kinds.
+	 */
+	private static function post_kinds_sleep_parts( int $total_s, string $bedtime ): array {
+		if ( ! Outpost_Post_Kinds_Adapter::has_card_block( self::SLEEP_CARD ) ) {
+			return array();
+		}
+		$attributes = array();
+		if ( $total_s > 0 ) {
+			$attributes['durationMinutes'] = (int) round( $total_s / 60 );
+		}
+		$parts = array(
+			'blocks' => array(
+				array(
+					'name'       => self::SLEEP_CARD,
+					'attributes' => $attributes,
+				),
 			),
 		);
+
+		$terms = Outpost_Post_Kinds_Adapter::kind_terms( 'sleep' );
+		if ( array() !== $terms ) {
+			$parts['terms'] = $terms;
+		}
+
+		$night = self::night_of( $bedtime );
+		if ( null !== $night ) {
+			$parts['date'] = $night . 'T12:00:00';
+		}
+		return $parts;
+	}
+
+	/**
+	 * The night a bedtime belongs to, as Y-m-d: the date twelve hours
+	 * earlier in the site timezone, the rule Post Kinds files sleep by.
+	 */
+	private static function night_of( string $bedtime ): ?string {
+		if ( '' === $bedtime ) {
+			return null;
+		}
+		try {
+			$at = new DateTimeImmutable( $bedtime );
+		} catch ( Exception $e ) {
+			return null;
+		}
+		return $at->setTimezone( wp_timezone() )->modify( '-12 hours' )->format( 'Y-m-d' );
 	}
 
 	/**
@@ -298,12 +370,14 @@ final class Outpost_Fetch_Recent_Oura {
 		}
 		$response = wp_remote_get(
 			self::API_BASE . $path,
-			array(
-				'timeout' => self::TIMEOUT_SECONDS,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $token,
-					'Accept'        => 'application/json',
-				),
+			Outpost_OAuth_Provider_Base::credential_request_args(
+				array(
+					'timeout' => self::TIMEOUT_SECONDS,
+					'headers' => array(
+						'Authorization' => 'Bearer ' . $token,
+						'Accept'        => 'application/json',
+					),
+				)
 			)
 		);
 		if ( is_wp_error( $response ) ) {
@@ -328,6 +402,14 @@ final class Outpost_Fetch_Recent_Oura {
 			return 0;
 		}
 		return max( 0, $end_ts - $start_ts );
+	}
+
+	/**
+	 * Unix time to sort by, 0 when the value doesn't parse. Never sent.
+	 */
+	private static function sort_key( string $iso ): int {
+		$ts = '' !== $iso ? strtotime( $iso ) : false;
+		return false === $ts ? 0 : $ts;
 	}
 
 	private static function short_date( string $iso ): string {

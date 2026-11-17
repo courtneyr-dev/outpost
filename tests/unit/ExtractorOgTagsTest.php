@@ -26,12 +26,14 @@ namespace Outpost\Tests\Unit;
 
 use Outpost_Source_Extractor_Og_Tags;
 use Outpost\Tests\Helpers\SourceFixtureLoader;
+use Outpost\Tests\Helpers\CoreSanitizerMocks;
 use WP_Mock;
 
 final class ExtractorOgTagsTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		CoreSanitizerMocks::register();
 	}
 
 	public function tearDown(): void {
@@ -210,9 +212,11 @@ final class ExtractorOgTagsTest extends \WP_Mock\Tools\TestCase {
 		$result = $this->parse( $body );
 
 		$this->assertSame( 'Headless Title', $result['og:title'] );
-		// Fixture uses entity-escaped `&lt;head&gt;` per HTML5; parser
-		// decodes back to literal `<head>`.
-		$this->assertStringContainsString( '<head>', $result['og:description'] );
+		// Fixture uses entity-escaped `&lt;head&gt;` per HTML5; the parser
+		// decodes it to a literal `<head>` and then strips it as markup, since
+		// OG text becomes an unfiltered post_title through Micropub.
+		$this->assertStringNotContainsString( '<head>', $result['og:description'] );
+		$this->assertStringContainsString( 'Body-level OG tags should still parse', $result['og:description'] );
 		$this->assertSame( 'https://example.com/no-head-image.jpg', $result['og:image'] );
 	}
 

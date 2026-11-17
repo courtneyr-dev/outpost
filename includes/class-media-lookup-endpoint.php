@@ -116,33 +116,58 @@ final class Outpost_Media_Lookup_Endpoint {
 	 * Permission callback. Requires the edit_posts capability, with a filter
 	 * override for site admins who want to lock it down.
 	 *
-	 * Managed-WP hosts (GoDaddy's Apache) strip the Authorization header, so
-	 * the PWA sends the IndieAuth token in the request body. The shared
-	 * bearer-auth trait restores it and asks `determine_current_user` (the
-	 * IndieAuth plugin's own authority) to validate it, exactly as the preview,
-	 * geocode, and syndicate-targets routes do. Doing this HERE — inside the
-	 * route's permission callback — scopes it by construction: the REST
-	 * dispatcher has already identified the route, so no URI or query-string
-	 * matching is involved. An earlier build hooked a global
+	 * WordPress resolves the user before this runs: IndieAuth validates a
+	 * token from the Authorization header or a form-encoded `access_token`
+	 * field (the PWA sends both, for hosts that strip the header). This
+	 * callback checks that user and the token's scope; it never resolves or
+	 * switches users. An earlier build hooked a global
 	 * `determine_current_user` filter scoped by `strpos()` on REQUEST_URI,
 	 * which reinjected the token on any route whose URI merely contained the
 	 * lookup path (pre-1.0.4 audit, route-resolution class).
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
-		$allow = current_user_can( 'edit_posts' );
+	public static function check_permission( WP_REST_Request $request ) {
+		// Read-only: proxies a metadata lookup, writes nothing. It serves
+		// the composer, so a token needs `create` or `update` (F-56).
+		$message = __( 'Outpost media lookup requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, self::COMPOSER_SCOPES ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the media-lookup permission decision.
+		 * Filters whether a request may use the media-lookup endpoint.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_media_lookup_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_media_lookup_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost media lookup requires an authenticated user.', 'outpost-mobile-publishing' ),
+				$message,
 				array( 'status' => 401 )
 			);
 		}

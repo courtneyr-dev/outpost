@@ -23,37 +23,67 @@ final class Outpost_Request_Headers {
 
 	/**
 	 * Raw Authorization header, with the REDIRECT_HTTP_AUTHORIZATION
-	 * fallback some Apache/managed-host setups use.
+	 * fallback some Apache/managed-host setups use, then the SAPI's own
+	 * header list for hosts that never copy the header into `$_SERVER`.
+	 *
+	 * IndieAuth's `Authorize::get_authorization_header()` reads the same
+	 * three sources in the same order, so any header IndieAuth
+	 * authenticates from is one Outpost can see too.
 	 *
 	 * The value is a credential: callers regex-validate its shape and
-	 * compare tokens — it is never stored or echoed. It is unslashed but
-	 * deliberately NOT run through a sanitizer, because sanitizers can
-	 * alter token bytes and break constant-time comparison.
+	 * compare tokens — it is never stored or echoed. It is sanitized like
+	 * every other `$_SERVER` read. A bearer token is RFC 6750 `b64token`
+	 * (`A-Za-z0-9-._~+/=`), which sanitize_text_field() returns unchanged,
+	 * so only a malformed header is altered, and that header then fails
+	 * token validation.
 	 *
 	 * @since 1.0.1
 	 *
 	 * @return string Header value, or '' when absent.
 	 */
 	public static function authorization(): string {
-		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Credential compared/validated by callers; sanitizing would corrupt it. Unslashed here, never stored or output.
 		if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
 			return self::server_string( 'HTTP_AUTHORIZATION' );
 		}
 		if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 			return self::server_string( 'REDIRECT_HTTP_AUTHORIZATION' );
 		}
-		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		return self::authorization_from_sapi_headers();
+	}
+
+	/**
+	 * The Authorization header from `getallheaders()`, matched on name
+	 * case-insensitively, or '' when the function or the header is absent.
+	 *
+	 * `getallheaders()` is not defined under the CLI SAPI, and its values
+	 * never pass through wp_magic_quotes(), so there is nothing to unslash.
+	 *
+	 * @return string
+	 */
+	private static function authorization_from_sapi_headers(): string {
+		$headers = function_exists( 'getallheaders' ) ? getallheaders() : null;
+		if ( ! is_array( $headers ) ) {
+			return '';
+		}
+		foreach ( $headers as $name => $value ) {
+			if ( is_string( $value ) && 0 === strcasecmp( (string) $name, 'authorization' ) ) {
+				return sanitize_text_field( $value );
+			}
+		}
 		return '';
 	}
 
 	/**
-	 * A `$_SERVER` value as an unslashed string.
+	 * A `$_SERVER` value, unslashed and sanitized.
 	 *
-	 * For request metadata (REQUEST_URI, REQUEST_METHOD, REMOTE_ADDR,
-	 * HTTP_USER_AGENT, proxy IP headers) used for routing checks,
-	 * rate-limit keys, and diagnostics. Callers validate per use —
-	 * e.g. strpos route matching or IP-format checks — so no generic
-	 * sanitizer is applied here.
+	 * For request metadata (REQUEST_METHOD, REMOTE_ADDR, HTTP_USER_AGENT,
+	 * proxy IP headers, Authorization) used for routing checks, rate-limit
+	 * keys, and diagnostics. The sender controls all of it. Callers still
+	 * validate per use — IP-format checks, method allowlists, token
+	 * comparison.
+	 *
+	 * Not for percent-encoded values such as REQUEST_URI:
+	 * sanitize_text_field() strips `%XX` octets.
 	 *
 	 * @since 1.0.1
 	 *
@@ -65,8 +95,85 @@ final class Outpost_Request_Headers {
 		if ( ! isset( $_SERVER[ $key ] ) ) {
 			return $fallback;
 		}
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed request metadata; callers validate per use (route matching, IP keying). Never stored or output raw.
-		return (string) wp_unslash( $_SERVER[ $key ] );
+		return sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+	}
+
+	/**
+	 * A query-string value as a key (sanitize_key), or '' when it is absent
+	 * or not a scalar string or integer. An array- or object-shaped value (`?tab[]=x`)
+	 * is refused without a PHP warning (T10-S3-13). For display flags and
+	 * selectors only: a caller still checks the nonce and capability before
+	 * any protected effect.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_key( string $key ): string {
+		// sanitize_key() returns '' for an array or object, with no warning.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		return isset( $_GET[ $key ] ) ? sanitize_key( wp_unslash( $_GET[ $key ] ) ) : '';
+	}
+
+	/**
+	 * Whether the query string carries `$key` at all, in any shape.
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key `$_GET` key.
+	 */
+	public static function query_present( string $key ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence check only.
+		return isset( $_GET[ $key ] );
+	}
+
+	/**
+	 * A query-string value as short text (sanitize_text_field, length-capped),
+	 * or '' when it is absent or not a single string. Same rules as
+	 * query_key().
+	 *
+	 * @since 1.0.27
+	 *
+	 * @param string $key        `$_GET` key.
+	 * @param int    $max_length Longest value accepted; longer values are refused.
+	 */
+	public static function query_text( string $key, int $max_length = 200 ): string {
+		// sanitize_text_field() returns '' for an array or object, with no warning.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selector; callers verify nonces before any state change.
+		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		return strlen( $value ) > $max_length ? '' : $value;
+	}
+
+	/**
+	 * The REST nonce presented with this request, unslashed and sanitized, or
+	 * '' when none was sent.
+	 *
+	 * Mirrors core's `rest_cookie_check_errors()` resolution order exactly: the
+	 * `_wpnonce` request parameter first, then the `X-WP-Nonce` header. A
+	 * security decision that has to re-derive whether a cookie session carries a
+	 * valid nonce — because an earlier `rest_authentication_errors` filter made
+	 * core short-circuit before its own check ran — must resolve the nonce the
+	 * same way core would, or it will disagree with core on which requests are
+	 * nonce-protected.
+	 *
+	 * This returns the raw nonce for the caller to pass to
+	 * `wp_verify_nonce( ..., 'wp_rest' )`; reading it here is the read half of
+	 * that verification, not a standalone processing of request input.
+	 *
+	 * @since 1.0.21
+	 *
+	 * @return string
+	 */
+	public static function rest_nonce(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- returns the presented nonce for the caller to pass to wp_verify_nonce(); this is the read half of that verification, not a standalone action. sanitize_text_field() returns '' for a non-string (e.g. an array), so no is_scalar guard is needed.
+		$param = isset( $_REQUEST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ) : '';
+		if ( '' !== $param ) {
+			return $param;
+		}
+		if ( isset( $_SERVER['HTTP_X_WP_NONCE'] ) ) {
+			return self::server_string( 'HTTP_X_WP_NONCE' );
+		}
+		return '';
 	}
 
 	/**
@@ -86,8 +193,7 @@ final class Outpost_Request_Headers {
 	 * serves the request, so every `rest_authentication_errors` callback and
 	 * every permission callback sees the authoritative value. Callers that can
 	 * run earlier (e.g. `determine_current_user` at `init`) must not rely on
-	 * this and should scope themselves by construction instead — see
-	 * `Outpost_Bearer_Auth`.
+	 * this and should scope themselves by construction instead.
 	 *
 	 * Normalization: one leading slash, no trailing slash, no surrounding
 	 * whitespace. Anything else (absent, empty, non-string) yields null so
@@ -142,46 +248,5 @@ final class Outpost_Request_Headers {
 		// exact comparison here would disagree with the route that
 		// actually ran. Route paths are ASCII.
 		return 0 === strcasecmp( '/' . $expected, $resolved );
-	}
-
-	/**
-	 * Resolve a bearer token to a user id, using only token-based
-	 * authentication.
-	 *
-	 * `determine_current_user` is core's whole user-resolution chain, and
-	 * cookie validators sit on it. Calling it to validate a token therefore
-	 * also re-validates whatever session cookie the request happens to
-	 * carry — which resurrects a cookie session that core deliberately
-	 * dropped for a REST request with no nonce, so any non-empty token
-	 * string would authorize a cookie-bearing request. The cookie and
-	 * application-password validators are unhooked for the duration of the
-	 * call so only token validators (IndieAuth's) can answer, then restored.
-	 *
-	 * @return int Resolved user id, or 0 when the token authenticates nobody.
-	 */
-	public static function resolve_token_user(): int {
-		$cookie_validators = array(
-			'wp_validate_auth_cookie',
-			'wp_validate_logged_in_cookie',
-			'wp_validate_application_password',
-		);
-
-		$removed = array();
-		foreach ( $cookie_validators as $callback ) {
-			$priority = has_filter( 'determine_current_user', $callback );
-			if ( false !== $priority ) {
-				remove_filter( 'determine_current_user', $callback, $priority );
-				$removed[ $callback ] = $priority;
-			}
-		}
-
-		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core WP hook.
-		$user_id = (int) apply_filters( 'determine_current_user', false );
-
-		foreach ( $removed as $callback => $priority ) {
-			add_filter( 'determine_current_user', $callback, $priority );
-		}
-
-		return $user_id > 0 ? $user_id : 0;
 	}
 }

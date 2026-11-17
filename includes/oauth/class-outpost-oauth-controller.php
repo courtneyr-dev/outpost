@@ -8,9 +8,12 @@
  *   GET  /wp-json/outpost/v1/oauth/{provider}/callback   → exchange code, store creds
  *   POST /wp-json/outpost/v1/oauth/{provider}/disconnect → revoke + delete creds
  *
- * All three routes require manage_options + a logged-in user. The
- * callback URL pattern is fixed; each provider's app registration uses
- * its own callback URL with the provider id in the path.
+ * The start, disconnect and verify routes require the person's own
+ * wp-admin session (a cookie with a valid REST nonce) and manage_options;
+ * bearer tokens and application passwords are refused (see
+ * permission_check()). The callback URL pattern is fixed; each
+ * provider's app registration uses its own callback URL with the provider
+ * id in the path.
  *
  * Provider registration via add_provider(); G3.5a ships with Notion
  * registered.
@@ -26,6 +29,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Outpost_OAuth_Controller {
+
+	use Outpost_Bearer_Auth;
 
 	/**
 	 * Registered provider instances keyed by provider id.
@@ -98,6 +103,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_start' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -112,6 +118,12 @@ final class Outpost_OAuth_Controller {
 				// inside the handler before any side effects.
 				'permission_callback' => '__return_true',
 				'show_in_index'       => false,
+				'args'                => self::route_args(
+					array(
+						'code'  => array( 'type' => 'string' ),
+						'state' => array( 'type' => 'string' ),
+					)
+				),
 			)
 		);
 		register_rest_route(
@@ -122,6 +134,7 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_disconnect' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 		register_rest_route(
@@ -132,12 +145,46 @@ final class Outpost_OAuth_Controller {
 				'callback'            => array( __CLASS__, 'handle_verify' ),
 				'permission_callback' => array( __CLASS__, 'permission_check' ),
 				'show_in_index'       => false,
+				'args'                => self::route_args(),
 			)
 		);
 	}
 
-	public static function permission_check(): bool {
-		return is_user_logged_in() && current_user_can( 'manage_options' );
+	/**
+	 * Declared arguments for the OAuth routes (F-63). A `type` makes
+	 * WordPress validate and cast each one (rest_parse_request_arg) before
+	 * the handler runs, as on Outpost's other routes; `?code[]=x` gets a
+	 * 400 instead of reaching a string cast.
+	 *
+	 * @param array<string, array<string, mixed>> $extra Route-specific arguments.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function route_args( array $extra = array() ): array {
+		return array(
+			'provider' => array(
+				'type'    => 'string',
+				'pattern' => '^[a-z0-9-]+$',
+			),
+		) + $extra;
+	}
+
+	/**
+	 * Permission for the start, disconnect and verify routes: the person's
+	 * own wp-admin session (a cookie with a valid REST nonce) and
+	 * manage_options.
+	 *
+	 * These routes read or remove a connected-account credential and are
+	 * wp-admin actions only (the start link carries `_wpnonce`). Bearer
+	 * tokens and application passwords are refused, the same client
+	 * boundary as connected-account reads (T10-S3-06, T10-S4-11).
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 */
+	public static function permission_check( \WP_REST_Request $request ): bool {
+		if ( ! self::is_first_party_cookie_request( $request ) ) {
+			return false;
+		}
+		return current_user_can( 'manage_options' );
 	}
 
 	/**
@@ -183,10 +230,8 @@ final class Outpost_OAuth_Controller {
 		if ( null === $user_id ) {
 			return self::redirect_to_settings( $provider->id(), 'state_invalid' );
 		}
-		// Trust the user from the validated state for the rest of this
-		// request (credential persistence is per-user).
-		wp_set_current_user( $user_id );
-
+		// The request stays anonymous. Everything below takes the state's
+		// user by id, so no user switch is needed.
 		$exchange = $provider->exchange_code( $code );
 		if ( is_wp_error( $exchange ) ) {
 			return self::redirect_to_settings( $provider->id(), 'exchange_failed' );

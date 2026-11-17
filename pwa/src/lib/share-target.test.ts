@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parse_dispatch_params, parse_share_target } from './share-target';
 
 /**
@@ -149,5 +149,143 @@ describe('parse_dispatch_params — shared photos', () => {
 			tab: 'note',
 			variant: 'note',
 		});
+	});
+});
+
+describe('hold_share_for_review (T10-S3-05 v1.2)', () => {
+	beforeEach(() => sessionStorage.clear());
+
+	it('holds a first share, then a second as the new share, across reloads', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'first' });
+		expect(hold_share_for_review()).toEqual({ shares: [{ tab: 'note', content: 'first' }], refused: false, epoch: null });
+		stash_share_target({ tab: 'reply', url: 'https://example.test/' });
+		const held = hold_share_for_review();
+		expect(held.shares.map((s) => s.tab)).toEqual(['note', 'reply']);
+		// A reload with no new share keeps both, in order.
+		expect(hold_share_for_review()).toEqual(held);
+		expect(sessionStorage.getItem('outpost.share_target')).toBeNull();
+	});
+
+	it('refuses a third share without replacing either', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		for (const content of ['one', 'two', 'three']) {
+			stash_share_target({ tab: 'note', content });
+			hold_share_for_review();
+		}
+		stash_share_target({ tab: 'note', content: 'four' });
+		const held = hold_share_for_review();
+		expect(held.refused).toBe(true);
+		expect(held.shares.map((s) => s.content)).toEqual(['one', 'two']);
+	});
+
+	it('refuses a photo share the service worker could not keep', async () => {
+		const { hold_share_for_review, stash_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'photo', sharedPhotos: true, shareRefused: true });
+		expect(hold_share_for_review()).toEqual({ shares: [], refused: true, epoch: null });
+	});
+
+	it('drops an unreadable slot instead of failing', async () => {
+		const { hold_share_for_review } = await import('./share-target');
+		sessionStorage.setItem('outpost.share_review', '{not json');
+		sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'note', content: 'ok' }));
+		expect(hold_share_for_review().shares).toEqual([{ tab: 'note', content: 'ok' }]);
+	});
+
+	it('drops a share whose tab is not a composer mode (#323)', async () => {
+		const { hold_share_for_review } = await import('./share-target');
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'checkin', content: 'old value' }));
+		sessionStorage.setItem('outpost.share_review', JSON.stringify({ tab: 'about', content: 'no' }));
+		sessionStorage.setItem('outpost.share_review_candidate', JSON.stringify({ tab: 'reply', url: 'https://example.test/' }));
+		expect(hold_share_for_review().shares).toEqual([{ tab: 'reply', url: 'https://example.test/' }]);
+	});
+
+	it('peek returns nothing for a stash whose tab is not a composer mode (#323)', async () => {
+		const { peek_share_target } = await import('./share-target');
+		for (const tab of ['checkin', '', 42, null]) {
+			sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab, content: 'x' }));
+			expect(peek_share_target()).toBeNull();
+		}
+		sessionStorage.setItem('outpost.share_target', JSON.stringify({ tab: 'life', content: 'x' }));
+		expect(peek_share_target()).toEqual({ tab: 'life', content: 'x' });
+	});
+
+	it('release hands the earliest share to the modes and clears both slots', async () => {
+		const { hold_share_for_review, release_held_share, stash_share_target, peek_share_target } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'first' });
+		hold_share_for_review();
+		expect(release_held_share()).toEqual({ tab: 'note', content: 'first' });
+		expect(peek_share_target()).toEqual({ tab: 'note', content: 'first' });
+		expect(sessionStorage.getItem('outpost.share_review')).toBeNull();
+		expect(sessionStorage.getItem('outpost.share_review_candidate')).toBeNull();
+	});
+});
+
+/**
+ * P4G-01: another tab can change the account between this tab reading a
+ * share and writing it back. A sessionStorage wrapper flips the origin epoch
+ * at the moment of the write, which the Web Storage spec allows.
+ */
+describe('a write that races an account change in another tab (P4G-01)', () => {
+	beforeEach(() => {
+		sessionStorage.clear();
+		localStorage.clear();
+		localStorage.setItem('outpost.share_epoch', 'A');
+	});
+
+	function flip_epoch_when_writing(keys: string[]): void {
+		const real = sessionStorage;
+		vi.stubGlobal('sessionStorage', {
+			getItem: (k: string) => real.getItem(k),
+			setItem: (k: string, v: string) => {
+				real.setItem(k, v);
+				if (keys.includes(k)) localStorage.setItem('outpost.share_epoch', 'B');
+			},
+			removeItem: (k: string) => real.removeItem(k),
+			clear: () => real.clear(),
+			key: (i: number) => real.key(i),
+			get length() {
+				return real.length;
+			},
+		});
+	}
+
+	it('set_held_shares refuses and leaves nothing readable under the new epoch', async () => {
+		const { set_held_shares, hold_share_for_review } = await import('./share-target');
+		flip_epoch_when_writing(['outpost.share_review']);
+		try {
+			expect(set_held_shares([{ tab: 'note', content: 'Account A' }], 'A')).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(hold_share_for_review().shares).toEqual([]);
+	});
+
+	it('release_held_share returns nothing and leaves nothing for the modes under the new epoch', async () => {
+		const { set_held_shares, release_held_share, peek_share_target, hold_share_for_review } = await import('./share-target');
+		expect(set_held_shares([{ tab: 'note', content: 'Account A' }], 'A')).toBe(true);
+		flip_epoch_when_writing(['outpost.share_target']);
+		let released: unknown;
+		try {
+			released = release_held_share('A');
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(released).toBeNull();
+		expect(peek_share_target()).toBeNull();
+		expect(hold_share_for_review().shares).toEqual([]);
+	});
+
+	it('hold_share_for_review returns no share it couldn’t keep under its epoch', async () => {
+		const { stash_share_target, hold_share_for_review } = await import('./share-target');
+		stash_share_target({ tab: 'note', content: 'Account A' });
+		flip_epoch_when_writing(['outpost.share_review']);
+		let held: { shares: unknown[] };
+		try {
+			held = hold_share_for_review();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(held.shares).toEqual([]);
 	});
 });

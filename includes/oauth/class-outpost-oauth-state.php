@@ -12,7 +12,7 @@
  * Looking up state by user_id requires authenticating the user first,
  * which is the chicken-and-egg the nonce was for. Keying on the state
  * value lets the callback handler look up the state with no auth, then
- * derive the user_id from the stored value, then `wp_set_current_user`.
+ * derive the user_id from the stored value and pass it on by id.
  * The state value is high-entropy (32 random bytes) so guessing is
  * infeasible.
  *

@@ -132,7 +132,7 @@ final class FetchRecentRestTest extends TestCase {
 		$this->assertNull( $item['icon_url'] );
 		$this->assertSame( 'note', $item['post_kind'] );
 		$this->assertSame( '', $item['post_payload']['content'] );
-		$this->assertSame( array(), $item['post_payload']['post_meta'] );
+		$this->assertArrayNotHasKey( 'post_meta', $item['post_payload'], 'Provider meta stays on the server (P4B-01).' );
 	}
 
 	public function test_resolve_items_caps_to_count(): void {

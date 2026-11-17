@@ -62,6 +62,13 @@ final class G35bFakeDestination extends Outpost_POSSE_Destination_Base {
 
 final class PosseDispatcherTest extends TestCase {
 
+	/** @var array<string, string>|null Fields of the post get_post() returns; null for a deleted post. */
+	private ?array $post_fields = array(
+		'post_status'   => 'publish',
+		'post_password' => '',
+		'post_type'     => 'post',
+	);
+
 	public function setUp(): void {
 		WP_Mock::setUp();
 		$ref  = new ReflectionClass( \WP_Mock\Filter::class );
@@ -108,8 +115,11 @@ final class PosseDispatcherTest extends TestCase {
 			'publish',
 			'draft',
 			(object) array(
-				'ID'          => 1,
-				'post_author' => 7,
+				'ID'            => 1,
+				'post_author'   => 7,
+				'post_status'   => 'publish',
+				'post_password' => '',
+				'post_type'     => 'post',
 			)
 		);
 
@@ -140,8 +150,11 @@ final class PosseDispatcherTest extends TestCase {
 			'publish',
 			'draft',
 			(object) array(
-				'ID'          => 1,
-				'post_author' => 7,
+				'ID'            => 1,
+				'post_author'   => 7,
+				'post_status'   => 'publish',
+				'post_password' => '',
+				'post_type'     => 'post',
 			)
 		);
 
@@ -160,8 +173,11 @@ final class PosseDispatcherTest extends TestCase {
 			'publish',
 			'publish',
 			(object) array(
-				'ID'          => 1,
-				'post_author' => 7,
+				'ID'            => 1,
+				'post_author'   => 7,
+				'post_status'   => 'publish',
+				'post_password' => '',
+				'post_type'     => 'post',
 			)
 		);
 
@@ -182,8 +198,11 @@ final class PosseDispatcherTest extends TestCase {
 			'publish',
 			'draft',
 			(object) array(
-				'ID'          => 1,
-				'post_author' => 7,
+				'ID'            => 1,
+				'post_author'   => 7,
+				'post_status'   => 'publish',
+				'post_password' => '',
+				'post_type'     => 'post',
 			)
 		);
 		$this->assertSame( 0, $schedules->count );
@@ -204,8 +223,11 @@ final class PosseDispatcherTest extends TestCase {
 			'publish',
 			'draft',
 			(object) array(
-				'ID'          => 1,
-				'post_author' => 7,
+				'ID'            => 1,
+				'post_author'   => 7,
+				'post_status'   => 'publish',
+				'post_password' => '',
+				'post_type'     => 'post',
 			)
 		);
 		$this->assertSame( 0, $schedules->count );
@@ -232,6 +254,107 @@ final class PosseDispatcherTest extends TestCase {
 		$ts  = Outpost_POSSE_Dispatcher::next_retry_timestamp( 3 );
 		$this->assertGreaterThanOrEqual( $now + 30 * 60 - 1, $ts );
 		$this->assertLessThanOrEqual( $now + 30 * 60 + 1, $ts );
+	}
+
+	// --- Public-post gate (F-48) ---------------------------------------
+
+	/**
+	 * @return array<string, array{0: array<string, string>}>
+	 */
+	public static function non_public_posts(): array {
+		return array(
+			'password-protected' => array( array( 'post_status' => 'publish', 'post_password' => 'pw', 'post_type' => 'post' ) ),
+			'page'               => array( array( 'post_status' => 'publish', 'post_password' => '', 'post_type' => 'page' ) ),
+			'draft'              => array( array( 'post_status' => 'draft', 'post_password' => '', 'post_type' => 'post' ) ),
+			'private'            => array( array( 'post_status' => 'private', 'post_password' => '', 'post_type' => 'post' ) ),
+			'trash'              => array( array( 'post_status' => 'trash', 'post_password' => '', 'post_type' => 'post' ) ),
+		);
+	}
+
+	/**
+	 * @dataProvider non_public_posts
+	 *
+	 * @param array<string, string> $fields Post fields.
+	 */
+	public function test_non_public_post_is_not_scheduled( array $fields ): void {
+		$this->stub_wp_state();
+		$store     = $this->stub_post_meta_store(
+			array(
+				'1|' . Outpost_POSSE_Meta::TARGETS => array( 'destination-a' ),
+			)
+		);
+		$schedules = $this->stub_schedule_counter();
+		WP_Mock::userFunction( 'user_can' )->andReturn( true );
+
+		Outpost_POSSE_Dispatcher::maybe_schedule_on_publish(
+			'publish',
+			'draft',
+			(object) array_merge(
+				array(
+					'ID'          => 1,
+					'post_author' => 7,
+				),
+				$fields
+			)
+		);
+
+		$this->assertSame( 0, $schedules->count, 'Nothing scheduled.' );
+		$this->assertArrayNotHasKey( '1|' . Outpost_POSSE_Meta::IN_FLIGHT, $store->meta, 'Nothing marked in flight.' );
+	}
+
+	/**
+	 * @return array<string, array{0: array<string, string>, 1: int}>
+	 */
+	public static function non_public_posts_by_attempt(): array {
+		$out = array();
+		foreach ( self::non_public_posts() as $label => $row ) {
+			foreach ( array( 1, 2, 3 ) as $attempt ) {
+				$out[ "$label, attempt $attempt" ] = array( $row[0], $attempt );
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * @dataProvider non_public_posts_by_attempt
+	 *
+	 * @param array<string, string> $fields  Post fields.
+	 * @param int                   $attempt Attempt number.
+	 */
+	public function test_dispatch_stops_for_a_non_public_post_on_any_attempt( array $fields, int $attempt ): void {
+		$this->stub_wp_state();
+		$store             = $this->stub_post_meta_store(
+			array(
+				'1|' . Outpost_POSSE_Meta::IN_FLIGHT => array( 'destination-a' ),
+			)
+		);
+		$schedules         = $this->stub_schedule_counter();
+		$this->post_fields = $fields;
+		Outpost_POSSE_Registry::register( new G35bFakeDestination( 'destination-a' ) );
+
+		Outpost_POSSE_Dispatcher::handle_dispatch( 1, 'destination-a', $attempt );
+
+		$this->assertSame( 0, G35bFakeDestination::$dispatch_calls, 'The destination is never called.' );
+		$this->assertSame( 0, $schedules->count, 'No retry.' );
+		$this->assertSame( array(), $store->meta[ '1|' . Outpost_POSSE_Meta::IN_FLIGHT ] ?? null, 'In-flight cleared.' );
+		$failures = $store->meta[ '1|' . Outpost_POSSE_Meta::FAILURES ] ?? array();
+		$this->assertCount( 1, $failures, 'One failure.' );
+		$this->assertSame( Outpost_POSSE_Dispatcher::NOT_PUBLIC, $failures[0]['error'], 'Reason.' );
+		$this->assertSame( $attempt, $failures[0]['attempt_count'], 'Attempt recorded.' );
+	}
+
+	public function test_dispatch_for_a_deleted_post_writes_nothing(): void {
+		$this->stub_wp_state();
+		$store             = $this->stub_post_meta_store( array() );
+		$schedules         = $this->stub_schedule_counter();
+		$this->post_fields = null;
+		Outpost_POSSE_Registry::register( new G35bFakeDestination( 'destination-a' ) );
+
+		Outpost_POSSE_Dispatcher::handle_dispatch( 1, 'destination-a', 1 );
+
+		$this->assertSame( 0, G35bFakeDestination::$dispatch_calls );
+		$this->assertSame( 0, $schedules->count );
+		$this->assertSame( array(), $store->meta, 'No orphan meta for a deleted post.' );
 	}
 
 	// --- Dispatch result handling ----------------------------------
@@ -378,6 +501,20 @@ final class PosseDispatcherTest extends TestCase {
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
 		WP_Mock::userFunction( 'do_action' )->andReturn( null );
 		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 0 );
+		WP_Mock::userFunction( 'get_post' )->andReturnUsing( array( $this, 'post_fixture' ) );
+	}
+
+	/**
+	 * The post handle_dispatch() re-reads. Public unless a test changes
+	 * $this->post_fields.
+	 *
+	 * @param mixed $post_id Post id.
+	 */
+	public function post_fixture( $post_id ): ?object {
+		if ( null === $this->post_fields ) {
+			return null;
+		}
+		return (object) array_merge( array( 'ID' => (int) $post_id ), $this->post_fields );
 	}
 
 	/**

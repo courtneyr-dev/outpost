@@ -2,12 +2,12 @@
 /**
  * Integration test: REST route identity for route-scoped security decisions.
  *
- * Drives WordPress's real `rest_authentication_errors` chain — core's
- * `rest_cookie_check_errors` (priority 100) followed by Outpost's
- * composer-config opt-out (priority 999) — exactly as
+ * Drives WordPress's real `rest_authentication_errors` chain (core's
+ * `rest_cookie_check_errors`, priority 100) exactly as
  * `WP_REST_Server::check_authentication()` runs it on a live request.
  *
- * The audited defect (pre-1.0.4 audit, 2026-09-01): the opt-out keyed on
+ * The audited defect (pre-1.0.4 audit, 2026-09-01): a composer-config
+ * authentication opt-out (removed in 1.0.27) keyed on
  * REQUEST_URI's path while WordPress dispatches on the `rest_route` query
  * var. A logged-in victim lured to
  *
@@ -18,6 +18,12 @@
  * not run (the target post survives); the valid-nonce control proves the
  * same flow does delete when the nonce is genuine, so the survival assertion
  * is calibrated.
+ *
+ * The second audited defect (SEC-2026-09-21) lived in the same opt-out. 1.0.27
+ * removed the opt-out entirely: Outpost no longer clears any
+ * rest_authentication_errors result, so another plugin's REST gate now stands
+ * on the composer-config route as it does everywhere else. The tests below keep
+ * the route-identity and CSRF assertions and pin that the gate stands.
  *
  * @package Outpost\Tests\Integration
  */
@@ -134,6 +140,30 @@ final class RestRouteResolutionTest extends TestCase {
 	}
 
 	/**
+	 * The composer-config equivalent of serve_delete(): authenticate the way
+	 * WP_REST_Server::serve_request() does, and only dispatch the real route
+	 * when authentication passed. A denied request returns response => null, so
+	 * a test can prove the handler never built the companion body.
+	 *
+	 * @return array{auth: mixed, response: \WP_REST_Response|null}
+	 */
+	private function serve_composer_config(): array {
+		$server = rest_get_server();
+		$auth   = $server->check_authentication();
+		if ( is_wp_error( $auth ) ) {
+			return array(
+				'auth'     => $auth,
+				'response' => null,
+			);
+		}
+		$response = $server->dispatch( new WP_REST_Request( 'GET', '/outpost/v1/composer-config' ) );
+		return array(
+			'auth'     => $auth,
+			'response' => $response,
+		);
+	}
+
+	/**
 	 * @test
 	 */
 	public function bogus_nonce_delete_smuggled_through_composer_config_path_is_refused_and_post_survives(): void {
@@ -146,7 +176,7 @@ final class RestRouteResolutionTest extends TestCase {
 
 		$auth = $this->serve_delete( $post_id );
 
-		$this->assertInstanceOf( \WP_Error::class, $auth, 'Core\'s invalid-nonce error must survive the composer-config opt-out.' );
+		$this->assertInstanceOf( \WP_Error::class, $auth, 'Core\'s invalid-nonce error must stand on a request smuggled through the composer-config path.' );
 		$this->assertSame( 'rest_cookie_invalid_nonce', $auth->get_error_code() );
 		$this->assertSame( 'publish', get_post_status( $post_id ), 'The protected DELETE must not have run.' );
 	}
@@ -186,8 +216,7 @@ final class RestRouteResolutionTest extends TestCase {
 	 * @test
 	 */
 	public function bogus_nonce_on_composer_config_itself_is_still_refused(): void {
-		// The opt-out may clear third-party blanket gates for its own route, but
-		// never core's CSRF defense.
+		// Core's CSRF defense applies to composer-config like any other route.
 		$this->arrive_as_cookie_user( '/wp-json/outpost/v1/composer-config?_wpnonce=bogus', '/outpost/v1/composer-config', 'bogus' );
 
 		$auth = rest_get_server()->check_authentication();
@@ -199,7 +228,7 @@ final class RestRouteResolutionTest extends TestCase {
 	/**
 	 * @test
 	 */
-	public function third_party_blanket_gate_is_cleared_only_for_the_composer_config_route(): void {
+	public function third_party_blanket_gate_stands_on_the_composer_config_route_too(): void {
 		// Simulate a REST-hardening plugin: anonymous requests are refused everywhere.
 		$gate = static function ( $result ) {
 			if ( null !== $result || is_user_logged_in() ) {
@@ -212,13 +241,16 @@ final class RestRouteResolutionTest extends TestCase {
 		$GLOBALS['wp_rest_auth_cookie'] = null;
 
 		try {
-			// Our own route: the gate is cleared so our permission_callback decides.
+			// Our own route: since 1.0.27 Outpost never clears another plugin's
+			// authentication decision, so the gate stands here too.
 			$wp = new \WP();
 			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- test harness.
 			$wp->query_vars         = array( 'rest_route' => '/outpost/v1/composer-config' );
 			$GLOBALS['wp']          = $wp;
 			$_SERVER['REQUEST_URI'] = '/wp-json/outpost/v1/composer-config';
-			$this->assertNull( rest_get_server()->check_authentication(), 'Compatibility purpose preserved for the composer-config route.' );
+			$own                    = rest_get_server()->check_authentication();
+			$this->assertInstanceOf( \WP_Error::class, $own, 'Another plugin\'s gate must stand on composer-config.' );
+			$this->assertSame( 'rest_not_logged_in', $own->get_error_code() );
 
 			// Our path, another route: the gate must stand.
 			$wp->query_vars         = array( 'rest_route' => '/wp/v2/posts' );
@@ -236,7 +268,7 @@ final class RestRouteResolutionTest extends TestCase {
 	 */
 	public function composer_config_request_still_reaches_its_own_permission_callback(): void {
 		// Not a CSRF shape: a plain logged-in dispatch of the real route must
-		// keep working and be decided by edit_posts, not by the opt-out.
+		// keep working and be decided by edit_posts.
 		wp_set_current_user( $this->admin_id );
 		$GLOBALS['wp_rest_auth_cookie'] = null;
 		delete_transient( 'outpost_config_rl_u_' . $this->admin_id );
@@ -250,12 +282,13 @@ final class RestRouteResolutionTest extends TestCase {
 	/**
 	 * @test
 	 */
-	public function media_lookup_body_token_is_only_restored_on_the_lookup_route(): void {
+	public function media_lookup_body_token_is_never_copied_into_the_header(): void {
 		// Third instance of the class: the bearer reinjection used to hook
 		// determine_current_user globally and scope itself by strpos() on
-		// REQUEST_URI. Now it lives in the lookup route's own permission
-		// callback, so dispatching ANY other route with a body token and the
-		// lookup path as a decoy restores nothing.
+		// REQUEST_URI, and later lived in the lookup route's permission
+		// callback. Since the wp.org review of 2026-09-14 no Outpost code
+		// copies a body token into the header or switches users, on any
+		// route: IndieAuth reads `$_POST['access_token']` itself.
 		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		wp_set_current_user( 0 );
 		$_POST['access_token']  = 'decoy-token'; // outpost-lint:fixture-credential
@@ -270,12 +303,13 @@ final class RestRouteResolutionTest extends TestCase {
 		rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/wp/v2/users' ) );
 		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'No reinjection on a route that is not the lookup.' );
 
-		// The lookup route itself DOES restore the header for its validating filter.
 		$wp->query_vars = array( 'rest_route' => '/outpost/v1/lookup' );
 		$request        = new WP_REST_Request( 'POST', '/outpost/v1/lookup' );
 		$request->set_body_params( array( 'kind' => 'book', 'q' => 'dune', 'access_token' => 'decoy-token' ) );
-		rest_get_server()->dispatch( $request );
-		$this->assertSame( 'Bearer decoy-token', $_SERVER['HTTP_AUTHORIZATION'] ?? null );
+		$response = rest_get_server()->dispatch( $request );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'No reinjection on the lookup route either.' );
+		$this->assertSame( 0, get_current_user_id(), 'The lookup route must not switch users.' );
+		$this->assertSame( 401, $response->get_status() );
 		unset( $_POST['access_token'], $_SERVER['HTTP_AUTHORIZATION'] );
 	}
 }

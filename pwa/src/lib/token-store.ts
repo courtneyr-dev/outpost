@@ -140,6 +140,12 @@ export async function read_token(
 /**
  * Forget the token. Leaves the encryption key in place — re-login uses the
  * same key, which is fine because the IV randomises every ciphertext anyway.
+ *
+ * Leaves the offline queue alone. "Sign out and back in" is the composer's
+ * own advice when a token expires or is rejected, so a sign-out must not
+ * discard posts still waiting to send; a replay after the next sign-in to
+ * the same site sends them (see offline-queue.ts, "Replay and the
+ * signed-in site").
  */
 export async function clear_token(env: TokenStoreEnvironment = default_env): Promise<void> {
 	const db = await open_db(env);

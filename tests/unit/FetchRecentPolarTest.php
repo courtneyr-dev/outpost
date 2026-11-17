@@ -24,7 +24,19 @@ final class FetchRecentPolarTest extends TestCase {
 		Outpost_Fetch_Recent_Polar::set_http_resolver_for_tests( null );
 		WP_Mock::userFunction( 'sanitize_key' )->andReturnUsing( static function ( $s ) { return $s; } );
 		WP_Mock::userFunction( 'esc_html' )->andReturnUsing( static function ( $s ) { return (string) $s; } );
+		$this->site_settings = array();
+		WP_Mock::userFunction( 'get_option' )->andReturnUsing(
+			fn ( $name, $fallback = false ) => 'outpost_settings' === $name
+				? $this->site_settings
+				: ( $this->other_option ?? $fallback )
+		);
 	}
+
+	/** @var array<string,mixed> What get_option( 'outpost_settings' ) returns. */
+	private array $site_settings = array();
+
+	/** @var string|null What every other get_option() call returns (the encryption key). */
+	private ?string $other_option = null;
 
 	public function tearDown(): void {
 		Outpost_Fetch_Recent_Polar::set_http_resolver_for_tests( null );
@@ -60,6 +72,41 @@ final class FetchRecentPolarTest extends TestCase {
 		$this->assertSame( '2026-05-04', $item['subtitle'] );
 		$this->assertSame( '5200', $item['post_payload']['post_meta']['_outpost_polar_distance_m'] );
 		$this->assertSame( 'PT32M0S', $item['post_payload']['post_meta']['_outpost_polar_duration'] );
+	}
+
+	/**
+	 * P4B-02: without Post Kinds' card, the title and paragraph go into the
+	 * post. Distance and duration stay in private post meta unless the site
+	 * turns on "Workout details in post text"; the picker list keeps them.
+	 */
+	public function test_post_text_leaves_out_distance_and_duration_by_default(): void {
+		$distance = Outpost_Fetch_Recent_Polar::map_exercise_item(
+			array( 'id' => 'ex-1', 'sport' => 'RUNNING', 'distance' => 5200.0, 'duration' => 'PT32M0S' ),
+			'url'
+		);
+		$duration = Outpost_Fetch_Recent_Polar::map_exercise_item(
+			array( 'id' => 'ex-2', 'sport' => 'STRENGTH_TRAINING', 'duration' => 'PT45M30S' ),
+			'url'
+		);
+
+		$this->assertSame( 'Training — Running', $distance['post_payload']['title'] );
+		$this->assertSame( '<p>Training — Running</p>', $distance['post_payload']['content'] );
+		$this->assertSame( 'Training — Strength Training', $duration['post_payload']['title'] );
+		$this->assertSame( '<p>Training — Strength Training</p>', $duration['post_payload']['content'] );
+		$this->assertStringContainsString( '5.2 km', $distance['title'], 'The picker list still shows the distance.' );
+		$this->assertSame( '5200', $distance['post_payload']['post_meta']['_outpost_polar_distance_m'] );
+	}
+
+	public function test_post_text_includes_details_when_the_site_turns_them_on(): void {
+		$this->site_settings = array( 'workout_details_in_text' => true );
+
+		$item = Outpost_Fetch_Recent_Polar::map_exercise_item(
+			array( 'id' => 'ex-1', 'sport' => 'RUNNING', 'distance' => 5200.0, 'duration' => 'PT32M0S' ),
+			'url'
+		);
+
+		$this->assertSame( 'Training — Running, 5.2 km', $item['post_payload']['title'] );
+		$this->assertSame( '<p>Training — Running, 5.2 km</p>', $item['post_payload']['content'] );
 	}
 
 	public function test_map_exercise_with_only_duration_uses_minutes(): void {
@@ -132,8 +179,8 @@ final class FetchRecentPolarTest extends TestCase {
 			static function () {
 				return array(
 					'exercises' => array(
-						'https://www.polaraccesslink.com/v3/exercises/ex-1',
-						'https://www.polaraccesslink.com/v3/exercises/ex-2',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-1',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-2',
 					),
 				);
 			}
@@ -150,7 +197,7 @@ final class FetchRecentPolarTest extends TestCase {
 			static function () {
 				return array(
 					'exercises' => array(
-						array( 'url' => 'https://www.polaraccesslink.com/v3/exercises/ex-3' ),
+						array( 'url' => 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3' ),
 					),
 				);
 			}
@@ -160,6 +207,24 @@ final class FetchRecentPolarTest extends TestCase {
 
 		$this->assertCount( 1, $urls );
 		$this->assertStringContainsString( 'ex-3', $urls[0] );
+	}
+
+	public function test_list_transaction_exercises_drops_urls_outside_this_transaction(): void {
+		Outpost_Fetch_Recent_Polar::set_http_resolver_for_tests(
+			static function () {
+				return array(
+					'exercises' => array(
+						'https://attacker.example/v3/users/7/exercise-transactions/txn-1/exercises/ex-1',
+						'https://www.polaraccesslink.com/v3/users/8/exercise-transactions/txn-1/exercises/ex-2',
+						'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3',
+					),
+				);
+			}
+		);
+
+		$urls = Outpost_Fetch_Recent_Polar::list_transaction_exercises( 'fixture-token', 7, 'txn-1' );
+
+		$this->assertSame( array( 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/ex-3' ), $urls );
 	}
 
 	public function test_fetch_items_does_not_commit_transaction(): void {
@@ -172,9 +237,9 @@ final class FetchRecentPolarTest extends TestCase {
 				if ( 'POST' === $method && str_contains( $url, '/exercise-transactions' ) ) {
 					return array( 'transaction-id' => 'txn-test' );
 				}
-				if ( 'GET' === $method && str_contains( $url, '/exercise-transactions/txn-test' ) ) {
+				if ( 'GET' === $method && str_ends_with( $url, '/exercise-transactions/txn-test' ) ) {
 					return array(
-						'exercises' => array( 'https://www.polaraccesslink.com/v3/exercises/ex-9' ),
+						'exercises' => array( 'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-test/exercises/ex-9' ),
 					);
 				}
 				if ( 'GET' === $method && str_contains( $url, '/exercises/ex-9' ) ) {
@@ -205,11 +270,11 @@ final class FetchRecentPolarTest extends TestCase {
 				if ( 'POST' === $method ) {
 					return array( 'transaction-id' => 'txn-1' );
 				}
-				if ( str_contains( $url, '/exercise-transactions/txn-1' ) ) {
+				if ( str_ends_with( $url, '/exercise-transactions/txn-1' ) ) {
 					return array(
 						'exercises' => array(
-							'https://www.polaraccesslink.com/v3/exercises/a',
-							'https://www.polaraccesslink.com/v3/exercises/b',
+							'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/a',
+							'https://www.polaraccesslink.com/v3/users/7/exercise-transactions/txn-1/exercises/b',
 						),
 					);
 				}
@@ -271,7 +336,8 @@ final class FetchRecentPolarTest extends TestCase {
 	private function stub_credentials_for_user( int $user_id, string $access_token ): void {
 		$creds = array( 'access_token' => $access_token );
 		\Outpost_Encryption_Key_Resolver::reset_for_tests();
-		WP_Mock::userFunction( 'get_option' )->andReturn( base64_encode( random_bytes( 32 ) ) );
+		// One get_option() mock per test (WP_Mock gotcha); setUp() registers it.
+		$this->other_option = base64_encode( random_bytes( 32 ) );
 		$envelope = \Outpost_Encryption::encrypt( wp_json_encode( $creds ) );
 		WP_Mock::userFunction( 'get_user_meta' )->andReturnUsing(
 			static function ( $uid, $key, $single ) use ( $user_id, $envelope ) {

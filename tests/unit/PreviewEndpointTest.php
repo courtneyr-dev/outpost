@@ -26,6 +26,9 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	public function setUp(): void {
 		WP_Mock::setUp();
+		// Outpost_Request_Headers sanitizes every $_SERVER read.
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => is_string( $v ) ? trim( $v ) : '' );
 	}
 
 	public function tearDown(): void {
@@ -181,30 +184,34 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		// IndieAuth rejects the bogus token: determine_current_user resolves nobody.
 		$this->mock_filters( false );
 
-		$result = Outpost_Preview_Endpoint::check_permission();
+		$result = Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
 	}
 
 	/**
-	 * Regression: same bypass via the Micropub body-token fallback.
-	 *
-	 * `{"access_token":"x", ...}` in the body must also be validated, not
-	 * accepted on presence.
+	 * wp.org review 2026-09-14: the permission callback never resolves or
+	 * switches users. A JSON-body token WordPress didn't resolve leaves the
+	 * request anonymous, and the preview route refuses it with 401.
 	 */
-	public function test_check_permission_rejects_unvalidated_body_token(): void {
-		$_POST['access_token'] = 'x'; // outpost-lint:fixture-credential
+	public function test_check_permission_refuses_a_body_token_wordpress_did_not_resolve(): void {
+		$request = new \WP_REST_Request( 'POST', '/' );
+		$request->set_body( '{"access_token":"x"}' ); // outpost-lint:fixture-credential
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
 		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		WP_Mock::userFunction( 'sanitize_text_field' )->andReturnUsing( static fn( $v ) => $v );
 		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
-		$this->mock_filters( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		// Even a token IndieAuth would accept: the callback never asks.
+		$this->mock_filters( 42 );
 
-		$result = Outpost_Preview_Endpoint::check_permission();
+		$result = Outpost_Preview_Endpoint::check_permission( $request );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+		$this->assertArrayNotHasKey( 'HTTP_AUTHORIZATION', $_SERVER, 'The callback must not write a request header.' );
 	}
 
 	/**
@@ -213,13 +220,37 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 	 */
 	public function test_check_permission_allows_validated_bearer_editor(): void {
 		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
-		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
-		WP_Mock::userFunction( 'wp_set_current_user' )->with( 42 )->andReturn( null );
-		// determine_current_user validates the token to user 42, who can edit_posts.
+		// IndieAuth resolved the header token during WordPress's own user
+		// resolution, before the route ran.
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( true );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
 		$this->mock_filters( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		// H6/H7: bearer_has_scope() reads indieauth_scopes via the real
+		// apply_filters() shim (WP_Mock::onFilter), not the userFunction
+		// mock above — mock_filters()'s wholesale apply_filters override is
+		// inert for this call (see "Scope source" in trait-bearer-auth.php).
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
 
-		$this->assertTrue( Outpost_Preview_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
+	}
+
+	/**
+	 * H7 fix-round-1, Important: an under-scoped (but otherwise validated)
+	 * bearer token is refused, distinct from an unvalidated-token refusal.
+	 */
+	public function test_check_permission_refuses_under_scoped_bearer_token(): void {
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		WP_Mock::userFunction( 'is_user_logged_in' )->andReturn( false );
+		WP_Mock::userFunction( 'wp_set_current_user' )->never();
+		$this->mock_filters( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'profile' ) );
+
+		$result = Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 403, $result->get_error_data()['status'] ?? null );
 	}
 
 	/**
@@ -230,7 +261,7 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
 		$this->mock_filters( false );
 
-		$this->assertTrue( Outpost_Preview_Endpoint::check_permission() );
+		$this->assertTrue( Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) ) );
 	}
 
 	/**
@@ -243,9 +274,97 @@ final class PreviewEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( false );
 		$this->mock_filters( false );
 
-		$result = Outpost_Preview_Endpoint::check_permission();
+		$result = Outpost_Preview_Endpoint::check_permission( new \WP_REST_Request( 'POST', '/' ) );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 401, $result->get_error_data()['status'] ?? null );
+	}
+
+	// =====================================================================
+	// H9: safe_fetch() pins the connection to the address the SSRF guard
+	// vetted, instead of trusting a second DNS lookup at connect time.
+	//
+	// The happy path (guard passes, fetch proceeds) is NOT unit-testable
+	// here: mocking wp_safe_remote_get() via WP_Mock::userFunction()
+	// permanently defines it as a real global function for the rest of the
+	// PHP process (proven empirically -- WP_Mock::tearDown() does not undo
+	// it), which then makes every later integration test's
+	// `function_exists('wp_safe_remote_get')` environment-readiness guard
+	// misfire and try to run for real against a WordPress core that was
+	// never loaded. That coverage lives in the integration suite instead
+	// (tests/integration/PreviewSsrfTest.php's
+	// `public_host_pins_the_vetted_ip_during_the_fetch()` and pre-existing
+	// `public_host_is_fetched()`), matching this codebase's own documented
+	// convention (SourceSpotifyLiveTest.php's docblock) that fetch
+	// behavior belongs there.
+	//
+	// The blocked-address path below is safe to test here precisely
+	// because it must NOT call wp_safe_remote_get() at all: that name
+	// stays deliberately unmocked, so a regression that let the guard
+	// through would fatal with "Call to undefined function
+	// wp_safe_remote_get()" here instead of silently reaching the network.
+	// =====================================================================
+
+	private function stub_wp_parse_url(): void {
+		WP_Mock::userFunction( 'wp_parse_url' )->andReturnUsing(
+			static function ( $url, $component = -1 ) {
+				return -1 === $component ? parse_url( (string) $url ) : parse_url( (string) $url, $component );
+			}
+		);
+	}
+
+	public function test_safe_fetch_never_reaches_the_network_for_a_blocked_resolved_address(): void {
+		// A host that resolves to a blocked address (the DNS-rebinding shape
+		// the guard must fail closed on) must never reach the fetch at all.
+		WP_Mock::onFilter( 'outpost_resolve_host_ips' )->with( array(), 'rebind.example' )->reply( array( '169.254.169.254' ) );
+		$this->stub_wp_parse_url();
+
+		$response = $this->invoke_private( 'safe_fetch', array( 'http://rebind.example/post', array( 'text/html' ) ) );
+
+		$this->assertInstanceOf( WP_Error::class, $response );
+	}
+
+	// =====================================================================
+	// H9 fix round 1: resolve_pin_entry() is the pure host:port:ip builder
+	// safe_fetch() hands to CURLOPT_RESOLVE via http_api_curl. Extracted so
+	// the port-default logic is directly unit-tested — nothing here
+	// previously checked the actual pin value, only that the hook was
+	// attached and detached (tests/integration/PreviewSsrfTest.php).
+	// =====================================================================
+
+	public function test_resolve_pin_entry_defaults_to_443_for_https(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://example.test/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:443:93.184.216.34', $entry );
+	}
+
+	public function test_resolve_pin_entry_defaults_to_80_for_http(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'http://example.test/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:80:93.184.216.34', $entry );
+	}
+
+	public function test_resolve_pin_entry_keeps_an_explicit_port(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://example.test:8080/post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:8080:93.184.216.34', $entry );
+	}
+
+	/**
+	 * Requests lower-cases the URL host (its Iri class) before curl sees
+	 * it, so the pin entry must carry the same lower-case host.
+	 */
+	public function test_resolve_pin_entry_lower_cases_the_host(): void {
+		$this->stub_wp_parse_url();
+
+		$entry = $this->invoke_private( 'resolve_pin_entry', array( 'https://Example.TEST/Post', '93.184.216.34' ) );
+
+		$this->assertSame( 'example.test:443:93.184.216.34', $entry );
 	}
 }

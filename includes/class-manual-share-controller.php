@@ -145,25 +145,69 @@ final class Outpost_Manual_Share_Controller {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability. Filterable.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope. Filterable.
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
-
-		$allow = current_user_can( 'edit_posts' );
+	public static function check_permission( WP_REST_Request $request ) {
+		// This callback guards all three routes. GET /manual-share-chips
+		// returns static chip metadata — read-only, so a `read` scope
+		// suffices in addition to `create`/`update`. Both POST routes
+		// mutate: /intent/log explicitly updates the audit log's
+		// `outcome`, and /intent — despite looking like a computed
+		// payload — calls Outpost_Manual_Share_Intent_Payload_Builder::
+		// build_for_android()/build_for_ios(), which both call
+		// Outpost_Manual_Share_Audit_Log::add_entry() -> update_post_meta()
+		// (H6 fix round 1, Critical 2: /intent was misclassified read-only).
+		// A prior per-route match on /intent/log (case-sensitive string
+		// comparison against $request->get_route()) was also a bypass: core
+		// matches REST routes case-insensitively, so /intent/LOG would
+		// dispatch to the same mutating handler while failing that
+		// comparison and falling through to the read-only scope. A plain
+		// method split has no such mismatch — both POSTs need the same
+		// scope regardless of which one they are.
+		$required_scopes = 'GET' === $request->get_method()
+			? array( 'create', 'update', 'read' )
+			: array( 'create', 'update' );
+		$message         = __( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, $required_scopes ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the manual-share intent endpoint permission decision.
+		 * Filters whether a request may use the manual-share intent endpoint.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_manual_share_intent_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_manual_share_intent_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost manual-share intent firing requires an authenticated user.', 'outpost-mobile-publishing' ),
+				$message,
 				array( 'status' => 401 )
 			);
 		}

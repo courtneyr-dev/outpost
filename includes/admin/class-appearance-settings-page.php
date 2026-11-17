@@ -63,8 +63,9 @@ final class Outpost_Appearance_Settings_Page {
 		}
 		$user_id   = (int) get_current_user_id();
 		$mode_pref = Outpost_Mode_Controller::get_mode( $user_id );
-		$day       = Outpost_Token_Resolver::resolve( $user_id, 'day' );
-		$night     = Outpost_Token_Resolver::resolve( $user_id, 'night' );
+		$source    = Outpost_Style_Source::get_source( $user_id );
+		$day       = Outpost_Token_Resolver::resolve( $user_id, 'day', $source );
+		$night     = Outpost_Token_Resolver::resolve( $user_id, 'night', $source );
 
 		?>
 		<div class="wrap outpost-appearance-wrap">
@@ -72,15 +73,31 @@ final class Outpost_Appearance_Settings_Page {
 
 			<?php self::render_admin_notice(); ?>
 
-			<p><?php esc_html_e( 'Customize how the Outpost composer paints itself. Color and font defaults inherit from your active theme; you can override any individual token below. Day/night mode is a per-user preference — two contributors on the same site can have different settings.', 'outpost-mobile-publishing' ); ?></p>
+			<p><?php esc_html_e( 'Choose how the Outpost composer looks for you. Style source picks where colors and fonts come from: the built-in Outpost Default design, or your active theme. Appearance picks Light, Dark, or System. Both are per-user, and the composer\'s Preferences (the gear button, or About › Preferences) change the same values. You can also override individual tokens below.', 'outpost-mobile-publishing' ); ?></p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="outpost-appearance-form">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ACTION ); ?>">
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 
-				<h2><?php esc_html_e( 'Mode', 'outpost-mobile-publishing' ); ?></h2>
+				<h2><?php esc_html_e( 'Style source', 'outpost-mobile-publishing' ); ?></h2>
+				<fieldset class="outpost-appearance-source">
+					<legend class="screen-reader-text"><?php esc_html_e( 'Style source', 'outpost-mobile-publishing' ); ?></legend>
+					<?php foreach ( self::source_options() as $value => $label ) : ?>
+						<label class="outpost-appearance-mode__option">
+							<input
+								type="radio"
+								name="style_source"
+								value="<?php echo esc_attr( $value ); ?>"
+								<?php checked( $source, $value ); ?>
+							>
+							<?php echo esc_html( $label ); ?>
+						</label>
+					<?php endforeach; ?>
+				</fieldset>
+
+				<h2><?php esc_html_e( 'Appearance', 'outpost-mobile-publishing' ); ?></h2>
 				<fieldset class="outpost-appearance-mode">
-					<legend class="screen-reader-text"><?php esc_html_e( 'Day / night mode preference', 'outpost-mobile-publishing' ); ?></legend>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Light, Dark, or System', 'outpost-mobile-publishing' ); ?></legend>
 					<?php foreach ( self::mode_options() as $value => $label ) : ?>
 						<label class="outpost-appearance-mode__option">
 							<input
@@ -137,25 +154,33 @@ final class Outpost_Appearance_Settings_Page {
 	}
 
 	/**
-	 * admin-post.php handler — validates nonce + cap, forwards into
-	 * the REST controller's POST handler so there's a single write
-	 * path. Redirects back with notice on success/failure.
+	 * admin-post.php handler. The nonce and the `edit_posts` check run
+	 * first, here, and stop the request when either fails; then the
+	 * fields are forwarded into the REST controller's POST handler so
+	 * there's a single write path. Redirects back with a notice.
 	 */
 	public static function handle_save(): void {
-		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Verified by guard_post_request() at the top of this handler.
-		self::guard_post_request();
+		$nonce = isset( $_POST[ self::NONCE_NAME ] )
+			? sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) )
+			: '';
+		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
+		}
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ) );
+		}
 
 		$user_id   = (int) get_current_user_id();
-		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( (string) $_POST['mode_preference'] ) ) : '';
+		$mode_pref = isset( $_POST['mode_preference'] ) ? sanitize_key( wp_unslash( $_POST['mode_preference'] ) ) : '';
+		$source_in = isset( $_POST['style_source'] ) ? sanitize_key( wp_unslash( $_POST['style_source'] ) ) : '';
 		// Bypass-contrast checkboxes — names like `bypass_contrast[text]` etc.
 		$bypass_in = isset( $_POST['bypass_contrast'] ) && is_array( $_POST['bypass_contrast'] )
-			? array_keys( array_filter( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) ) )
+			? self::checked_keys( array_map( 'rest_sanitize_boolean', wp_unslash( (array) $_POST['bypass_contrast'] ) ) )
 			: array();
-		$bypass_in = array_filter( $bypass_in, 'is_string' );
-		$bypass_in = array_values( array_map( static fn ( string $s ): string => sanitize_key( $s ), $bypass_in ) );
 
 		$payload = array(
 			'mode_preference' => $mode_pref,
+			'style_source'    => $source_in,
 			'bypass_contrast' => $bypass_in,
 		);
 		foreach ( array( 'day', 'night' ) as $mode ) {
@@ -170,7 +195,6 @@ final class Outpost_Appearance_Settings_Page {
 				'fonts'  => self::clean_string_map( $fonts_in ),
 			);
 		}
-		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		// Forward into REST handler. We stand up a synthetic
 		// WP_REST_Request so validation + persistence + cache
@@ -182,23 +206,15 @@ final class Outpost_Appearance_Settings_Page {
 		$response = Outpost_Appearance_REST_Controller::handle_post( $request );
 
 		if ( $response instanceof \WP_Error ) {
-			self::redirect_with_notice( 'error', $response->get_error_message() );
+			// The message rides in a short-lived per-user transient, not the
+			// redirect URL, so the notice never prints text a link supplied
+			// (T10-S3-13, F-11). It is shown once, escaped, on this screen.
+			set_transient( self::notice_key( $user_id ), $response->get_error_message(), MINUTE_IN_SECONDS );
+			self::redirect_with_notice( 'error' );
 			return;
 		}
 
-		self::redirect_with_notice( 'saved', '' );
-	}
-
-	private static function guard_post_request(): void {
-		$nonce = isset( $_POST[ self::NONCE_NAME ] )
-			? sanitize_text_field( wp_unslash( (string) $_POST[ self::NONCE_NAME ] ) )
-			: '';
-		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
-			wp_die( esc_html__( 'Security check failed.', 'outpost-mobile-publishing' ) );
-		}
-		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage appearance preferences.', 'outpost-mobile-publishing' ) );
-		}
+		self::redirect_with_notice( 'saved' );
 	}
 
 	/**
@@ -318,9 +334,13 @@ final class Outpost_Appearance_Settings_Page {
 		<?php
 	}
 
+	/** Per-user transient that carries a save error to the next page view. */
+	private static function notice_key( int $user_id ): string {
+		return 'outpost_appearance_notice_' . $user_id;
+	}
+
 	private static function render_admin_notice(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display flag.
-		$notice = isset( $_GET['notice'] ) ? sanitize_key( wp_unslash( (string) $_GET['notice'] ) ) : '';
+		$notice = Outpost_Request_Headers::query_key( 'notice' );
 		switch ( $notice ) {
 			case 'saved':
 				printf(
@@ -329,8 +349,10 @@ final class Outpost_Appearance_Settings_Page {
 				);
 				break;
 			case 'error':
-				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display.
-				$message = isset( $_GET['message'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['message'] ) ) : '';
+				$key     = self::notice_key( (int) get_current_user_id() );
+				$stored  = get_transient( $key );
+				$message = is_string( $stored ) ? $stored : '';
+				delete_transient( $key );
 				printf(
 					'<div class="notice notice-error is-dismissible"><p>%s</p></div>',
 					esc_html( '' === $message ? __( 'Save failed.', 'outpost-mobile-publishing' ) : $message )
@@ -339,15 +361,12 @@ final class Outpost_Appearance_Settings_Page {
 		}
 	}
 
-	private static function redirect_with_notice( string $notice, string $message ): void {
+	private static function redirect_with_notice( string $notice ): void {
 		$args = array(
 			'page'   => self::PAGE_SLUG,
 			'notice' => $notice,
 		);
-		if ( '' !== $message && 'error' === $notice ) {
-			$args['message'] = $message;
-		}
-		$url = add_query_arg( $args, admin_url( 'admin.php' ) );
+		$url  = add_query_arg( $args, admin_url( 'admin.php' ) );
 		if ( ! defined( 'OUTPOST_TESTING_PWA_SHELL' ) ) {
 			wp_safe_redirect( $url );
 			exit;
@@ -379,7 +398,7 @@ final class Outpost_Appearance_Settings_Page {
 			. '<head>'
 			. '<meta charset="utf-8">'
 			. '<title>Outpost preview</title>'
-			. self::preview_style_markup( Outpost_Token_Resolver::to_css( $resolved ), $mode )
+			. self::preview_style_markup( $resolved, $mode )
 			. '</head>'
 			. '<body class="' . esc_attr( $root_class ) . '">'
 			. $body
@@ -404,17 +423,21 @@ final class Outpost_Appearance_Settings_Page {
 	 * rewrites its contents as the user edits — keep the handle names in
 	 * step with that selector.
 	 *
-	 * @param string $tokens_css Resolved --outpost-* token declarations.
-	 * @param string $mode       'day' or 'night'.
+	 * The token block carries the resolved component tokens too: the tab
+	 * rules paint from them, with the same contrast-checked values
+	 * to_scoped_css() gives /post/.
+	 *
+	 * @param array<string,mixed> $resolved {@see Outpost_Token_Resolver::resolve()} output.
+	 * @param string              $mode     'day' or 'night'.
 	 * @return string The printed style tags for the srcdoc head.
 	 */
-	private static function preview_style_markup( string $tokens_css, string $mode ): string {
+	private static function preview_style_markup( array $resolved, string $mode ): string {
 		$suffix        = 'night' === $mode ? 'night' : 'day';
 		$tokens_handle = 'outpost-preview-tokens-' . $suffix;
 		$static_handle = 'outpost-preview-static-' . $suffix;
 
 		wp_register_style( $tokens_handle, false, array(), OUTPOST_VERSION );
-		wp_add_inline_style( $tokens_handle, $tokens_css );
+		wp_add_inline_style( $tokens_handle, Outpost_Token_Resolver::to_css( $resolved ) . self::component_declarations( $resolved, $suffix ) );
 		wp_register_style( $static_handle, false, array(), OUTPOST_VERSION );
 		wp_add_inline_style( $static_handle, self::preview_static_styles() );
 
@@ -423,14 +446,89 @@ final class Outpost_Appearance_Settings_Page {
 		return (string) ob_get_clean();
 	}
 
+	/**
+	 * The resolved component tokens as one `.outpost-mode-{mode}` block of
+	 * `--outpost-*` declarations. Names and values pass the same checks
+	 * to_scoped_css() applies.
+	 *
+	 * @param array<string,mixed> $resolved
+	 */
+	private static function component_declarations( array $resolved, string $mode ): string {
+		$components = is_array( $resolved['components'] ?? null ) ? $resolved['components'] : array();
+		$lines      = array();
+		foreach ( $components as $name => $value ) {
+			if ( 1 !== preg_match( '/^[a-z0-9-]+$/', (string) $name ) ) {
+				continue;
+			}
+			$clean = Outpost_Token_Resolver::safe_css_value( (string) $value );
+			if ( '' !== $clean ) {
+				$lines[] = "\t--outpost-" . $name . ': ' . $clean . ';';
+			}
+		}
+		if ( array() === $lines ) {
+			return '';
+		}
+		return "\n.outpost-mode-" . $mode . " {\n" . implode( "\n", $lines ) . "\n}";
+	}
+
 	private static function preview_static_styles(): string {
 		// Mini structural styles for the preview only. All paint goes
-		// through --outpost-* references; no hex values here.
+		// through --outpost-* references; no hex values here. The tab
+		// rules are structure.css's own, unchanged (#324); a unit test
+		// fails when they drift apart.
 		return '
 			body { margin: 0; padding: 16px; font-family: var(--outpost-font-body); background: var(--outpost-bg); color: var(--outpost-text); }
-			.outpost-preview-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--outpost-border); padding-bottom: 8px; margin-bottom: 16px; }
-			.outpost-preview-tabs button { background: transparent; border: 0; padding: 8px 12px; font-family: inherit; font-size: var(--outpost-size-body); color: var(--outpost-text-secondary); cursor: pointer; }
-			.outpost-preview-tabs button[aria-selected="true"] { color: var(--outpost-text); border-bottom: 2px solid var(--outpost-accent); }
+			.outpost-tablist-wrap {
+				position: relative;
+				border-block-end: 1px solid var(--outpost-border);
+			}
+			.outpost-tablist {
+				display: grid;
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+				gap: 0.25rem;
+				padding: 0.5rem 0.25rem 0;
+			}
+			.outpost-tab {
+				min-height: 2.75rem;
+				padding: 0.5rem 0.125rem;
+				border: 1px solid var(--outpost-card-border, currentColor);
+				border-radius: var(--outpost-radius, 0.375rem);
+				font: inherit;
+				font-weight: 500;
+				text-align: center;
+				overflow-wrap: anywhere;
+				cursor: pointer;
+				background: transparent;
+				color: inherit;
+			}
+			.outpost-tab:focus {
+				outline: 2px solid var(--outpost-focus, currentColor);
+				outline-offset: 2px;
+			}
+			.outpost-tab[aria-current="true"] {
+				background: var(--outpost-tab-bg-active);
+				color: var(--outpost-tab-fg-active);
+				border-color: var(--outpost-tab-indicator);
+				box-shadow: inset 0 0 0 2px var(--outpost-tab-indicator);
+				font-weight: 700;
+			}
+			.outpost-tab:not([aria-current="true"]) {
+				color: var(--outpost-tab-fg);
+			}
+			.outpost-mode-day .outpost-tab:not(.outpost-tab--plain),
+			.outpost-mode-night .outpost-tab:not(.outpost-tab--plain),
+			.outpost-mode-system .outpost-tab:not(.outpost-tab--plain) {
+				font-family: var(--outpost-font-family-display);
+				font-style: italic;
+				font-size: 1rem;
+				padding-inline: 0.125rem;
+			}
+			@media (forced-colors: active) {
+				.outpost-tab[aria-current="true"] {
+					outline: 2px solid Highlight;
+					outline-offset: -2px;
+				}
+			}
 			h2.outpost-preview-heading { font-family: var(--outpost-font-display); font-size: var(--outpost-size-display); margin: 16px 0 8px; color: var(--outpost-text); }
 			.outpost-preview-input { width: 100%; padding: 8px 12px; border: 1px solid var(--outpost-border); border-radius: 4px; background: var(--outpost-surface); color: var(--outpost-text); font-family: inherit; font-size: var(--outpost-size-body); }
 			.outpost-preview-radios { display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
@@ -442,11 +540,15 @@ final class Outpost_Appearance_Settings_Page {
 
 	private static function preview_body_html(): string {
 		return '
-			<div class="outpost-preview-tabs">
-				<button type="button">Post</button>
-				<button type="button" aria-selected="true">Doing</button>
-				<button type="button">Photo</button>
-			</div>
+			<div class="outpost-tablist-wrap"><div role="group" aria-label="Composer modes" class="outpost-tablist">'
+			. '<button type="button" class="outpost-tab">Post</button>'
+			. '<button type="button" class="outpost-tab">Reply</button>'
+			. '<button type="button" class="outpost-tab">Photo</button>'
+			. '<button type="button" class="outpost-tab" aria-current="true">Doing</button>'
+			. '<button type="button" class="outpost-tab">Life</button>'
+			. '<button type="button" class="outpost-tab">Recipe</button>'
+			. '<button type="button" class="outpost-tab">About</button>'
+			. '</div></div>
 			<h2 class="outpost-preview-heading">Doing</h2>
 			<input class="outpost-preview-input" type="text" placeholder="https://example.com/track" readonly>
 			<div class="outpost-preview-radios">
@@ -462,9 +564,17 @@ final class Outpost_Appearance_Settings_Page {
 	/** @return array<string,string> */
 	private static function mode_options(): array {
 		return array(
-			Outpost_Mode_Controller::MODE_SYSTEM => __( 'Match system', 'outpost-mobile-publishing' ),
-			Outpost_Mode_Controller::MODE_DAY    => __( 'Always day', 'outpost-mobile-publishing' ),
-			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Always night', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_DAY    => __( 'Light', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_NIGHT  => __( 'Dark', 'outpost-mobile-publishing' ),
+			Outpost_Mode_Controller::MODE_SYSTEM => __( 'System', 'outpost-mobile-publishing' ),
+		);
+	}
+
+	/** @return array<string,string> */
+	private static function source_options(): array {
+		return array(
+			Outpost_Style_Source::SOURCE_OUTPOST => __( 'Outpost Default', 'outpost-mobile-publishing' ),
+			Outpost_Style_Source::SOURCE_SITE    => __( 'Use Site Theme', 'outpost-mobile-publishing' ),
 		);
 	}
 
@@ -536,12 +646,22 @@ final class Outpost_Appearance_Settings_Page {
 	}
 
 	private static function render_inline_script(): void {
-		// Minimal vanilla JS: watch form inputs, rebuild the iframe's
-		// preview HTML whenever a value changes. No bundler, no
-		// dependencies. Attached to a src-less handle so it prints
-		// through the WordPress script API (in the admin footer, after
-		// the form and iframe markup it reads).
-		$script = <<<'JS'
+		// Attached to a src-less handle so it prints through the
+		// WordPress script API (in the admin footer, after the form and
+		// iframe markup it reads).
+		if ( ! wp_script_is( 'outpost-appearance-preview', 'registered' ) ) {
+			wp_register_script( 'outpost-appearance-preview', false, array(), OUTPOST_VERSION, true );
+		}
+		wp_enqueue_script( 'outpost-appearance-preview' );
+		wp_add_inline_script( 'outpost-appearance-preview', self::preview_script() );
+	}
+
+	/**
+	 * Minimal vanilla JS: watch form inputs, rewrite the iframe's token
+	 * block whenever a value changes. No bundler, no dependencies.
+	 */
+	public static function preview_script(): string {
+		return <<<'JS'
 		(function () {
 			var iframe = document.querySelector('.outpost-appearance-preview');
 			if (!iframe) return;
@@ -582,6 +702,21 @@ final class Outpost_Appearance_Settings_Page {
 					lines.push('\t' + name + ': ' + resolved.sizes[slug] + ';');
 				});
 				lines.push('}');
+				// The saved component tokens for this mode; the tab rules
+				// paint from them. Same name and value checks as the server.
+				var components = resolved.components || {};
+				var componentLines = [];
+				Object.keys(components).forEach(function (name) {
+					var value = String(components[name]).trim();
+					if (!/^[a-z0-9-]+$/.test(name) || !value || value.length > 256) return;
+					if (/[\x00-\x1F\x7F;{}<>\\]|\/\*|\*\/|url\s*\(|expression\s*\(|@import/i.test(value)) return;
+					componentLines.push('\t--outpost-' + name + ': ' + value + ';');
+				});
+				if (componentLines.length) {
+					lines.push('.outpost-mode-' + modeKey + ' {');
+					lines.push.apply(lines, componentLines);
+					lines.push('}');
+				}
 				return lines.join('\n');
 			}
 
@@ -608,11 +743,6 @@ final class Outpost_Appearance_Settings_Page {
 			form.addEventListener('change', refreshIframe);
 		})();
 JS;
-		if ( ! wp_script_is( 'outpost-appearance-preview', 'registered' ) ) {
-			wp_register_script( 'outpost-appearance-preview', false, array(), OUTPOST_VERSION, true );
-		}
-		wp_enqueue_script( 'outpost-appearance-preview' );
-		wp_add_inline_script( 'outpost-appearance-preview', $script );
 	}
 
 	private static function render_inline_styles(): void {
@@ -630,5 +760,22 @@ JS;
 		}
 		wp_enqueue_style( 'outpost-appearance-inline' );
 		wp_add_inline_style( 'outpost-appearance-inline', $css );
+	}
+
+	/**
+	 * The sanitized names of the checked boxes in a `name[key]` checkbox
+	 * group, read in the same expression as the request value (F-62).
+	 *
+	 * @param array<mixed> $checked Key => rest_sanitize_boolean() result.
+	 * @return list<string>
+	 */
+	private static function checked_keys( array $checked ): array {
+		$keys = array();
+		foreach ( $checked as $key => $on ) {
+			if ( true === $on && is_string( $key ) ) {
+				$keys[] = sanitize_key( $key );
+			}
+		}
+		return $keys;
 	}
 }

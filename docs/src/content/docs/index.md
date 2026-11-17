@@ -9,7 +9,7 @@ Outpost is a mobile-first Progressive Web App (PWA) composer for WordPress. Thes
 
 Outpost serves a posting app at `/post` on your own WordPress site. Open it on your phone, write a note, reply to a URL, or log something you're listening to or watching, and the post publishes to your site through the Micropub API. Syndication chips let you send the same post to other platforms — the [IndieWeb](https://indieweb.org/) pattern called [POSSE](https://indieweb.org/POSSE) (Publish on your Own Site, Syndicate Elsewhere).
 
-Because the composer is a real PWA, it installs to your iOS or Android home screen, works offline with a queued-draft system, and hooks into the OS share sheet so you can reply to any page from any app.
+Because the composer is a real PWA, it installs to your iOS or Android home screen, keeps unsent text on your device if you reload or sign in again, queues posts you make offline, and accepts links from your phone's share sheet so you can reply to a page from another app.
 
 ## Who it's for
 
@@ -23,11 +23,11 @@ Outpost is for WordPress site owners who want fast mobile posting without Jetpac
 
 If either required plugin is missing or inactive, Outpost shows an admin notice with an install link, and the `/post` page shows a setup prompt instead of the composer.
 
-Companion plugins are detected the moment you activate them. Recommended: Post Kinds for IndieWeb in Block Themes (the media "Look it up" search, plus kind classification and card display for every entry the composer posts — it covers all 36 of its kinds), Webmention (so the replies and likes you send are received, and theirs show on your posts), and Syndication Links (your destinations become the composer's chips). Also detected when present: Post Formats for Block Themes, Link Extension for XFN, ActivityPub, Bridgy, Yoast SEO, and Accessibility Checker.
+Companion plugins are detected the moment you activate them. Recommended: Post Kinds for IndieWeb in Block Themes (the media "Look it up" search, plus kind classification and card display for every entry the composer posts), Webmention (so the replies and likes you send are received, and theirs show on your posts), and Syndication Links (your destinations become the composer's chips). Also detected when present: Post Formats for Block Themes, Link Extension for XFN, ActivityPub, Bridgy, Yoast SEO, and Accessibility Checker.
 
 ## Is Outpost on WordPress.org?
 
-Not yet. Outpost is not available in the WordPress.org plugin directory — you install it from a release ZIP on GitHub. [Installation](/outpost/installation/) covers the whole process, and [Playground preview](/outpost/playground/) lets you try it in your browser first without installing anything.
+Not yet. Outpost isn't in the WordPress.org plugin directory, so you install it from its GitHub repository, and WordPress doesn't offer you updates for it. [Installation](/outpost/installation/) covers the install, [Update Outpost](/outpost/update/) covers moving to a new version, and [Playground preview](/outpost/playground/) lets you try it in your browser first without installing anything.
 
 ## Get started
 

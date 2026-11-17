@@ -39,11 +39,11 @@ title:    "Training — Running, 5.2 km"        (when distance > 0)
           "Training — Strength Training, 46 min" (when only duration)
           "Training — Yoga"                   (when neither)
 subtitle: "2026-05-04"
+fetched_at: "2026-05-04"
 post_kind: "workout"
 post_meta:
   _outpost_polar_exercise_id: "ex-1"
   _outpost_polar_sport:       "Running"
-  _outpost_polar_start_time:  "2026-05-04T07:30:00.000"
   _outpost_polar_distance_m:  "5200"
   _outpost_polar_duration:    "PT32M0S"
 ```
@@ -51,6 +51,18 @@ post_meta:
 The sport name is normalized: Polar returns `RUNNING` / `STRENGTH_TRAINING`; the picker displays `Running` / `Strength Training` (underscores → spaces, then word-cased).
 
 ISO 8601 duration parsing handles `PT45M30S`-style values into total minutes for the title.
+
+With Post Kinds active (its `post-kinds-indieweb/exercise-card` block registered), the payload adds what the picker inserts in place of the paragraph:
+
+```
+blocks: [ { name: "post-kinds-indieweb/exercise-card",
+            attributes: { activity: "Running", distance: 5.2, distanceUnit: "km", duration: "PT32M" } } ]
+terms:  { kind: [ <id of the exercise term> ] }
+```
+
+The card keeps distance and duration private until its author turns on showing details, and it has no field for start time, calories or heart rate. The REST route checks `blocks` and `terms` before sending them (see [the fetch-recent picker](../concepts/fetch-recent-picker.md)).
+
+The start time sets the newest-first order on the server and never leaves it, with or without the card: `fetched_at` and the subtitle carry the date alone, and `post_meta` has no start-time key (`_outpost_polar_start_time` was removed in 1.0.28). Polar's fractional seconds are rounded to whole seconds. `terms` is left out when the site has no `exercise` term yet; Post Kinds files the post by its first card on save.
 
 ## Roundtrip count
 
@@ -62,7 +74,7 @@ Realistic worst case: ~12 HTTP roundtrips per modal open. Acceptable for a one-t
 
 Polar requires the user be registered with the AccessLink app before any data API call works. PR #50's `after_token_exchange()` hook handles this during the OAuth connect flow. PR #50's `verify_connection()` also auto-retries registration if it failed silently.
 
-The fetch-recent callback assumes the user is already registered. If registration silently failed and was never auto-retried, the POST `/exercise-transactions` will return 404. The picker surfaces that as an empty list — modal renders "No recent items available." User can re-trigger registration by hitting the OAuth verify endpoint via Settings.
+The fetch-recent callback assumes the user is already registered. If registration silently failed and was never auto-retried, the POST `/exercise-transactions` will return 404. The picker surfaces that as an empty list — modal renders "No recent items available." No admin screen calls the verify endpoint. To re-trigger registration, request `GET /wp-json/outpost/v1/oauth/polar/verify` as a logged-in administrator (cookie auth with a REST nonce), or disconnect and reconnect Polar under Outpost → OAuth Connections.
 
 ## No icon URL
 

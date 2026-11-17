@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Outpost
 
 ## Project
@@ -15,9 +17,11 @@ Mobile-first PWA composer at `/post` (configurable). Five modes: Note, Reply/Lik
 
 Uses Micropub as the API and IndieAuth for browser-side auth. PWA frontend uses Vite + TypeScript + Preact, output to `/build/pwa/`.
 
-## Hard Contract — plugin owns layout, theme owns paint
+## Hard Contract — plugin owns layout, the selected style source owns paint
 
 If anything else in this file contradicts this rule, the rule wins.
+
+**Amended 2026-11-07** ([decision](docs/decisions/session-pwa-ui-appearance.md)): Outpost owns layout, interaction, accessibility, and the default design tokens. Each person's selected style source supplies paint through `--outpost-*` tokens: **Outpost Default** (the token files) or **Use Site Theme** (the resolver's theme-derived tokens). Components never hardcode paint. Site Theme stays optional and portable. B6, token parity, shell isolation, and the seven `--plain` opt-outs are unchanged. Where the sections below say "theme", read "the selected style source"; under Use Site Theme they apply as written.
 
 ### Plugin always owns
 
@@ -52,7 +56,7 @@ Plugin structural CSS only references colors and fonts through `var(--outpost-*,
 }
 ```
 
-If a theme sets the variable, the plugin uses it. Otherwise the composer inherits the theme's normal styling. **No part of Outpost ever forces a color the theme didn't ask for.**
+If a theme sets the variable, the plugin uses it. Under Outpost Default the token files supply the value; under Use Site Theme the resolver supplies it from the theme. **Component CSS never hardcodes a color; paint always comes from the selected source's tokens.**
 
 One forced default: `padding-bottom: env(safe-area-inset-bottom)` on the iOS bottom toolbar. Structural, not paint.
 
@@ -141,10 +145,10 @@ Every feature and bugfix lands with tests — failing test first, then the fix. 
 Sanitize input, validate data, escape output (Security Trinity above). Secrets live in env/config, never in code or commits. Public-facing features get a security review pass before shipping.
 
 Real incidents from this repo's history, so the pattern doesn't regress:
-- **Bearer-token-in-URL leak** — the token used to ride in the query string; moved to the JSON body (Micropub-spec compliant) so it stops leaking through access logs, browser history, and CDN cache keys.
+- **Bearer-token-in-URL leak** — the token used to ride in the query string; moved to the request body so it stops leaking through access logs, browser history, and CDN cache keys. Since the 2026-11 wp.org review fix it rides as a form-encoded `access_token` field (Micropub spec), which IndieAuth reads itself; Outpost never switches users to accept a token, so a JSON-body token authenticates nothing.
 - **Filter privilege-escalation** — a hostile `outpost_companion_adapters` filter could once instantiate arbitrary classes; now restricted to `Outpost_*_Adapter`-pattern class names plus a `is_subclass_of` check.
 - **Token-store XSS size limit** — the encrypted IndexedDB token store defeats casual DevTools inspection (non-extractable `CryptoKey`) but does **not** defeat same-origin XSS; that's documented honestly rather than oversold, and is why CSP work matters.
-- **Cookie + bearer credential collision** — a same-origin PWA calling WordPress REST with `Authorization: Bearer` also carries the `wordpress_logged_in_*` cookie if the user is logged into wp-admin in the same browser. WordPress's cookie-auth path then demands a nonce bearer auth doesn't have, and the request 403s. Fix: `credentials: 'omit'` on every bearer-authenticated fetch. Endpoints that intentionally support cookie fallback keep `credentials: 'include'`.
+- **Cookie + bearer credential collision** — a same-origin PWA calling WordPress REST with `Authorization: Bearer` also carries the `wordpress_logged_in_*` cookie if the user is logged into wp-admin in the same browser. WordPress's cookie-auth path then demands a nonce bearer auth doesn't have, and the request 403s. Fix: `credentials: 'omit'` on every bearer-authenticated fetch. Since the 2026-11 wp.org review fix no PWA fetch uses `credentials: 'include'` (preview was the last).
 
 ## Accessibility
 
@@ -244,7 +248,7 @@ Micropub client + note form. Per-post endpoint discovery; form-encoded `h=entry`
 
 ## Session C0 — Locked Decisions (shipped)
 
-WAI-ARIA tab framework with Note as the first real mode. Roving tabindex, automatic activation, wrap-around arrow keys; all panels render eagerly and toggle via `hidden` so form state survives tab switches; mode files live at `pwa/src/components/modes/*-mode.tsx`; 40 KB gzipped bundle ceiling through Phase C; conditional-spread pattern for optional props under `exactOptionalPropertyTypes`. Full decisions: [docs/decisions/session-c0.md](docs/decisions/session-c0.md).
+WAI-ARIA tabs shipped with Note as the first real mode; in 1.0.27 the tab strip became a two-row native button group with `aria-current`, and the arrow-key model retired. All panels still render eagerly and toggle via `hidden` so form state survives mode switches; mode files live at `pwa/src/components/modes/*-mode.tsx`; 40 KB gzipped bundle ceiling through Phase C; conditional-spread pattern for optional props under `exactOptionalPropertyTypes`. Full decisions: [docs/decisions/session-c0.md](docs/decisions/session-c0.md) and [docs/decisions/session-wave-o.md](docs/decisions/session-wave-o.md).
 
 ## Session B2 + C1 — Locked Decisions (shipped)
 
@@ -320,11 +324,21 @@ Concrete `Extractor_Og_Tags` (regex, not DOMDocument; decodes HTML entities at p
 
 ## Phase F parallel work — FX-iOS-Shortcut (shipped)
 
-iOS Shortcut bridge (parallel session): a per-user long-lived token authenticates ONLY `/wp-json/outpost/v1/shortcut` — presenting it on any other route returns 401, and that scope enforcement is the security boundary; the `rest_authentication_errors` filter must match `REQUEST_URI`, not the unresolved REST route; settings page at Settings → Outpost iOS Shortcut Bridge; tokens never appear in fixtures. Full decisions: [docs/decisions/session-fx-ios-shortcut.md](docs/decisions/session-fx-ios-shortcut.md).
+**Amended 1.0.27 (wp.org review):** the Shortcut signs in with a core WordPress Application Password that Outpost creates with a fixed `app_id` (`Outpost_IOS_Shortcut_App_Password`). Outpost never maps a credential to a user or hooks `determine_current_user`; it only adds an error through core's `wp_authenticate_application_password_errors` when that password is used anywhere but the resolved `/outpost/v1/shortcut` route (covers XML-RPC too). The password is shown once and never stored by Outpost; legacy plaintext tokens are purged on upgrade. Never return to a plugin-defined login path: the Plugins Team rejects it ("Creating / login users").
+
+Original record: a per-user long-lived token authenticated ONLY `/wp-json/outpost/v1/shortcut`; settings page at Settings → Outpost iOS Shortcut Bridge; credentials never appear in fixtures. Full decisions: [docs/decisions/session-fx-ios-shortcut.md](docs/decisions/session-fx-ios-shortcut.md).
 
 ## Phase F parallel work — FY-Theming (shipped)
 
-Theme inheritance + Field Notes treatments (three stacked PRs). Token priority chain override → theme → default with per-token WCAG contrast enforcement; per-user mode and overrides live in user-meta; the B6 lint bans hex literals in `structure.css` — the tokens.css files are the single source of truth, with no fallback hexes in components; `--plain` modifier classes are public opt-out API; stacked-PR lesson: retarget downstream PRs to main before merging/deleting the upstream branch. Full decisions: [docs/decisions/session-fy-theming.md](docs/decisions/session-fy-theming.md).
+Theme inheritance + Field Notes treatments (three stacked PRs). Token priority chain override → theme → default with per-token WCAG contrast enforcement (the theme layer now applies only under Use Site Theme; see the PWA UI appearance amendment); per-user mode and overrides live in user-meta; the B6 lint bans hex literals in `structure.css` — the tokens.css files are the single source of truth, with no fallback hexes in components; `--plain` modifier classes are public opt-out API; stacked-PR lesson: retarget downstream PRs to main before merging/deleting the upstream branch. Full decisions: [docs/decisions/session-fy-theming.md](docs/decisions/session-fy-theming.md).
+
+## PWA UI appearance — Locked Decisions (in progress, 2026-11-07)
+
+Outpost Default ships the paper/violet/orange design; Use Site Theme is a per-user option (`outpost_appearance_source`), independent of Light/Dark/System (`outpost_appearance_mode`). Upgrades keep Site Theme for users registered before the `outpost_appearance_schema` cutoff; fresh installs and later users get Outpost Default + System. The resolver derives the full component token set (`component_tokens()`, contrast-checked final pairs) and emits it scoped to `.outpost-source-*` (`to_scoped_css()`); the shell prints it for cookie users and `assets/js/appearance-boot.js` applies the device cache before first paint; `/appearance/tokens` accepts bearer tokens and answers `no-store`. Full decisions: [docs/decisions/session-pwa-ui-appearance.md](docs/decisions/session-pwa-ui-appearance.md).
+
+## PWA UI Home launcher — Locked Decisions (in progress, 2026-11-08)
+
+Home is a `view` inside `ComposerTabs`, not a router: the tab strip and all seven panels stay mounted and `hidden`, so a trip Home drops nothing. Per-user start screen in `outpost_start_screen` (`home` default for everyone; values are the tab ids, so Post is `note`, Doing is `listen`), carried as `start_screen` on `/appearance/tokens` with the appearance device copy and pending reconciliation. Precedence: auth callback → share/bookmarklet/Shortcut intake → navigation already made (decided once) → saved start screen → Home; a first launch on a device waits at most 1.5 s. The "← Home" footer link is in page flow, never fixed. Sign out lives in About › Connection. Compact composer (#289): Doing and Reply types are wrapping `border-box` 44 px tiles, never a disclosure; every composing tab ends with `PublishButton` plus a "Still needed: …" hint; the selected appearance segment paints from `segment-bg-selected` / `segment-fg-selected`, not `chip-active`. Full decisions: [docs/decisions/session-pwa-ui-home.md](docs/decisions/session-pwa-ui-home.md).
 
 ## Build Order (40 sessions)
 

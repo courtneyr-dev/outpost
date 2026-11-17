@@ -22,6 +22,7 @@ import { type FunctionComponent } from 'preact';
 import { useState } from 'preact/hooks';
 import { SnoozeMenu, type SnoozeDuration } from './snooze-menu';
 import { SyndicationCaptureForm } from './syndication-capture-form';
+import { ExternalLink } from './external-link';
 import type { CaptureApiEnvironment, PendingEntry } from '../lib/manual-share/capture-api';
 
 export interface DetailEntry extends PendingEntry {
@@ -151,14 +152,12 @@ export const SyndicationDetailView: FunctionComponent<SyndicationDetailViewProps
 							</div>
 
 							{ state === 'complete' && entry.silo_url && (
-								<a
+								<ExternalLink
 									class="outpost-syndication-detail__silo-link"
 									href={ entry.silo_url }
-									rel="noopener noreferrer"
-									target="_blank"
 								>
-									{ entry.silo_url }
-								</a>
+									View syndicated post
+								</ExternalLink>
 							) }
 
 							<div class="outpost-syndication-detail__strategy">

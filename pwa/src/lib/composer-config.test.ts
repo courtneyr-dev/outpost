@@ -71,7 +71,7 @@ describe('fetch_composer_config', () => {
 		expect(seen?.url).not.toContain('secret-token-abc');
 		expect(seen?.url).not.toContain('_o_token');
 		expect(String(seen?.init.body)).toContain('secret-token-abc');
-		const parsed = JSON.parse(String(seen?.init.body)) as { access_token?: string };
+		const parsed = Object.fromEntries(new URLSearchParams(String(seen?.init.body))) as { access_token?: string };
 		expect(parsed.access_token).toBe('secret-token-abc');
 	});
 
@@ -82,10 +82,13 @@ describe('fetch_composer_config', () => {
 		});
 	});
 
-	it('throws unauthorized on 403', async () => {
+	it('throws forbidden on 403, distinct from an expired sign-in', async () => {
+		// A 403 is a scope, capability, or nonce refusal; re-signing in
+		// doesn't fix it, so the composer must not tell the person their
+		// sign-in expired.
 		const env = mock_env({ ok: false, status: 403 });
 		await expect(fetch_composer_config('test-token', env)).rejects.toMatchObject({
-			code: 'unauthorized',
+			code: 'forbidden',
 		});
 	});
 
@@ -176,5 +179,31 @@ describe('fetch_composer_config — site default terms', () => {
 		const result = await fetch_composer_config('test-token', env);
 		expect(result.siteSettings.defaultCategories).toBeUndefined();
 		expect(result.siteSettings.defaultTags).toBeUndefined();
+	});
+});
+
+describe('fetch_composer_config — postKinds capabilities (#243)', () => {
+	it('carries postKinds.comics through', async () => {
+		const env = mock_env({ ok: true, status: 200 }, { ...valid_config, postKinds: { comics: true } });
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.postKinds).toEqual({ comics: true });
+	});
+
+	it('still accepts a server or cached config that predates postKinds', async () => {
+		const env = mock_env({ ok: true, status: 200 }, valid_config);
+		const result = await fetch_composer_config('test-token', env);
+		expect(result.postKinds).toBeUndefined();
+	});
+
+	it.each([
+		['null', null],
+		['a boolean', true],
+		['an object without comics', {}],
+		['a non-boolean comics value', { comics: 'yes' }],
+	])('rejects postKinds when it is %s', async (_label, postKinds) => {
+		const env = mock_env({ ok: true, status: 200 }, { ...valid_config, postKinds });
+		await expect(fetch_composer_config('test-token', env)).rejects.toMatchObject({
+			code: 'invalid_response',
+		});
 	});
 });

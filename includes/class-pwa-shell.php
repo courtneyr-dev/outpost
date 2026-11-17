@@ -65,6 +65,7 @@ final class Outpost_PWA_Shell {
 		// that nothing else paints it.
 		list( $style_handles, $script_handles ) = self::register_shell_assets( $entry_url, $css_urls );
 		?><!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -76,14 +77,17 @@ final class Outpost_PWA_Shell {
 		<?php if ( null !== $entry_url ) : ?>
 	<link rel="modulepreload" href="<?php echo esc_url( $entry_url ); ?>">
 		<?php endif; ?>
-	<meta name="theme-color" content="#2a4a39">
+	<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf5">
+	<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e1838">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-title" content="Outpost">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<?php wp_styles()->do_items( $style_handles ); ?>
+		<?php self::print_theme_font_faces(); ?>
 </head>
-<body class="outpost-composer-shell">
-	<main id="outpost-root" data-outpost-route="composer"></main>
+<body class="outpost-composer-shell <?php echo esc_attr( self::mode_class() . ' ' . self::source_class() ); ?>">
+		<?php wp_scripts()->do_items( array( 'outpost-appearance-boot' ) ); ?>
+	<main id="outpost-root" data-outpost-route="composer" data-outpost-version="<?php echo esc_attr( OUTPOST_VERSION ); ?>"></main>
 		<?php
 		wp_scripts()->do_items( $script_handles );
 		?>
@@ -119,6 +123,19 @@ final class Outpost_PWA_Shell {
 		wp_register_style( 'outpost-shell-critical', false, array(), OUTPOST_VERSION );
 		wp_add_inline_style( 'outpost-shell-critical', self::critical_css() );
 
+		// Applies the last-known appearance (mode, style source, cached
+		// token CSS) from this device before the composer paints. A
+		// classic script, printed right after <body> opens, because the
+		// CSP allows no inline script and a module script runs too late
+		// to prevent a flash of the wrong scheme.
+		wp_register_script(
+			'outpost-appearance-boot',
+			OUTPOST_PLUGIN_URL . 'assets/js/appearance-boot.js',
+			array(),
+			OUTPOST_VERSION,
+			false
+		);
+
 		// Server-rendered with a stable filename, so it needs the version query
 		// as a cache-bust. The bundle assets below don't — Vite content-hashes
 		// their filenames, so `null` keeps ?ver= off URLs that are already
@@ -129,6 +146,13 @@ final class Outpost_PWA_Shell {
 			array(),
 			OUTPOST_VERSION
 		);
+
+		$user_css = self::user_appearance_css();
+		if ( '' !== $user_css ) {
+			wp_register_style( 'outpost-appearance-user', false, array( 'outpost-tokens' ), OUTPOST_VERSION );
+			wp_add_inline_style( 'outpost-appearance-user', $user_css );
+			$style_handles[] = 'outpost-appearance-user';
+		}
 
 		foreach ( array_values( $css_urls ) as $index => $css_url ) {
 			$handle          = 'outpost-app-' . (string) $index;
@@ -145,7 +169,112 @@ final class Outpost_PWA_Shell {
 			add_filter( 'script_loader_tag', array( self::class, 'filter_app_script_tag' ), 10, 2 );
 		}
 
+		/**
+		 * Filters the stylesheet handles printed in the composer shell.
+		 *
+		 * The shell prints only these handles (never the theme queue), so a
+		 * site integration that wants to paint the composer — for example to
+		 * follow the site's stored appearance preference — registers its own
+		 * handle and appends it here.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string[] $style_handles Registered style handles.
+		 */
+		$style_handles = (array) apply_filters( 'outpost_shell_style_handles', $style_handles );
+
+		/**
+		 * Filters the script handles printed at the end of the composer shell.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string[] $script_handles Registered script handles.
+		 */
+		$script_handles = (array) apply_filters( 'outpost_shell_script_handles', $script_handles );
+
 		return array( $style_handles, $script_handles );
+	}
+
+	/**
+	 * Appearance mode class for the shell body.
+	 *
+	 * The stored per-user mode (day / night / system) becomes the
+	 * `outpost-mode-*` class the tokens already key on; until now the class
+	 * was computed but never printed. A site integration can map another
+	 * preference source onto it.
+	 *
+	 * @since 1.0.15
+	 *
+	 * @return string One of outpost-mode-day, outpost-mode-night, outpost-mode-system.
+	 */
+	private static function mode_class(): string {
+		$class = Outpost_Mode_Controller::root_class_for_user( 0 );
+
+		/**
+		 * Filters the appearance mode class printed on the composer shell body.
+		 *
+		 * @since 1.0.15
+		 *
+		 * @param string $class One of outpost-mode-day, outpost-mode-night, outpost-mode-system.
+		 */
+		$class = (string) apply_filters( 'outpost_shell_mode_class', $class );
+
+		return in_array( $class, array( 'outpost-mode-day', 'outpost-mode-night', 'outpost-mode-system' ), true ) ? $class : 'outpost-mode-system';
+	}
+
+	/**
+	 * Style-source class for the shell body: `outpost-source-outpost` or
+	 * `outpost-source-site`. For a request WordPress can't tie to a user
+	 * (the installed PWA authenticates with a bearer token, which a page
+	 * load doesn't carry), this is the new-user default, and the boot
+	 * script swaps in the device's last-known choice.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function source_class(): string {
+		$user_id = (int) get_current_user_id();
+		$source  = $user_id > 0 ? Outpost_Style_Source::get_source( $user_id ) : Outpost_Style_Source::SOURCE_OUTPOST;
+		return 'outpost-source-' . $source;
+	}
+
+	/**
+	 * Resolved token CSS for a cookie-identified user whose paint differs
+	 * from the token file: Site Theme, or Outpost Default with overrides.
+	 * The shell is sent no-store, and this holds colors and font names
+	 * only, never a credential.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function user_appearance_css(): string {
+		$user_id = (int) get_current_user_id();
+		if ( $user_id <= 0 ) {
+			return '';
+		}
+		$source    = Outpost_Style_Source::get_source( $user_id );
+		$overrides = get_user_meta( $user_id, Outpost_Token_Resolver::OVERRIDE_META_KEY, true );
+		if ( Outpost_Style_Source::SOURCE_SITE !== $source && empty( $overrides ) ) {
+			return '';
+		}
+		return Outpost_Token_Resolver::to_scoped_css(
+			$source,
+			Outpost_Token_Resolver::resolve( $user_id, 'day', $source ),
+			Outpost_Token_Resolver::resolve( $user_id, 'night', $source )
+		);
+	}
+
+	/**
+	 * The active theme's `@font-face` rules (theme.json fontFace entries),
+	 * so Use Site Theme can render the theme's own fonts. Same-origin font
+	 * files satisfy `font-src 'self'`, and a browser downloads a face only
+	 * when a rule uses its family, so Outpost Default pays nothing. This
+	 * prints font faces only, not the theme's stylesheet queue.
+	 *
+	 * @since 1.0.24
+	 */
+	private static function print_theme_font_faces(): void {
+		if ( function_exists( 'wp_print_font_faces' ) ) {
+			wp_print_font_faces();
+		}
 	}
 
 	/**
@@ -307,6 +436,7 @@ final class Outpost_PWA_Shell {
 		self::send_html_header();
 		?>
 		<!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -362,6 +492,7 @@ final class Outpost_PWA_Shell {
 		);
 		?>
 		<!doctype html>
+<!-- noptimize-page -->
 <html lang="<?php echo esc_attr( str_replace( '_', '-', get_locale() ) ); ?>">
 <head>
 	<meta charset="utf-8">
@@ -469,7 +600,10 @@ final class Outpost_PWA_Shell {
 		);
 
 		self::send_json_header();
-		echo wp_json_encode( $manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+		// Default escaping plus hex-encoded <, >, &, ' and ", so no manifest
+		// value (the plugin URL comes from a filterable core function) can
+		// form markup if a client ever renders the response as HTML.
+		echo wp_json_encode( $manifest, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		self::halt();
 	}
 
@@ -532,10 +666,16 @@ const PRECACHE_URLS = [
 	PLUGIN_URL + 'assets/icons/outpost-icon-maskable.svg',
 ];
 
+// Precache without cookies. The shell is sent no-store because a
+// cookie-identified response carries that person's appearance choice, and
+// the Cache API stores whatever it gets; the credential-less shell keeps the
+// composer opening offline without keeping one person's shell (T10-S4-04).
+const PRECACHE_REQUESTS = PRECACHE_URLS.map((url) => new Request(url, { credentials: 'omit' }));
+
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(CACHE_NAME)
-			.then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {
+			.then((cache) => cache.addAll(PRECACHE_REQUESTS).catch(() => {
 				// Best-effort precache. If a single URL 404s on first install
 				// (e.g. token CSS not yet deployed) we don't want the whole
 				// install to fail — the fetch handler will fill the cache
@@ -579,6 +719,16 @@ function is_static_asset(url) {
 		p.includes('/assets/icons/');
 }
 
+// Scripts and stylesheets the shell prints from outside the plugin's asset
+// paths, such as a theme's appearance bridge added through the
+// outpost_shell_script_handles filter. Fetch-initiated requests (endpoint
+// discovery, Micropub) have an empty destination and never match.
+function is_shell_subresource(request, url) {
+	if (url.origin !== self.location.origin) return false;
+	if (url.pathname.startsWith('/wp-json/')) return false;
+	return request.destination === 'script' || request.destination === 'style';
+}
+
 function is_outpost_rest(url) {
 	return url.origin === self.location.origin &&
 		url.pathname.startsWith('/wp-json/outpost/v1/');
@@ -595,9 +745,31 @@ function is_share_target_request(url) {
 // Nothing is uploaded until the user posts. Text-only shares pass through
 // to the PHP dispatcher, which routes them by content. The database and
 // store names must match pwa/src/lib/share-inbox.ts.
+//
+// The share may come from any app or page, so every field and file is
+// untrusted: only image types the composer can upload (pwa/src/lib/photo.ts),
+// within the limits below, are parked. The body is read as a stream and
+// never past SHARE_MAX_BODY_BYTES: a larger share passes through unparsed.
+// The per-file, count, and total limits then apply to the parsed parts, and
+// shared title and text are cut to SHARE_MAX_TEXT_CHARS. Parked photos wait for the person: the composer shows them
+// for review and nothing is used until they choose. The inbox holds the
+// waiting share (`pending`) and at most one newer share (`candidate`) while
+// the person decides between them; neither is ever overwritten, and a third
+// share is not kept. Everything else passes through to the server, which
+// keeps nothing.
 const SHARE_INBOX_DB = 'outpost-share-inbox';
 const SHARE_INBOX_STORE = 'inbox';
 const SHARE_INBOX_KEY = 'pending';
+const SHARE_INBOX_CANDIDATE_KEY = 'candidate';
+const SHARE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+// Same per-file cap the composer applies before upload (pwa/src/lib/photo.ts).
+const SHARE_MAX_FILE_BYTES = 50 * 1024 * 1024;
+const SHARE_MAX_FILES = 10;
+const SHARE_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+// Room for the title, text, and multipart framing on top of the photos.
+const SHARE_MAX_BODY_BYTES = SHARE_MAX_TOTAL_BYTES + 1024 * 1024;
+// Same bound the PHP dispatcher applies (Outpost_Source_Detector::TEXT_MAX_LENGTH).
+const SHARE_MAX_TEXT_CHARS = 4000;
 
 function open_share_inbox() {
 	return new Promise((resolve, reject) => {
@@ -613,13 +785,29 @@ function open_share_inbox() {
 	});
 }
 
+// Park a share in the first free slot: `pending`, else `candidate`.
+// Resolves with the slot used, or 'refused' when both are taken. Rejects
+// when IndexedDB fails.
 async function park_shared_photos(payload) {
 	const db = await open_share_inbox();
 	try {
-		await new Promise((resolve, reject) => {
+		return await new Promise((resolve, reject) => {
 			const tx = db.transaction(SHARE_INBOX_STORE, 'readwrite');
-			tx.objectStore(SHARE_INBOX_STORE).put(payload, SHARE_INBOX_KEY);
-			tx.oncomplete = () => resolve();
+			const store = tx.objectStore(SHARE_INBOX_STORE);
+			let slot = 'refused';
+			const keys = store.getAllKeys();
+			keys.onsuccess = () => {
+				const taken = keys.result.map(String);
+				if (!taken.includes(SHARE_INBOX_KEY)) {
+					slot = SHARE_INBOX_KEY;
+				} else if (!taken.includes(SHARE_INBOX_CANDIDATE_KEY)) {
+					slot = SHARE_INBOX_CANDIDATE_KEY;
+				}
+				if (slot !== 'refused') {
+					store.add(payload, slot);
+				}
+			};
+			tx.oncomplete = () => resolve(slot);
 			tx.onerror = () => reject(tx.error);
 			tx.onabort = () => reject(tx.error);
 		});
@@ -628,22 +816,58 @@ async function park_shared_photos(payload) {
 	}
 }
 
+// The share's form fields, read without ever holding more than
+// SHARE_MAX_BODY_BYTES (T10-S4-19). Resolves null when the body declares or
+// streams past that limit; rejects when it can't be read or parsed.
+async function read_bounded_form(request) {
+	const declared = request.headers.get('content-length');
+	if (declared !== null && (!/^[0-9]+$/.test(declared) || Number(declared) > SHARE_MAX_BODY_BYTES)) {
+		return null;
+	}
+	if (!request.body) {
+		throw new Error('no body');
+	}
+	const reader = request.body.getReader();
+	const chunks = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.byteLength;
+		if (total > SHARE_MAX_BODY_BYTES) {
+			// Don't wait for the cancel: this body is one branch of the
+			// clone's tee, and cancelling it can wait on the other branch,
+			// which only the pass-through fetch reads (T10-S4-23).
+			reader.cancel().catch(() => {});
+			return null;
+		}
+		chunks.push(value);
+	}
+	const type = request.headers.get('content-type') || '';
+	return new Response(new Blob(chunks), { headers: { 'content-type': type } }).formData();
+}
+
 async function handle_share_post(event) {
-	// Clone before reading: formData() consumes the body, and a share with
+	// Clone before reading: reading consumes the body, and a share with
 	// no photo still has to reach the server as the original POST.
 	const passthrough = event.request.clone();
 	let form;
 	try {
-		form = await event.request.formData();
+		form = await read_bounded_form(event.request);
 	} catch (_err) {
+		return fetch(passthrough);
+	}
+	if (form === null) {
 		return fetch(passthrough);
 	}
 	const photos = form.getAll('photos').filter((entry) =>
 		entry && typeof entry === 'object' &&
 		typeof entry.size === 'number' && entry.size > 0 &&
-		/^image\//.test(entry.type || '')
+		entry.size <= SHARE_MAX_FILE_BYTES &&
+		SHARE_IMAGE_TYPES.includes(String(entry.type || '').toLowerCase())
 	);
-	if (photos.length === 0) {
+	const total = photos.reduce((sum, photo) => sum + photo.size, 0);
+	if (photos.length === 0 || photos.length > SHARE_MAX_FILES || total > SHARE_MAX_TOTAL_BYTES) {
 		return fetch(passthrough);
 	}
 	try {
@@ -657,18 +881,27 @@ async function handle_share_post(event) {
 			lastModified: typeof photo.lastModified === 'number' ? photo.lastModified : Date.now(),
 			buffer: await photo.arrayBuffer(),
 		})));
-		await park_shared_photos({
+		const slot = await park_shared_photos({
 			files: records,
-			title: String(form.get('title') || ''),
-			text: String(form.get('text') || ''),
+			title: String(form.get('title') || '').slice(0, SHARE_MAX_TEXT_CHARS),
+			text: String(form.get('text') || '').slice(0, SHARE_MAX_TEXT_CHARS),
 			received: Date.now(),
+			// A random identity, so a decision about this share can tell it
+			// from a later one that arrived in the same millisecond (P4I-01).
+			id: (self.crypto && typeof self.crypto.randomUUID === 'function')
+				? self.crypto.randomUUID()
+				: String(Date.now()) + '-' + Math.random().toString(36).slice(2),
 		});
+		// The composer shows what is waiting for review; `refused` tells it
+		// this share wasn't kept because two were already waiting.
+		const refused = 'refused' === slot ? '&refused=1' : '';
+		return Response.redirect(SHELL_URL + '?mode=photo&shared=photos' + refused, 303);
 	} catch (_err) {
-		// IndexedDB unavailable (storage pressure, private mode). The
-		// composer still opens on the Photo tab; the user picks the photo
-		// again from the library.
+		// IndexedDB unavailable (storage pressure, private mode): nothing
+		// was kept. The composer opens on the Photo tab with nothing to
+		// review; the person picks the photo again from the library.
+		return Response.redirect(SHELL_URL + '?mode=photo', 303);
 	}
-	return Response.redirect(SHELL_URL + '?mode=photo&shared=photos', 303);
 }
 
 self.addEventListener('fetch', (event) => {
@@ -709,8 +942,15 @@ self.addEventListener('fetch', (event) => {
 		return;
 	}
 
+	// Network-first with a cached copy, so an offline composer still runs a
+	// theme's shell script and keeps the site's light or dark preference.
+	if (is_shell_subresource(request, url)) {
+		event.respondWith(network_first_asset(request));
+		return;
+	}
+
 	// Everything else (Micropub endpoint discovery on the user's "me" URL,
-	// theme assets, etc.) — passthrough.
+	// images, etc.) — passthrough.
 });
 
 async function network_first(request, cache_key) {
@@ -744,6 +984,21 @@ async function network_first(request, cache_key) {
 	}
 }
 
+async function network_first_asset(request) {
+	try {
+		const response = await fetch(request);
+		const cache_control = (response && response.headers.get('cache-control')) || '';
+		if (response && response.ok && !/no-store/i.test(cache_control)) {
+			const cache = await caches.open(CACHE_NAME);
+			await cache.put(request, response.clone());
+		}
+		return response;
+	} catch (_err) {
+		const cached = await caches.match(request);
+		return cached || Response.error();
+	}
+}
+
 async function cache_first(request) {
 	const cached = await caches.match(request);
 	if (cached) return cached;
@@ -767,6 +1022,55 @@ async function cache_first(request) {
 	}
 
 	/**
+	 * Tell page optimizers and page caches to leave this document alone.
+	 *
+	 * The shell's CSP allows no inline script, and optimizers rewrite pages
+	 * with inline handlers: Perfmatters' Remove Unused CSS and Autoptimize's
+	 * deferred CSS swap stylesheets in with `onload`, and delay-JS modes add
+	 * an inline loader. Blocked, they leave the composer unstyled or unbooted
+	 * (issue #320). The CSP stays as it is; the optimizers step aside, on
+	 * Outpost's HTML routes only.
+	 *
+	 * Each opt-out is one the optimizer reads at that point in the request,
+	 * checked in its source:
+	 * - Perfmatters 2.6.9 opens its buffer at after_setup_theme and asks
+	 *   `perfmatters_allow_buffer` when it flushes.
+	 * - WP Rocket 3.24 and Autoptimize 3.1.17 open their buffers at
+	 *   template_redirect priority 2, after the shell exits. WP Rocket's
+	 *   page-cache buffer still reads DONOTCACHEPAGE, and its optimizers read
+	 *   DONOTROCKETOPTIMIZE, at flush. Autoptimize reads DONOTMINIFY and
+	 *   `autoptimize_filter_noptimize` before buffering and the
+	 *   `<!-- noptimize-page -->` marker the documents print at flush.
+	 * - LiteSpeed Cache 7.9.3 opens its buffer at after_setup_theme and reads
+	 *   LITESPEED_NO_OPTM and LITESPEED_NO_PAGEOPTM at flush.
+	 */
+	private static function opt_out_of_page_optimizers(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTROCKETOPTIMIZE' ) ) {
+			define( 'DONOTROCKETOPTIMIZE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'DONOTMINIFY' ) ) {
+			define( 'DONOTMINIFY', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_OPTM' ) ) {
+			define( 'LITESPEED_NO_OPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+		if ( ! defined( 'LITESPEED_NO_PAGEOPTM' ) ) {
+			define( 'LITESPEED_NO_PAGEOPTM', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- A name other plugins read; defined only on Outpost's HTML routes.
+		}
+
+		add_filter( 'perfmatters_allow_buffer', '__return_false', PHP_INT_MAX );
+		add_filter( 'perfmatters_remove_unused_css', '__return_false', PHP_INT_MAX );
+		add_filter( 'perfmatters_delay_js', '__return_false', PHP_INT_MAX );
+		add_filter( 'autoptimize_filter_noptimize', '__return_true', PHP_INT_MAX );
+
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- LiteSpeed Cache's own action.
+		do_action( 'litespeed_control_set_nocache', 'Outpost composer shell' );
+	}
+
+	/**
 	 * Send headers for an HTML response. Skipped when headers have already been
 	 * sent (e.g. WP startup printed something) so test output can still capture
 	 * the body via ob_start.
@@ -783,6 +1087,7 @@ async function cache_first(request) {
 	 * to those.
 	 */
 	private static function send_html_header(): void {
+		self::opt_out_of_page_optimizers();
 		if ( ! headers_sent() ) {
 			nocache_headers();
 			header( 'Content-Type: text/html; charset=utf-8' );
@@ -804,9 +1109,8 @@ async function cache_first(request) {
 	 * for photo previews. All other directives stay tight.
 	 *
 	 * No 'unsafe-eval' — Vite's esbuild output is plain ES modules.
-	 * No 'unsafe-inline' on script-src — the SW registration script in
-	 * render_shell() is the one inline script; it gets a per-request
-	 * nonce that we attach to its tag.
+	 * No 'unsafe-inline' on script-src — the shell has no inline script;
+	 * the SW registration lives in the bundle.
 	 *
 	 * Filterable via `outpost_csp` for sites that need to extend
 	 * (e.g. allow a specific analytics origin, embed a CDN).
@@ -844,43 +1148,67 @@ async function cache_first(request) {
 			$csp = array();
 		}
 
-		// Enforce a security baseline. Each required prefix represents
-		// a directive we won't allow filters to drop or weaken to a
-		// permissive value. If a filter dropped one, re-add the safe
-		// default; if a filter weakened one (e.g., `default-src *`),
-		// restoring the safe default takes precedence.
-		$required = array(
-			"default-src 'self'",
-			"frame-ancestors 'none'",
-			"object-src 'none'",
-			"base-uri 'self'",
-		);
-		foreach ( $required as $directive ) {
-			$prefix   = strtok( $directive, ' ' );
-			$has_safe = false;
-			$rebuilt  = array();
-			foreach ( $csp as $existing ) {
-				if ( ! is_string( $existing ) ) {
+		return implode( '; ', self::enforce_csp_baseline( $csp ) );
+	}
+
+	/**
+	 * Rebuilds a filtered CSP directive list so it can't drop or loosen the
+	 * baseline (F-58).
+	 *
+	 * Entries are split on `;`, so one entry can't smuggle in a second
+	 * directive, and directive names compare case-insensitively, as browsers
+	 * read them. The first copy of a directive wins, as in a browser.
+	 * `default-src`, `frame-ancestors`, `object-src` and `base-uri` always
+	 * get their safe values. `script-src` keeps any origins a filter adds,
+	 * so a site can still allow an analytics or CDN host, but always starts
+	 * with `'self'` and loses every token that loosens it. `script-src-elem`
+	 * and `script-src-attr` are removed, since either would override
+	 * `script-src`.
+	 *
+	 * @param array<mixed> $entries Directive strings from the filter.
+	 * @return list<string> Directives, one per entry.
+	 */
+	private static function enforce_csp_baseline( array $entries ): array {
+		$directives = array();
+		foreach ( $entries as $entry ) {
+			if ( ! is_string( $entry ) ) {
+				continue;
+			}
+			// Control characters can't reach the header.
+			$entry = (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $entry );
+			foreach ( explode( ';', $entry ) as $part ) {
+				$tokens = preg_split( '/\s+/', trim( $part ), -1, PREG_SPLIT_NO_EMPTY );
+				if ( ! is_array( $tokens ) || array() === $tokens ) {
 					continue;
 				}
-				if ( 0 === strpos( $existing, $prefix . ' ' ) || $existing === $prefix ) {
-					if ( $existing === $directive ) {
-						$has_safe  = true;
-						$rebuilt[] = $existing;
-					}
-					// Drop weakened variants of the required directive;
-					// the safe default gets appended below.
+				$name = strtolower( (string) array_shift( $tokens ) );
+				if ( 1 !== preg_match( '/^[a-z][a-z-]*$/', $name ) || isset( $directives[ $name ] ) ) {
 					continue;
 				}
-				$rebuilt[] = $existing;
+				$directives[ $name ] = $tokens;
 			}
-			if ( ! $has_safe ) {
-				$rebuilt[] = $directive;
-			}
-			$csp = $rebuilt;
 		}
 
-		return implode( '; ', $csp );
+		$directives['default-src']     = array( "'self'" );
+		$directives['frame-ancestors'] = array( "'none'" );
+		$directives['object-src']      = array( "'none'" );
+		$directives['base-uri']        = array( "'self'" );
+
+		$loosening = array( "'self'", "'none'", "'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "'wasm-unsafe-eval'", "'strict-dynamic'", '*', 'http:', 'https:', 'data:', 'blob:', 'filesystem:', 'ws:', 'wss:' );
+		$script    = array( "'self'" );
+		foreach ( $directives['script-src'] ?? array() as $token ) {
+			if ( ! in_array( strtolower( $token ), $loosening, true ) ) {
+				$script[] = $token;
+			}
+		}
+		$directives['script-src'] = array_values( array_unique( $script ) );
+		unset( $directives['script-src-elem'], $directives['script-src-attr'] );
+
+		$csp = array();
+		foreach ( $directives as $name => $tokens ) {
+			$csp[] = trim( $name . ' ' . implode( ' ', $tokens ) );
+		}
+		return $csp;
 	}
 
 	/**
@@ -905,19 +1233,6 @@ async function cache_first(request) {
 				'accelerometer=()',
 			)
 		);
-	}
-
-	/**
-	 * Per-request script nonce. Generated lazily and cached for the
-	 * remainder of the request so the CSP header and the shell's inline
-	 * script tag agree.
-	 */
-	public static function script_nonce(): string {
-		static $nonce = null;
-		if ( null === $nonce ) {
-			$nonce = wp_generate_uuid4();
-		}
-		return $nonce;
 	}
 
 	private static function send_json_header(): void {

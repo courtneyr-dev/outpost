@@ -25,7 +25,7 @@ Wiki pages (`/Wiki/{slug}`) are NOT claimed in v1 — they have a different API-
 
 ## License attribution (CC BY-NC-SA)
 
-iFixit guides are licensed CC BY-NC-SA. Outpost renders attribution by default. Suppress or customize via filter:
+iFixit guides are licensed CC BY-NC-SA. Outpost doesn't add attribution to your post automatically: `Outpost_Source_Ifixit::attribution_html( $source_url )` (`includes/sources/class-source-ifixit.php`) builds the markup, `<p class="outpost-ifixit-attribution">Source: iFixit (CC BY-NC-SA)</p>` with a link to the guide, but nothing in Outpost calls it. Add attribution yourself when you post iFixit content, by writing it into the post or calling the helper from your theme. The `outpost_ifixit_attribution_html` filter customizes what the helper returns:
 
 ```php
 add_filter(
@@ -46,12 +46,8 @@ Returning an empty string from the filter logs a debug-level warning when `WP_DE
 
 The original G14a prompt specified hitting iFixit's REST API at `/api/2.0/guides/{guideid}` to extract structured fields (tools, parts, time-required, difficulty). That requires the F-phase `api_json` extractor, which is currently a stub (per F5 #6). G14a ships og_tags-only.
 
-When the `api_json` extractor lands, **G14b** will:
-
-- Fetch via the REST API as primary path
-- Fall back to og_tags when the API is unavailable
-- Surface tools / parts / time-required / difficulty as structured post-meta (`outpost_ifixit_tools`, `outpost_ifixit_parts`, etc.) for theme-side display
+Structured fields (tools, parts, time required, difficulty) aren't available yet. Outpost doesn't call iFixit's REST API and writes no `outpost_ifixit_*` post meta.
 
 ## Why iFixit specifically
 
-iFixit's right-to-repair mission and CC-BY-NC-SA licensing posture make it a natural fit for IndieWeb users sharing repair guides on their own sites. Outpost recommends iFixit over closed-platform repair documentation in the maker category. The other two adapters in the original G14 maker cluster (Ravelry, Adafruit Learning) wait on foundation work — Ravelry on OAuth, Adafruit Learning on the RSS extractor implementation.
+iFixit's right-to-repair mission and CC-BY-NC-SA licensing posture make it a natural fit for IndieWeb users sharing repair guides on their own sites. Outpost recommends iFixit over closed-platform repair documentation in the maker category. Of the other two adapters in the original G14 maker cluster, Ravelry has an OAuth provider but no source class ([Ravelry](ravelry.md)), and Adafruit Learning has no code in Outpost.

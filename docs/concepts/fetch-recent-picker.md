@@ -2,19 +2,19 @@
 
 Composer primitive for "no shareable URL" platforms. Wellness providers (Oura, WHOOP, Polar Flow) don't expose URLs for individual workouts / sleep sessions, so users can't paste a URL the way they can for Notion or Ravelry. The picker fetches a list of recent items from the connected platform and lets the user pick one to insert into the post.
 
-This PR ships the primitive — REST endpoint, provider registry, sidebar panel, modal, demo "test" provider. Real provider classes (Oura, WHOOP, Polar) register against this primitive in follow-up PRs (~250 lines each).
+The primitive is the REST endpoint, provider registry, sidebar panel, modal, and a demo "test" provider. Three real providers register against it: Oura, WHOOP, and Polar Flow (`includes/sources/class-outpost-fetch-recent-{oura,whoop,polar}.php`; see [Oura fetch-recent](../adapters/oura-fetch-recent.md), [WHOOP fetch-recent](../adapters/whoop-fetch-recent.md), [Polar fetch-recent](../adapters/polar-fetch-recent.md)).
 
 ## Components
 
 ### PHP side
 
 - **`Outpost_Fetch_Recent_REST`** — REST endpoint at `/outpost/v1/fetch-recent/<provider_id>?count=10` returning items as JSON. Plus a sibling list endpoint at `/outpost/v1/fetch-recent-providers` returning provider summaries (id + label + oauth_provider) for the sidebar panel to render buttons.
-- **`Outpost_Fetch_Recent_Test_Provider`** — demo provider returning three hardcoded sample items so the picker visibly works without any real API integration. Real providers replace this in their own PRs.
+- **`Outpost_Fetch_Recent_Test_Provider`** — demo provider returning three hardcoded sample items. `outpost.php` registers it on every site, alongside the real providers, so every user with `edit_posts` sees a **Test (sample data)** button in the sidebar. Remove it with the `outpost_fetch_recent_providers` filter: `unset( $providers['test'] )`.
 
 ### JS side (Gutenberg sidebar)
 
-- **`FetchRecentPanel`** — renders one button per registered provider inside the existing `OutpostSidebar` PluginSidebar (G3.5c). Fetches the provider list once on mount.
-- **`FetchRecentPickerModal`** — opens when a button is clicked; fetches provider items via REST; renders states (loading / error / not-connected / items / empty); inserts the chosen item's payload into the editor as a paragraph block on selection.
+- **`FetchRecentPanel`** — renders one button per registered provider inside the existing `OutpostSidebar` PluginSidebar (G3.5c). Fetches the provider list once on mount. The list endpoint filters providers only by each provider's `capability`, not by connection state, so a provider's button shows even when the user hasn't connected it.
+- **`FetchRecentPickerModal`** — opens when a button is clicked; fetches provider items via REST; renders states (loading / error / not-connected / items / empty); inserts the chosen item's payload on selection: its Post Kinds card blocks when the editor has them, else a paragraph block.
 - **`DefaultItemRenderer`** — provider-agnostic Card-style item renderer with optional icon, title, subtitle, and relative-time footer. Custom renderers per provider override via the `outpost.fetchRecent.itemRenderer.<provider_id>` `wp.hooks` filter.
 
 ## Canonical fetch-recent item shape
@@ -27,7 +27,7 @@ Every provider's callback returns items in this shape:
     "title": "Workout - Running 5.2 miles",
     "subtitle": "2026-05-04, 32 minutes, 478 kcal",
     "icon_url": "optional-thumbnail-url-or-null",
-    "fetched_at": "ISO 8601 timestamp",
+    "fetched_at": "YYYY-MM-DD",
     "post_kind": "workout",
     "post_payload": {
         "title": "post title to insert",
@@ -40,12 +40,24 @@ Every provider's callback returns items in this shape:
 
 `Outpost_Fetch_Recent_REST::normalize_item()` coerces partial entries into the canonical shape and drops malformed ones (missing `id` or `title`). The REST endpoint then caps to the requested `count` (1–50, default 10).
 
+`fetched_at` is the item's date. The route keeps the leading `YYYY-MM-DD` of whatever the provider sends, or today (UTC) when there isn't one, so a health event's clock time never reaches the editor. Providers sort by the event time on the server before mapping.
+
+A provider can also send three optional card parts in `post_payload`, which the picker inserts in place of the paragraph. `normalize_item()` checks each one and drops it when it doesn't pass:
+
+| Field | Passes when |
+|---|---|
+| `blocks` | A list of 1 to 5 entries. Every `name` matches `^post-kinds-indieweb/[a-z0-9-]+$` and is a registered block type; one bad entry drops the whole list. `attributes` keeps only scalar values whose keys the block type declares. |
+| `terms` | Keys are REST bases of registered REST taxonomies. Values are lists of positive integer ids of existing terms in that taxonomy; other keys and ids are dropped. |
+| `date` | Exactly `YYYY-MM-DDT12:00:00` on a real calendar day. Noon is the only time a provider can set, so no clock time travels with the post date. |
+
+The picker applies the same `post-kinds-indieweb/` check and inserts the blocks only when the editor has every block type registered; otherwise it inserts the paragraph and skips `terms` and `date`.
+
 ## Provider registration
 
 ```php
 add_filter( 'outpost_fetch_recent_providers', function( $providers ) {
     $providers['oura'] = [
-        'label'          => __( 'Oura', 'outpost' ),
+        'label'          => __( 'Oura', 'outpost-mobile-publishing' ),
         'callback'       => function( $count = 10 ) {
             // Returns array of canonical items.
         },
@@ -81,16 +93,9 @@ When `oauth_provider` is set and the current user doesn't have a connection in `
 }
 ```
 
-### Auth failed (200 + reason)
+### Auth failed (not returned)
 
-```json
-{
-    "provider_id": "oura",
-    "items": [],
-    "reason": "auth_failed",
-    "message": "Oura connection expired. Reconnect in OAuth settings."
-}
-```
+`Outpost_Fetch_Recent_REST::REASON_AUTH_FAILED` (`'auth_failed'`) is defined, and the modal has a branch that renders it, but no code path returns it. When a provider's token is rejected, the Oura, WHOOP, and Polar callbacks return an empty list, and the modal shows "No recent items available."
 
 ### Transport failure (503)
 
@@ -101,7 +106,7 @@ When `oauth_provider` is set and the current user doesn't have a connection in `
 }
 ```
 
-The 200-with-reason pattern for missing-auth is intentional: it's a non-error UX state the modal handles gracefully (renders a Connect prompt instead of a list). Only true server / network errors return non-200.
+The 200-with-reason pattern for a missing connection is intentional: it's a non-error UX state the modal handles gracefully (renders a Connect prompt instead of a list). Only true server / network errors return non-200.
 
 ## Insert flow
 
@@ -112,7 +117,7 @@ When the user picks an item, `FetchRecentPickerModal::handleSelect`:
 3. If `post_payload.post_meta` is non-empty, dispatches `core/editor`'s `editPost` with the meta map.
 4. Closes the modal.
 
-Future enhancement: insert as a custom Outpost block instead of a paragraph block, so the post_kind taxonomy + post_meta render visually inside the editor. Out of scope for v1.
+The picker inserts a paragraph block, not a custom Outpost block, so `post_kind` and post meta don't render visually inside the editor.
 
 ## Custom item renderers
 
@@ -134,11 +139,6 @@ If no filter is registered for a provider, `DefaultItemRenderer` runs.
 
 This branch (`phase-g/fetch-recent-picker`) bases on `phase-g/g3.5c-gutenberg-sidebar`, NOT `main`. Per the FY-Theming locked decision #29 (stacked-PR merge sequencing), retarget this PR's base to `main` BEFORE the G3.5c branch is deleted after G3.5c merges. The cascade-prevention ritual is documented in CLAUDE.md.
 
-## Follow-ups
+## Shipped providers
 
-After this lands:
-- **Oura source class** — registers `oura` provider, fetches /workouts, /sleep, /readiness via Outpost_Credentials_Store-resolved access token.
-- **WHOOP source class** — same pattern; per-day workouts and recovery summaries.
-- **Polar source class** — same pattern; activity sessions and training load.
-
-Each source class is ~250 lines (provider config + callback that hits the upstream API + canonical-item projection). The picker primitive doesn't change; only the registered providers grow.
+The three providers this section once listed as follow-ups have shipped: Oura (workouts and sleep), WHOOP (cycles and recovery), and Polar Flow (training sessions). The picker primitive didn't change to support them; each is a provider config plus a callback that calls the upstream API and projects canonical items.

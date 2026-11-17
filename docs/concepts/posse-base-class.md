@@ -1,23 +1,24 @@
 # POSSE outbound base class
 
-Outpost's POSSE-outbound foundation. Every direct-API syndication destination — Beehiiv, Buttondown, Kit, write.as in G5; Notion outbound, RWG, WHOOP outbound, and others in later phases — is a concrete subclass of `Outpost_POSSE_Destination_Base` registered with `Outpost_POSSE_Registry`. The dispatcher handles scheduling, retry, and post-meta accounting; destinations only make the API call.
+Outpost's POSSE-outbound foundation. Every direct-API syndication destination (Beehiiv, Buttondown, Kit, and write.as, from G5) is a concrete subclass of `Outpost_POSSE_Destination_Base` registered with `Outpost_POSSE_Registry`. The dispatcher handles scheduling, retry, and post-meta accounting; destinations only make the API call.
 
 ## Components
 
-- **`Outpost_POSSE_Destination_Base`** — abstract. Subclasses implement `id()`, `label()`, `provider_id()`, `dispatch( int $post_id ): array`. The base provides `get_credentials_for_user()` (loads from `Outpost_Credentials_Store` via the G3.5a OAuth foundation) plus `success_result()` / `failure_result()` helpers.
+- **`Outpost_POSSE_Destination_Base`** — abstract. Subclasses implement `id()`, `label()`, `provider_id()`, `dispatch( int $post_id ): array`. The base provides `get_credentials_for_user()` (loads from `Outpost_Credentials_Store` via the G3.5a OAuth foundation; returns null when `provider_id()` is `''`) plus `success_result()` / `failure_result()` helpers. The four shipped destinations return `''` from `provider_id()` and read their keys from the Outpost → Settings → API Keys tab through `Outpost_Settings_Handler::read_tab( 'api_keys' )` instead.
 - **`Outpost_POSSE_Registry`** — static registry keyed by destination id. Concrete destinations register themselves on `init`. Filterable via `outpost_posse_destinations` for site-config overrides.
 - **`Outpost_POSSE_Dispatcher`** — wp-cron-driven dispatcher. Hooks `transition_post_status` to schedule a single-event 30 seconds after publish, then handles retries with exponential backoff (30s → 5min → 30min) up to 3 attempts.
-- **`Outpost_POSSE_Meta`** — post-meta accessor for the four canonical keys (`_outpost_posse_targets`, `_outpost_syndication_urls`, `_outpost_posse_failures`, `_outpost_posse_in_flight`). All four are registered via `register_post_meta` so the Gutenberg sidebar (G3.5c) reads/writes them via REST.
+- **`Outpost_POSSE_Meta`** — post-meta accessor for the four canonical keys (`_outpost_posse_targets`, `_outpost_syndication_urls`, `_outpost_posse_failures`, `_outpost_posse_in_flight`). All four are registered via `register_post_meta` with `show_in_rest`, so REST clients can read and write them. The Gutenberg sidebar (G3.5c) doesn't read or write them yet.
 
 ## Lifecycle
 
-1. User publishes a post that has `_outpost_posse_targets` set (selected via G3.5c sidebar).
-2. `transition_post_status` fires; dispatcher checks: new=='publish', old!=new (re-publish, not edit), publishing user has `publish_posts`, targets non-empty.
+1. User publishes a post that has `_outpost_posse_targets` set. No editor UI sets it yet; see [Choosing destinations](#choosing-destinations).
+2. `transition_post_status` fires; dispatcher checks: new=='publish', old!=new (re-publish, not edit), the post is public (no password, and its type is `post` or one the `outpost_posse_post_types` filter adds), the current user (when there is one) can `edit_post` this post, the post author has `publish_posts`, targets non-empty.
 3. For each target not already in `_outpost_posse_in_flight`:
    - `outpost_posse_should_dispatch` filter veto check (default true; site owners can skip per-destination).
    - Add to in-flight (idempotency seal).
    - Schedule wp-cron event `outpost_posse_dispatch` at +30s with `[ post_id, destination_id, attempt = 1 ]`.
 4. Cron fires → `handle_dispatch( $post_id, $destination_id, $attempt )`:
+   - Re-read the post. If it was deleted, exit without writing anything. If it's no longer public (status other than `publish`, a password, or a type outside `outpost_posse_post_types`), record the non-retrying failure `post_not_public`, remove it from in-flight, and exit. This runs on every attempt, retries included, so a post made draft, private, trashed or password-protected after scheduling is never sent.
    - Resolve destination via registry; missing → record failure, exit.
    - Fire `outpost_posse_before_dispatch` action.
    - Call `$destination->dispatch( $post_id )`.
@@ -61,6 +62,7 @@ After three attempts, the dispatcher records a permanent failure and the destina
 
 ## Filters and actions
 
+- **Filter `outpost_posse_post_types`** (scheduler, dispatcher and each destination): receives `string[] $types`, default `array( 'post' )`. Only posts of these types are scheduled or sent.
 - **Filter `outpost_posse_destinations`** (registry): accept `array<string,Outpost_POSSE_Destination_Base>` keyed by id; site owners can append, remove, or replace destinations.
 - **Filter `outpost_posse_should_dispatch`** (dispatcher, per-destination): receives `(bool $should, int $post_id, string $destination_id)`. Returning false skips that destination for that post.
 - **Action `outpost_posse_before_dispatch`** (`int $post_id, string $destination_id, int $attempt`): fires before each attempt. Useful for logging.
@@ -76,7 +78,7 @@ final class Outpost_POSSE_Destination_Beehiiv extends Outpost_POSSE_Destination_
     }
 
     public function label(): string {
-        return __( 'Beehiiv', 'outpost' );
+        return __( 'Beehiiv', 'outpost-mobile-publishing' );
     }
 
     public function provider_id(): string {
@@ -110,4 +112,19 @@ The four canonical keys, all keyed by post id:
 - **`_outpost_posse_failures`** (`array<{destination_id, error, attempted_at, attempt_count}>`) — permanent failures.
 - **`_outpost_posse_in_flight`** (`string[]`) — currently scheduled or retrying.
 
-All four are `register_post_meta`'d on `init` with `show_in_rest: true`, the auth callback gating writes on `edit_post` cap.
+All four are `register_post_meta`'d on `init` for the `post` post type with `show_in_rest`, the auth callback gating writes on `edit_post` cap, and a sanitize callback on each. `_outpost_posse_failures` and `_outpost_posse_in_flight` appear only in `context=edit` responses, which the core posts route serves only to a user who can edit the post, so a public read of a published post never shows them.
+
+Nothing in Outpost reads `_outpost_posse_failures` back: no admin notice, list-table column, or editor panel shows POSSE failures. Read the meta with `get_post_meta( $post_id, '_outpost_posse_failures', true )`, `wp post meta get <id> _outpost_posse_failures --format=json`, or `GET /wp-json/wp/v2/posts/<id>?context=edit`.
+
+## Choosing destinations
+
+The block editor has no destination selector. Set `_outpost_posse_targets` to a list of destination ids (`beehiiv`, `buttondown`, `kit`, `write-as`) before the post is published, through the core posts route. The request needs a user with `edit_post` on the post. Set `WP_USER` to your username and `WP_APP_PASSWORD` to an application password (Users → Profile → Application Passwords) first:
+
+```bash
+curl -X POST https://example.com/wp-json/wp/v2/posts/123 \
+  -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"meta":{"_outpost_posse_targets":["beehiiv","buttondown"]}}'
+```
+
+Or with WP-CLI: `wp post meta update 123 _outpost_posse_targets '["beehiiv","buttondown"]' --format=json`. Each id passes through `sanitize_key()`. Each destination's own checkbox on the API Keys tab must also be on, or its dispatch fails with a "disabled in settings" error.

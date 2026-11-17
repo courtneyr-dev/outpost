@@ -96,25 +96,58 @@ final class Outpost_Syndication_Capture_Controller {
 	}
 
 	/**
-	 * Permission callback. Validates bearer tokens before checking the
-	 * edit_posts capability.
+	 * Permission callback. Checks the user WordPress resolved (cookie
+	 * session or IndieAuth bearer token) for edit_posts and token scope.
 	 *
 	 * @return bool|WP_Error
 	 */
-	public static function check_permission() {
-		self::authenticate_bearer_token();
-
-		$allow = current_user_can( 'edit_posts' );
+	public static function check_permission( WP_REST_Request $request ) {
+		// This callback guards both the read-only GET /pending route and
+		// the mutating POST /capture route (writes completed_at + silo_url
+		// to the audit log and outpost_syndication_links). GET requests
+		// accept a `read` scope in addition to `create`/`update`; POST
+		// requires `create`/`update`.
+		$required_scopes = 'GET' === $request->get_method()
+			? array( 'create', 'update', 'read' )
+			: array( 'create', 'update' );
+		$message         = __( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' );
+		// Credential first, and it fails early: a cookie session without a
+		// valid REST nonce, or a token without an accepted scope, is refused
+		// here, before the capability check. No filter can change this.
+		if ( ! self::bearer_has_scope( $request, $required_scopes ) ) {
+			// See Outpost_Preview_Endpoint::check_permission() for the
+			// 401-vs-403 rationale.
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => current_user_can( 'edit_posts' ) ? 403 : 401 )
+			);
+		}
+		// Capability second, unfiltered: a request without `edit_posts`,
+		// anonymous ones included, is refused before the site filter runs.
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				$message,
+				array( 'status' => 401 )
+			);
+		}
 		/**
-		 * Override the syndication-capture endpoint permission decision.
+		 * Filters whether a request may use the syndication-capture endpoint.
 		 *
-		 * @param bool $allow Whether the request is authorized.
+		 * This filter can only restrict access. It runs after the credential
+		 * check and the `edit_posts` check have both passed, and its value
+		 * starts at true, so returning false denies the request while no
+		 * return value admits a request those checks refused.
+		 *
+		 * @param bool            $allow   True: the request passed both checks.
+		 * @param WP_REST_Request $request Current REST request.
 		 */
-		$allow = (bool) apply_filters( 'outpost_syndication_capture_permission', $allow );
+		$allow = (bool) apply_filters( 'outpost_syndication_capture_permission', true, $request );
 		if ( ! $allow ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Outpost syndication capture requires an authenticated user.', 'outpost-mobile-publishing' ),
+				$message,
 				array( 'status' => 401 )
 			);
 		}

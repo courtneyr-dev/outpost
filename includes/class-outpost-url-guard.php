@@ -76,9 +76,26 @@ final class Outpost_Url_Guard {
 	 * @return bool
 	 */
 	public static function host_is_blocked( string $host ): bool {
+		return null === self::resolve_safe_ip( $host );
+	}
+
+	/**
+	 * Resolve a host to the single address this guard vetted as safe.
+	 *
+	 * A caller that goes on to fetch the host must connect to exactly this
+	 * address rather than trust a second, independent DNS lookup — a
+	 * resolver can answer differently between the check and the connect
+	 * (DNS rebinding), which would let a vetted-safe hostname serve the
+	 * request from an address this guard never saw.
+	 *
+	 * @param string $host Hostname or bracketed/plain IP literal.
+	 * @return string|null The vetted IP, or null when the host is blocked
+	 *                      or could not be resolved.
+	 */
+	public static function resolve_safe_ip( string $host ): ?string {
 		$host = trim( $host );
 		if ( '' === $host ) {
-			return true;
+			return null;
 		}
 		// Strip IPv6 brackets: [::1] → ::1.
 		if ( isset( $host[0] ) && '[' === $host[0] && ']' === substr( $host, -1 ) ) {
@@ -87,20 +104,20 @@ final class Outpost_Url_Guard {
 
 		// Literal IP host: classify directly, no DNS.
 		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
-			return self::is_blocked_ip( $host );
+			return self::is_blocked_ip( $host ) ? null : $host;
 		}
 
 		$ips = self::resolve_host_ips( $host );
 		if ( empty( $ips ) ) {
 			// Could not prove the host is safe — fail closed.
-			return true;
+			return null;
 		}
 		foreach ( $ips as $ip ) {
 			if ( self::is_blocked_ip( (string) $ip ) ) {
-				return true;
+				return null;
 			}
 		}
-		return false;
+		return (string) $ips[0];
 	}
 
 	/**
@@ -217,6 +234,27 @@ final class Outpost_Url_Guard {
 		if ( 100 === $a && $b >= 64 && $b <= 127 ) { // 100.64.0.0/10 CGNAT.
 			return true;
 		}
+		// IANA special-purpose blocks that are never a public web
+		// destination (T10-S3-08): 192.0.0.0/24 IETF protocol assignments,
+		// 192.0.2.0/24 TEST-NET-1, 192.88.99.0/24 6to4 relay anycast,
+		// 198.18.0.0/15 benchmarking, 198.51.100.0/24 TEST-NET-2,
+		// 203.0.113.0/24 TEST-NET-3.
+		$c = $parts[2];
+		if ( 192 === $a && 0 === $b && ( 0 === $c || 2 === $c ) ) {
+			return true;
+		}
+		if ( 192 === $a && 88 === $b && 99 === $c ) {
+			return true;
+		}
+		if ( 198 === $a && ( 18 === $b || 19 === $b ) ) {
+			return true;
+		}
+		if ( 198 === $a && 51 === $b && 100 === $c ) {
+			return true;
+		}
+		if ( 203 === $a && 0 === $b && 113 === $c ) {
+			return true;
+		}
 		// Broader hygiene: multicast, reserved, and the 255.255.255.255
 		// broadcast address all fall in 224.0.0.0/3 and above.
 		if ( $a >= 224 ) {
@@ -243,6 +281,32 @@ final class Outpost_Url_Guard {
 		}
 		// fc00::/7 unique-local (fc.. and fd..).
 		if ( 0xFC === ( $b0 & 0xFE ) ) {
+			return true;
+		}
+		// fec0::/10 site-local (deprecated, still routed internally by some networks).
+		if ( 0xFE === $b0 && 0xC0 === ( $b1 & 0xC0 ) ) {
+			return true;
+		}
+		// ff00::/8 multicast.
+		if ( 0xFF === $b0 ) {
+			return true;
+		}
+		// 2002::/16 6to4: every address tunnels to the IPv4 address in bytes
+		// 2-5, internal or not, so the whole prefix is refused (T10-S3-08).
+		if ( 0x20 === $b0 && 0x02 === $b1 ) {
+			return true;
+		}
+		// 2001::/32 Teredo (tunnels to an embedded IPv4 server and client) and
+		// 2001:db8::/32 documentation.
+		if ( 0x20 === $b0 && 0x01 === $b1 ) {
+			$b2 = ord( $packed[2] );
+			$b3 = ord( $packed[3] );
+			if ( ( 0x00 === $b2 && 0x00 === $b3 ) || ( 0x0D === $b2 && 0xB8 === $b3 ) ) {
+				return true;
+			}
+		}
+		// 100::/64 discard-only.
+		if ( "\x01\x00\0\0\0\0\0\0" === substr( $packed, 0, 8 ) ) {
 			return true;
 		}
 		return false;

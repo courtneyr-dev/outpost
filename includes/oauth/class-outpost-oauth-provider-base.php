@@ -100,6 +100,27 @@ abstract class Outpost_OAuth_Provider_Base {
 		return $response_body;
 	}
 
+	/** Largest provider response Outpost reads: 5 MiB (F-54). */
+	public const MAX_RESPONSE_BYTES = 5242880;
+
+	/**
+	 * Arguments for any request that carries a stored provider credential
+	 * (access or refresh token, client secret, authorization code): follow
+	 * no redirect, because WordPress resends the original headers,
+	 * Authorization included, to a redirect target; and read at most
+	 * 5 MiB of the response (F-54).
+	 *
+	 * @since 1.0.28
+	 *
+	 * @param array<string,mixed> $args wp_remote_* arguments.
+	 * @return array<string,mixed>
+	 */
+	public static function credential_request_args( array $args ): array {
+		$args['redirection']         = 0;
+		$args['limit_response_size'] = self::MAX_RESPONSE_BYTES;
+		return $args;
+	}
+
 	/**
 	 * Build the URL the user gets redirected to (with state in query).
 	 *
@@ -142,15 +163,17 @@ abstract class Outpost_OAuth_Provider_Base {
 		);
 		$response = wp_remote_post(
 			$this->token_url(),
-			array(
-				'timeout' => 10,
-				'headers' => array_merge(
-					array(
-						'Accept' => 'application/json',
+			self::credential_request_args(
+				array(
+					'timeout' => 10,
+					'headers' => array_merge(
+						array(
+							'Accept' => 'application/json',
+						),
+						$this->extra_token_request_headers()
 					),
-					$this->extra_token_request_headers()
-				),
-				'body'    => $this->token_request_body( $body ),
+					'body'    => $this->token_request_body( $body ),
+				)
 			)
 		);
 		return $this->parse_token_response( $response );
@@ -190,10 +213,7 @@ abstract class Outpost_OAuth_Provider_Base {
 	 */
 	final protected function parse_token_response( $response ) {
 		if ( is_wp_error( $response ) ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-				error_log( 'Outpost OAuth token transport error: ' . $response->get_error_message() );
-			}
+			Outpost_Debug_Log::write( sprintf( 'OAuth %s token exchange failed: transport error %s', $this->id(), Outpost_Debug_Log::error_code( $response ) ) );
 			return new \WP_Error(
 				'outpost_oauth_token_transport',
 				$response->get_error_message()
@@ -201,9 +221,9 @@ abstract class Outpost_OAuth_Provider_Base {
 		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		$body   = (string) wp_remote_retrieve_body( $response );
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ( $status < 200 || $status >= 300 ) ) {
-			/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-			error_log( sprintf( 'Outpost OAuth token exchange failed: HTTP %d body=%s', $status, $body ) );
+		if ( $status < 200 || $status >= 300 ) {
+			// Status only: the body can carry provider error detail or tokens.
+			Outpost_Debug_Log::write( sprintf( 'OAuth %s token exchange failed: HTTP %d', $this->id(), $status ) );
 		}
 		$decoded = json_decode( $body, true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $decoded ) ) {
@@ -243,18 +263,19 @@ abstract class Outpost_OAuth_Provider_Base {
 			if ( is_array( $creds ) && ! empty( $creds['access_token'] ) ) {
 				$response = wp_remote_post(
 					$endpoint,
-					array(
-						'timeout' => 5,
-						'body'    => array(
-							'token'         => (string) $creds['access_token'],
-							'client_id'     => $this->client_id(),
-							'client_secret' => $this->client_secret(),
-						),
+					self::credential_request_args(
+						array(
+							'timeout' => 5,
+							'body'    => array(
+								'token'         => (string) $creds['access_token'],
+								'client_id'     => $this->client_id(),
+								'client_secret' => $this->client_secret(),
+							),
+						)
 					)
 				);
-				if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					/* phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log */
-					error_log( sprintf( 'Outpost OAuth revocation failed for %s: %s', $this->id(), $response->get_error_message() ) );
+				if ( is_wp_error( $response ) ) {
+					Outpost_Debug_Log::write( sprintf( 'OAuth %s revocation failed: %s', $this->id(), Outpost_Debug_Log::error_code( $response ) ) );
 				}
 			}
 		}
@@ -320,13 +341,15 @@ abstract class Outpost_OAuth_Provider_Base {
 		);
 		$response = wp_remote_post(
 			$this->token_url(),
-			array(
-				'timeout' => 10,
-				'headers' => array_merge(
-					array( 'Accept' => 'application/json' ),
-					$this->extra_token_request_headers()
-				),
-				'body'    => $this->token_request_body( $body ),
+			self::credential_request_args(
+				array(
+					'timeout' => 10,
+					'headers' => array_merge(
+						array( 'Accept' => 'application/json' ),
+						$this->extra_token_request_headers()
+					),
+					'body'    => $this->token_request_body( $body ),
+				)
 			)
 		);
 		$decoded  = $this->parse_token_response( $response );
