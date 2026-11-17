@@ -38,6 +38,7 @@ export default defineConfig({
 				PageTitle: './src/components/Breadcrumbs.astro',
 				Head: './src/components/Head.astro',
 			},
+			customCss: ['./src/styles/search.css'],
 			sidebar: [
 				{
 					label: 'Start here',
