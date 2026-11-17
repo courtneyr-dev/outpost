@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -66,6 +66,8 @@ export interface NoteModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 }
 
 type Status =
@@ -212,7 +214,7 @@ function consume_share_target_for_note(): {
 	return out;
 }
 
-export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) {
+export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }: NoteModeProps) {
 	// Web Share Target intake (Phase E0): when this tab is the share
 	// destination, consume the stashed payload as the initial state.
 	// One-shot — sessionStorage clears on read.
@@ -318,12 +320,7 @@ export function NoteMode({ token, micropubEnv, composerConfig }: NoteModeProps) 
 			setPickedLocation(null);
 			setVenueName('');
 		} catch (err) {
-			const message =
-				err instanceof MicropubError
-					? err.code + ': ' + err.message
-					: err instanceof Error
-						? err.message
-						: 'Unknown error';
+			const message = report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};

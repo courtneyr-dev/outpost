@@ -459,6 +459,13 @@ export function ComposerTabs({
 	// `online` listener, which is attached once.
 	const config_needed = useRef(true);
 
+	// A post rejected with 401 means the bearer token expired: show the same
+	// banner, with Sign in again, as a 401 on the composer config.
+	const sign_in_expired = (): void => {
+		config_needed.current = false;
+		setConfigError('unauthorized');
+	};
+
 	const retry_config_now = (): void => {
 		config_retry_step.current = 0;
 		setConfigAttempt((n) => n + 1);
@@ -563,6 +570,7 @@ export function ComposerTabs({
 			render: () => (
 				<NoteMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
@@ -574,6 +582,7 @@ export function ComposerTabs({
 			render: () => (
 				<ReplyMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
@@ -585,6 +594,7 @@ export function ComposerTabs({
 			render: () => (
 				<PhotoMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(shareInboxEnv ? { shareInboxEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
@@ -597,6 +607,7 @@ export function ComposerTabs({
 			render: () => (
 				<ListenMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
@@ -608,6 +619,7 @@ export function ComposerTabs({
 			render: () => (
 				<LifeMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>
@@ -619,6 +631,7 @@ export function ComposerTabs({
 			render: () => (
 				<RecipeMode
 					token={token}
+					onSignInExpired={sign_in_expired}
 					{...(micropubEnv ? { micropubEnv } : {})}
 					{...(composer_config ? { composerConfig: composer_config } : {})}
 				/>

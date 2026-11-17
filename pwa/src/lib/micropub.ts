@@ -47,6 +47,69 @@ export class MicropubError extends Error {
 	}
 }
 
+export type PostFailureKind =
+	| 'expired_sign_in'
+	| 'forbidden'
+	| 'server_error'
+	| 'not_accepted'
+	| 'no_endpoint'
+	| 'bad_link'
+	| 'unknown';
+
+export interface PostFailure {
+	kind: PostFailureKind;
+	/** Plain composer copy. Never carries the code, the status, or the server's body. */
+	message: string;
+}
+
+const POST_FAILURE_MESSAGES: Record<PostFailureKind, string> = {
+	expired_sign_in: "Your sign-in expired, so this wasn't posted. Everything you entered is still here. Sign in again, then post it.",
+	forbidden: "Your site didn't let this sign-in create posts, so this wasn't posted. Everything you entered is still here. About › Diagnostics shows what this sign-in can do.",
+	server_error: "Your site had a problem and didn't post this. Everything you entered is still here, so you can try again.",
+	not_accepted: "Your site didn't accept this post. Everything you entered is still here; check it and try again.",
+	no_endpoint: "Outpost couldn't find where your site accepts posts, so this wasn't posted. Everything you entered is still here, so you can try again.",
+	bad_link: "Your site answered, but its reply didn't include a link Outpost can use. Check your site before posting again, in case this is already there.",
+	unknown: "Something went wrong and this wasn't posted. Everything you entered is still here, so you can try again.",
+};
+
+/**
+ * Turn a failed submit into composer copy (implementation brief section 7):
+ * an expired sign-in (401), a refusal (403) and a server failure (5xx) each
+ * get their own message, and none of them shows the code, the HTTP status or
+ * the server's body. Callers log the error itself for debugging.
+ */
+export function describe_post_failure(err: unknown): PostFailure {
+	let kind: PostFailureKind = 'unknown';
+	if (err instanceof MicropubError) {
+		if (err.code === 'unauthorized' || err.status === 401) {
+			kind = 'expired_sign_in';
+		} else if (err.status === 403) {
+			kind = 'forbidden';
+		} else if (err.status !== undefined && err.status >= 500) {
+			kind = 'server_error';
+		} else if (err.code === 'no_endpoint' || err.code === 'discovery_failed') {
+			kind = 'no_endpoint';
+		} else if (err.code === 'no_location' || err.code === 'invalid_location') {
+			kind = 'bad_link';
+		} else {
+			kind = 'not_accepted';
+		}
+	}
+	return { kind, message: POST_FAILURE_MESSAGES[kind] };
+}
+
+/**
+ * The composer modes' catch handler for a failed submit: logs the raw error
+ * (the diagnostics stay in the console), asks the shell for a fresh sign-in
+ * on a 401, and returns the plain message to show.
+ */
+export function report_post_failure(err: unknown, onSignInExpired?: () => void): string {
+	const failure = describe_post_failure(err);
+	if (typeof console !== 'undefined') console.warn('Outpost: post failed', err);
+	if (failure.kind === 'expired_sign_in') onSignInExpired?.();
+	return failure.message;
+}
+
 export interface PostNoteParams {
 	content: string;
 	accessToken: string;
