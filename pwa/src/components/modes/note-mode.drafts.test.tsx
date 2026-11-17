@@ -55,7 +55,30 @@ afterEach(() => {
 	root.remove();
 	vi.useRealTimers();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
+
+/**
+ * Swap in a localStorage whose `method` throws, as a blocked or full store
+ * does. happy-dom 21's Storage is a Proxy that vi.spyOn can't restore, so a
+ * spy on it would leak into every later test.
+ */
+function refuse_storage(method: 'getItem' | 'setItem'): void {
+	const real = localStorage;
+	vi.stubGlobal('localStorage', {
+		get length() {
+			return real.length;
+		},
+		key: (index: number) => real.key(index),
+		getItem: (key: string) => real.getItem(key),
+		setItem: (key: string, value: string) => real.setItem(key, value),
+		removeItem: (key: string) => real.removeItem(key),
+		clear: () => real.clear(),
+		[method]: () => {
+			throw new DOMException('denied', 'SecurityError');
+		},
+	});
+}
 
 function mount(me = ME): void {
 	render(<NoteMode token={token_for(me)} micropubEnv={online_micropub()} />, root);
@@ -170,9 +193,7 @@ describe('NoteMode drafts', () => {
 	});
 
 	it('keeps working without "Draft saved" when storage refuses writes', async () => {
-		vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-			throw new DOMException('denied', 'SecurityError');
-		});
+		refuse_storage('setItem');
 		mount();
 		type('outpost-note-title', 'Offline-proof');
 		type('outpost-note-content', 'Still postable');
@@ -187,11 +208,50 @@ describe('NoteMode drafts', () => {
 	});
 
 	it('mounts with an empty form when storage reads throw', async () => {
-		vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
-			throw new DOMException('denied', 'SecurityError');
-		});
+		refuse_storage('getItem');
 		mount();
 		await flush();
 		expect(field('outpost-note-content').value).toBe('');
+	});
+});
+
+describe('NoteMode drafts: leaving the page before the save delay ends', () => {
+	afterEach(() => {
+		// Undo the visibilityState override; jsdom's own getter is on the prototype.
+		delete (document as unknown as Record<string, unknown>).visibilityState;
+	});
+
+	it('saves the latest text when the page is closed or reloaded', async () => {
+		mount();
+		type('outpost-note-content', 'Typed just before a reload');
+		await flush();
+		window.dispatchEvent(new Event('pagehide'));
+		expect(localStorage.getItem(DRAFTS_KEY)).toContain('Typed just before a reload');
+		reload();
+		await flush();
+		expect(field('outpost-note-content').value).toBe('Typed just before a reload');
+	});
+
+	it('saves the latest text when the app goes to the background', async () => {
+		mount();
+		type('outpost-note-content', 'Typed before switching apps');
+		await flush();
+		Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(localStorage.getItem(DRAFTS_KEY)).toContain('Typed before switching apps');
+	});
+
+	it('does not bring a published draft back when the page is closed afterward', async () => {
+		mount();
+		type('outpost-note-title', 'Ready');
+		type('outpost-note-content', 'Publish me');
+		await wait_for_save();
+		(root.querySelector('form') as HTMLFormElement).dispatchEvent(
+			new Event('submit', { bubbles: true, cancelable: true }),
+		);
+		await vi.waitFor(() => expect(posts).toHaveLength(1));
+		await flush();
+		window.dispatchEvent(new Event('pagehide'));
+		expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
 	});
 });

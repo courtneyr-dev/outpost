@@ -222,6 +222,15 @@ export function useDraft({
 		}
 	};
 
+	const save = (): void => {
+		const { fields: f, meta: m } = latest.current;
+		const blank = is_blank(f);
+		const ok = write_draft(mode, me, f, m, target);
+		setState(blank ? 'idle' : ok ? 'saved' : 'unavailable');
+	};
+	const save_ref = useRef(save);
+	save_ref.current = save;
+
 	useEffect(() => {
 		// The first render shows what was restored (or a blank form); there is
 		// nothing new to save yet.
@@ -233,15 +242,32 @@ export function useDraft({
 		setState('idle');
 		timer.current = setTimeout(() => {
 			timer.current = null;
-			const { fields: f, meta: m } = latest.current;
-			const blank = is_blank(f);
-			const ok = write_draft(mode, me, f, m, target);
-			setState(blank ? 'idle' : ok ? 'saved' : 'unavailable');
+			save();
 		}, DRAFT_SAVE_DELAY_MS);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- `snapshot` is the serialized fields+meta; the objects themselves are new every render.
 	}, [snapshot, mode, me]);
 
 	useEffect(() => cancel, []);
+
+	// A reload, a closed tab or a PWA sent to the background can end the page
+	// before the save delay runs out, and an unloading page runs no unmount
+	// cleanup. Write the pending text now instead of dropping it.
+	useEffect(() => {
+		const save_pending = (): void => {
+			if (timer.current === null) return;
+			cancel();
+			save_ref.current();
+		};
+		const on_visibility_change = (): void => {
+			if (document.visibilityState === 'hidden') save_pending();
+		};
+		window.addEventListener('pagehide', save_pending);
+		document.addEventListener('visibilitychange', on_visibility_change);
+		return (): void => {
+			window.removeEventListener('pagehide', save_pending);
+			document.removeEventListener('visibilitychange', on_visibility_change);
+		};
+	}, []);
 
 	const discard = (): void => {
 		cancel();
