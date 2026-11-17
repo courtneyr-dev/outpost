@@ -19,7 +19,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "linkinator": "^8.1.0",
-    "markdownlint-cli2": "^0.24.0",
+    "markdownlint-cli2": "^0.24.1",
     "playwright": "^1.62.1"
   }
 }
