@@ -51,9 +51,14 @@ test.describe('composer journeys @journey', () => {
 		await expect(homeHeading(page)).toBeVisible();
 		await expect(page).toHaveTitle('Home – Outpost');
 		const cards = page.getByRole('region', { name: 'What would you like to post?' }).getByRole('listitem').getByRole('button');
-		// BRIEF 6: six cards, Post, Reply, Photo, Doing, Life, Recipe, in that order; "a title as its accessible name".
+		// BRIEF 6: six cards, Post, Reply, Photo, Doing, Life, Recipe, in that order; each is
+		// "named by all of its visible text, title first" (WCAG 2.5.3 Label in Name).
 		await expect(cards).toHaveCount(CARDS.length);
-		for (const [i, c] of CARDS.entries()) await expect(cards.nth(i)).toHaveAccessibleName(c.card);
+		for (const [i, c] of CARDS.entries()) {
+			const visible = (await cards.nth(i).innerText()).replace(/\s+/g, ' ').trim();
+			expect(visible.startsWith(c.card + ' ')).toBe(true);
+			await expect(cards.nth(i)).toHaveAccessibleName(visible);
+		}
 		await expect(page.getByRole('button', { name: /^About Outpost/ })).toBeVisible();
 		// BRIEF 6: a connection line from runtime state, never hard-coded.
 		const line = page.getByRole('region', { name: 'What would you like to post?' }).getByRole('paragraph').first();
