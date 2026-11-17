@@ -7,9 +7,21 @@ Outpost adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.29] - Unreleased
+
 ### Added
 
-- Added `outpost/manual-share` and `outpost/capture-syndication` as non-public WordPress abilities. Each ability has its own disabled-by-default switch under Outpost's Agent abilities settings section, checks write-token scope and per-post edit access, and defaults to a no-write dry run.
+- Two non-public write abilities for the WordPress Abilities API, `outpost/manual-share` and `outpost/capture-syndication`. Each has its own switch (`outpost_ability_manual_share`, `outpost_ability_capture_syndication`), off by default, under the settings screen's "Agent abilities" section; a switch reads as on only for `true`, `1` and `"1"`. The permission check runs the switch first, then the same credential gate as the matching write routes (a cookie session needs a REST nonce, a token needs the `create` or `update` scope), then `edit_post` on an existing post; no route permission filter applies. Both default to `dry_run`, which writes nothing and stays on for `"true"`, `"1"` and `1`; only `false`, `0`, `"0"` or `"false"` writes. Manual share reports `written` only when the share log gained an entry. Capture keeps the REST route's order (URL check, share-log entry, platform-mismatch warning, dry run, write) and trims its input as the route does. Uninstall deletes both options.
+
+### Security
+
+- WordPress.org review T11 items deferred from 1.0.28 (#342):
+  - Preview, geocode, media lookup, composer-config, syndicate-targets and appearance routes need a `create` or `update` token; a token with only `read`, `profile` or `draft` is refused (F-56). Outpost's PWA asks for `create profile update media`, so it's unaffected. The read abilities keep their own scopes.
+  - The composer's Content Security Policy reads filtered directives case-insensitively, keeps the first copy, always sets `default-src`, `frame-ancestors`, `object-src` and `base-uri`, strips loosening tokens from `script-src`, and removes `script-src-elem` and `script-src-attr` (F-58).
+  - Link-preview fetches through `Og_Inbound::fetch()` read at most 5 MB and accept only HTML (F-59). Listen mode sends a cover only when it's an HTTP(S) URL (F-55).
+  - The Perfmatters defang list accepts only `perfmatters_*` hooks (F-60). Admin notices match Outpost's five page slugs only (F-64).
+  - Uninstall deletes every `outpost_settings_{tab_id}` option (F-61), and settings and appearance saves sanitize keys where they read them (F-62).
+  - A photo-inbox record from a pre-1.0.28 service worker gets an id, so two records received in the same millisecond no longer look identical.
 
 ## [1.0.28] - Unreleased
 
