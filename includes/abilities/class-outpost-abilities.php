@@ -437,7 +437,7 @@ final class Outpost_Abilities {
 		$platform_id = (string) $input['platform_id'];
 		$device      = isset( $input['device'] ) ? (string) $input['device'] : Outpost_Manual_Share_Controller::PLATFORM_DESKTOP;
 		$in_pwa_mode = isset( $input['in_pwa_mode'] ) && true === $input['in_pwa_mode'];
-		$dry_run     = ! isset( $input['dry_run'] ) || true === $input['dry_run'];
+		$dry_run     = self::is_dry_run( $input );
 		$platform    = self::find_platform( $platform_id );
 
 		if ( ! $platform instanceof Outpost_Manual_Share_Platform_Config ) {
@@ -490,11 +490,18 @@ final class Outpost_Abilities {
 		}
 
 		$post_id          = (int) $input['post_id'];
-		$audit_log_id     = (string) $input['audit_log_id'];
-		$silo_url         = (string) $input['silo_url'];
+		$audit_log_id     = trim( (string) $input['audit_log_id'] );
+		$silo_url         = trim( (string) $input['silo_url'] );
 		$confirm_mismatch = isset( $input['confirm_mismatch'] ) && true === $input['confirm_mismatch'];
-		$dry_run          = ! isset( $input['dry_run'] ) || true === $input['dry_run'];
-		$validity         = Outpost_Manual_Share_Syndication_Writeback::validate_url( $silo_url );
+		$dry_run          = self::is_dry_run( $input );
+		if ( '' === $audit_log_id ) {
+			return new WP_Error(
+				'outpost_invalid_audit_log_id',
+				__( 'audit_log_id is required.', 'outpost-mobile-publishing' ),
+				array( 'status' => 400 )
+			);
+		}
+		$validity = Outpost_Manual_Share_Syndication_Writeback::validate_url( $silo_url );
 		if ( is_wp_error( $validity ) ) {
 			return new WP_Error(
 				'outpost_' . $validity->get_error_code(),
@@ -684,6 +691,21 @@ final class Outpost_Abilities {
 	public static function ability_is_enabled( string $option ): bool {
 		$value = get_option( $option, false );
 		return in_array( $value, array( true, 1, '1' ), true );
+	}
+
+	/**
+	 * Whether a write should stay a dry run. Core validates `dry_run` as a
+	 * boolean but doesn't cast it, so "true", "1" and 1 arrive as given;
+	 * only an explicit false value turns the write on.
+	 *
+	 * @param array<string, mixed> $input Validated ability input.
+	 */
+	private static function is_dry_run( array $input ): bool {
+		if ( ! array_key_exists( 'dry_run', $input ) ) {
+			return true;
+		}
+		$value = is_string( $input['dry_run'] ) ? strtolower( $input['dry_run'] ) : $input['dry_run'];
+		return ! in_array( $value, array( false, 0, '0', 'false' ), true );
 	}
 
 	private static function disabled_error(): WP_Error {

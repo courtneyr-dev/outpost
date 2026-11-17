@@ -283,6 +283,104 @@ final class AbilitiesWriteTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 0, $this->pre_http_requests );
 	}
 
+	/**
+	 * @dataProvider truthy_dry_run_values
+	 *
+	 * @param mixed $dry_run Value core's boolean validation accepts.
+	 */
+	public function test_truthy_dry_run_values_never_write( $dry_run ): void {
+		$this->options[ Outpost_Abilities::OPTION_MANUAL_SHARE ] = '1';
+		$this->enable_capture_with_audit_entry( 'instagram-feed' );
+		$writes_before = $this->post_writes;
+
+		$share = Outpost_Abilities::execute_manual_share(
+			array(
+				'post_id'     => 42,
+				'platform_id' => 'instagram-feed',
+				'device'      => 'android',
+				'dry_run'     => $dry_run,
+			)
+		);
+		$capture = Outpost_Abilities::execute_capture_syndication(
+			array(
+				'post_id'      => 42,
+				'audit_log_id' => 'audit-1',
+				'silo_url'     => 'https://instagram.com/p/example',
+				'dry_run'      => $dry_run,
+			)
+		);
+
+		$this->assertTrue( $share['dry_run'] );
+		$this->assertFalse( $share['written'] );
+		$this->assertSame( 'dry_run', $capture['status'] );
+		$this->assertFalse( $capture['written'] );
+		$this->assertSame( $writes_before, $this->post_writes );
+	}
+
+	/**
+	 * @return array<string, array{0: mixed}>
+	 */
+	public static function truthy_dry_run_values(): array {
+		return array(
+			'bool true'      => array( true ),
+			'string true'    => array( 'true' ),
+			'string TRUE'    => array( 'TRUE' ),
+			'string one'     => array( '1' ),
+			'int one'        => array( 1 ),
+		);
+	}
+
+	public function test_string_false_dry_run_writes(): void {
+		$this->enable_capture_with_audit_entry( 'instagram-feed' );
+
+		$result = Outpost_Abilities::execute_capture_syndication(
+			array(
+				'post_id'      => 42,
+				'audit_log_id' => 'audit-1',
+				'silo_url'     => 'https://instagram.com/p/example',
+				'dry_run'      => 'false',
+			)
+		);
+
+		$this->assertSame( 'recorded', $result['status'] );
+		$this->assertTrue( $result['written'] );
+	}
+
+	public function test_capture_trims_the_url_so_padding_cannot_skip_the_mismatch_warning(): void {
+		$this->enable_capture_with_audit_entry( 'instagram-feed' );
+
+		$result = Outpost_Abilities::execute_capture_syndication(
+			array(
+				'post_id'      => 42,
+				'audit_log_id' => ' audit-1 ',
+				'silo_url'     => '  https://linkedin.com/posts/example',
+				'dry_run'      => false,
+			)
+		);
+
+		$this->assertSame( 'mismatch_warning', $result['status'] );
+		$this->assertSame( 'https://linkedin.com/posts/example', $result['silo_url'] );
+		$this->assertSame( 'audit-1', $result['audit_log_id'] );
+		$this->assertFalse( $result['written'] );
+	}
+
+	public function test_capture_rejects_an_empty_audit_log_id_with_400(): void {
+		$this->options[ Outpost_Abilities::OPTION_CAPTURE_SYNDICATION ] = '1';
+
+		$result = Outpost_Abilities::execute_capture_syndication(
+			array(
+				'post_id'      => 42,
+				'audit_log_id' => '  ',
+				'silo_url'     => 'https://instagram.com/p/example',
+			)
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'outpost_invalid_audit_log_id', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] ?? null );
+		$this->assertSame( 0, $this->meta_reads );
+	}
+
 	public function test_manual_share_rejects_an_unknown_platform(): void {
 		$this->options[ Outpost_Abilities::OPTION_MANUAL_SHARE ] = '1';
 
