@@ -38,7 +38,8 @@ function sw_source(): string {
 	return php
 		.slice(open, close)
 		.replace(/<\?php echo esc_js\( \$version \); \?>/g, 'test')
-		.replace(/<\?php echo esc_js\( \$plugin_url \); \?>/g, ORIGIN + '/wp-content/plugins/outpost/');
+		.replace(/<\?php echo esc_js\( \$plugin_url \); \?>/g, ORIGIN + '/wp-content/plugins/outpost/')
+		.replace(/<\?php echo wp_json_encode\( \$bundle_urls, [^?]*\?>/g, '[]');
 }
 
 let passthrough: Request[];
