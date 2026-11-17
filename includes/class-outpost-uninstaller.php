@@ -45,6 +45,8 @@ final class Outpost_Uninstaller {
 		'outpost_telegraph_author_url',
 		'outpost_appearance_schema',
 		'outpost_ios_shortcut_legacy_purged',
+		'outpost_ability_manual_share',
+		'outpost_ability_capture_syndication',
 	);
 
 	/**

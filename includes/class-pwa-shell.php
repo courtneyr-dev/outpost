@@ -646,6 +646,12 @@ final class Outpost_PWA_Shell {
 		self::send_js_header();
 		$version    = OUTPOST_VERSION;
 		$plugin_url = OUTPOST_PLUGIN_URL;
+		// The hashed JS and CSS the shell loads, read from the build manifest.
+		$bundle_urls = array_values(
+			array_filter(
+				array_merge( array( Outpost_PWA_Assets::entry_url() ), Outpost_PWA_Assets::entry_css_urls() )
+			)
+		);
 		?>
 // Outpost service worker — Phase D0. Plugin version: <?php echo esc_js( $version ); ?>.
 
@@ -654,16 +660,22 @@ const CACHE_NAME = 'outpost-' + CACHE_VERSION;
 const PLUGIN_URL = '<?php echo esc_js( $plugin_url ); ?>';
 const SHELL_URL = '/post/';
 
-// Resources to seed the cache with on install. The bundled JS/CSS get
-// fetched lazily on first composer open and cached by the fetch handler —
-// we don't precache them by URL because their hashed filenames change with
-// every plugin build.
+// The hashed JS and CSS bundle from the build manifest. The first page loads
+// them before this worker controls it, so the fetch handler never sees those
+// requests; without precaching them here, the composer couldn't open offline
+// until a second online visit. A new build changes these names, and with
+// them this script's bytes, so the browser installs a fresh worker that
+// precaches the new bundle.
+const BUNDLE_URLS = <?php echo wp_json_encode( $bundle_urls, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); ?>;
+
+// Resources to seed the cache with on install.
 const PRECACHE_URLS = [
 	SHELL_URL,
 	'/post/manifest.json',
 	PLUGIN_URL + 'styles/outpost-tokens.css',
 	PLUGIN_URL + 'assets/icons/outpost-icon.svg',
 	PLUGIN_URL + 'assets/icons/outpost-icon-maskable.svg',
+	...BUNDLE_URLS,
 ];
 
 // Precache without cookies. The shell is sent no-store because a

@@ -1,6 +1,6 @@
 {
   "name": "outpost-mobile-publishing",
-  "version": "1.0.28",
+  "version": "1.0.30",
   "files": [
     "admin",
     "assets",
@@ -62,10 +62,12 @@
     "package:wporg": "node bin/package-wporg.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "^9.13.0",
-    "@playwright/test": "^1.48.0",
+    "@msw/playwright": "0.7.0",
+    "@playwright/test": "^1.65.1",
     "@preact/preset-vite": "^2.10.0",
-    "@testing-library/dom": "^10.4.1",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.0.0",
@@ -82,16 +84,17 @@
     "eslint": "^9.13.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "fake-indexeddb": "^6.0.0",
+    "fake-indexeddb": "^6.2.8",
     "happy-dom": "^21.0.4",
+    "msw": "3.0.3",
     "preact": "^10.24.0",
-    "prettier": "^3.3.0",
+    "prettier": "^3.10.1",
     "prop-for-that": "0.7.12",
     "typescript": "^5.5.0",
-    "typescript-eslint": "^8.68.0",
+    "typescript-eslint": "^8.72.2",
     "vite": "^6.4.6",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.12",
+    "vitest": "^5.1.0",
     "workbox-window": "^7.3.0"
   },
   "engines": {

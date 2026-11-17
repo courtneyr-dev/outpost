@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.28\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.30\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-15T14:03:48+00:00\n"
+"POT-Creation-Date: 2026-11-17T04:45:57+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -39,7 +39,7 @@ msgstr ""
 msgid "https://courtneyr.dev"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:100
+#: includes/abilities/class-outpost-abilities.php:106
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
 #: includes/class-admin-page.php:208
@@ -47,32 +47,71 @@ msgstr ""
 msgid "Outpost"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:101
+#: includes/abilities/class-outpost-abilities.php:107
 msgid "Read publishing and syndication information from Outpost."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:126
+#: includes/abilities/class-outpost-abilities.php:134
 msgid "Get syndication targets"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:127
+#: includes/abilities/class-outpost-abilities.php:135
 msgid "Returns the available syndication targets for an optional composer mode."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:164
+#: includes/abilities/class-outpost-abilities.php:172
 msgid "Get share status"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:165
+#: includes/abilities/class-outpost-abilities.php:173
 msgid "Returns the manual-share status and log for one post."
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:205
+#: includes/abilities/class-outpost-abilities.php:213
 msgid "Get composer configuration"
 msgstr ""
 
-#: includes/abilities/class-outpost-abilities.php:206
+#: includes/abilities/class-outpost-abilities.php:214
 msgid "Returns the local configuration used by the Outpost composer."
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:270
+msgid "Prepare a manual share"
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:271
+msgid "Builds a device-specific manual-share payload and records it in the post share log."
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:327
+msgid "Capture a syndication link"
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:328
+msgid "Records a silo URL as a post syndication link and completes its share-log entry."
+msgstr ""
+
+#. translators: %s: platform id supplied by the caller.
+#. translators: %s: platform id supplied by the client.
+#: includes/abilities/class-outpost-abilities.php:448
+#: includes/class-manual-share-controller.php:261
+#, php-format
+msgid "Unknown manual-share platform: %s"
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:500
+#: includes/class-manual-share-status-controller.php:265
+#: includes/class-syndication-capture-controller.php:217
+msgid "audit_log_id is required."
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:517
+#: includes/class-manual-share-status-controller.php:280
+msgid "No matching audit log entry."
+msgstr ""
+
+#: includes/abilities/class-outpost-abilities.php:725
+msgid "This Outpost ability is disabled."
 msgstr ""
 
 #: includes/adapters/outbound/class-telegraph-adapter.php:172
@@ -157,23 +196,31 @@ msgstr ""
 msgid "Source %s returned non-array, non-WP_Error value."
 msgstr ""
 
-#: includes/adapters/primitives/class-og-inbound.php:117
+#: includes/adapters/primitives/class-og-inbound.php:123
 msgid "Invalid or unsupported URL."
 msgstr ""
 
 #. translators: %s: error message from wp_remote_get
-#: includes/adapters/primitives/class-og-inbound.php:148
+#: includes/adapters/primitives/class-og-inbound.php:158
 #, php-format
 msgid "OG fetch failed: %s"
 msgstr ""
 
 #. translators: %d: HTTP status code
-#: includes/adapters/primitives/class-og-inbound.php:158
+#: includes/adapters/primitives/class-og-inbound.php:168
 #, php-format
 msgid "OG fetch returned HTTP %d."
 msgstr ""
 
-#: includes/adapters/primitives/class-og-inbound.php:170
+#: includes/adapters/primitives/class-og-inbound.php:187
+msgid "OG fetch returned something other than an HTML page."
+msgstr ""
+
+#: includes/adapters/primitives/class-og-inbound.php:196
+msgid "OG fetch returned a page larger than 5 MB."
+msgstr ""
+
+#: includes/adapters/primitives/class-og-inbound.php:203
 msgid "OG fetch returned empty body."
 msgstr ""
 
@@ -248,109 +295,109 @@ msgstr ""
 msgid "You do not have permission to manage appearance preferences."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:231
+#: includes/admin/class-appearance-settings-page.php:229
 msgid "Colors"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:237
+#: includes/admin/class-appearance-settings-page.php:235
 msgid "Fonts"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:277
+#: includes/admin/class-appearance-settings-page.php:275
 msgid "Contrast adjustment applied."
 msgstr ""
 
 #. translators: 1: original color hex, 2: adjusted hex, 3: ratio before, 4: ratio after.
-#: includes/admin/class-appearance-settings-page.php:281
+#: includes/admin/class-appearance-settings-page.php:279
 #, php-format
 msgid "Your %1$s rendered at %3$s:1 against the surface; auto-adjusted to %2$s for %4$s:1."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:295
+#: includes/admin/class-appearance-settings-page.php:293
 msgid "Override anyway (keep my color, accept the lower contrast)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:332
+#: includes/admin/class-appearance-settings-page.php:330
 msgid "Paste a CSS font-family value. Outpost picks up custom fonts your theme already loads — installing fonts is your theme's job."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:350
+#: includes/admin/class-appearance-settings-page.php:348
 msgid "Appearance settings saved."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:360
+#: includes/admin/class-appearance-settings-page.php:358
 msgid "Save failed."
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:569
+#: includes/admin/class-appearance-settings-page.php:567
 msgid "Light"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:570
+#: includes/admin/class-appearance-settings-page.php:568
 msgid "Dark"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:571
+#: includes/admin/class-appearance-settings-page.php:569
 msgid "System"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:578
+#: includes/admin/class-appearance-settings-page.php:576
 msgid "Outpost Default"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:579
+#: includes/admin/class-appearance-settings-page.php:577
 msgid "Use Site Theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:586
+#: includes/admin/class-appearance-settings-page.php:584
 msgid "Background"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:587
+#: includes/admin/class-appearance-settings-page.php:585
 msgid "Surface"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:588
+#: includes/admin/class-appearance-settings-page.php:586
 msgid "Text"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:589
+#: includes/admin/class-appearance-settings-page.php:587
 msgid "Text (secondary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:590
+#: includes/admin/class-appearance-settings-page.php:588
 msgid "Accent (primary)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:591
+#: includes/admin/class-appearance-settings-page.php:589
 msgid "Accent (second)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:592
+#: includes/admin/class-appearance-settings-page.php:590
 msgid "Border"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:599
+#: includes/admin/class-appearance-settings-page.php:597
 msgid "Body font"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:600
+#: includes/admin/class-appearance-settings-page.php:598
 msgid "Display font (headings)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:601
+#: includes/admin/class-appearance-settings-page.php:599
 msgid "Monospace (URL fields)"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:608
+#: includes/admin/class-appearance-settings-page.php:606
 msgid "overridden"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:610
+#: includes/admin/class-appearance-settings-page.php:608
 msgid "from theme"
 msgstr ""
 
-#: includes/admin/class-appearance-settings-page.php:613
+#: includes/admin/class-appearance-settings-page.php:611
 msgid "default"
 msgstr ""
 
@@ -436,43 +483,47 @@ msgstr ""
 msgid "Revoking deletes the password. You can also manage it under Users → Profile → Application Passwords."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:234
+#: includes/admin/class-ios-shortcut-settings-page.php:219
+msgid "Outpost limits this password to its Shortcut endpoint only while Outpost is active. Deactivating or deleting Outpost from the Plugins screen deletes the password. If Outpost's folder is ever removed some other way, revoke the password under Users → Profile → Application Passwords, because it then works like any other application password."
+msgstr ""
+
+#: includes/admin/class-ios-shortcut-settings-page.php:237
 msgid "On a multisite network, the Shortcut password needs Outpost network-activated, so the rule that limits it to the Shortcut works on every site."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:240
+#: includes/admin/class-ios-shortcut-settings-page.php:243
 msgid "WordPress application passwords are not available on this site. They need HTTPS (or a local development environment), and a security plugin may have turned them off."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:247
+#: includes/admin/class-ios-shortcut-settings-page.php:250
 msgid "Copy this password now. It will not be shown again."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:253
+#: includes/admin/class-ios-shortcut-settings-page.php:256
 msgid "No Shortcut password yet."
 msgstr ""
 
 #. translators: %s: date the password was created.
-#: includes/admin/class-ios-shortcut-settings-page.php:265
+#: includes/admin/class-ios-shortcut-settings-page.php:268
 #, php-format
 msgid "Created %s."
 msgstr ""
 
 #. translators: %s: date the password was last used.
-#: includes/admin/class-ios-shortcut-settings-page.php:272
+#: includes/admin/class-ios-shortcut-settings-page.php:275
 #, php-format
 msgid "Last used %s."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:276
+#: includes/admin/class-ios-shortcut-settings-page.php:279
 msgid "Not used yet. Run a test share from your iPhone."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:288
+#: includes/admin/class-ios-shortcut-settings-page.php:291
 msgid "Shortcut password created. Copy it below; it will not be shown again."
 msgstr ""
 
-#: includes/admin/class-ios-shortcut-settings-page.php:290
+#: includes/admin/class-ios-shortcut-settings-page.php:293
 msgid "Shortcut password revoked."
 msgstr ""
 
@@ -810,12 +861,6 @@ msgstr ""
 msgid "Manual-share intent requires a platform_id string."
 msgstr ""
 
-#. translators: %s: platform id supplied by the client.
-#: includes/class-manual-share-controller.php:261
-#, php-format
-msgid "Unknown manual-share platform: %s"
-msgstr ""
-
 #: includes/class-manual-share-controller.php:278
 msgid "You do not have permission to share this post."
 msgstr ""
@@ -864,17 +909,8 @@ msgstr ""
 msgid "You do not have permission to update this post's syndication."
 msgstr ""
 
-#: includes/class-manual-share-status-controller.php:265
-#: includes/class-syndication-capture-controller.php:217
-msgid "audit_log_id is required."
-msgstr ""
-
 #: includes/class-manual-share-status-controller.php:271
 msgid "Invalid snooze duration. Use a SNOOZE_* duration or a valid date/time string."
-msgstr ""
-
-#: includes/class-manual-share-status-controller.php:280
-msgid "No matching audit log entry."
 msgstr ""
 
 #: includes/class-manual-share-status-controller.php:308
@@ -913,23 +949,23 @@ msgstr ""
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:192
+#: includes/class-outpost-uninstaller.php:194
 msgid "Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:193
+#: includes/class-outpost-uninstaller.php:195
 msgid "Outpost is still active"
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:208
+#: includes/class-outpost-uninstaller.php:210
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:209
+#: includes/class-outpost-uninstaller.php:211
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:212
+#: includes/class-outpost-uninstaller.php:214
 msgid "Outpost uninstall stopped"
 msgstr ""
 
@@ -1096,81 +1132,113 @@ msgstr ""
 msgid "Server requirements"
 msgstr ""
 
-#: includes/class-settings.php:103
+#: includes/class-settings.php:129
 msgid "Composer defaults"
 msgstr ""
 
-#: includes/class-settings.php:110
+#: includes/class-settings.php:136
 msgid "Default Post variant"
 msgstr ""
 
-#: includes/class-settings.php:118
-#: includes/class-settings.php:338
+#: includes/class-settings.php:144
+#: includes/class-settings.php:396
 msgid "Default categories"
 msgstr ""
 
-#: includes/class-settings.php:126
+#: includes/class-settings.php:152
 msgid "Default tags"
 msgstr ""
 
-#: includes/class-settings.php:134
+#: includes/class-settings.php:160
 msgid "Bridgy auto-suggest"
 msgstr ""
 
-#: includes/class-settings.php:142
+#: includes/class-settings.php:168
+msgid "Workout details in post text"
+msgstr ""
+
+#: includes/class-settings.php:176
 msgid "Auto Post-Format inference"
 msgstr ""
 
-#: includes/class-settings.php:287
+#: includes/class-settings.php:184
+msgid "Agent abilities"
+msgstr ""
+
+#: includes/class-settings.php:191
+msgid "Manual share"
+msgstr ""
+
+#: includes/class-settings.php:199
+msgid "Capture syndication"
+msgstr ""
+
+#: includes/class-settings.php:345
 msgid "Site-wide defaults the Outpost composer respects. Each user can override at post time from the More options panel."
 msgstr ""
 
-#: includes/class-settings.php:297
+#: includes/class-settings.php:355
 msgid "Article (title + body)"
 msgstr ""
 
-#: includes/class-settings.php:298
+#: includes/class-settings.php:356
 msgid "Note (auto-format from content length)"
 msgstr ""
 
-#: includes/class-settings.php:299
+#: includes/class-settings.php:357
 msgid "Status (forces the Status post format)"
 msgstr ""
 
-#: includes/class-settings.php:300
+#: includes/class-settings.php:358
 msgid "Aside (forces the Aside post format)"
 msgstr ""
 
-#: includes/class-settings.php:301
+#: includes/class-settings.php:359
 msgid "Quote (forces the Quote post format)"
 msgstr ""
 
-#: includes/class-settings.php:313
+#: includes/class-settings.php:371
 msgid "The variant the Post tab opens to on every fresh composer load."
 msgstr ""
 
-#: includes/class-settings.php:332
+#: includes/class-settings.php:390
 msgid "No categories exist yet. Create one under Posts > Categories first."
 msgstr ""
 
-#: includes/class-settings.php:352
+#: includes/class-settings.php:410
 msgid "Pre-selected in the composer's More options on every post, and applied to a post from Outpost that names no category. Leave every box unticked to keep WordPress's own default category (Settings > Writing)."
 msgstr ""
 
-#: includes/class-settings.php:365
+#: includes/class-settings.php:423
 msgid "indieweb, photos"
 msgstr ""
 
-#: includes/class-settings.php:367
+#: includes/class-settings.php:425
 msgid "Comma-separated tag names, pre-selected in the composer's More options. A name that doesn't exist yet is created the first time a post uses it. Leave empty for no default tags."
 msgstr ""
 
-#: includes/class-settings.php:380
+#: includes/class-settings.php:438
 msgid "When the Reply / Doing target URL host matches a known silo, pre-check the matching Bridgy publish target."
 msgstr ""
 
-#: includes/class-settings.php:394
+#: includes/class-settings.php:452
 msgid "Set the WordPress Post Format automatically based on h-entry signals (likes → link, photos → image / gallery, etc.). Disable if you prefer manual format selection only."
+msgstr ""
+
+#: includes/class-settings.php:465
+msgid "Put the distance and duration of a Polar or Oura workout in the post title and text. Off, they stay in private post meta; Post Kinds' exercise card keeps them private until you choose to show them."
+msgstr ""
+
+#: includes/class-settings.php:481
+msgid "Abilities that can change post data stay off until a site administrator enables each one."
+msgstr ""
+
+#: includes/class-settings.php:490
+msgid "Let agents prepare a manual share for a post and record it in the post's share log."
+msgstr ""
+
+#: includes/class-settings.php:497
+msgid "Let agents record a silo URL as a post's syndication link."
 msgstr ""
 
 #: includes/class-syndicate-targets-endpoint.php:87
@@ -1384,7 +1452,7 @@ msgid "That URL points at a private or local network address."
 msgstr ""
 
 #. translators: %s: provider id
-#: includes/oauth/class-outpost-oauth-controller.php:299
+#: includes/oauth/class-outpost-oauth-controller.php:326
 #, php-format
 msgid "Unknown OAuth provider: %s"
 msgstr ""
@@ -1413,7 +1481,7 @@ msgid "Notion"
 msgstr ""
 
 #: includes/oauth/providers/class-outpost-oauth-provider-oura.php:58
-#: includes/sources/class-outpost-fetch-recent-oura.php:80
+#: includes/sources/class-outpost-fetch-recent-oura.php:81
 msgid "Oura"
 msgstr ""
 
@@ -1758,52 +1826,53 @@ msgstr ""
 msgid "Some platforms (such as scholarly databases) use API keys instead of OAuth. Add keys here for the platforms you use."
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-oura.php:170
+#: includes/sources/class-outpost-fetch-recent-oura.php:171
 msgid "Workout"
 msgstr ""
 
 #. translators: 1: activity name, 2: distance in km.
-#: includes/sources/class-outpost-fetch-recent-oura.php:181
+#: includes/sources/class-outpost-fetch-recent-oura.php:182
 #, php-format
 msgid "Workout — %1$s, %2$s km"
 msgstr ""
 
 #. translators: %s: activity name.
-#: includes/sources/class-outpost-fetch-recent-oura.php:187
+#: includes/sources/class-outpost-fetch-recent-oura.php:188
+#: includes/sources/class-outpost-fetch-recent-oura.php:217
 #, php-format
 msgid "Workout — %s"
 msgstr ""
 
 #. translators: %d: duration in minutes.
-#: includes/sources/class-outpost-fetch-recent-oura.php:198
+#: includes/sources/class-outpost-fetch-recent-oura.php:199
 #, php-format
 msgid "%d min"
 msgstr ""
 
 #. translators: %d: calories.
-#: includes/sources/class-outpost-fetch-recent-oura.php:205
+#: includes/sources/class-outpost-fetch-recent-oura.php:206
 #, php-format
 msgid "%d kcal"
 msgstr ""
 
 #. translators: %s: date.
-#: includes/sources/class-outpost-fetch-recent-oura.php:250
+#: includes/sources/class-outpost-fetch-recent-oura.php:260
 #, php-format
 msgid "Sleep — %s"
 msgstr ""
 
-#: includes/sources/class-outpost-fetch-recent-oura.php:251
+#: includes/sources/class-outpost-fetch-recent-oura.php:261
 msgid "recent"
 msgstr ""
 
 #. translators: %s: hours of sleep.
-#: includes/sources/class-outpost-fetch-recent-oura.php:258
+#: includes/sources/class-outpost-fetch-recent-oura.php:268
 #, php-format
 msgid "%s hours"
 msgstr ""
 
 #. translators: %d: sleep score.
-#: includes/sources/class-outpost-fetch-recent-oura.php:265
+#: includes/sources/class-outpost-fetch-recent-oura.php:275
 #, php-format
 msgid "score: %d"
 msgstr ""
@@ -1822,6 +1891,7 @@ msgstr ""
 
 #. translators: %s: sport name.
 #: includes/sources/class-outpost-fetch-recent-polar.php:292
+#: includes/sources/class-outpost-fetch-recent-polar.php:305
 #, php-format
 msgid "Training — %s"
 msgstr ""
@@ -2027,7 +2097,7 @@ msgid "Outpost requires the %s plugin. Install it from WordPress.org to continue
 msgstr ""
 
 #. translators: %s: installed Micropub plugin version.
-#: outpost.php:796
+#: outpost.php:808
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
 msgstr ""

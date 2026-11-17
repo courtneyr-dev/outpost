@@ -118,3 +118,9 @@ docs/.astro/
 
 # Playwright session token minted by tests/e2e/global-setup.ts
 tests/e2e/.auth/
+tests/bombadil/.auth/
+tests/bombadil/output/
+
+# web-testing toolkit (tests/web-testing/): minted sessions and run output
+tests/web-testing/.auth/
+tests/web-testing/output/

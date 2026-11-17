@@ -373,16 +373,14 @@ describe('text and link share conflicts (T10-S3-05 v1.2)', () => {
 		await stash_shared_photos({ files: [new File([new Uint8Array([1])], 'later.jpg', { type: 'image/jpeg' })], title: 'Later', text: '', received: 2 }, inbox_env, 'pending');
 		stash_share_target({ tab: 'photo', sharedPhotos: true });
 		remount();
-		await wait(30);
+		await vi.waitFor(() => expect(region()?.textContent).toContain('later.jpg'), { timeout: 5000 });
 
 		expect(root.querySelectorAll('[data-outpost-share-review]').length).toBe(1);
 		expect(region()?.textContent).toContain('First shared words');
-		expect(region()?.textContent).toContain('later.jpg');
 
 		click('Use new share');
-		await wait(30);
+		await vi.waitFor(() => expect(region()?.textContent).not.toContain('First shared words'), { timeout: 5000 });
 		expect(region()?.textContent).toContain('later.jpg');
-		expect(region()?.textContent).not.toContain('First shared words');
 		expect((await read_share_inbox(inbox_env)).pending?.title).toBe('Later');
 	});
 });
@@ -705,7 +703,8 @@ describe('photo share conflicts', () => {
 		await stash_shared_photos({ files: [photo('newer.jpg')], title: 'Newer', text: '', received: 2 }, inbox_env, 'candidate');
 		stash_share_target({ tab: 'photo', sharedPhotos: true });
 		mount();
-		await wait(30);
+		// The conflict choices render after the IndexedDB inbox read; a fixed delay raced it in CI.
+		await vi.waitFor(() => expect(region()?.textContent).toContain('newer.jpg'), { timeout: 5000 });
 	}
 
 	it('names both shares and offers the three choices', async () => {
@@ -928,9 +927,7 @@ describe('a review open when the account changes in another tab', () => {
 		stash_share_target({ tab: 'note', content: 'Account A words' });
 		mount();
 		other_tab_changes_account();
-		await wait(40);
-
-		expect(share_keys()).toEqual([]);
+		await vi.waitFor(() => expect(share_keys()).toEqual([]), { timeout: 5000 });
 		remount();
 		await wait(30);
 		expect(region()).toBeNull();

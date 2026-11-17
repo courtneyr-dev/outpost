@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -68,6 +68,8 @@ export interface ListenModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 	/** Injectable environment for the metadata lookup (tests pass a stub). */
 	mediaLookupEnv?: MediaLookupEnvironment;
 	/** Injectable environment for the source preview (tests pass a stub). */
@@ -596,6 +598,7 @@ export function ListenMode({
 	token,
 	micropubEnv,
 	composerConfig,
+	onSignInExpired,
 	mediaLookupEnv,
 	previewEnv,
 }: ListenModeProps) {
@@ -1145,11 +1148,7 @@ export function ListenMode({
 			const message =
 				err instanceof PhotoError
 					? err.code + ': ' + err.message
-					: err instanceof MicropubError
-						? err.code + ': ' + err.message
-						: err instanceof Error
-							? err.message
-							: 'Unknown error';
+					: report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};

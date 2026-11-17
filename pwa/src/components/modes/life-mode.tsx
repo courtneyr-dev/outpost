@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -56,6 +56,8 @@ export interface LifeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 	moodsEnv?: MoodsEnvironment;
 }
 
@@ -173,7 +175,7 @@ function consume_share_target_for_life(): { variant?: Variant; content?: string 
 	return out;
 }
 
-export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeModeProps) {
+export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv, onSignInExpired }: LifeModeProps) {
 	const initial_share = consume_share_target_for_life();
 	// A share wins over an unsent draft, as in NoteMode.
 	const [draft] = useState(() =>
@@ -273,12 +275,7 @@ export function LifeMode({ token, micropubEnv, composerConfig, moodsEnv }: LifeM
 			setPickedLocation(null);
 			setVenueName('');
 		} catch (err) {
-			const message =
-				err instanceof MicropubError
-					? err.code + ': ' + err.message
-					: err instanceof Error
-						? err.message
-						: 'Unknown error';
+			const message = report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};

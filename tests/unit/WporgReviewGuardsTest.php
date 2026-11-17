@@ -97,7 +97,7 @@ final class WporgReviewGuardsTest extends TestCase {
 			'Contributors:',
 			'Tags:',
 			'Tested up to:',
-			'Stable tag:        1.0.28',
+			'Stable tag:        1.0.30',
 			'License:           GPLv2 or later',
 			'Requires at least:',
 			'Requires PHP:',
@@ -106,7 +106,7 @@ final class WporgReviewGuardsTest extends TestCase {
 			'== External services ==',
 			'== Source Code ==',
 			'== Changelog ==',
-			'= 1.0.28 =',
+			'= 1.0.30 =',
 			'`pwa/src/`',
 			'`src/`',
 			'npm run build:all',
@@ -139,7 +139,7 @@ final class WporgReviewGuardsTest extends TestCase {
 		$this->assertFileExists( $root . '/CHANGELOG.md' );
 		$this->assertMatchesRegularExpression( '/^CHANGELOG\.md$/m', (string) file_get_contents( $root . '/.distignore' ), 'CHANGELOG.md is not packaged.' );
 		$this->assertSame( 1, preg_match( '/^Stable tag:\s*(\S+)\s*$/m', $readme, $tag ) );
-		$this->assertSame( '1.0.28', $tag[1], 'No version other than 1.0.28.' );
+		$this->assertSame( '1.0.30', $tag[1], 'No version other than 1.0.30.' );
 	}
 
 	/**
