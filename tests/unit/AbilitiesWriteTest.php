@@ -364,6 +364,24 @@ final class AbilitiesWriteTest extends \WP_Mock\Tools\TestCase {
 		$this->assertFalse( $result['written'] );
 	}
 
+	public function test_capture_accepts_a_string_confirm_mismatch_and_writes(): void {
+		$this->enable_capture_with_audit_entry( 'instagram-feed' );
+
+		$result = Outpost_Abilities::execute_capture_syndication(
+			array(
+				'post_id'          => 42,
+				'audit_log_id'     => 'audit-1',
+				'silo_url'         => 'https://linkedin.com/posts/example',
+				'confirm_mismatch' => 'true',
+				'dry_run'          => 0,
+			)
+		);
+
+		$this->assertSame( 'recorded', $result['status'] );
+		$this->assertTrue( $result['written'] );
+		$this->assertSame( 2, $this->post_writes );
+	}
+
 	public function test_capture_rejects_an_empty_audit_log_id_with_400(): void {
 		$this->options[ Outpost_Abilities::OPTION_CAPTURE_SYNDICATION ] = '1';
 

@@ -434,9 +434,9 @@ final class Outpost_Abilities {
 		}
 
 		$post_id     = (int) $input['post_id'];
-		$platform_id = (string) $input['platform_id'];
+		$platform_id = trim( (string) $input['platform_id'] );
 		$device      = isset( $input['device'] ) ? (string) $input['device'] : Outpost_Manual_Share_Controller::PLATFORM_DESKTOP;
-		$in_pwa_mode = isset( $input['in_pwa_mode'] ) && true === $input['in_pwa_mode'];
+		$in_pwa_mode = isset( $input['in_pwa_mode'] ) && self::is_true( $input['in_pwa_mode'] );
 		$dry_run     = self::is_dry_run( $input );
 		$platform    = self::find_platform( $platform_id );
 
@@ -492,7 +492,7 @@ final class Outpost_Abilities {
 		$post_id          = (int) $input['post_id'];
 		$audit_log_id     = trim( (string) $input['audit_log_id'] );
 		$silo_url         = trim( (string) $input['silo_url'] );
-		$confirm_mismatch = isset( $input['confirm_mismatch'] ) && true === $input['confirm_mismatch'];
+		$confirm_mismatch = isset( $input['confirm_mismatch'] ) && self::is_true( $input['confirm_mismatch'] );
 		$dry_run          = self::is_dry_run( $input );
 		if ( '' === $audit_log_id ) {
 			return new WP_Error(
@@ -706,6 +706,17 @@ final class Outpost_Abilities {
 		}
 		$value = is_string( $input['dry_run'] ) ? strtolower( $input['dry_run'] ) : $input['dry_run'];
 		return ! in_array( $value, array( false, 0, '0', 'false' ), true );
+	}
+
+	/**
+	 * Whether a validated boolean input is true. Core accepts "true", "1"
+	 * and 1 as booleans without casting them.
+	 *
+	 * @param mixed $value Validated boolean input.
+	 */
+	private static function is_true( $value ): bool {
+		$value = is_string( $value ) ? strtolower( $value ) : $value;
+		return in_array( $value, array( true, 1, '1', 'true' ), true );
 	}
 
 	private static function disabled_error(): WP_Error {
