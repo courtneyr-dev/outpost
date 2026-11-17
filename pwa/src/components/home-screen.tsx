@@ -167,9 +167,13 @@ export function HomeScreen({ siteHost, connection, drafts, onOpen, onAbout, head
 								<span class="outpost-home-card__title" id={`outpost-home-${card.id}-title`}>
 									{card.title}
 								</span>
+								{/* Real spaces between the text spans: the flex column doesn't
+								    render them, but text extraction that ignores layout (axe's
+								    visible text) would otherwise read "PostArticles". */}{' '}
 								<span class="outpost-home-card__desc" id={`outpost-home-${card.id}-desc`}>
 									{card.description}
 								</span>
+								{has_draft && ' '}
 								{has_draft && (
 									<span class="outpost-home-card__badge" id={`outpost-home-${card.id}-draft`}>
 										Unsent draft

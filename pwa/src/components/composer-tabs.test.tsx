@@ -444,6 +444,9 @@ describe('ComposerTabs: Home and the start screen', () => {
 			expect(name).toBe(visible);
 			// The description is part of the name now, so it isn't repeated.
 			expect(c.hasAttribute('aria-describedby')).toBe(false);
+			// Text extraction that ignores layout must still see separate words:
+			// without a space, axe reads "PostArticles" and the name check fails.
+			expect(c.textContent?.startsWith(title + ' ')).toBe(true);
 		}
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Acquisition');
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Exercise');
