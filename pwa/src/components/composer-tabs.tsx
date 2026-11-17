@@ -48,6 +48,7 @@ import type { AppearanceEnvironment } from '../lib/appearance';
 import { AppHeader } from './app-header';
 import { SettingsSheet } from './settings-sheet';
 import { Scenery } from './scenery';
+import { ModeOnScreen } from '../lib/composer-prefs';
 import { DRAFT_SAVE_DELAY_MS, draft_modes, drafts_available, type DraftMode, type DraftStorage } from '../lib/drafts';
 
 /**
@@ -789,7 +790,9 @@ export function ComposerTabs({
 						class="outpost-mode-panel"
 						hidden={view !== 'tabs' || active !== mode.id || deciding}
 					>
-						<Fragment key={generation[mode.id] ?? 0}>{mode.render()}</Fragment>
+						<ModeOnScreen.Provider value={view === 'tabs' && active === mode.id && !deciding}>
+							<Fragment key={generation[mode.id] ?? 0}>{mode.render()}</Fragment>
+						</ModeOnScreen.Provider>
 					</div>
 				))}
 				<Scenery />

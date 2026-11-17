@@ -567,3 +567,84 @@ describe('ComposerTabs: Home and the start screen', () => {
 		expect(JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}').start).toBe('recipe');
 	});
 });
+
+describe('ComposerTabs: More options drawer', () => {
+	const KEY_MORE_OPEN = 'outpost.composer.more-open';
+	const config_env = {
+		fetch: ((): Promise<Response> =>
+			Promise.resolve(
+				new Response(
+					JSON.stringify({
+						companions: {},
+						postFormats: null,
+						xfnRels: [],
+						existingCategories: [],
+						existingTags: [],
+						bridgyHostMap: {},
+						siteSettings: { bridgyAutoSuggest: false, defaultPostVariant: 'note' },
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				),
+			)) as typeof fetch,
+	};
+
+	function mount_more(): void {
+		render(
+			<ComposerTabs
+				token={mock_token}
+				tokenStore={mock_token_store()}
+				composerConfigEnv={config_env}
+				queueEnv={{ indexedDB: new IDBFactory() }}
+				appearanceEnv={{ fetch: () => Promise.reject(new TypeError('offline')) }}
+			/>,
+			root,
+		);
+	}
+
+	/** Every "More options" drawer the modes rendered, open or closed. */
+	const more_drawers = (): HTMLElement[] =>
+		Array.from(root.querySelectorAll<HTMLElement>('.outpost-mode-panel .outpost-drawer')).filter(
+			(drawer) => drawer.querySelector('h2')?.textContent === 'More options',
+		);
+
+	/** The panels whose "More options" drawer is open. */
+	const panels_with_open_more = (): string[] =>
+		more_drawers()
+			.filter((drawer) => drawer.dataset.open === 'true')
+			.map((drawer) => drawer.closest('.outpost-mode-panel')?.id ?? '');
+
+	it('opens the remembered drawer only in the mode on screen', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		expect(panels_with_open_more()).toEqual(['outpost-panel-note']);
+	});
+
+	it('moves the open drawer with the mode on screen', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		root.querySelector<HTMLButtonElement>('#outpost-tab-photo')?.click();
+		await flush();
+
+		expect(panels_with_open_more()).toEqual(['outpost-panel-photo']);
+	});
+
+	it('closing the drawer in one mode keeps it closed in the others', async () => {
+		localStorage.setItem(KEY_MORE_OPEN, '1');
+		mount_more();
+		await vi.waitFor(() => expect(more_drawers().length).toBeGreaterThan(1));
+
+		root
+			.querySelector<HTMLButtonElement>('#outpost-panel-note .outpost-drawer[data-open="true"] button[aria-label="Close"]')
+			?.click();
+		await flush();
+		root.querySelector<HTMLButtonElement>('#outpost-tab-photo')?.click();
+		await flush();
+
+		expect(panels_with_open_more()).toEqual([]);
+		expect(localStorage.getItem(KEY_MORE_OPEN)).toBe('0');
+	});
+});
