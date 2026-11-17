@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -56,6 +56,8 @@ export interface RecipeModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 }
 
 type Status =
@@ -103,7 +105,7 @@ function consume_share_target_for_recipe(): { name?: string; content?: string } 
 	};
 }
 
-export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModeProps) {
+export function RecipeMode({ token, micropubEnv, composerConfig, onSignInExpired }: RecipeModeProps) {
 	const [initial_share] = useState(consume_share_target_for_recipe);
 	// A share is a new post the person just asked for, so it wins over an
 	// unsent draft; the draft is replaced on the next save.
@@ -277,13 +279,7 @@ export function RecipeMode({ token, micropubEnv, composerConfig }: RecipeModePro
 			setMediaEntries([]);
 		} catch (err) {
 			const message =
-				err instanceof PhotoError
-					? err.message
-					: err instanceof MicropubError
-						? err.code + ': ' + err.message
-						: err instanceof Error
-							? err.message
-							: 'Unknown error';
+				err instanceof PhotoError ? err.message : report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};
