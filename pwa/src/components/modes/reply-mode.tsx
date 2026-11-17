@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
-	MicropubError,
+	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
 } from '../../lib/micropub';
@@ -55,6 +55,8 @@ export interface ReplyModeProps {
 	token: StoredToken;
 	micropubEnv?: MicropubEnvironment;
 	composerConfig?: ComposerConfig;
+	/** Called when a post fails because the sign-in expired (401), so the shell can offer Sign in again. */
+	onSignInExpired?: () => void;
 }
 
 type Variant =
@@ -287,7 +289,7 @@ function consume_share_target_for_reply(): {
 	return out;
 }
 
-export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps) {
+export function ReplyMode({ token, micropubEnv, composerConfig, onSignInExpired }: ReplyModeProps) {
 	const initial_share = consume_share_target_for_reply();
 	// A share wins over an unsent draft, as in NoteMode.
 	const [draft] = useState(() => (initial_share ? null : read_draft('reply', token.me)));
@@ -410,12 +412,7 @@ export function ReplyMode({ token, micropubEnv, composerConfig }: ReplyModeProps
 			setPreview(null);
 			resetMoreValues();
 		} catch (err) {
-			const message =
-				err instanceof MicropubError
-					? err.code + ': ' + err.message
-					: err instanceof Error
-						? err.message
-						: 'Unknown error';
+			const message = report_post_failure(err, onSignInExpired);
 			setStatus({ kind: 'error', message });
 		}
 	};
