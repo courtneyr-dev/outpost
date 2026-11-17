@@ -157,8 +157,10 @@ export function HomeScreen({ siteHost, connection, drafts, onOpen, onAbout, head
 								type="button"
 								class="outpost-home-card"
 								data-mode={card.id}
-								aria-labelledby={`outpost-home-${card.id}-title${has_draft ? ` outpost-home-${card.id}-draft` : ''}`}
-								aria-describedby={`outpost-home-${card.id}-desc`}
+								// Named by all of its visible text in reading order, title
+								// first (WCAG 2.5.3 Label in Name), so voice control can
+								// say "Post" and the name never drops what's on screen.
+								aria-labelledby={`outpost-home-${card.id}-title outpost-home-${card.id}-desc${has_draft ? ` outpost-home-${card.id}-draft` : ''}`}
 								onClick={(): void => onOpen(card.id)}
 							>
 								<span class="outpost-home-card__icon">{card.icon}</span>

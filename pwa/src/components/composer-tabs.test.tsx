@@ -424,17 +424,26 @@ describe('ComposerTabs: Home and the start screen', () => {
 		expect(root.querySelector('#outpost-home-title')?.textContent).toBe('What would you like to post?');
 	});
 
-	it('offers six cards, each a named button with a description', async () => {
+	it('offers six cards, each a button named by all of its visible text, title first', async () => {
 		mount_home();
 		await vi.waitFor(() => expect(home()).not.toBeNull());
 		const cards = Array.from(root.querySelectorAll<HTMLButtonElement>('.outpost-home-card'));
 		expect(cards.map((c) => c.dataset['mode'])).toEqual(['note', 'reply', 'photo', 'listen', 'life', 'recipe']);
 		for (const c of cards) {
 			expect(c.tagName).toBe('BUTTON');
-			const name = document.getElementById(c.getAttribute('aria-labelledby') ?? '')?.textContent;
-			const description = document.getElementById(c.getAttribute('aria-describedby') ?? '')?.textContent;
-			expect(name).toBeTruthy();
-			expect(description).toBeTruthy();
+			const ids = c.getAttribute('aria-labelledby')?.split(' ') ?? [];
+			const name = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+			const title = c.querySelector('.outpost-home-card__title')?.textContent ?? '';
+			const visible = Array.from(c.querySelectorAll('span:not([aria-hidden="true"]):not(.outpost-home-card__icon)'))
+				.map((s) => s.textContent ?? '')
+				.join(' ');
+			// WCAG 2.5.3 Label in Name: the name holds the text the button shows
+			// (axe label-content-name-mismatch), starting with the title.
+			expect(title).toBeTruthy();
+			expect(name.startsWith(title)).toBe(true);
+			expect(name).toBe(visible);
+			// The description is part of the name now, so it isn't repeated.
+			expect(c.hasAttribute('aria-describedby')).toBe(false);
 		}
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Acquisition');
 		expect(root.querySelector('.outpost-home')?.textContent).toContain('Exercise');
@@ -489,7 +498,10 @@ describe('ComposerTabs: Home and the start screen', () => {
 		await vi.waitFor(() => expect(card('note').textContent).toContain('Unsent draft'));
 		expect(card('reply').textContent).not.toContain('Unsent draft');
 		const name_ids = card('note').getAttribute('aria-labelledby')?.split(' ') ?? [];
-		expect(name_ids.map((id) => document.getElementById(id)?.textContent)).toEqual(['Post', 'Unsent draft']);
+		const name_parts = name_ids.map((id) => document.getElementById(id)?.textContent);
+		expect(name_parts[0]).toBe('Post');
+		expect(name_parts.at(-1)).toBe('Unsent draft');
+		expect(name_parts).toHaveLength(3);
 		card('note').click();
 		await flush();
 		expect((root.querySelector('#outpost-note-content') as HTMLTextAreaElement).value).toBe('Half a thought');
