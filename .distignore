@@ -28,6 +28,7 @@
 
 # Dev/meta files
 .gitignore
+.gitattributes
 .gitkeep
 .distignore
 .session-progress.md
