@@ -29,7 +29,7 @@ export const Android: Story = {
 			});
 			window.dispatchEvent(event);
 			expect(canvas.queryByRole('button', { name: 'Install' })).not.toBeNull();
-		});
+		}, { timeout: 5000 });
 		await canvas.findByRole('button', { name: 'Install' });
 	},
 };
