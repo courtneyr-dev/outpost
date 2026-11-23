@@ -208,7 +208,7 @@ export function QueueBadge({ owner, micropubEnv, queueEnv }: QueueBadgeProps) {
 				</span>
 				<span class="outpost-queue-badge__count" aria-live="polite">
 					{count}
-				</span>
+				</span>{' '}
 				<span class="outpost-queue-badge__label">queued</span>
 			</button>
 			<Drawer

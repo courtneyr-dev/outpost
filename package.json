@@ -59,7 +59,10 @@
     "test:wp:unit": "wp-scripts test-unit-js",
     "screenshots:docs": "node scripts/capture-docs-screenshots.cjs",
     "check:dist": "node bin/check-dist-paths.mjs",
-    "package:wporg": "node bin/package-wporg.mjs"
+    "package:wporg": "node bin/package-wporg.mjs",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build -o storybook-static",
+    "test:storybook-a11y": "node bin/test-storybook-a11y.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
@@ -67,6 +70,9 @@
     "@msw/playwright": "0.7.0",
     "@playwright/test": "^1.65.1",
     "@preact/preset-vite": "^2.10.0",
+    "@storybook/addon-a11y": "10.6.6",
+    "@storybook/addon-docs": "10.6.6",
+    "@storybook/preact-vite": "10.6.6",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.3",
@@ -90,6 +96,7 @@
     "preact": "^10.24.0",
     "prettier": "^3.10.1",
     "prop-for-that": "0.7.12",
+    "storybook": "10.6.6",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.72.2",
     "vite": "^6.4.6",

@@ -12,6 +12,8 @@
 /styles/src
 /.wordpress-org
 /scripts
+/.storybook
+/storybook-static
 # Developer note beside the Shortcut installer link; the .txt ships (T10-S4-03).
 /assets/ios-shortcut-base-link.README.md
 
