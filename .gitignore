@@ -112,6 +112,9 @@ wp-includes/
 .overnight-progress.md
 .overnight-questions.md
 
+# Storybook build output (npm run build-storybook)
+storybook-static/
+
 # Docs site build output (docs/ is an Astro Starlight project)
 docs/dist/
 docs/.astro/

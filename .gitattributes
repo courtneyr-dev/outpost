@@ -14,6 +14,8 @@
 /styles/src export-ignore
 /.wordpress-org export-ignore
 /scripts export-ignore
+/.storybook export-ignore
+/storybook-static export-ignore
 /assets/ios-shortcut-base-link.README.md export-ignore
 *.zip export-ignore
 *.map export-ignore
