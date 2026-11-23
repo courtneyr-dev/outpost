@@ -9,6 +9,10 @@
  * server, or reaches a /wp-json path on it, fails the run: stories must mock
  * every call through the component's injected `env.fetch`.
  *
+ * A story also fails when its render or play function throws, when the page
+ * raises an uncaught error, or when it logs a console error: axe on a
+ * half-played story audits the wrong state.
+ *
  * Run `npm run build-storybook` first, then `npm run test:storybook-a11y`.
  */
 
@@ -39,19 +43,21 @@ const TYPES = {
 	'.woff2': 'font/woff2',
 };
 
-// Exact known violations: story id, scheme, viewport, axe rule and the
-// node's full target selector. A known entry that stops occurring fails the
-// run, so the list can only shrink.
+// Exact known violations. Each entry names a story, an axe rule, the node's
+// full target selector, and every scheme and viewport it occurs in. A listed
+// combination that stops occurring fails the run, so the list only shrinks.
 const KNOWN = [];
+
+const comboKey = ( k, scheme, viewport ) => `${ k.story } ${ k.rule } ${ k.target } ${ scheme } ${ viewport }`;
 
 const isKnown = ( run, finding ) =>
 	KNOWN.find(
 		( k ) =>
 			k.story === run.story &&
-			k.scheme === run.scheme &&
-			k.viewport === run.viewport &&
 			k.rule === finding.id &&
-			k.target === finding.target
+			k.target === finding.target &&
+			k.schemes.includes( run.scheme ) &&
+			k.viewports.includes( run.viewport )
 	);
 
 function serve() {
@@ -73,9 +79,44 @@ function serve() {
 	);
 }
 
+const STORY_ERROR_EVENTS = [
+	'playFunctionThrewException',
+	'storyThrewException',
+	'storyErrored',
+	'unhandledErrorsWhilePlaying',
+];
+
+// Storybook assigns its channel to this global once; subscribing in the setter
+// catches render and play errors that the preview recovers from on screen.
+function watchStoryErrors( events ) {
+	const errors = ( globalThis.__outpostStoryErrors = [] );
+	let channel;
+	Object.defineProperty( globalThis, '__STORYBOOK_ADDONS_CHANNEL__', {
+		configurable: true,
+		get: () => channel,
+		set: ( next ) => {
+			channel = next;
+			for ( const event of events ) {
+				next.on( event, ( payload ) => {
+					const first = [ payload ].flat()[ 0 ];
+					errors.push( `${ event }: ${ String( first?.message ?? first ).split( '\n' )[ 0 ] }` );
+				} );
+			}
+		},
+	} );
+}
+
 async function audit( context, url, run ) {
 	const page = await context.newPage();
 	const leaks = [];
+	const errors = [];
+	page.on( 'pageerror', ( error ) => errors.push( `pageerror: ${ error.message.split( '\n' )[ 0 ] }` ) );
+	page.on( 'console', ( message ) => {
+		if ( message.type() === 'error' && ! message.text().startsWith( 'Failed to load resource' ) ) {
+			errors.push( `console.error: ${ message.text().split( '\n' )[ 0 ] }` );
+		}
+	} );
+	await page.addInitScript( watchStoryErrors, STORY_ERROR_EVENTS );
 	await page.route( '**/*', ( route ) => {
 		const target = route.request().url();
 		const local = target.startsWith( `${ url }/` ) && ! new URL( target ).pathname.startsWith( '/wp-json' );
@@ -93,8 +134,12 @@ async function audit( context, url, run ) {
 			null,
 			{ timeout: 20000 }
 		);
+		errors.push( ...( await page.evaluate( () => globalThis.__outpostStoryErrors ) ) );
 		if ( await page.$( 'body.sb-show-errordisplay' ) ) {
-			return [ { id: 'story-error', target: run.story, help: 'the story threw while rendering or playing' } ];
+			errors.push( 'the preview shows its error display' );
+		}
+		if ( errors.length ) {
+			return errors.map( ( help ) => ( { id: 'story-error', target: run.story, help } ) );
 		}
 		const { violations, incomplete } = await new AxeBuilder( { page } )
 			.include( '#storybook-root' )
@@ -160,7 +205,7 @@ async function worker() {
 		for ( const finding of found ) {
 			const match = isKnown( run, finding );
 			if ( match ) {
-				seenKnown.add( match );
+				seenKnown.add( comboKey( match, run.scheme, run.viewport ) );
 			} else {
 				fresh.push( `${ finding.id }: ${ finding.target }  ${ finding.help }` );
 			}
@@ -182,13 +227,18 @@ try {
 	server.close();
 }
 
-for ( const k of KNOWN ) {
-	if ( seenKnown.has( k ) ) {
-		console.log( `known ${ k.viewport } ${ k.scheme } ${ k.story } ${ k.rule } ${ k.target }  ${ k.note }` );
-	} else {
-		failures += 1;
-		console.log( `FAIL  known violation no longer occurs, remove it from KNOWN: ${ k.viewport } ${ k.scheme } ${ k.story } ${ k.target }` );
-	}
+const missing = KNOWN.flatMap( ( k ) =>
+	k.schemes.flatMap( ( scheme ) =>
+		k.viewports.map( ( viewport ) => comboKey( k, scheme, viewport ) ).filter( ( key ) => ! seenKnown.has( key ) )
+	)
+);
+for ( const key of missing ) {
+	failures += 1;
+	console.log( `FAIL  known violation no longer occurs, remove it from KNOWN: ${ key }` );
+}
+console.log( `\n${ KNOWN.length } KNOWN entries matched ${ seenKnown.size } times:` );
+for ( const note of new Set( KNOWN.map( ( k ) => k.note ) ) ) {
+	console.log( `  ${ KNOWN.filter( ( k ) => k.note === note ).length } x ${ note }` );
 }
 
 console.log(

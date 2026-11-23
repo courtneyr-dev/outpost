@@ -15,7 +15,7 @@ const ROWS = [
 
 const search = async (canvasElement: HTMLElement, query = 'trail'): Promise<void> => {
 	const canvas = within(canvasElement);
-	await userEvent.type(canvas.getByRole('textbox'), query);
+	await userEvent.type(canvas.getByRole('searchbox'), query);
 	await userEvent.click(canvas.getByRole('button', { name: 'Look it up' }));
 };
 
