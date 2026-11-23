@@ -45,7 +45,7 @@ export const SnoozeMenu: FunctionComponent<SnoozeMenuProps> = ( {
 	return (
 		<div
 			class="outpost-snooze-menu"
-			role="menu"
+			role="group"
 			aria-label="Snooze duration"
 		>
 			<ul class="outpost-snooze-menu__list">
@@ -54,7 +54,6 @@ export const SnoozeMenu: FunctionComponent<SnoozeMenuProps> = ( {
 						<button
 							type="button"
 							class="outpost-snooze-menu__option"
-							role="menuitem"
 							data-snooze-value={ option.value }
 							disabled={ disabled }
 							onClick={ () => on_pick( option.value ) }
