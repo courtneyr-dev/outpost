@@ -59,35 +59,10 @@ const known = ( rule, viewports, note, entries ) =>
 const SNOOZE_MENU = [ 'components-snoozemenu--default', 'components-snoozemenu--disabled', 'components-snoozemenu--with-cancel', 'components-reminderrollup--snooze-menu-open' ];
 const SNOOZE_OPTIONS = [ 'P1D', 'P3D', 'P7D', 'forever' ].map( ( v ) => `button[data-snooze-value="${ v }"]` );
 const SNOOZE_ARIA = 'SnoozeMenu puts role="menu" on a wrapper around ul > li, so its role="menuitem" buttons have no menu parent.';
-const TARGET_SIZE = 'Manual-share buttons have no size rules in structure.css and render under 24 px.';
-const OVERFLOW = 'At 390 px the panel is wider than the screen (the file input min-content and an unwrapped XFN code legend), so axe cannot read the background.';
 
 const KNOWN = [
 	...known( 'aria-required-children', ALL, SNOOZE_ARIA, SNOOZE_MENU.map( ( story ) => [ story, '.outpost-snooze-menu' ] ) ),
 	...known( 'aria-required-parent', ALL, SNOOZE_ARIA, SNOOZE_MENU.flatMap( ( story ) => SNOOZE_OPTIONS.map( ( target ) => [ story, target ] ) ) ),
-	...known( 'target-size', ALL, TARGET_SIZE, [
-		...[ 'components-snoozemenu--default', 'components-snoozemenu--with-cancel', 'components-reminderrollup--snooze-menu-open' ].flatMap(
-			( story ) => SNOOZE_OPTIONS.slice( 0, 3 ).map( ( target ) => [ story, target ] )
-		),
-		[ 'components-manualsharefallbackmodal--image-and-app', '.outpost-manual-share-modal__close' ],
-		[ 'components-manualsharefallbackmodal--text-only', '.outpost-manual-share-modal__action' ],
-		[ 'components-manualsharefallbackmodal--text-only', '.outpost-manual-share-modal__close' ],
-		[ 'components-syndicationcaptureform--mismatch-warning', '.outpost-syndication-capture-form__action--confirm' ],
-		[ 'components-syndicationcaptureform--mismatch-warning', '.outpost-syndication-capture-form__action--save' ],
-		[ 'components-syndicationcaptureform--mismatch-warning', '.outpost-syndication-capture-form__action--cancel' ],
-	] ),
-	...known( 'target-size', PHONE, TARGET_SIZE, [
-		[ 'components-syndicationcaptureform--idle', '.outpost-syndication-capture-form__action--save' ],
-		[ 'components-syndicationcaptureform--idle', '.outpost-syndication-capture-form__action--cancel' ],
-		[ 'components-pendingsyndicationspanel--capture-form-open', '.outpost-syndication-capture-form__action--save' ],
-		[ 'components-pendingsyndicationspanel--capture-form-open', '.outpost-syndication-capture-form__action--cancel' ],
-	] ),
-	...known( 'color-contrast-unmeasured', PHONE, OVERFLOW, [
-		[ 'modes-listenmode--empty', '.outpost-card__lede' ],
-		[ 'modes-listenmode--watch', '.outpost-card__lede' ],
-		[ 'modes-recipemode--empty', '.outpost-card__lede' ],
-		[ 'components-morepanel--all-companions-active', 'legend > code' ],
-	] ),
 	...known( 'color-contrast-unmeasured', PHONE, 'The 90dvh settings drawer cuts the reset help text at its edge on a phone, so axe cannot read its background. Not a contrast failure.', [
 		[ 'components-settingssheet--open', '#outpost-settings-reset-help' ],
 	] ),

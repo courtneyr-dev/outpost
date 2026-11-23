@@ -76,6 +76,11 @@
 	max-width: 100%;
 }
 
+/* A file input's min-content width (about 359 px) overflows a 390 px screen. */
+.outpost-input[type='file'] {
+	inline-size: 100%;
+}
+
 .outpost-input {
 	min-height: 2.75rem;
 	padding: 0.5rem 0.75rem;
@@ -783,6 +788,11 @@
 	font-weight: 600;
 	font-size: 0.9rem;
 	padding: 0 0.25rem;
+}
+
+/* The XFN legend names rel values in <code>; long ones must wrap at 390 px. */
+.outpost-xfn-picker code {
+	overflow-wrap: anywhere;
 }
 
 /*
@@ -2455,4 +2465,15 @@
 	.outpost-footer-nav__home {
 		color: LinkText;
 	}
+}
+
+/* Manual-share controls (snooze menu, silo URL capture, fallback modal)
+ * get the same 44 px touch target as the composer buttons. */
+.outpost-snooze-menu__option,
+.outpost-snooze-menu__cancel,
+.outpost-syndication-capture-form__action,
+.outpost-manual-share-modal__action,
+.outpost-manual-share-modal__close {
+	min-block-size: 2.75rem;
+	min-inline-size: 2.75rem;
 }
