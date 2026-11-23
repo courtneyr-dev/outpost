@@ -3,6 +3,7 @@ import type { StoredToken, TokenStoreEnvironment } from '../pwa/src/lib/token-st
 import type { MicropubEnvironment } from '../pwa/src/lib/micropub';
 import { enqueue, type OfflineQueueEnvironment } from '../pwa/src/lib/offline-queue';
 import type { ComposerConfig, CompanionId, CompanionStatus } from '../pwa/src/lib/composer-config';
+import type { AuthFlowEnvironment } from '../pwa/src/lib/auth-flow';
 
 // Fixtures mirror the unit tests: every network call goes through an injected
 // `env.fetch`, and IndexedDB is a fresh fake-indexeddb factory per story, so
@@ -114,3 +115,33 @@ export const seededQueue = async (contents: string[], me = ME): Promise<OfflineQ
 	}
 	return queueEnv;
 };
+
+/** An in-memory Storage, so auth stories never touch the iframe's sessionStorage. */
+export const memoryStorage = (seed: Record<string, string> = {}): Storage => {
+	const items = new Map(Object.entries(seed));
+	return {
+		get length() {
+			return items.size;
+		},
+		clear: () => items.clear(),
+		getItem: (key) => items.get(key) ?? null,
+		key: (index) => [...items.keys()][index] ?? null,
+		removeItem: (key) => {
+			items.delete(key);
+		},
+		setItem: (key, value) => {
+			items.set(key, value);
+		},
+	};
+};
+
+export const authFlowEnv = (fetchImpl: typeof fetch, session: Storage = memoryStorage()): AuthFlowEnvironment => ({
+	indieauth: {
+		fetch: fetchImpl,
+		crypto: globalThis.crypto,
+		random: () => globalThis.crypto.getRandomValues(new Uint8Array(32)),
+	},
+	tokenStore: tokenStore(),
+	sessionStorage: session,
+	shareInbox: { indexedDB: fakeIndexedDB() },
+});
