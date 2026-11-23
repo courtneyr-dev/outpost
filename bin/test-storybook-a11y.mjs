@@ -147,7 +147,10 @@ function watchStoryErrors( events ) {
 	} );
 }
 
-async function audit( context, url, run ) {
+// One browser context per run: stories in parallel pages would otherwise share
+// localStorage and IndexedDB, and one story's cleanup would erase another's seed.
+async function audit( browser, url, run ) {
+	const context = await browser.newContext( { viewport: VIEWPORTS[ run.viewport ] } );
 	const page = await context.newPage();
 	const leaks = [];
 	const errors = [];
@@ -201,7 +204,7 @@ async function audit( context, url, run ) {
 			...leaks.map( ( target ) => ( { id: 'unmocked-request', target, help: 'request left the static Storybook' } ) ),
 		];
 	} finally {
-		await page.close();
+		await context.close();
 	}
 }
 
@@ -220,15 +223,6 @@ const runs = Object.keys( VIEWPORTS ).flatMap( ( viewport ) =>
 
 const { server, url } = await serve();
 const browser = await chromium.launch( { channel: 'chrome' } );
-const contexts = Object.fromEntries(
-	await Promise.all(
-		Object.entries( VIEWPORTS ).map( async ( [ name, viewport ] ) => [
-			name,
-			await browser.newContext( { viewport } ),
-		] )
-	)
-);
-
 let failures = 0;
 const seenKnown = new Set();
 let next = 0;
@@ -238,7 +232,7 @@ async function worker() {
 		const run = runs[ next++ ];
 		let found;
 		try {
-			found = await audit( contexts[ run.viewport ], url, run );
+			found = await audit( browser, url, run );
 		} catch ( error ) {
 			found = [ { id: 'audit-error', target: run.story, help: error.message.split( '\n' )[ 0 ] } ];
 		}
