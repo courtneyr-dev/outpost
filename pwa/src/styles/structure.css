@@ -2467,8 +2467,10 @@
 	}
 }
 
-/* Manual-share controls (snooze menu, silo URL capture, fallback modal)
- * get the same 44 px touch target as the composer buttons. */
+/* Manual-share buttons (snooze menu, silo URL capture, fallback modal)
+ * get the same 44 px minimum size as the composer buttons. The fallback
+ * modal's open link (__action--open) is inline, so these minimums don't
+ * apply to it and it keeps its text height. */
 .outpost-snooze-menu__option,
 .outpost-snooze-menu__cancel,
 .outpost-syndication-capture-form__action,
