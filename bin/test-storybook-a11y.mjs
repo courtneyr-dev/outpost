@@ -11,7 +11,10 @@
  *
  * A story also fails when its render or play function throws, when the page
  * raises an uncaught error, or when it logs a console error: axe on a
- * half-played story audits the wrong state.
+ * half-played story audits the wrong state. The runner keeps listening for
+ * SETTLE_MS after Storybook reports the story finished (rendered and played)
+ * and counts every error from page load to that deadline. Errors raised later
+ * than SETTLE_MS after the story finishes are not observed.
  *
  * Run `npm run build-storybook` first, then `npm run test:storybook-a11y`.
  */
@@ -32,6 +35,7 @@ const VIEWPORTS = {
 	desktop: { width: 1280, height: 800 },
 };
 const CONCURRENCY = 4;
+const SETTLE_MS = 2000;
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -178,12 +182,16 @@ async function audit( browser, url, run ) {
 			null,
 			{ timeout: 20000 }
 		);
-		errors.push( ...( await page.evaluate( () => globalThis.__outpostStoryErrors ) ) );
-		if ( await page.$( 'body.sb-show-errordisplay' ) ) {
-			errors.push( 'the preview shows its error display' );
-		}
-		if ( errors.length ) {
-			return errors.map( ( help ) => ( { id: 'story-error', target: run.story, help } ) );
+		const settled = Date.now() + SETTLE_MS;
+		const storyErrors = async () =>
+			[
+				...errors,
+				...( await page.evaluate( () => globalThis.__outpostStoryErrors ) ),
+				...( ( await page.$( 'body.sb-show-errordisplay' ) ) ? [ 'the preview shows its error display' ] : [] ),
+			].map( ( help ) => ( { id: 'story-error', target: run.story, help } ) );
+		const early = await storyErrors();
+		if ( early.length ) {
+			return early;
 		}
 		const { violations, incomplete } = await new AxeBuilder( { page } )
 			.include( '#storybook-root' )
@@ -196,7 +204,9 @@ async function audit( browser, url, run ) {
 				target: node.target.join( ' ' ),
 				help: node.any[ 0 ]?.message,
 			} ) );
+		await page.waitForTimeout( Math.max( 0, settled - Date.now() ) );
 		return [
+			...( await storyErrors() ),
 			...violations.flatMap( ( v ) =>
 				v.nodes.map( ( node ) => ( { id: v.id, target: node.target.join( ' ' ), help: v.help } ) )
 			),
