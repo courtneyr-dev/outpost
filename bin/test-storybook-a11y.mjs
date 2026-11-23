@@ -51,18 +51,11 @@ const TYPES = {
 // full target selector, and every scheme and viewport it occurs in. A listed
 // combination that stops occurring fails the run, so the list only shrinks.
 const BOTH = [ 'light', 'dark' ];
-const ALL = [ 'phone', 'desktop' ];
 const PHONE = [ 'phone' ];
 const known = ( rule, viewports, note, entries ) =>
 	entries.map( ( [ story, target ] ) => ( { story, rule, target, schemes: BOTH, viewports, note } ) );
 
-const SNOOZE_MENU = [ 'components-snoozemenu--default', 'components-snoozemenu--disabled', 'components-snoozemenu--with-cancel', 'components-reminderrollup--snooze-menu-open' ];
-const SNOOZE_OPTIONS = [ 'P1D', 'P3D', 'P7D', 'forever' ].map( ( v ) => `button[data-snooze-value="${ v }"]` );
-const SNOOZE_ARIA = 'SnoozeMenu puts role="menu" on a wrapper around ul > li, so its role="menuitem" buttons have no menu parent.';
-
 const KNOWN = [
-	...known( 'aria-required-children', ALL, SNOOZE_ARIA, SNOOZE_MENU.map( ( story ) => [ story, '.outpost-snooze-menu' ] ) ),
-	...known( 'aria-required-parent', ALL, SNOOZE_ARIA, SNOOZE_MENU.flatMap( ( story ) => SNOOZE_OPTIONS.map( ( target ) => [ story, target ] ) ) ),
 	...known( 'color-contrast-unmeasured', PHONE, 'The 90dvh settings drawer cuts the reset help text at its edge on a phone, so axe cannot read its background. Not a contrast failure.', [
 		[ 'components-settingssheet--open', '#outpost-settings-reset-help' ],
 	] ),

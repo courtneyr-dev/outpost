@@ -76,18 +76,18 @@ describe( 'SnoozeMenu', () => {
 		} );
 	} );
 
-	it( 'role="menu" + role="menuitem" for accessibility', () => {
+	it( 'is a group named "Snooze duration" holding one button per option', () => {
 		render( h( SnoozeMenu, { on_pick: vi.fn() } ), root );
 
-		expect( root.querySelector( '[role="menu"]' ) ).not.toBeNull();
-		const menuitems = root.querySelectorAll( '[role="menuitem"]' );
-		expect( menuitems.length ).toBe( 4 );
+		const group = root.querySelector( '[role="group"]' );
+		expect( group?.getAttribute( 'aria-label' ) ).toBe( 'Snooze duration' );
+		expect( group?.querySelectorAll( 'button' ).length ).toBe( 4 );
 	} );
 
-	it( 'has aria-label "Snooze duration"', () => {
+	it( 'claims no menu roles, because it has no menu arrow-key handling', () => {
 		render( h( SnoozeMenu, { on_pick: vi.fn() } ), root );
-		const menu = root.querySelector( '[role="menu"]' );
-		expect( menu?.getAttribute( 'aria-label' ) ).toBe( 'Snooze duration' );
+
+		expect( root.querySelector( '[role="menu"], [role="menuitem"]' ) ).toBeNull();
 	} );
 
 	it( 'options override default list', () => {
