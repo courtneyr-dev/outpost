@@ -2,10 +2,35 @@ name: Docs
 
 on:
   pull_request:
-    paths: ['docs/**', '.github/workflows/docs.yml']
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+      # The Storybook published at /storybook/: its config, the stories and
+      # everything they import, and the files its build and a11y run read.
+      - '.storybook/**'
+      - 'pwa/src/**'
+      - 'assets/svg/**'
+      - 'tests/fixtures/pkiw/**'
+      - 'bin/test-storybook-a11y.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
   push:
     branches: [main]
-    paths: ['docs/**', '.github/workflows/docs.yml']
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+      # Same list as pull_request above.
+      - '.storybook/**'
+      - 'pwa/src/**'
+      - 'assets/svg/**'
+      - 'tests/fixtures/pkiw/**'
+      - 'bin/test-storybook-a11y.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
   workflow_dispatch:
 
 env:
@@ -25,13 +50,27 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: docs/package-lock.json
+          cache-dependency-path: |
+            docs/package-lock.json
+            package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build site
         run: npm run build
+
+      - name: Install Storybook dependencies
+        working-directory: .
+        run: npm ci
+
+      # Astro empties docs/dist on build, so the Storybook goes in after it.
+      # Pages publishes this folder at /outpost/storybook/.
+      - name: Build Storybook into the site
+        working-directory: .
+        run: |
+          npm run build-storybook
+          cp -R storybook-static docs/dist/storybook
 
       - name: Markdown lint
         run: npm run lint:md
@@ -42,13 +81,19 @@ jobs:
           ./vale --minAlertLevel=error src/content
 
       - name: Internal link check
-        run: SKIP_EXTERNAL=1 npm run check:links
+        run: CHECK_STORYBOOK=1 SKIP_EXTERNAL=1 npm run check:links
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Accessibility check (axe)
         run: npm run check:a11y
+
+      # Every story in both schemes at both viewports, plus the manager page,
+      # served from the built site at the path Pages publishes it under.
+      - name: Storybook accessibility check (axe)
+        working-directory: .
+        run: npm run test:storybook-a11y -- docs/dist/storybook --base /outpost/storybook/
 
       - name: Upload site artifact
         if: github.event_name != 'pull_request'

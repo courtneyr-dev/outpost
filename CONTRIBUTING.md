@@ -73,6 +73,23 @@ Every non-trivial change needs tests: write a failing test first, then the fix. 
 
 Before you open a PR, run at least `composer check`, `npm test`, `npm run typecheck`, `npm run lint`, and `npm run lint:wp`. If you touched anything the integration suite covers, run `npm run test:integration` too.
 
+### PWA Storybook
+
+Run `npm run storybook` from the repository root to preview the PWA components. In Storybook, open the Settings drawer, choose the phone viewport, and check that keyboard focus remains visible as you tab to Reset preferences. Repeat in light and dark. The story supplies mock data. To check the same interaction in the app, run it against the local WordPress site from [Run Outpost locally](#run-outpost-locally).
+
+Run `npm run build-storybook` and `npm run test:storybook-a11y` to exercise the built stories and the manager. The Docs workflow builds Astro first, copies the Storybook into `docs/dist/storybook`, and tests it at the Pages path:
+
+```sh
+npm --prefix docs ci
+npm --prefix docs run build
+npm run build-storybook
+cp -R storybook-static docs/dist/storybook
+CHECK_STORYBOOK=1 SKIP_EXTERNAL=1 npm --prefix docs run check:links
+npm run test:storybook-a11y -- docs/dist/storybook --base /outpost/storybook/
+```
+
+After a Docs deployment, check the docs home, the Storybook index, and a story iframe. If the deployment breaks either site, revert the offending commit on `main` through a PR and verify both sites after the Docs workflow publishes again. The workflow uploads one artifact containing both sites.
+
 ### Test types
 
 - **Unit tests:** WP_Mock for PHP (`tests/unit/`, `tests/auth/`, `tests/admin/`, `tests/theming/`), Vitest for TypeScript (next to the source in `pwa/src/`).

@@ -16,19 +16,30 @@
  * and counts every error from page load to that deadline. Errors raised later
  * than SETTLE_MS after the story finishes are not observed.
  *
+ * It also runs axe on the manager page (index.html, the sidebar and toolbar
+ * around the preview iframe) in both color schemes, against KNOWN_IN_STORYBOOK_UI.
+ *
  * Run `npm run build-storybook` first, then `npm run test:storybook-a11y`.
+ * To audit another build, pass its folder and the URL path it is published
+ * under: `node bin/test-storybook-a11y.mjs docs/dist/storybook --base /outpost/storybook/`
+ * serves that folder at /outpost/storybook/, as GitHub Pages does.
  */
 
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { chromium } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { WCAG_TAGS } from '../.storybook/a11y-rules.js';
 
-const ROOT = fileURLToPath( new URL( '../storybook-static', import.meta.url ) );
+const args = parseArgs( { allowPositionals: true, options: { base: { type: 'string', default: '/' } } } );
+const ROOT = args.positionals[ 0 ]
+	? resolve( args.positionals[ 0 ] )
+	: fileURLToPath( new URL( '../storybook-static', import.meta.url ) );
+const BASE = `/${ args.values.base.replace( /^\/+|\/+$/g, '' ) }/`.replace( /^\/\/$/, '/' );
 const SCHEMES = [ 'light', 'dark' ];
 const VIEWPORTS = {
 	phone: { width: 390, height: 844 },
@@ -61,6 +72,13 @@ const KNOWN = [
 	] ),
 ];
 
+// Exact known violations in the manager page, which is Storybook's own markup.
+// Each entry names an axe rule and the node's full target selector; Storybook's
+// emotion class names are hashed, so the selector part is a pattern. An entry
+// that stops occurring in either scheme fails the run.
+const STORYBOOK_UI = 'Storybook 10.6.6 manager markup, not this repo';
+const KNOWN_IN_STORYBOOK_UI = [];
+
 const comboKey = ( k, scheme, viewport ) => `${ k.story } ${ k.rule } ${ k.target } ${ scheme } ${ viewport }`;
 
 const isKnown = ( run, finding ) =>
@@ -75,7 +93,12 @@ const isKnown = ( run, finding ) =>
 
 function serve() {
 	const server = createServer( async ( req, res ) => {
-		const path = normalize( decodeURIComponent( new URL( req.url, 'http://localhost' ).pathname ) );
+		const pathname = decodeURIComponent( new URL( req.url, 'http://localhost' ).pathname );
+		if ( ! pathname.startsWith( BASE ) ) {
+			res.writeHead( 404 ).end();
+			return;
+		}
+		const path = normalize( `/${ pathname.slice( BASE.length ) }` );
 		const file = join( ROOT, path.endsWith( '/' ) ? `${ path }index.html` : path );
 		try {
 			const body = await readFile( file );
@@ -87,7 +110,7 @@ function serve() {
 	} );
 	return new Promise( ( resolve ) =>
 		server.listen( 0, '127.0.0.1', () =>
-			resolve( { server, url: `http://127.0.0.1:${ server.address().port }` } )
+			resolve( { server, origin: `http://127.0.0.1:${ server.address().port }` } )
 		)
 	);
 }
@@ -121,7 +144,7 @@ function watchStoryErrors( events ) {
 
 // One browser context per run: stories in parallel pages would otherwise share
 // localStorage and IndexedDB, and one story's cleanup would erase another's seed.
-async function audit( browser, url, run ) {
+async function audit( browser, origin, url, run ) {
 	const context = await browser.newContext( { viewport: VIEWPORTS[ run.viewport ] } );
 	const page = await context.newPage();
 	const leaks = [];
@@ -135,7 +158,7 @@ async function audit( browser, url, run ) {
 	await page.addInitScript( watchStoryErrors, STORY_ERROR_EVENTS );
 	await page.route( '**/*', ( route ) => {
 		const target = route.request().url();
-		const local = target.startsWith( `${ url }/` ) && ! new URL( target ).pathname.startsWith( '/wp-json' );
+		const local = target.startsWith( `${ origin }/` ) && ! new URL( target ).pathname.startsWith( '/wp-json' );
 		if ( local || target.startsWith( 'data:' ) || target.startsWith( 'blob:' ) ) {
 			return route.continue();
 		}
@@ -144,7 +167,7 @@ async function audit( browser, url, run ) {
 	} );
 	try {
 		await page.emulateMedia( { colorScheme: run.scheme } );
-		await page.goto( `${ url }/iframe.html?id=${ run.story }&viewMode=story&globals=scheme:${ run.scheme }` );
+		await page.goto( `${ url }iframe.html?id=${ run.story }&viewMode=story&globals=scheme:${ run.scheme }` );
 		await page.waitForFunction(
 			() => globalThis.__STORYBOOK_PREVIEW__?.currentRender?.phase === 'finished',
 			null,
@@ -186,8 +209,68 @@ async function audit( browser, url, run ) {
 	}
 }
 
+// The manager page, with every sidebar group expanded so axe sees each item.
+async function auditManager( browser, url ) {
+	const seen = new Set();
+	const fresh = [];
+	for ( const scheme of SCHEMES ) {
+		const context = await browser.newContext( { viewport: VIEWPORTS.desktop } );
+		const page = await context.newPage();
+		const errors = [];
+		page.on( 'pageerror', ( error ) => errors.push( `pageerror: ${ error.message.split( '\n' )[ 0 ] }` ) );
+		page.on( 'console', ( message ) => {
+			if ( message.type() === 'error' ) {
+				errors.push( `console.error: ${ message.text().split( '\n' )[ 0 ] }` );
+			}
+		} );
+		try {
+			await page.emulateMedia( { colorScheme: scheme } );
+			await page.goto( url );
+			await page.waitForSelector( '#storybook-explorer-menu' );
+			for ( const button of await page.locator( '[data-action="expand-all"]' ).all() ) {
+				await button.click();
+			}
+			await page.waitForTimeout( SETTLE_MS );
+			const { violations } = await new AxeBuilder( { page } ).exclude( 'iframe' ).withTags( WCAG_TAGS ).analyze();
+			for ( const help of errors ) {
+				fresh.push( `${ scheme.padEnd( 5 ) } story-error: manager page  ${ help }` );
+			}
+			for ( const v of violations ) {
+				for ( const node of v.nodes ) {
+					const target = node.target.join( ' ' );
+					const known = KNOWN_IN_STORYBOOK_UI.find(
+						( k ) => k.rule === v.id && k.target.test( target ) && ( ! k.html || k.html.test( node.html ) )
+					);
+					if ( known ) {
+						seen.add( `${ KNOWN_IN_STORYBOOK_UI.indexOf( known ) } ${ scheme }` );
+					} else {
+						fresh.push( `${ scheme.padEnd( 5 ) } ${ v.id }: ${ target }  ${ v.help }` );
+					}
+				}
+			}
+		} finally {
+			await context.close();
+		}
+	}
+	console.log( `${ fresh.length ? 'FAIL' : 'pass' }  desktop both   manager page (index.html)` );
+	for ( const line of fresh ) {
+		console.log( `        ${ line }` );
+	}
+	let failed = fresh.length;
+	KNOWN_IN_STORYBOOK_UI.forEach( ( known, i ) => {
+		for ( const scheme of SCHEMES ) {
+			if ( ! seen.has( `${ i } ${ scheme }` ) ) {
+				failed += 1;
+				console.log( `FAIL  known violation no longer occurs, remove it from KNOWN_IN_STORYBOOK_UI: ${ known.rule } ${ known.target } ${ scheme }` );
+			}
+		}
+		console.log( `  known in manager page: ${ known.rule }  (${ known.why })` );
+	} );
+	return failed;
+}
+
 if ( ! existsSync( join( ROOT, 'index.json' ) ) ) {
-	console.error( 'storybook-static/index.json is missing. Run `npm run build-storybook` first.' );
+	console.error( `${ join( ROOT, 'index.json' ) } is missing. Run \`npm run build-storybook\` first.` );
 	process.exit( 1 );
 }
 
@@ -199,7 +282,8 @@ const runs = Object.keys( VIEWPORTS ).flatMap( ( viewport ) =>
 	SCHEMES.flatMap( ( scheme ) => stories.map( ( story ) => ( { story, scheme, viewport } ) ) )
 );
 
-const { server, url } = await serve();
+const { server, origin } = await serve();
+const url = `${ origin }${ BASE }`;
 const browser = await chromium.launch( { channel: 'chrome' } );
 let failures = 0;
 const seenKnown = new Set();
@@ -210,7 +294,7 @@ async function worker() {
 		const run = runs[ next++ ];
 		let found;
 		try {
-			found = await audit( browser, url, run );
+			found = await audit( browser, origin, url, run );
 		} catch ( error ) {
 			found = [ { id: 'audit-error', target: run.story, help: error.message.split( '\n' )[ 0 ] } ];
 		}
@@ -235,6 +319,7 @@ async function worker() {
 
 try {
 	await Promise.all( Array.from( { length: CONCURRENCY }, worker ) );
+	failures += await auditManager( browser, url );
 } finally {
 	await browser.close();
 	server.close();
@@ -255,7 +340,7 @@ for ( const note of new Set( KNOWN.map( ( k ) => k.note ) ) ) {
 }
 
 console.log(
-	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports, ${ failures } failures, ${ seenKnown.size } known (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
+	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports plus the manager page x ${ SCHEMES.length } schemes, served at ${ BASE }, ${ failures } failures, ${ seenKnown.size } known (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
 );
 
 if ( failures > 0 ) {
