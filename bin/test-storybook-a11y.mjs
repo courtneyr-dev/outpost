@@ -17,7 +17,7 @@
  * than SETTLE_MS after the story finishes are not observed.
  *
  * It also runs axe on the manager page (index.html, the sidebar and toolbar
- * around the preview iframe) in both color schemes, against KNOWN_IN_STORYBOOK_UI.
+ * around the preview iframe) in both color schemes.
  *
  * Run `npm run build-storybook` first, then `npm run test:storybook-a11y`.
  * To audit another build, pass its folder and the URL path it is published
@@ -57,39 +57,6 @@ const TYPES = {
 	'.png': 'image/png',
 	'.woff2': 'font/woff2',
 };
-
-// Exact known violations. Each entry names a story, an axe rule, the node's
-// full target selector, and every scheme and viewport it occurs in. A listed
-// combination that stops occurring fails the run, so the list only shrinks.
-const BOTH = [ 'light', 'dark' ];
-const PHONE = [ 'phone' ];
-const known = ( rule, viewports, note, entries ) =>
-	entries.map( ( [ story, target ] ) => ( { story, rule, target, schemes: BOTH, viewports, note } ) );
-
-const KNOWN = [
-	...known( 'color-contrast-unmeasured', PHONE, 'The 90dvh settings drawer cuts the reset help text at its edge on a phone, so axe cannot read its background. Not a contrast failure.', [
-		[ 'components-settingssheet--open', '#outpost-settings-reset-help' ],
-	] ),
-];
-
-// Exact known violations in the manager page, which is Storybook's own markup.
-// Each entry names an axe rule and the node's full target selector; Storybook's
-// emotion class names are hashed, so the selector part is a pattern. An entry
-// that stops occurring in either scheme fails the run.
-const STORYBOOK_UI = 'Storybook 10.6.6 manager markup, not this repo';
-const KNOWN_IN_STORYBOOK_UI = [];
-
-const comboKey = ( k, scheme, viewport ) => `${ k.story } ${ k.rule } ${ k.target } ${ scheme } ${ viewport }`;
-
-const isKnown = ( run, finding ) =>
-	KNOWN.find(
-		( k ) =>
-			k.story === run.story &&
-			k.rule === finding.id &&
-			k.target === finding.target &&
-			k.schemes.includes( run.scheme ) &&
-			k.viewports.includes( run.viewport )
-	);
 
 function serve() {
 	const server = createServer( async ( req, res ) => {
@@ -184,6 +151,9 @@ async function audit( browser, origin, url, run ) {
 		if ( early.length ) {
 			return early;
 		}
+		if ( run.story === 'components-settingssheet--open' && run.viewport === 'phone' ) {
+			await page.locator( '#outpost-settings-reset-help' ).scrollIntoViewIfNeeded();
+		}
 		const { violations, incomplete } = await new AxeBuilder( { page } )
 			.include( '#storybook-root' )
 			.withTags( WCAG_TAGS )
@@ -211,7 +181,6 @@ async function audit( browser, origin, url, run ) {
 
 // The manager page, with every sidebar group expanded so axe sees each item.
 async function auditManager( browser, url ) {
-	const seen = new Set();
 	const fresh = [];
 	for ( const scheme of SCHEMES ) {
 		const context = await browser.newContext( { viewport: VIEWPORTS.desktop } );
@@ -238,14 +207,7 @@ async function auditManager( browser, url ) {
 			for ( const v of violations ) {
 				for ( const node of v.nodes ) {
 					const target = node.target.join( ' ' );
-					const known = KNOWN_IN_STORYBOOK_UI.find(
-						( k ) => k.rule === v.id && k.target.test( target ) && ( ! k.html || k.html.test( node.html ) )
-					);
-					if ( known ) {
-						seen.add( `${ KNOWN_IN_STORYBOOK_UI.indexOf( known ) } ${ scheme }` );
-					} else {
-						fresh.push( `${ scheme.padEnd( 5 ) } ${ v.id }: ${ target }  ${ v.help }` );
-					}
+					fresh.push( `${ scheme.padEnd( 5 ) } ${ v.id }: ${ target }  ${ v.help }` );
 				}
 			}
 		} finally {
@@ -256,17 +218,7 @@ async function auditManager( browser, url ) {
 	for ( const line of fresh ) {
 		console.log( `        ${ line }` );
 	}
-	let failed = fresh.length;
-	KNOWN_IN_STORYBOOK_UI.forEach( ( known, i ) => {
-		for ( const scheme of SCHEMES ) {
-			if ( ! seen.has( `${ i } ${ scheme }` ) ) {
-				failed += 1;
-				console.log( `FAIL  known violation no longer occurs, remove it from KNOWN_IN_STORYBOOK_UI: ${ known.rule } ${ known.target } ${ scheme }` );
-			}
-		}
-		console.log( `  known in manager page: ${ known.rule }  (${ known.why })` );
-	} );
-	return failed;
+	return fresh.length;
 }
 
 if ( ! existsSync( join( ROOT, 'index.json' ) ) ) {
@@ -286,7 +238,6 @@ const { server, origin } = await serve();
 const url = `${ origin }${ BASE }`;
 const browser = await chromium.launch( { channel: 'chrome' } );
 let failures = 0;
-const seenKnown = new Set();
 let next = 0;
 
 async function worker() {
@@ -298,15 +249,7 @@ async function worker() {
 		} catch ( error ) {
 			found = [ { id: 'audit-error', target: run.story, help: error.message.split( '\n' )[ 0 ] } ];
 		}
-		const fresh = [];
-		for ( const finding of found ) {
-			const match = isKnown( run, finding );
-			if ( match ) {
-				seenKnown.add( comboKey( match, run.scheme, run.viewport ) );
-			} else {
-				fresh.push( `${ finding.id }: ${ finding.target }  ${ finding.help }` );
-			}
-		}
+		const fresh = found.map( ( finding ) => `${ finding.id }: ${ finding.target }  ${ finding.help }` );
 		failures += fresh.length;
 		console.log(
 			`${ fresh.length ? 'FAIL' : 'pass' }  ${ run.viewport.padEnd( 7 ) } ${ run.scheme.padEnd( 5 ) }  ${ run.story }`
@@ -325,22 +268,8 @@ try {
 	server.close();
 }
 
-const missing = KNOWN.flatMap( ( k ) =>
-	k.schemes.flatMap( ( scheme ) =>
-		k.viewports.map( ( viewport ) => comboKey( k, scheme, viewport ) ).filter( ( key ) => ! seenKnown.has( key ) )
-	)
-);
-for ( const key of missing ) {
-	failures += 1;
-	console.log( `FAIL  known violation no longer occurs, remove it from KNOWN: ${ key }` );
-}
-console.log( `\n${ KNOWN.length } KNOWN entries matched ${ seenKnown.size } times:` );
-for ( const note of new Set( KNOWN.map( ( k ) => k.note ) ) ) {
-	console.log( `  ${ KNOWN.filter( ( k ) => k.note === note ).length } x ${ note }` );
-}
-
 console.log(
-	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports plus the manager page x ${ SCHEMES.length } schemes, served at ${ BASE }, ${ failures } failures, ${ seenKnown.size } known (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
+	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports plus the manager page x ${ SCHEMES.length } schemes, served at ${ BASE }, ${ failures } failures (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
 );
 
 if ( failures > 0 ) {
