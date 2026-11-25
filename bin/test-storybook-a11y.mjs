@@ -16,19 +16,30 @@
  * and counts every error from page load to that deadline. Errors raised later
  * than SETTLE_MS after the story finishes are not observed.
  *
+ * It also runs axe on the manager page (index.html, the sidebar and toolbar
+ * around the preview iframe) in both color schemes.
+ *
  * Run `npm run build-storybook` first, then `npm run test:storybook-a11y`.
+ * To audit another build, pass its folder and the URL path it is published
+ * under: `node bin/test-storybook-a11y.mjs docs/dist/storybook --base /outpost/storybook/`
+ * serves that folder at /outpost/storybook/, as GitHub Pages does.
  */
 
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { chromium } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { WCAG_TAGS } from '../.storybook/a11y-rules.js';
 
-const ROOT = fileURLToPath( new URL( '../storybook-static', import.meta.url ) );
+const args = parseArgs( { allowPositionals: true, options: { base: { type: 'string', default: '/' } } } );
+const ROOT = args.positionals[ 0 ]
+	? resolve( args.positionals[ 0 ] )
+	: fileURLToPath( new URL( '../storybook-static', import.meta.url ) );
+const BASE = `/${ args.values.base.replace( /^\/+|\/+$/g, '' ) }/`.replace( /^\/\/$/, '/' );
 const SCHEMES = [ 'light', 'dark' ];
 const VIEWPORTS = {
 	phone: { width: 390, height: 844 },
@@ -47,35 +58,14 @@ const TYPES = {
 	'.woff2': 'font/woff2',
 };
 
-// Exact known violations. Each entry names a story, an axe rule, the node's
-// full target selector, and every scheme and viewport it occurs in. A listed
-// combination that stops occurring fails the run, so the list only shrinks.
-const BOTH = [ 'light', 'dark' ];
-const PHONE = [ 'phone' ];
-const known = ( rule, viewports, note, entries ) =>
-	entries.map( ( [ story, target ] ) => ( { story, rule, target, schemes: BOTH, viewports, note } ) );
-
-const KNOWN = [
-	...known( 'color-contrast-unmeasured', PHONE, 'The 90dvh settings drawer cuts the reset help text at its edge on a phone, so axe cannot read its background. Not a contrast failure.', [
-		[ 'components-settingssheet--open', '#outpost-settings-reset-help' ],
-	] ),
-];
-
-const comboKey = ( k, scheme, viewport ) => `${ k.story } ${ k.rule } ${ k.target } ${ scheme } ${ viewport }`;
-
-const isKnown = ( run, finding ) =>
-	KNOWN.find(
-		( k ) =>
-			k.story === run.story &&
-			k.rule === finding.id &&
-			k.target === finding.target &&
-			k.schemes.includes( run.scheme ) &&
-			k.viewports.includes( run.viewport )
-	);
-
 function serve() {
 	const server = createServer( async ( req, res ) => {
-		const path = normalize( decodeURIComponent( new URL( req.url, 'http://localhost' ).pathname ) );
+		const pathname = decodeURIComponent( new URL( req.url, 'http://localhost' ).pathname );
+		if ( ! pathname.startsWith( BASE ) ) {
+			res.writeHead( 404 ).end();
+			return;
+		}
+		const path = normalize( `/${ pathname.slice( BASE.length ) }` );
 		const file = join( ROOT, path.endsWith( '/' ) ? `${ path }index.html` : path );
 		try {
 			const body = await readFile( file );
@@ -87,7 +77,7 @@ function serve() {
 	} );
 	return new Promise( ( resolve ) =>
 		server.listen( 0, '127.0.0.1', () =>
-			resolve( { server, url: `http://127.0.0.1:${ server.address().port }` } )
+			resolve( { server, origin: `http://127.0.0.1:${ server.address().port }` } )
 		)
 	);
 }
@@ -121,7 +111,7 @@ function watchStoryErrors( events ) {
 
 // One browser context per run: stories in parallel pages would otherwise share
 // localStorage and IndexedDB, and one story's cleanup would erase another's seed.
-async function audit( browser, url, run ) {
+async function audit( browser, origin, url, run ) {
 	const context = await browser.newContext( { viewport: VIEWPORTS[ run.viewport ] } );
 	const page = await context.newPage();
 	const leaks = [];
@@ -135,7 +125,7 @@ async function audit( browser, url, run ) {
 	await page.addInitScript( watchStoryErrors, STORY_ERROR_EVENTS );
 	await page.route( '**/*', ( route ) => {
 		const target = route.request().url();
-		const local = target.startsWith( `${ url }/` ) && ! new URL( target ).pathname.startsWith( '/wp-json' );
+		const local = target.startsWith( `${ origin }/` ) && ! new URL( target ).pathname.startsWith( '/wp-json' );
 		if ( local || target.startsWith( 'data:' ) || target.startsWith( 'blob:' ) ) {
 			return route.continue();
 		}
@@ -144,7 +134,7 @@ async function audit( browser, url, run ) {
 	} );
 	try {
 		await page.emulateMedia( { colorScheme: run.scheme } );
-		await page.goto( `${ url }/iframe.html?id=${ run.story }&viewMode=story&globals=scheme:${ run.scheme }` );
+		await page.goto( `${ url }iframe.html?id=${ run.story }&viewMode=story&globals=scheme:${ run.scheme }` );
 		await page.waitForFunction(
 			() => globalThis.__STORYBOOK_PREVIEW__?.currentRender?.phase === 'finished',
 			null,
@@ -160,6 +150,9 @@ async function audit( browser, url, run ) {
 		const early = await storyErrors();
 		if ( early.length ) {
 			return early;
+		}
+		if ( run.story === 'components-settingssheet--open' && run.viewport === 'phone' ) {
+			await page.locator( '#outpost-settings-reset-help' ).scrollIntoViewIfNeeded();
 		}
 		const { violations, incomplete } = await new AxeBuilder( { page } )
 			.include( '#storybook-root' )
@@ -186,8 +179,50 @@ async function audit( browser, url, run ) {
 	}
 }
 
+// The manager page, with every sidebar group expanded so axe sees each item.
+async function auditManager( browser, url ) {
+	const fresh = [];
+	for ( const scheme of SCHEMES ) {
+		const context = await browser.newContext( { viewport: VIEWPORTS.desktop } );
+		const page = await context.newPage();
+		const errors = [];
+		page.on( 'pageerror', ( error ) => errors.push( `pageerror: ${ error.message.split( '\n' )[ 0 ] }` ) );
+		page.on( 'console', ( message ) => {
+			if ( message.type() === 'error' ) {
+				errors.push( `console.error: ${ message.text().split( '\n' )[ 0 ] }` );
+			}
+		} );
+		try {
+			await page.emulateMedia( { colorScheme: scheme } );
+			await page.goto( url );
+			await page.waitForSelector( '#storybook-explorer-menu' );
+			for ( const button of await page.locator( '[data-action="expand-all"]' ).all() ) {
+				await button.click();
+			}
+			await page.waitForTimeout( SETTLE_MS );
+			const { violations } = await new AxeBuilder( { page } ).exclude( 'iframe' ).withTags( WCAG_TAGS ).analyze();
+			for ( const help of errors ) {
+				fresh.push( `${ scheme.padEnd( 5 ) } story-error: manager page  ${ help }` );
+			}
+			for ( const v of violations ) {
+				for ( const node of v.nodes ) {
+					const target = node.target.join( ' ' );
+					fresh.push( `${ scheme.padEnd( 5 ) } ${ v.id }: ${ target }  ${ v.help }` );
+				}
+			}
+		} finally {
+			await context.close();
+		}
+	}
+	console.log( `${ fresh.length ? 'FAIL' : 'pass' }  desktop both   manager page (index.html)` );
+	for ( const line of fresh ) {
+		console.log( `        ${ line }` );
+	}
+	return fresh.length;
+}
+
 if ( ! existsSync( join( ROOT, 'index.json' ) ) ) {
-	console.error( 'storybook-static/index.json is missing. Run `npm run build-storybook` first.' );
+	console.error( `${ join( ROOT, 'index.json' ) } is missing. Run \`npm run build-storybook\` first.` );
 	process.exit( 1 );
 }
 
@@ -199,10 +234,10 @@ const runs = Object.keys( VIEWPORTS ).flatMap( ( viewport ) =>
 	SCHEMES.flatMap( ( scheme ) => stories.map( ( story ) => ( { story, scheme, viewport } ) ) )
 );
 
-const { server, url } = await serve();
+const { server, origin } = await serve();
+const url = `${ origin }${ BASE }`;
 const browser = await chromium.launch( { channel: 'chrome' } );
 let failures = 0;
-const seenKnown = new Set();
 let next = 0;
 
 async function worker() {
@@ -210,19 +245,11 @@ async function worker() {
 		const run = runs[ next++ ];
 		let found;
 		try {
-			found = await audit( browser, url, run );
+			found = await audit( browser, origin, url, run );
 		} catch ( error ) {
 			found = [ { id: 'audit-error', target: run.story, help: error.message.split( '\n' )[ 0 ] } ];
 		}
-		const fresh = [];
-		for ( const finding of found ) {
-			const match = isKnown( run, finding );
-			if ( match ) {
-				seenKnown.add( comboKey( match, run.scheme, run.viewport ) );
-			} else {
-				fresh.push( `${ finding.id }: ${ finding.target }  ${ finding.help }` );
-			}
-		}
+		const fresh = found.map( ( finding ) => `${ finding.id }: ${ finding.target }  ${ finding.help }` );
 		failures += fresh.length;
 		console.log(
 			`${ fresh.length ? 'FAIL' : 'pass' }  ${ run.viewport.padEnd( 7 ) } ${ run.scheme.padEnd( 5 ) }  ${ run.story }`
@@ -235,27 +262,14 @@ async function worker() {
 
 try {
 	await Promise.all( Array.from( { length: CONCURRENCY }, worker ) );
+	failures += await auditManager( browser, url );
 } finally {
 	await browser.close();
 	server.close();
 }
 
-const missing = KNOWN.flatMap( ( k ) =>
-	k.schemes.flatMap( ( scheme ) =>
-		k.viewports.map( ( viewport ) => comboKey( k, scheme, viewport ) ).filter( ( key ) => ! seenKnown.has( key ) )
-	)
-);
-for ( const key of missing ) {
-	failures += 1;
-	console.log( `FAIL  known violation no longer occurs, remove it from KNOWN: ${ key }` );
-}
-console.log( `\n${ KNOWN.length } KNOWN entries matched ${ seenKnown.size } times:` );
-for ( const note of new Set( KNOWN.map( ( k ) => k.note ) ) ) {
-	console.log( `  ${ KNOWN.filter( ( k ) => k.note === note ).length } x ${ note }` );
-}
-
 console.log(
-	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports, ${ failures } failures, ${ seenKnown.size } known (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
+	`\n${ stories.length } stories x ${ SCHEMES.length } schemes x ${ Object.keys( VIEWPORTS ).length } viewports plus the manager page x ${ SCHEMES.length } schemes, served at ${ BASE }, ${ failures } failures (axe tags: ${ WCAG_TAGS.join( ', ' ) })`
 );
 
 if ( failures > 0 ) {
