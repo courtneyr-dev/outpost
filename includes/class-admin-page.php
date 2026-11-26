@@ -77,11 +77,47 @@ final class Outpost_Admin_Page {
 			'manage_options',
 			self::MENU_SLUG,
 			array( self::class, 'render_page' ),
-			outpost_menu_icon(),
+			self::menu_icon(),
 			76
 		);
 
 		self::$hook_suffix = ( is_string( $suffix ) && '' !== $suffix ) ? $suffix : null;
+	}
+
+	/**
+	 * Register the menu icon on Core versions that render named admin icons.
+	 *
+	 * @return string Icon name or the older admin menu's data URI.
+	 */
+	private static function menu_icon(): string {
+		if ( version_compare( get_bloginfo( 'version' ), '7.2-alpha', '<' )
+			|| ! function_exists( 'wp_register_icon_collection' )
+			|| ! function_exists( 'wp_register_icon' )
+			|| ! function_exists( 'wp_get_icon' ) ) {
+			return outpost_menu_icon();
+		}
+
+		$icon = 'outpost/fingerpost';
+		if ( '' !== wp_get_icon( $icon ) ) {
+			return $icon;
+		}
+
+		$label = __( 'Outpost', 'outpost-mobile-publishing' );
+		wp_register_icon_collection(
+			'outpost',
+			array(
+				'label'  => $label,
+				'public' => false,
+			)
+		);
+		$registered = wp_register_icon(
+			$icon,
+			array(
+				'label'   => $label,
+				'content' => outpost_menu_icon( true ),
+			)
+		);
+		return $registered ? $icon : outpost_menu_icon();
 	}
 
 	/**

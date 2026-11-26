@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.30
+ * Version:           1.0.31
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Requires Plugins:  indieauth, micropub
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.30' );
+define( 'OUTPOST_VERSION', '1.0.31' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -490,15 +490,21 @@ function outpost_meets_requirements(): bool {
  *
  * @since 1.0.0
  *
- * @return string A `data:image/svg+xml;base64,` URI for add_menu_page().
+ * @param bool $inline Whether to return SVG markup for the Core icon registry.
+ * @return string SVG markup or a `data:image/svg+xml;base64,` URI.
  */
-function outpost_menu_icon(): string {
-	$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#a7aaad">'
+function outpost_menu_icon( bool $inline = false ): string {
+	$fill = $inline ? 'currentColor' : '#a7aaad';
+	$svg  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="' . $fill . '">'
 		. '<path d="M11 3h2v17h-2z"/>'
 		. '<path d="M8 20h8v2H8z"/>'
 		. '<path d="M4 5h12.5L20 7.25 16.5 9.5H4z"/>'
 		. '<path d="M20 12H7.5L4 14.25 7.5 16.5H20z"/>'
 		. '</svg>';
+
+	if ( $inline ) {
+		return $svg;
+	}
 
 	return 'data:image/svg+xml;base64,' . base64_encode( $svg ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Inline SVG for an admin menu icon; base64 is the format add_menu_page() requires.
 }
