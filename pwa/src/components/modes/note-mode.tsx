@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import {
+	post_h_entry,
 	report_post_failure,
 	type HEntryProperties,
 	type MicropubEnvironment,
@@ -17,6 +18,7 @@ import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
+import { is_safe_http_url } from '../../lib/url-validation';
 import { ExternalLink } from '../external-link';
 import { PublishButton } from '../publish-button';
 import { useRevealError } from '../../lib/use-reveal-error';
@@ -75,6 +77,7 @@ type Status =
 	| { kind: 'discovering' }
 	| { kind: 'posting' }
 	| { kind: 'posted'; location?: string }
+	| { kind: 'draft-saved'; editUrl: string }
 	| { kind: 'queued' }
 	| { kind: 'error'; message: string };
 
@@ -261,8 +264,15 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
-	const handle_submit = async (event: Event): Promise<void> => {
+	const draft_endpoint = composerConfig?.draftEndpoint;
+	const can_save_draft =
+		!!draft_endpoint &&
+		is_safe_http_url(draft_endpoint) &&
+		new URL(draft_endpoint).origin === window.location.origin;
+
+	const handle_submit = async (event: Event, as_draft = false): Promise<void> => {
 		event.preventDefault();
+		if (status.kind === 'discovering' || status.kind === 'posting') return;
 		const trimmed_content = content.trim();
 		const trimmed_title = title.trim();
 		if (!trimmed_content) return;
@@ -285,6 +295,32 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 				...(trimmed_venue ? { 'mp-place-name': trimmed_venue } : {}),
 			};
 			const properties = merge_more_values(base, more_values);
+
+			if (as_draft && can_save_draft) {
+				properties['post-status'] = 'draft';
+				delete properties['mp-syndicate-to'];
+				setStatus({ kind: 'posting' });
+				const result = await post_h_entry(
+					{ properties, accessToken: token.accessToken, micropubEndpoint: draft_endpoint },
+					micropubEnv,
+				);
+				if (!result.draftEditUrl) {
+					setStatus({
+						kind: 'error',
+						message: 'WordPress did not return an editor link. Check your drafts before saving again.',
+					});
+					return;
+				}
+				saved_draft.discard();
+				setStatus({ kind: 'draft-saved', editUrl: result.draftEditUrl });
+				setContent('');
+				setTitle('');
+				resetMoreValues();
+				setPickedLocation(null);
+				setVenueName('');
+				return;
+			}
+			if (as_draft) return;
 
 			const result = await post_or_queue(
 				{
@@ -491,7 +527,9 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 
 				<p
 					class={`outpost-status${
-						status.kind === 'posted' || status.kind === 'queued' ? '' : ' outpost-status--empty'
+						status.kind === 'posted' || status.kind === 'queued' || status.kind === 'draft-saved'
+							? ''
+							: ' outpost-status--empty'
 					}`}
 					aria-live="polite"
 				>
@@ -512,6 +550,10 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 						) : (
 							'Posted, but the server did not return a link. Check your site to confirm it published.'
 						)
+					) : status.kind === 'draft-saved' ? (
+						<>
+							Draft saved. <a href={status.editUrl}>Open draft in WordPress</a>
+						</>
 					) : status.kind === 'queued' ? (
 						"Saved for later. Outpost will post this when you're back online."
 					) : (
@@ -519,6 +561,18 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 					)}
 				</p>
 
+				{can_save_draft && (
+					<button
+						type="button"
+						class="outpost-button outpost-button--secondary"
+						disabled={!can_submit}
+						onClick={(event): void => {
+							void handle_submit(event, true);
+						}}
+					>
+						Save as WordPress draft
+					</button>
+				)}
 				<PublishButton
 					idPrefix="outpost-note"
 					label={button_label}

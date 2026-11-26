@@ -125,6 +125,7 @@ export interface PostNoteParams {
  * encoded with `[]` suffix in the form body; scalars are plain key=value.
  */
 export interface HEntryProperties {
+	'post-status'?: 'draft';
 	content?: string;
 	name?: string;
 	summary?: string;
@@ -292,6 +293,7 @@ export interface PostHEntryParams {
 }
 
 export interface PostNoteResult {
+	draftEditUrl?: string;
 	/**
 	 * URL of the created post, parsed from the Micropub server's `Location`
 	 * response header. Per the Micropub spec the server MUST return Location
@@ -405,6 +407,7 @@ export async function post_h_entry(
 	try {
 		response = await env.fetch(params.micropubEndpoint, {
 			method: 'POST',
+			...(params.properties['post-status'] === 'draft' ? { redirect: 'error' } : {}),
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 				Authorization: 'Bearer ' + params.accessToken,
@@ -435,6 +438,18 @@ export async function post_h_entry(
 			'post_failed',
 			response.status,
 		);
+	}
+
+	if (params.properties['post-status'] === 'draft') {
+		const edit_url = response.headers.get('X-Outpost-Draft-Edit');
+		if (
+			edit_url &&
+			is_safe_http_url(edit_url) &&
+			new URL(edit_url).origin === new URL(params.micropubEndpoint).origin
+		) {
+			return { draftEditUrl: edit_url };
+		}
+		return {};
 	}
 
 	const location = response.headers.get('location') ?? response.headers.get('Location');

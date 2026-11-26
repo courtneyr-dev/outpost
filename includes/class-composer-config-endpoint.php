@@ -349,6 +349,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 *
 	 * @return array{
 	 *     companions: array<string, string>,
+	 *     draftEndpoint: string|null,
 	 *     postKinds: array{comics: bool},
 	 *     postFormats: array<int, string>|null,
 	 *     xfnRels: array<int, string>,
@@ -393,6 +394,7 @@ final class Outpost_Composer_Config_Endpoint {
 
 		return array(
 			'companions'         => $companions,
+			'draftEndpoint'      => defined( 'MICROPUB_PLUGIN_VERSION' ) ? Outpost_Micropub_Bridges::draft_endpoint() : null,
 			'postKinds'          => array(
 				'comics' => 'active' === $companions['post-kinds'] && Outpost_Post_Kinds_Adapter::supports_comics(),
 			),
