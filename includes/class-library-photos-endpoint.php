@@ -114,8 +114,9 @@ final class Outpost_Library_Photos_Endpoint {
 	 * A token reaches this route only in an `Authorization: Bearer` header
 	 * (or its `REDIRECT_HTTP_AUTHORIZATION` copy). IndieAuth also signs a
 	 * request in from a form-encoded `access_token` field before the route
-	 * runs, so a request IndieAuth authenticated, or one carrying an
-	 * `access_token` parameter, without a Bearer header is refused. So is a
+	 * runs, so a request carrying an `access_token` parameter is refused even
+	 * beside an Authorization header, and one IndieAuth authenticated without
+	 * a Bearer header is refused too. So is a
 	 * request with no user and no Authorization header at all. Both get the
 	 * same 401: the PWA always sends the header, so its absence means the
 	 * web server dropped it, and the composer can say how to fix that
@@ -128,9 +129,10 @@ final class Outpost_Library_Photos_Endpoint {
 	public static function permission_check( WP_REST_Request $request ) {
 		$header       = Outpost_Request_Headers::authorization();
 		$header_token = 1 === preg_match( '/Bearer\s+\S/i', $header );
-		$token_signin = null !== $request->get_param( 'access_token' )
-			|| ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null );
-		if ( ( 0 === get_current_user_id() && '' === $header ) || ( $token_signin && ! $header_token ) ) {
+		$body_token   = null !== $request->get_param( 'access_token' );
+		$token_signin = ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null );
+		// A body or query token is refused even beside a header: IndieAuth ignores some header forms and signs in from the body instead.
+		if ( $body_token || ( 0 === get_current_user_id() && '' === $header ) || ( $token_signin && ! $header_token ) ) {
 			return new WP_Error(
 				'outpost_authorization_header_missing',
 				__( 'WordPress did not receive the Authorization header. Ask your host to forward it to PHP (on Apache, add "CGIPassAuth On" to .htaccess).', 'outpost-mobile-publishing' ),

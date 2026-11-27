@@ -454,6 +454,27 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( 401, $result->get_error_data()['status'] );
 	}
 
+	public function test_body_token_is_refused_even_with_an_authorization_header(): void {
+		// A header IndieAuth ignores lets it sign in from the body token instead.
+		$_SERVER['HTTP_AUTHORIZATION']  = 'Bearer ignored-by-indieauth'; // outpost-lint:fixture-credential
+		$GLOBALS['wp_rest_auth_cookie'] = null;
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 3 );
+		WP_Mock::onFilter( 'indieauth_response' )->with( null )->reply( array( 'me' => 'https://example.test/' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+		WP_Mock::userFunction( 'current_user_can' )->andReturn( true );
+		$request = new WP_REST_Request( 'POST', '/outpost/v1/library-photos' );
+		$request->set_param( 'access_token', 'body-token' ); // outpost-lint:fixture-credential
+
+		try {
+			$result = Outpost_Library_Photos_Endpoint::permission_check( $request );
+		} finally {
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+		}
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
+	}
+
 	public function test_bearer_header_token_is_accepted(): void {
 		$_SERVER['HTTP_AUTHORIZATION']  = 'Bearer valid'; // outpost-lint:fixture-credential
 		$GLOBALS['wp_rest_auth_cookie'] = null;
