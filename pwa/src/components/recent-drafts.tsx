@@ -102,8 +102,11 @@ export function RecentDrafts({
 	}, [busy, focus_target, active, drafts]);
 
 	const go_to_page = (next: number): void => {
-		// Mark the page as loading in the same render as the page change, so
-		// focus waits for the new list instead of landing on the old one.
+		// The pressed button leaves with the old list, so move focus to the
+		// page label first; otherwise focus drops to the page while WordPress
+		// answers. Busy in the same render keeps the later focus pass waiting
+		// for the new list.
+		list_label_ref.current?.focus();
 		setDrafts(null);
 		setBusy(true);
 		setFocusTarget('list');
@@ -178,7 +181,12 @@ export function RecentDrafts({
 	return (
 		<div class="outpost-form-row" aria-busy={busy}>
 			{active ? (
-				<>
+				<form
+					onSubmit={(event) => {
+						event.preventDefault();
+						if (!busy) void save();
+					}}
+				>
 					<label class="outpost-label" for="outpost-draft-title">
 						Draft title
 					</label>
@@ -225,12 +233,7 @@ export function RecentDrafts({
 						<a href={edit_url}>Open draft in WordPress</a>
 					)}
 					<div class="outpost-form-actions">
-						<button
-							class="outpost-button"
-							type="button"
-							disabled={busy}
-							onClick={() => void save()}
-						>
+						<button class="outpost-button" type="submit" disabled={busy}>
 							Save WordPress draft
 						</button>
 						<button
@@ -250,7 +253,7 @@ export function RecentDrafts({
 							Back to recent drafts
 						</button>
 					</div>
-				</>
+				</form>
 			) : (
 				<>
 					<p

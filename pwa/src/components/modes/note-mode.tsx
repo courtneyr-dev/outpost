@@ -347,11 +347,15 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 				resetMoreValues();
 				return;
 			}
-			setStatus({
-				kind: 'posted',
-				...(result.location ? { location: result.location } : {}),
-			});
-			mark_posted_once();
+			if (result.draftEditUrl) {
+				setStatus({ kind: 'draft-saved', editUrl: result.draftEditUrl });
+			} else {
+				setStatus({
+					kind: 'posted',
+					...(result.location ? { location: result.location } : {}),
+				});
+				mark_posted_once();
+			}
 			setContent('');
 			setTitle('');
 			resetMoreValues();
@@ -526,15 +530,6 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 					</div>
 				)}
 
-				<Drawer
-					open={drafts_open}
-					onClose={() => setDraftsOpen(false)}
-					title="Recent WordPress drafts"
-					idPrefix="outpost-recent-drafts"
-				>
-					{drafts_open && <RecentDrafts token={token.accessToken} />}
-				</Drawer>
-
 				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
 				<div
 					ref={error_ref}
@@ -601,6 +596,16 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 					busy={submitting}
 				/>
 			</form>
+
+			{/* Outside the composer form: the picker submits its own form. */}
+			<Drawer
+				open={drafts_open}
+				onClose={() => setDraftsOpen(false)}
+				title="Recent WordPress drafts"
+				idPrefix="outpost-recent-drafts"
+			>
+				{drafts_open && <RecentDrafts token={token.accessToken} />}
+			</Drawer>
 		</section>
 	);
 }
