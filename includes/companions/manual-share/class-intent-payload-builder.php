@@ -240,35 +240,69 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 	}
 
 	/**
-	 * Collect attached media (images + videos) parented to the post.
-	 * Each entry returns url + alt + mime so the PWA can fetch into a
-	 * Blob and pass to navigator.share.
+	 * Collect the post's media: every core/image block in the content (with
+	 * the alt that use carries, an explicit empty alt kept as ''), then
+	 * images and videos parented to the post that no block showed. A reused
+	 * Media Library image keeps its own parent, so only the block finds it.
+	 * Each entry returns url + alt + mime so the PWA can fetch into a Blob
+	 * and pass to navigator.share.
+	 *
+	 * A block image the current user cannot read (its parent is a private
+	 * post they don't own) is left out.
 	 *
 	 * @return array<int, array{url: string, alt: string, mime: string}>
 	 */
 	private static function collect_post_files( int $post_id ): array {
-		$out        = array();
+		$out  = array();
+		$seen = array();
+		$post = get_post( $post_id );
+		$uses = $post instanceof WP_Post ? Outpost_Image_Block_Uses::in_content( (string) $post->post_content ) : array();
+		foreach ( $uses as $use ) {
+			if ( isset( $seen[ $use['id'] ] ) || 'attachment' !== get_post_type( $use['id'] ) || ! current_user_can( 'read_post', $use['id'] ) ) {
+				continue;
+			}
+			$seen[ $use['id'] ] = true;
+			$file               = self::file_entry( $use['id'], $use['alt'] );
+			if ( null !== $file ) {
+				$out[] = $file;
+			}
+		}
 		$candidates = array_merge(
 			(array) get_attached_media( 'image', $post_id ),
 			(array) get_attached_media( 'video', $post_id )
 		);
 		foreach ( $candidates as $attachment ) {
-			if ( ! $attachment instanceof WP_Post ) {
+			if ( ! $attachment instanceof WP_Post || isset( $seen[ $attachment->ID ] ) ) {
 				continue;
 			}
-			$url = (string) wp_get_attachment_url( $attachment->ID );
-			if ( '' === $url ) {
-				continue;
-			}
-			$alt   = (string) get_post_meta( $attachment->ID, '_wp_attachment_image_alt', true );
-			$mime  = (string) get_post_mime_type( $attachment->ID );
-			$out[] = array(
-				'url'  => $url,
-				'alt'  => $alt,
-				'mime' => '' === $mime ? 'application/octet-stream' : $mime,
+			$seen[ $attachment->ID ] = true;
+			$file                    = self::file_entry(
+				$attachment->ID,
+				(string) get_post_meta( $attachment->ID, '_wp_attachment_image_alt', true )
 			);
+			if ( null !== $file ) {
+				$out[] = $file;
+			}
 		}
 		return $out;
+	}
+
+	/**
+	 * One share file, or null when the attachment has no URL.
+	 *
+	 * @return array{url: string, alt: string, mime: string}|null
+	 */
+	private static function file_entry( int $attachment_id, string $alt ): ?array {
+		$url = (string) wp_get_attachment_url( $attachment_id );
+		if ( '' === $url ) {
+			return null;
+		}
+		$mime = (string) get_post_mime_type( $attachment_id );
+		return array(
+			'url'  => $url,
+			'alt'  => $alt,
+			'mime' => '' === $mime ? 'application/octet-stream' : $mime,
+		);
 	}
 
 	/**
