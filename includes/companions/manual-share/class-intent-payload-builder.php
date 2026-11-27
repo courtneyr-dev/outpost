@@ -241,7 +241,8 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 
 	/**
 	 * Collect the post's media: every core/image block in the content (with
-	 * the alt that use carries, an explicit empty alt kept as ''), then
+	 * the alt that use carries, an explicit empty alt kept as '' and a
+	 * missing one falling back to the attachment's shared alt), then
 	 * images and videos parented to the post that no block showed. A reused
 	 * Media Library image keeps its own parent, so only the block finds it.
 	 * Each entry returns url + alt + mime so the PWA can fetch into a Blob
@@ -262,7 +263,10 @@ final class Outpost_Manual_Share_Intent_Payload_Builder {
 				continue;
 			}
 			$seen[ $use['id'] ] = true;
-			$file               = self::file_entry( $use['id'], $use['alt'] );
+			$file               = self::file_entry(
+				$use['id'],
+				$use['alt'] ?? (string) get_post_meta( $use['id'], '_wp_attachment_image_alt', true )
+			);
 			if ( null !== $file ) {
 				$out[] = $file;
 			}

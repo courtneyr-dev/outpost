@@ -850,19 +850,19 @@ msgstr ""
 msgid "No URL detected in payload."
 msgstr ""
 
-#: includes/class-library-photos-endpoint.php:126
+#: includes/class-library-photos-endpoint.php:136
 msgid "WordPress did not receive the Authorization header. Ask your host to forward it to PHP (on Apache, add \"CGIPassAuth On\" to .htaccess)."
 msgstr ""
 
-#: includes/class-library-photos-endpoint.php:170
+#: includes/class-library-photos-endpoint.php:180
 msgid "This image is not ready or you cannot use it."
 msgstr ""
 
-#: includes/class-library-photos-endpoint.php:178
+#: includes/class-library-photos-endpoint.php:188
 msgid "The original image is unavailable."
 msgstr ""
 
-#: includes/class-library-photos-endpoint.php:190
+#: includes/class-library-photos-endpoint.php:200
 msgid "Add alt text or mark the image as decorative."
 msgstr ""
 

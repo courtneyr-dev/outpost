@@ -436,6 +436,58 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		}
 	}
 
+	public function test_body_token_without_a_bearer_header_gets_the_actionable_401(): void {
+		// IndieAuth signed the user in from the form body before the route ran.
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		$GLOBALS['wp_rest_auth_cookie'] = null;
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 3 );
+		WP_Mock::onFilter( 'indieauth_response' )->with( null )->reply( array( 'me' => 'https://example.test/' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+		WP_Mock::userFunction( 'current_user_can' )->andReturn( true );
+		$request = new WP_REST_Request( 'POST', '/outpost/v1/library-photos' );
+		$request->set_param( 'access_token', 'body-token' ); // outpost-lint:fixture-credential
+
+		$result = Outpost_Library_Photos_Endpoint::permission_check( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'outpost_authorization_header_missing', $result->get_error_code() );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
+	}
+
+	public function test_bearer_header_token_is_accepted(): void {
+		$_SERVER['HTTP_AUTHORIZATION']  = 'Bearer valid'; // outpost-lint:fixture-credential
+		$GLOBALS['wp_rest_auth_cookie'] = null;
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 3 );
+		WP_Mock::onFilter( 'indieauth_response' )->with( null )->reply( array( 'me' => 'https://example.test/' ) );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'upload_files' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+
+		try {
+			$this->assertTrue( Outpost_Library_Photos_Endpoint::permission_check( new WP_REST_Request( 'POST', '/outpost/v1/library-photos' ) ) );
+		} finally {
+			unset( $_SERVER['HTTP_AUTHORIZATION'] );
+		}
+	}
+
+	public function test_cookie_session_with_a_rest_nonce_is_accepted(): void {
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		$_SERVER['HTTP_X_WP_NONCE']     = 'nonce';
+		$GLOBALS['wp_rest_auth_cookie'] = true;
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 3 );
+		WP_Mock::userFunction( 'wp_unslash' )->andReturnUsing( static fn( $v ) => $v );
+		WP_Mock::userFunction( 'wp_verify_nonce' )->with( 'nonce', 'wp_rest' )->andReturn( 1 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'upload_files' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+
+		try {
+			$this->assertTrue( Outpost_Library_Photos_Endpoint::permission_check( new WP_REST_Request( 'POST', '/outpost/v1/library-photos' ) ) );
+		} finally {
+			unset( $_SERVER['HTTP_X_WP_NONCE'] );
+			$GLOBALS['wp_rest_auth_cookie'] = null;
+		}
+	}
+
 	// --- ActivityPub --------------------------------------------------------------
 
 	/**
@@ -533,5 +585,83 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->activitypub_attachments(), $post );
 
 		$this->assertSame( $this->activitypub_attachments(), $out );
+	}
+
+	/**
+	 * One post showing attachment 13 twice: ActivityPub sends the alt of the
+	 * later use, so that use alone decides whether the name is cleared.
+	 *
+	 * @param array<int, array{attrs: array<string, mixed>, alt: string}> $uses Block uses of attachment 13, in order.
+	 */
+	private function mock_repeated_use_post( array $uses ): WP_Post {
+		$blocks = array();
+		foreach ( $uses as $use ) {
+			$blocks[] = array(
+				'blockName'   => 'core/image',
+				'attrs'       => array( 'id' => 13 ) + $use['attrs'],
+				'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="' . $use['alt'] . '" class="wp-image-13"/></figure>',
+				'innerBlocks' => array(),
+			);
+		}
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn( $blocks );
+		WP_Mock::userFunction( 'get_post_meta' )->with( 41, Outpost_Library_Photos_Endpoint::DECORATIVE_META, false )->andReturn( array() );
+		WP_Mock::userFunction( 'wp_get_attachment_image_src' )->andReturn( array( 'https://example.test/uploads/decorative-1024x768.jpg', 1024, 768, true ) );
+		WP_Mock::userFunction( 'esc_url_raw' )->andReturnUsing( static fn( $v ) => (string) $v );
+		return new WP_Post(
+			array(
+				'ID'           => 41,
+				'post_content' => '<!-- wp:image {"id":13} -->...',
+			)
+		);
+	}
+
+	/** @return array<int, array<string, string>> */
+	private function repeated_use_attachment( string $name ): array {
+		return array(
+			array(
+				'type'      => 'Image',
+				'url'       => 'https://example.test/uploads/decorative-1024x768.jpg',
+				'mediaType' => 'image/jpeg',
+				'name'      => $name,
+			),
+		);
+	}
+
+	public function test_activitypub_keeps_a_later_described_use_of_an_image_first_used_decoratively(): void {
+		$post = $this->mock_repeated_use_post(
+			array(
+				array(
+					'attrs' => array( 'isDecorative' => true ),
+					'alt'   => '',
+				),
+				array(
+					'attrs' => array(),
+					'alt'   => 'Described in the second block',
+				),
+			)
+		);
+
+		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->repeated_use_attachment( 'Described in the second block' ), $post );
+
+		$this->assertSame( 'Described in the second block', $out[0]['name'] );
+	}
+
+	public function test_activitypub_clears_an_image_whose_later_use_is_decorative(): void {
+		$post = $this->mock_repeated_use_post(
+			array(
+				array(
+					'attrs' => array(),
+					'alt'   => 'Described in the first block',
+				),
+				array(
+					'attrs' => array( 'isDecorative' => true ),
+					'alt'   => '',
+				),
+			)
+		);
+
+		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->repeated_use_attachment( 'Shared alt from another post' ), $post );
+
+		$this->assertSame( '', $out[0]['name'] );
 	}
 }

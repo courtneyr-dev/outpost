@@ -239,6 +239,23 @@ describe('LibraryPhotos pages and errors', () => {
 		expect(document.activeElement).toBe(root.querySelector('#outpost-library-image'));
 	});
 
+	it('offers more images when a scanned page held none usable, and the empty message only once the scan ends', async () => {
+		fetch_stub.mockImplementation(async (_url: string, init: RequestInit) => {
+			const offset = new URLSearchParams(String(init.body)).get('offset');
+			return offset === '0' ? page([], 600) : page([], null);
+		});
+		render(<LibraryPhotos token="t" libraryUrl="" env={{ fetch: fetch_stub as unknown as typeof fetch }} />, root);
+		await flush();
+
+		expect(root.textContent).not.toContain('No matching images are ready to use.');
+		button('Load more images').click();
+		await flush();
+
+		expect(last_body().get('offset')).toBe('600');
+		expect(root.textContent).toContain('No matching images are ready to use.');
+		expect(() => button('Load more images')).toThrow();
+	});
+
 	it('names the header-forwarding fix when the host strips Authorization', async () => {
 		fetch_stub.mockImplementation(
 			async () =>

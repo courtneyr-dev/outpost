@@ -208,21 +208,21 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 							</option>
 						))}
 					</select>
-					{next_offset !== null && (
-						<button
-							class="outpost-button outpost-button--secondary"
-							type="button"
-							aria-disabled={busy}
-							onClick={(): void => {
-								if (!busy) void load(query, next_offset);
-							}}
-						>
-							Load more images
-						</button>
-					)}
 				</>
 			)}
-			{loaded && images.length === 0 && <p>No matching images are ready to use.</p>}
+			{next_offset !== null && (
+				<button
+					class="outpost-button outpost-button--secondary"
+					type="button"
+					aria-disabled={busy}
+					onClick={(): void => {
+						if (!busy) void load(query, next_offset);
+					}}
+				>
+					Load more images
+				</button>
+			)}
+			{loaded && images.length === 0 && next_offset === null && <p>No matching images are ready to use.</p>}
 
 			{selected && (
 				<>

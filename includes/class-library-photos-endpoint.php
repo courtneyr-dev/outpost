@@ -111,16 +111,26 @@ final class Outpost_Library_Photos_Endpoint {
 	 * capabilities to use media and write posts. Access to a specific
 	 * attachment is checked per image in {@see self::usable_image()}.
 	 *
-	 * A request that reaches PHP with no user and no Authorization header at
-	 * all gets its own 401: the PWA always sends the header, so its absence
-	 * means the web server dropped it, and the composer can say how to fix
-	 * that instead of reporting a generic failure.
+	 * A token reaches this route only in an `Authorization: Bearer` header
+	 * (or its `REDIRECT_HTTP_AUTHORIZATION` copy). IndieAuth also signs a
+	 * request in from a form-encoded `access_token` field before the route
+	 * runs, so a request IndieAuth authenticated, or one carrying an
+	 * `access_token` parameter, without a Bearer header is refused. So is a
+	 * request with no user and no Authorization header at all. Both get the
+	 * same 401: the PWA always sends the header, so its absence means the
+	 * web server dropped it, and the composer can say how to fix that
+	 * instead of reporting a generic failure. A wp-admin cookie session with
+	 * its REST nonce sends no token and is unaffected.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return bool|WP_Error
 	 */
 	public static function permission_check( WP_REST_Request $request ) {
-		if ( 0 === get_current_user_id() && '' === Outpost_Request_Headers::authorization() ) {
+		$header       = Outpost_Request_Headers::authorization();
+		$header_token = 1 === preg_match( '/Bearer\s+\S/i', $header );
+		$token_signin = null !== $request->get_param( 'access_token' )
+			|| ! empty( function_exists( 'indieauth_get_response' ) ? indieauth_get_response() : null );
+		if ( ( 0 === get_current_user_id() && '' === $header ) || ( $token_signin && ! $header_token ) ) {
 			return new WP_Error(
 				'outpost_authorization_header_missing',
 				__( 'WordPress did not receive the Authorization header. Ask your host to forward it to PHP (on Apache, add "CGIPassAuth On" to .htaccess).', 'outpost-mobile-publishing' ),
@@ -502,6 +512,11 @@ final class Outpost_Library_Photos_Endpoint {
 	 * the draft for a block with `alt=""`), the matching attachment's `name`
 	 * is set to ''. The attachment itself is not changed.
 	 *
+	 * When a post shows the same attachment more than once, ActivityPub sends
+	 * the alt of one use (Outpost_Image_Block_Uses::activitypub_selected()),
+	 * so only that use decides: a decorative first use followed by a
+	 * described one keeps the description.
+	 *
 	 * ActivityPub builds each image URL from `wp_get_attachment_image_src()`
 	 * at `large`, passed through `activitypub_get_image`; matching uses the
 	 * same URL.
@@ -516,7 +531,7 @@ final class Outpost_Library_Photos_Endpoint {
 		}
 		$recorded = array_map( 'intval', (array) get_post_meta( $post->ID, self::DECORATIVE_META, false ) );
 		$urls     = array();
-		foreach ( Outpost_Image_Block_Uses::in_content( (string) $post->post_content ) as $use ) {
+		foreach ( Outpost_Image_Block_Uses::activitypub_selected( (string) $post->post_content ) as $use ) {
 			$decorative = $use['decorative'] || ( '' === $use['alt'] && in_array( $use['id'], $recorded, true ) );
 			if ( ! $decorative ) {
 				continue;
