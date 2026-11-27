@@ -457,16 +457,31 @@ final class RecentDraftsEndpointTest extends TestCase {
 			$tied[]              = $post_id;
 			$this->extra_posts[] = $post_id;
 		}
+		// Whether MySQL breaks the tie by ID depends on the plan it picks, so
+		// the page query itself must ask for it.
+		$paging_sql = array();
+		$watch_sql  = static function ( string $sql ) use ( &$paging_sql ): string {
+			if ( str_contains( $sql, 'LIMIT' ) ) {
+				$paging_sql[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'posts_request', $watch_sql );
 		try {
 			$first  = $this->call( $tied_author, array( 'page' => '1' ) );
 			$second = $this->call( $tied_author, array( 'page' => '2' ) );
 		} finally {
+			remove_filter( 'posts_request', $watch_sql );
 			if ( $registered ) {
 				wp_unregister_ability( 'core/content-query' );
 				wp_unregister_ability_category( 'content' );
 			}
 		}
 
+		$this->assertNotEmpty( $paging_sql );
+		foreach ( $paging_sql as $sql ) {
+			$this->assertMatchesRegularExpression( '/ORDER BY \S*post_date DESC, \S*ID DESC/', $sql );
+		}
 		rsort( $tied );
 		$this->assertSame( array_slice( $tied, 0, 10 ), $this->ids( $first ), 'Equal dates fall back to the newest ID first.' );
 		$this->assertSame( array_slice( $tied, 10 ), $this->ids( $second ), 'The page boundary neither repeats nor skips a draft.' );
