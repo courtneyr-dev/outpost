@@ -976,9 +976,54 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( true );
 	}
 
-	public function test_apply_photo_alt_persists_empty_string_when_alt_missing(): void {
-		// Empty alt is preserved (not skipped) so the AP attachment.name
-		// has an explicit empty value rather than missing field.
+	public function test_apply_photo_alt_keeps_imported_alt_when_client_sends_none(): void {
+		// No alt at all is not a decorative choice. WordPress 7.0+ imports the
+		// file's embedded IPTC alt on upload; writing '' here would wipe it.
+		WP_Mock::userFunction( 'attachment_url_to_postid' )->andReturn( 101 );
+		WP_Mock::userFunction( 'wp_get_post_parent_id' )->andReturn( 42 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
+		WP_Mock::userFunction( 'update_post_meta', array( 'times' => 0 ) );
+
+		$this->invoke_private( 'apply_photo_alt_text', array( 42, array( 'photo' => 'https://example.test/photo.jpg' ) ) );
+		$this->invoke_private(
+			'apply_photo_alt_text',
+			array( 42, array( 'photo' => array( array( 'value' => 'https://example.test/photo.jpg' ) ) ) )
+		);
+		$this->assertTrue( true );
+	}
+
+	/**
+	 * @return array<string, array{0: array<string, mixed>}>
+	 */
+	public static function explicit_empty_alt_shapes(): array {
+		return array(
+			'parallel mp-photo-alt' => array(
+				array(
+					'photo'        => 'https://example.test/photo.jpg',
+					'mp-photo-alt' => '',
+				),
+			),
+			'structured photo'      => array(
+				array(
+					'photo' => array(
+						array(
+							'value' => 'https://example.test/photo.jpg',
+							'alt'   => '',
+						),
+						// The Micropub plugin's bare duplicate must not undo the choice.
+						'https://example.test/photo.jpg',
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider explicit_empty_alt_shapes
+	 *
+	 * @param array<string, mixed> $properties Micropub properties.
+	 */
+	public function test_apply_photo_alt_persists_explicit_empty_alt_as_decorative( array $properties ): void {
 		WP_Mock::userFunction( 'attachment_url_to_postid' )
 			->with( 'https://example.test/photo.jpg' )
 			->andReturn( 101 );
@@ -994,9 +1039,6 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 			->with( 101, '_wp_attachment_image_alt', '' )
 			->andReturn( true );
 
-		$properties = array(
-			'photo' => 'https://example.test/photo.jpg',
-		);
 		$this->invoke_private( 'apply_photo_alt_text', array( 42, $properties ) );
 		$this->assertTrue( true );
 	}

@@ -299,9 +299,11 @@ final class Outpost_Micropub_Bridges {
 	 * so the bridge never updates media the poster does not own, even
 	 * after the Micropub dependency re-parents a referenced URL.
 	 *
-	 * Empty alt strings are persisted (not skipped) because the AP
-	 * spec is fine with empty `attachment[].name` and an explicit
-	 * empty value beats a missing field for downstream consumers.
+	 * An explicit empty alt is persisted (not skipped): it is the client's
+	 * decorative choice, and the AP spec is fine with an empty
+	 * `attachment[].name`. An absent alt writes nothing, so the alt WordPress
+	 * imported from the file's embedded IPTC metadata on upload (7.0+) is
+	 * kept instead of being wiped.
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map from `extract_properties()`.
@@ -400,7 +402,7 @@ final class Outpost_Micropub_Bridges {
 		foreach ( $pairs as $pair ) {
 			$url = $pair['url'];
 			$alt = $pair['alt'];
-			if ( '' === $url ) {
+			if ( '' === $url || null === $alt ) {
 				continue;
 			}
 			$attachment_id = (int) attachment_url_to_postid( $url );
@@ -426,8 +428,11 @@ final class Outpost_Micropub_Bridges {
 	 * carries its own alt), and the parallel `mp-photo-alt` array fills
 	 * in for plain-string photo entries by index.
 	 *
+	 * `alt` is null when the client sent none for that photo, and `''` when it
+	 * sent an explicit empty alt (a decorative photo).
+	 *
 	 * @param array<string, mixed> $properties Flat properties map.
-	 * @return array<int, array{url: string, alt: string}>
+	 * @return array<int, array{url: string, alt: string|null}>
 	 */
 	private static function collect_photo_alt_pairs( array $properties ): array {
 		$photo = $properties['photo'] ?? null;
@@ -450,12 +455,12 @@ final class Outpost_Micropub_Bridges {
 		foreach ( $entries as $index => $entry ) {
 			if ( is_array( $entry ) && isset( $entry['value'] ) ) {
 				$url = is_string( $entry['value'] ) ? $entry['value'] : '';
-				$alt = isset( $entry['alt'] ) && is_string( $entry['alt'] ) ? $entry['alt'] : '';
+				$alt = isset( $entry['alt'] ) && is_string( $entry['alt'] ) ? $entry['alt'] : null;
 			} elseif ( is_string( $entry ) ) {
 				$url = $entry;
 				$alt = isset( $alt_array[ $index ] ) && is_string( $alt_array[ $index ] )
 					? $alt_array[ $index ]
-					: '';
+					: null;
 			} else {
 				continue;
 			}
@@ -470,11 +475,12 @@ final class Outpost_Micropub_Bridges {
 			// URL arrives twice — once with the client's alt, once bare. Pairing
 			// by index let the bare duplicate's empty alt overwrite the real one,
 			// wiping alt text on every real photo post. Keep the first-seen
-			// entry and its position; upgrade its alt only if it was empty and a
-			// later duplicate carries a real one.
+			// entry and its position; upgrade its alt only if it was absent or
+			// empty and a later duplicate carries one.
 			if ( isset( $index_by_url[ $url ] ) ) {
 				$existing = $index_by_url[ $url ];
-				if ( '' === $pairs[ $existing ]['alt'] && '' !== $alt ) {
+				$kept     = $pairs[ $existing ]['alt'];
+				if ( null !== $alt && ( null === $kept || ( '' === $kept && '' !== $alt ) ) ) {
 					$pairs[ $existing ]['alt'] = $alt;
 				}
 				continue;
