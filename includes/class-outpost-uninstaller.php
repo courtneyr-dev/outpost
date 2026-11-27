@@ -83,6 +83,7 @@ final class Outpost_Uninstaller {
 		'_outpost_posse_failures',
 		'_outpost_posse_in_flight',
 		'_outpost_skip_telegraph',
+		'_outpost_media_awaiting_finalize',
 		'outpost_syndication_links',
 		'outpost_manual_share_log',
 		'outpost_bridgy_publish_log',

@@ -236,6 +236,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller
 require_once OUTPOST_PLUGIN_DIR . 'includes/abilities/class-outpost-abilities.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-recent-drafts-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-library-photos-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -286,6 +287,8 @@ add_action(
 		Outpost_Composer_Config_Endpoint::register();
 
 		Outpost_Recent_Drafts_Endpoint::register();
+		// Register the /wp-json/outpost/v1/library-photos REST route (Media Library reuse).
+		Outpost_Library_Photos_Endpoint::register();
 		// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
 		Outpost_Geocode_Endpoint::register();
 		// Register the /wp-json/outpost/v1/lookup REST route (Post Kinds metadata proxy).

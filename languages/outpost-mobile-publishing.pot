@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-27T20:44:49+00:00\n"
+"POT-Creation-Date: 2026-11-26T23:06:48+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -850,6 +850,18 @@ msgstr ""
 msgid "No URL detected in payload."
 msgstr ""
 
+#: includes/class-library-photos-endpoint.php:136
+msgid "This image is not ready or you cannot use it."
+msgstr ""
+
+#: includes/class-library-photos-endpoint.php:144
+msgid "The original image is unavailable."
+msgstr ""
+
+#: includes/class-library-photos-endpoint.php:156
+msgid "Add alt text or mark the image as decorative."
+msgstr ""
+
 #: includes/class-manual-share-controller.php:173
 msgid "Outpost manual-share intent firing requires an authenticated user."
 msgstr ""
@@ -950,23 +962,23 @@ msgstr ""
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:194
+#: includes/class-outpost-uninstaller.php:195
 msgid "Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:195
+#: includes/class-outpost-uninstaller.php:196
 msgid "Outpost is still active"
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:210
+#: includes/class-outpost-uninstaller.php:211
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:211
+#: includes/class-outpost-uninstaller.php:212
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:214
+#: includes/class-outpost-uninstaller.php:215
 msgid "Outpost uninstall stopped"
 msgstr ""
 
@@ -1131,19 +1143,6 @@ msgstr ""
 
 #: includes/class-pwa-shell.php:510
 msgid "Server requirements"
-msgstr ""
-
-#: includes/class-recent-drafts-endpoint.php:84
-#: includes/class-recent-drafts-endpoint.php:107
-msgid "You cannot edit this draft in Outpost."
-msgstr ""
-
-#: includes/class-recent-drafts-endpoint.php:90
-msgid "The draft has changed. Reopen it before saving."
-msgstr ""
-
-#: includes/class-recent-drafts-endpoint.php:103
-msgid "WordPress did not save the draft. Try again."
 msgstr ""
 
 #: includes/class-settings.php:129
