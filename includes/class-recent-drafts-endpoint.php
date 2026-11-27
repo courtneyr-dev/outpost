@@ -17,6 +17,15 @@ final class Outpost_Recent_Drafts_Endpoint {
 
 	private const PAGE_SIZE = 10;
 
+	/** Newest first; equal dates fall back to the newest ID so pages never overlap. */
+	private const ORDER = array(
+		'date' => 'DESC',
+		'ID'   => 'DESC',
+	);
+
+	/** Fields WordPress runs through the saving user's filters on every update. */
+	private const FILTERED_FIELDS = array( 'post_title', 'post_content', 'post_excerpt', 'post_content_filtered' );
+
 	public static function register(): void {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
 	}
@@ -80,22 +89,25 @@ final class Outpost_Recent_Drafts_Endpoint {
 				if ( $record['version'] !== $request['version'] ) {
 					return new WP_Error( 'outpost_draft_changed', __( 'The draft has changed. Reopen it before saving.', 'outpost-mobile-publishing' ), array( 'status' => 409 ) );
 				}
-				$update = array(
-					'ID'         => $draft->ID,
-					'post_title' => sanitize_text_field( (string) $request['title'] ),
-				);
+				// The picker sends both fields back on every save. Write only
+				// the ones the author changed.
+				$fields = array();
+				if ( (string) $request['title'] !== $draft->post_title ) {
+					$fields['post_title'] = self::plain_text( (string) $request['title'] );
+				}
 				if ( null !== $record['content'] && $request->has_param( 'content' ) && $record['content'] !== $request['content'] ) {
-					$update['post_content'] = esc_html( sanitize_textarea_field( (string) $request['content'] ) );
+					$fields['post_content'] = htmlspecialchars( wp_check_invalid_utf8( (string) $request['content'] ), ENT_QUOTES, 'UTF-8' );
 				}
-				$saved = wp_update_post( wp_slash( $update ), true );
-				if ( is_wp_error( $saved ) ) {
-					return $saved;
+				if ( $fields ) {
+					if ( ! self::save_fields( $draft, $fields ) ) {
+						return new WP_Error( 'outpost_draft_save_failed', __( 'WordPress did not save the draft. Try again.', 'outpost-mobile-publishing' ), array( 'status' => 500 ) );
+					}
+					$draft = self::editable_draft( $draft->ID, $user_id );
+					if ( ! $draft ) {
+						return new WP_Error( 'outpost_draft_unavailable', __( 'You cannot edit this draft in Outpost.', 'outpost-mobile-publishing' ), array( 'status' => 403 ) );
+					}
+					$record = self::format_draft( $draft );
 				}
-				$draft = self::editable_draft( $saved, $user_id );
-				if ( ! $draft ) {
-					return new WP_Error( 'outpost_draft_unavailable', __( 'You cannot edit this draft in Outpost.', 'outpost-mobile-publishing' ), array( 'status' => 403 ) );
-				}
-				$record = self::format_draft( $draft );
 			}
 			$result = $record;
 		} else {
@@ -108,6 +120,53 @@ final class Outpost_Recent_Drafts_Endpoint {
 		$response = new WP_REST_Response( $result );
 		$response->header( 'Cache-Control', 'private, no-store' );
 		return $response;
+	}
+
+	/**
+	 * Plain text as typed: tags removed and whitespace collapsed, as
+	 * sanitize_text_field() does, but percent sequences such as %20 kept.
+	 */
+	private static function plain_text( string $value ): string {
+		$text = wp_check_invalid_utf8( $value );
+		if ( str_contains( $text, '<' ) ) {
+			$text = wp_strip_all_tags( wp_pre_kses_less_than( $text ) );
+		}
+		return trim( (string) preg_replace( '/[\r\n\t ]+/', ' ', $text ) );
+	}
+
+	/**
+	 * Update only the given fields through wp_update_post().
+	 *
+	 * wp_update_post() merges the stored post and runs every text field
+	 * through the saving user's filters, so an author without
+	 * unfiltered_html would strip an editor's iframe from content they never
+	 * touched. Each untouched field is put back exactly as stored.
+	 *
+	 * @param array{post_title?: string, post_content?: string} $fields Unslashed fields to write.
+	 */
+	private static function save_fields( WP_Post $draft, array $fields ): bool {
+		$keep_untouched = static function ( array $data, array $postarr ) use ( $draft, $fields ): array {
+			if ( (int) ( $postarr['ID'] ?? 0 ) !== $draft->ID ) {
+				return $data;
+			}
+			foreach ( self::FILTERED_FIELDS as $field ) {
+				if ( ! array_key_exists( $field, $fields ) ) {
+					$data[ $field ] = wp_slash( $draft->$field );
+				}
+			}
+			return $data;
+		};
+		add_filter( 'wp_insert_post_data', $keep_untouched, PHP_INT_MAX, 2 );
+		try {
+			$postarr = array( 'ID' => $draft->ID );
+			foreach ( $fields as $field => $value ) {
+				$postarr[ $field ] = wp_slash( $value );
+			}
+			$saved = wp_update_post( $postarr, true );
+		} finally {
+			remove_filter( 'wp_insert_post_data', $keep_untouched, PHP_INT_MAX );
+		}
+		return ! is_wp_error( $saved ) && $saved > 0;
 	}
 
 	private static function editable_draft( int $id, int $user_id ): ?WP_Post {
@@ -138,20 +197,29 @@ final class Outpost_Recent_Drafts_Endpoint {
 		// and wp_get_ability() on an unregistered name raises _doing_it_wrong().
 		$ability = function_exists( 'wp_has_ability' ) && wp_has_ability( 'core/content-query' ) ? wp_get_ability( 'core/content-query' ) : null;
 		if ( $ability ) {
-			$result = $ability->execute(
-				array(
-					'where'      => array(
-						'type'   => 'post',
-						'status' => array( 'draft' ),
-						'author' => array( 'id' => $user_id ),
-					),
-					'fields'     => array( 'id' ),
-					'pagination' => array(
-						'page'     => $page,
-						'per_page' => self::PAGE_SIZE,
-					),
-				)
-			);
+			// The ability takes no order input and sorts by date alone.
+			$order = static function ( WP_Query $query ): void {
+				$query->set( 'orderby', self::ORDER );
+			};
+			add_action( 'pre_get_posts', $order );
+			try {
+				$result = $ability->execute(
+					array(
+						'where'      => array(
+							'type'   => 'post',
+							'status' => array( 'draft' ),
+							'author' => array( 'id' => $user_id ),
+						),
+						'fields'     => array( 'id' ),
+						'pagination' => array(
+							'page'     => $page,
+							'per_page' => self::PAGE_SIZE,
+						),
+					)
+				);
+			} finally {
+				remove_action( 'pre_get_posts', $order );
+			}
 			// A page past the last one is an empty page, as on the WP_Query path.
 			if ( is_wp_error( $result ) && 'content_invalid_page_number' === $result->get_error_code() ) {
 				return array(
@@ -172,6 +240,7 @@ final class Outpost_Recent_Drafts_Endpoint {
 					'author'         => $user_id,
 					'paged'          => $page,
 					'posts_per_page' => self::PAGE_SIZE,
+					'orderby'        => self::ORDER,
 					'fields'         => 'ids',
 				)
 			);
