@@ -51,6 +51,8 @@ export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
 	draftEndpoint?: string | null;
 	recentDrafts?: boolean;
+	/** wp-admin Media Library URL; null without upload_files, absent on older servers. */
+	mediaLibraryUrl?: string | null;
 	/** Absent on servers (and cached configs) older than outpost#243. */
 	postKinds?: PostKindsCapabilities;
 	postFormats: string[] | null;

@@ -22,6 +22,7 @@ import { VoiceButton } from '../voice-button';
 import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { Drawer } from '../drawer';
+import { LibraryPhotos } from '../library-photos';
 import { draft_text, read_draft, useDraft, type DraftFields } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { ExternalLink } from '../external-link';
@@ -160,6 +161,8 @@ export function PhotoMode({
 	const [media_endpoint, setMediaEndpoint] = useState<string | null>(null);
 	const [more_values, setMoreValues, resetMoreValues] = useMorePanelValues(composerConfig);
 	const [more_open, setMoreOpen] = useMoreOpen();
+	const [library_open, setLibraryOpen] = useState(false);
+	const library_url = composerConfig?.mediaLibraryUrl ?? null;
 
 	const a11y_active =
 		composerConfig?.companions['accessibility-checker'] === 'active';
@@ -437,6 +440,16 @@ export function PhotoMode({
 					onChange={handle_file_change}
 					disabled={submitting}
 				/>
+				{library_url && (
+					<button
+						class="outpost-button outpost-button--secondary"
+						type="button"
+						onClick={(): void => setLibraryOpen(true)}
+						disabled={submitting}
+					>
+						Choose from WordPress Media Library
+					</button>
+				)}
 				{pending_photos.length > 0 && (
 					<p class="outpost-help outpost-draft-photos">
 						{pending_photos.length === 1
@@ -700,6 +713,18 @@ export function PhotoMode({
 					busy={submitting}
 				/>
 			</form>
+
+			{/* Outside the form: Enter in a chooser field must never publish the photo post. */}
+			{library_url && (
+				<Drawer
+					open={library_open}
+					onClose={(): void => setLibraryOpen(false)}
+					title="WordPress Media Library"
+					idPrefix="outpost-library-photos"
+				>
+					{library_open && <LibraryPhotos token={token.accessToken} libraryUrl={library_url} />}
+				</Drawer>
+			)}
 		</section>
 	);
 }
