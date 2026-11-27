@@ -495,11 +495,14 @@ final class RecentDraftsEndpointTest extends TestCase {
 		$draft_id = $this->own_drafts[4];
 		$opened   = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
 
-		$break    = static function ( string $query ) use ( $wpdb ): string {
+		$break = static function ( string $query ) use ( $wpdb ): string {
 			return 0 === strpos( $query, "UPDATE `{$wpdb->posts}`" ) ? "UPDATE `{$wpdb->posts}` SET outpost_no_such_column = 1 WHERE ID = 0" : $query;
 		};
-		$suppress = $wpdb->suppress_errors( true );
+		// Single site with WP_DEBUG and WP_DEBUG_DISPLAY: wpdb prints errors.
+		$shown    = $wpdb->show_errors( true );
+		$suppress = $wpdb->suppress_errors( false );
 		add_filter( 'query', $break );
+		ob_start();
 		try {
 			$saved = $this->call(
 				$this->author_id,
@@ -510,14 +513,48 @@ final class RecentDraftsEndpointTest extends TestCase {
 				)
 			);
 		} finally {
+			$printed = (string) ob_get_clean();
 			remove_filter( 'query', $break );
+			$still_shown = $wpdb->show_errors( $shown );
 			$wpdb->suppress_errors( $suppress );
 		}
 
+		$this->assertSame( '', $printed, 'Nothing reaches the response body but the JSON error.' );
+		$this->assertTrue( $still_shown, 'The save puts wpdb error display back as it found it.' );
 		$this->assertSame( 500, $saved->get_status() );
-		$this->assertSame( 'outpost_draft_save_failed', $saved->get_data()['code'] );
-		$this->assertStringNotContainsString( 'outpost_no_such_column', (string) wp_json_encode( $saved->get_data() ), 'The database error stays on the server.' );
+		$this->assertSame(
+			array(
+				'code'    => 'outpost_draft_save_failed',
+				'message' => 'WordPress did not save the draft. Try again.',
+				'data'    => array( 'status' => 500 ),
+			),
+			$saved->get_data()
+		);
 		$this->assertSame( 'Own draft 5', get_post( $draft_id )->post_title );
+	}
+
+	/**
+	 * @test
+	 */
+	public function plain_text_keeps_edge_whitespace_through_save_and_reopen(): void {
+		$draft_id = $this->own_drafts[5];
+		$opened   = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+		$text     = "Line one\nLine two\n";
+
+		$saved = $this->call(
+			$this->author_id,
+			array(
+				'id'      => (string) $draft_id,
+				'title'   => $opened['title'],
+				'content' => $text,
+				'version' => $opened['version'],
+			)
+		);
+		$this->assertSame( 200, $saved->get_status() );
+		$this->assertSame( $text, $saved->get_data()['content'], 'A trailing newline is still plain text.' );
+
+		$reopened = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+		$this->assertSame( $text, $reopened['content'], 'The body reopens with its trailing newline.' );
 	}
 
 	/**

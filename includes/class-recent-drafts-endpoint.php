@@ -156,6 +156,10 @@ final class Outpost_Recent_Drafts_Endpoint {
 			}
 			return $data;
 		};
+		// With WP_DEBUG and WP_DEBUG_DISPLAY on a single site, wpdb prints a
+		// failed query and its SQL into the REST response body.
+		global $wpdb;
+		$show_errors = $wpdb->hide_errors();
 		add_filter( 'wp_insert_post_data', $keep_untouched, PHP_INT_MAX, 2 );
 		try {
 			$postarr = array( 'ID' => $draft->ID );
@@ -165,6 +169,7 @@ final class Outpost_Recent_Drafts_Endpoint {
 			$saved = wp_update_post( $postarr, true );
 		} finally {
 			remove_filter( 'wp_insert_post_data', $keep_untouched, PHP_INT_MAX );
+			$wpdb->show_errors( $show_errors );
 		}
 		return ! is_wp_error( $saved ) && $saved > 0;
 	}
@@ -181,7 +186,9 @@ final class Outpost_Recent_Drafts_Endpoint {
 	/** @return array{id: int, title: string, content: string|null, editUrl: string|null, version: string} */
 	private static function format_draft( WP_Post $draft ): array {
 		$content = $draft->post_content;
-		$is_text = ! has_blocks( $content ) && wp_strip_all_tags( $content ) === $content;
+		// wp_strip_all_tags() trims, so compare against the trimmed body and
+		// return the body with its edge whitespace.
+		$is_text = ! has_blocks( $content ) && wp_strip_all_tags( $content ) === trim( $content );
 		return array(
 			'id'      => $draft->ID,
 			'title'   => $draft->post_title,
