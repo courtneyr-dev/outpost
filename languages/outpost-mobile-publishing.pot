@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-27T21:04:41+00:00\n"
+"POT-Creation-Date: 2026-11-27T22:02:04+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -1088,7 +1088,7 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:411
-#: outpost.php:650
+#: outpost.php:653
 #, php-format
 msgid "Install %s"
 msgstr ""
@@ -1101,14 +1101,14 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:426
-#: outpost.php:635
+#: outpost.php:638
 #, php-format
 msgid "Activate %s"
 msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:431
-#: outpost.php:640
+#: outpost.php:643
 #, php-format
 msgid "Outpost needs the %s plugin to be activated before the composer can run."
 msgstr ""
@@ -1140,13 +1140,26 @@ msgstr ""
 
 #. translators: 1: minimum WP version, 2: minimum PHP version.
 #: includes/class-pwa-shell.php:489
-#: outpost.php:698
+#: outpost.php:701
 #, php-format
 msgid "Outpost requires WordPress %1$s or newer and PHP %2$s or newer."
 msgstr ""
 
 #: includes/class-pwa-shell.php:510
 msgid "Server requirements"
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:84
+#: includes/class-recent-drafts-endpoint.php:107
+msgid "You cannot edit this draft in Outpost."
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:90
+msgid "The draft has changed. Reopen it before saving."
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:103
+msgid "WordPress did not save the draft. Try again."
 msgstr ""
 
 #: includes/class-settings.php:129
@@ -2108,13 +2121,13 @@ msgid "YouTube"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: outpost.php:655
+#: outpost.php:658
 #, php-format
 msgid "Outpost requires the %s plugin. Install it from WordPress.org to continue."
 msgstr ""
 
 #. translators: %s: installed Micropub plugin version.
-#: outpost.php:818
+#: outpost.php:821
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
 msgstr ""
