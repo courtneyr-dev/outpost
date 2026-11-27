@@ -125,6 +125,7 @@ export interface PostNoteParams {
  * encoded with `[]` suffix in the form body; scalars are plain key=value.
  */
 export interface HEntryProperties {
+	'post-status'?: 'draft';
 	content?: string;
 	name?: string;
 	summary?: string;
@@ -292,6 +293,7 @@ export interface PostHEntryParams {
 }
 
 export interface PostNoteResult {
+	draftEditUrl?: string;
 	/**
 	 * URL of the created post, parsed from the Micropub server's `Location`
 	 * response header. Per the Micropub spec the server MUST return Location
@@ -379,6 +381,7 @@ export async function post_h_entry(
 	params: PostHEntryParams,
 	env: MicropubEnvironment = default_env,
 ): Promise<PostNoteResult> {
+	const is_draft = params.properties['post-status'] === 'draft';
 	const body = new URLSearchParams();
 	body.append('h', 'entry');
 
@@ -399,12 +402,15 @@ export async function post_h_entry(
 	// strip the Authorization header before WP sees it; sending both means the
 	// body parameter is a fallback if the header is dropped. Servers that
 	// receive both prefer the header (per spec) and ignore the body copy.
-	body.append('access_token', params.accessToken);
+	// A draft save goes to the same-origin REST endpoint, so it sends the
+	// token in the header only.
+	if (!is_draft) body.append('access_token', params.accessToken);
 
 	let response: Response;
 	try {
 		response = await env.fetch(params.micropubEndpoint, {
 			method: 'POST',
+			...(is_draft ? { redirect: 'error' } : {}),
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 				Authorization: 'Bearer ' + params.accessToken,
@@ -437,12 +443,23 @@ export async function post_h_entry(
 		);
 	}
 
+	// Outpost's server adds this header whenever Micropub created a draft,
+	// including an ordinary submit from a user who can't publish.
+	const edit_url = response.headers.get('X-Outpost-Draft-Edit');
+	const draft: PostNoteResult =
+		edit_url &&
+		is_safe_http_url(edit_url) &&
+		new URL(edit_url).origin === new URL(params.micropubEndpoint).origin
+			? { draftEditUrl: edit_url }
+			: {};
+	if (is_draft) return draft;
+
 	const location = response.headers.get('location') ?? response.headers.get('Location');
 	if (!location) {
 		// Spec violation but the post did succeed (we got a 2xx). Soft-fail:
 		// caller renders a generic "posted" success without a link. See
 		// PostNoteResult docblock for context on which servers omit Location.
-		return {};
+		return draft;
 	}
 
 	// Defense in depth: a compromised Micropub endpoint or MitM could return
@@ -455,7 +472,7 @@ export async function post_h_entry(
 		);
 	}
 
-	return { location };
+	return { location, ...draft };
 }
 
 /**

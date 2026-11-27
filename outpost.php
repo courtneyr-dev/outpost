@@ -235,6 +235,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-syndication-admin-column.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/abilities/class-outpost-abilities.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-recent-drafts-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -283,6 +284,8 @@ add_action(
 		Outpost_Preview_Endpoint::register();
 		// Register the /wp-json/outpost/v1/composer-config REST route (Phase C5).
 		Outpost_Composer_Config_Endpoint::register();
+
+		Outpost_Recent_Drafts_Endpoint::register();
 		// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
 		Outpost_Geocode_Endpoint::register();
 		// Register the /wp-json/outpost/v1/lookup REST route (Post Kinds metadata proxy).

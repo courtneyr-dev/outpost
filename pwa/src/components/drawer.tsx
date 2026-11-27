@@ -75,6 +75,26 @@ export function Drawer({ open, onClose, title, children, idPrefix }: DrawerProps
 			if (focusable.length === 0) return;
 			const first = focusable[0]!;
 			const last = focusable[focusable.length - 1]!;
+			const active = document.activeElement;
+			if (!(active instanceof HTMLElement) || !focusable.includes(active)) {
+				// Focus is outside the drawer (its control was removed) or on a
+				// programmatic target such as a page label. Move to the nearest
+				// control inside instead of letting Tab leave the dialog.
+				event.preventDefault();
+				const inside = active instanceof HTMLElement && root.contains(active);
+				const following = inside
+					? focusable.filter(
+							(el) => active.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+						)
+					: [];
+				const preceding = inside
+					? focusable.filter(
+							(el) => active.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING,
+						)
+					: [];
+				(event.shiftKey ? (preceding.at(-1) ?? last) : (following[0] ?? first)).focus();
+				return;
+			}
 			if (event.shiftKey && document.activeElement === first) {
 				event.preventDefault();
 				last.focus();

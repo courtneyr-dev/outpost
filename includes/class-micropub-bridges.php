@@ -103,6 +103,50 @@ final class Outpost_Micropub_Bridges {
 	public static function register(): void {
 		add_action( 'after_micropub', array( self::class, 'apply_bridges' ), 20, 2 );
 		self::register_syndicate_chips();
+		add_filter( 'rest_request_after_callbacks', array( self::class, 'add_draft_edit_header' ), 20, 3 );
+	}
+
+	/**
+	 * The local Micropub endpoint that accepts an explicit draft status.
+	 *
+	 * @return string|null Local REST URL when the companion supports draft saves.
+	 */
+	public static function draft_endpoint(): ?string {
+		if ( ! defined( 'MICROPUB_NAMESPACE' ) || ! defined( 'MICROPUB_PLUGIN_VERSION' ) ||
+			version_compare( MICROPUB_PLUGIN_VERSION, '2.5.1', '<' ) ) {
+			return null;
+		}
+		return rest_url( MICROPUB_NAMESPACE . '/endpoint' );
+	}
+
+	/**
+	 * Add the native editor link to a successful Micropub draft creation.
+	 *
+	 * @param mixed           $response REST callback result.
+	 * @param array<string, mixed> $handler  REST route handler.
+	 * @param WP_REST_Request $request  Current request.
+	 * @return mixed REST callback result.
+	 */
+	public static function add_draft_edit_header( $response, array $handler, WP_REST_Request $request ) {
+		if ( ! defined( 'MICROPUB_NAMESPACE' ) ||
+			'/' . MICROPUB_NAMESPACE . '/endpoint' !== $request->get_route() ||
+			'POST' !== $request->get_method() ||
+			! $response instanceof WP_REST_Response ||
+			201 !== $response->get_status() ) {
+			return $response;
+		}
+
+		$data = $response->get_data();
+		$post = isset( $data['ID'] ) && is_int( $data['ID'] ) && $data['ID'] > 0 ? get_post( $data['ID'] ) : null;
+		if ( $post && 'post' === $post->post_type && 'draft' === $post->post_status ) {
+			$url = get_edit_post_link( $post, 'raw' );
+			if ( $url ) {
+				$response->header( 'X-Outpost-Draft-Edit', $url );
+				$response->header( 'Cache-Control', 'private, no-store' );
+			}
+		}
+
+		return $response;
 	}
 
 	/**

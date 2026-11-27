@@ -71,6 +71,73 @@ describe('Drawer', () => {
 		expect(document.body.style.overflow).toBe('');
 	});
 
+	describe('Tab containment', () => {
+		// jsdom has no layout, so every element reports a null offsetParent.
+		beforeEach(() => {
+			Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
+				configurable: true,
+				get() {
+					return document.body;
+				},
+			});
+		});
+		afterEach(() => {
+			delete (HTMLElement.prototype as { offsetParent?: unknown }).offsetParent;
+		});
+
+		function mount_with_outside(): { outside: HTMLButtonElement; label: HTMLElement; save: HTMLButtonElement } {
+			render(
+				<>
+					<button type="button" id="outside">
+						Behind the scrim
+					</button>
+					<Drawer open onClose={vi.fn()} title="Recent drafts">
+						<button type="button" id="save">
+							Save
+						</button>
+						<p id="label" tabIndex={-1}>
+							Your drafts, page 2
+						</p>
+					</Drawer>
+				</>,
+				root,
+			);
+			return {
+				outside: root.querySelector('#outside') as HTMLButtonElement,
+				label: root.querySelector('#label') as HTMLElement,
+				save: root.querySelector('#save') as HTMLButtonElement,
+			};
+		}
+
+		function tab(shiftKey = false): KeyboardEvent {
+			const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, cancelable: true });
+			window.dispatchEvent(event);
+			return event;
+		}
+
+		it('brings focus back into the drawer when it sits outside', async () => {
+			const { outside } = mount_with_outside();
+			await flush();
+			outside.focus();
+
+			expect(tab().defaultPrevented).toBe(true);
+			expect(document.activeElement?.getAttribute('aria-label')).toBe('Close');
+
+			outside.focus();
+			expect(tab(true).defaultPrevented).toBe(true);
+			expect(document.activeElement?.id).toBe('save');
+		});
+
+		it('wraps from a focused label that has no control after it', async () => {
+			const { label } = mount_with_outside();
+			await flush();
+			label.focus();
+
+			expect(tab().defaultPrevented).toBe(true);
+			expect(document.activeElement?.getAttribute('aria-label')).toBe('Close');
+		});
+	});
+
 	it('locks page scrolling only while a fixed drawer is open', async () => {
 		const style = document.createElement('style');
 		style.dataset.drawerTest = '';

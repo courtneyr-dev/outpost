@@ -49,6 +49,8 @@ export interface PostKindsCapabilities {
 
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
+	draftEndpoint?: string | null;
+	recentDrafts?: boolean;
 	/** Absent on servers (and cached configs) older than outpost#243. */
 	postKinds?: PostKindsCapabilities;
 	postFormats: string[] | null;
@@ -172,6 +174,7 @@ function is_composer_config(value: unknown): value is ComposerConfig {
 	if (!Array.isArray(v.existingTags)) return false;
 	if (!v.bridgyHostMap || typeof v.bridgyHostMap !== 'object') return false;
 	if (!v.siteSettings || typeof v.siteSettings !== 'object') return false;
+	if (v.draftEndpoint != null && typeof v.draftEndpoint !== 'string') return false;
 	if ('postKinds' in v && !is_post_kinds_capabilities(v.postKinds)) return false;
 	return true;
 }

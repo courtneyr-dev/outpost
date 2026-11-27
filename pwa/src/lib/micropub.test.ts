@@ -3,6 +3,7 @@ import {
 	discover_micropub_endpoint,
 	discover_media_endpoint,
 	discover_syndication_targets,
+	post_h_entry,
 	post_note,
 	MicropubError,
 	type MicropubEnvironment,
@@ -94,6 +95,90 @@ describe('discover_micropub_endpoint', () => {
 			discover_micropub_endpoint('https://example.test/', env),
 		).rejects.toBeInstanceOf(MicropubError);
 	});
+});
+
+describe('save a WordPress draft', () => {
+	const draft = {
+		properties: { content: 'Review copy', 'post-status': 'draft' as const },
+		accessToken: 'abc123',
+		micropubEndpoint: 'https://example.test/micropub',
+	};
+
+	it('returns the same-origin editor URL from the saved draft response', async () => {
+		const edit_url = 'https://example.test/wp-admin/post.php?post=72&action=edit';
+		const result = await post_h_entry(draft, {
+			fetch: async (_url, init) => {
+				expect(init?.credentials).toBe('omit');
+				expect(init?.redirect).toBe('error');
+				expect(new URLSearchParams(String(init?.body)).get('post-status')).toBe('draft');
+				return make_response({
+					status: 201,
+					headers: { Location: 'https://example.test/?p=72', 'X-Outpost-Draft-Edit': edit_url },
+				});
+			},
+		});
+		expect(result).toEqual({ draftEditUrl: edit_url });
+	});
+
+	it('sends the token only in the Authorization header', async () => {
+		let url = '';
+		let init: RequestInit | undefined;
+		await post_h_entry(draft, {
+			fetch: async (input, request) => {
+				url = String(input);
+				init = request;
+				return make_response({ status: 201 });
+			},
+		});
+		expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer abc123');
+		expect(new URLSearchParams(String(init?.body)).has('access_token')).toBe(false);
+		expect(String(init?.body)).not.toContain('abc123');
+		expect(url).not.toContain('abc123');
+	});
+
+	it('returns the editor URL when Micropub saved an ordinary post as a draft', async () => {
+		const edit_url = 'https://example.test/wp-admin/post.php?post=73&action=edit';
+		const result = await post_h_entry(
+			{ properties: { content: 'Contributor post' }, accessToken: 'abc123', micropubEndpoint: draft.micropubEndpoint },
+			{
+				fetch: async () =>
+					make_response({
+						status: 201,
+						headers: { Location: 'https://example.test/?p=73', 'X-Outpost-Draft-Edit': edit_url },
+					}),
+			},
+		);
+		expect(result).toEqual({ location: 'https://example.test/?p=73', draftEditUrl: edit_url });
+	});
+
+	it('ignores an editor URL on another origin for an ordinary post', async () => {
+		const result = await post_h_entry(
+			{ properties: { content: 'Contributor post' }, accessToken: 'abc123', micropubEndpoint: draft.micropubEndpoint },
+			{
+				fetch: async () =>
+					make_response({
+						status: 201,
+						headers: {
+							Location: 'https://example.test/?p=73',
+							'X-Outpost-Draft-Edit': 'https://wrong.example/wp-admin/post.php?post=73&action=edit',
+						},
+					}),
+			},
+		);
+		expect(result).toEqual({ location: 'https://example.test/?p=73' });
+	});
+
+	it.each([undefined, 'javascript:alert(1)', 'https://wrong.example/wp-admin/post.php?post=72'])(
+		'does not treat the preview URL as an editor link when the edit header is %s',
+		async (edit_url) => {
+			const headers: Record<string, string> = { Location: 'https://example.test/?p=72' };
+			if (edit_url) headers['X-Outpost-Draft-Edit'] = edit_url;
+			const result = await post_h_entry(draft, {
+				fetch: async () => make_response({ status: 201, headers }),
+			});
+			expect(result).toEqual({});
+		},
+	);
 });
 
 describe('post_note', () => {

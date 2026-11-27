@@ -57,7 +57,13 @@ export interface PostOrQueueInput {
 }
 
 export type PostOrQueueResult =
-	| { kind: 'posted'; location?: string; micropubEndpoint: string; mediaEndpoint: string | null }
+	| {
+			kind: 'posted';
+			location?: string;
+			draftEditUrl?: string;
+			micropubEndpoint: string;
+			mediaEndpoint: string | null;
+	  }
 	| {
 			kind: 'queued';
 			id: number;
@@ -117,6 +123,7 @@ export async function post_or_queue(
 		return {
 			kind: 'posted',
 			...(result.location ? { location: result.location } : {}),
+			...(result.draftEditUrl ? { draftEditUrl: result.draftEditUrl } : {}),
 			micropubEndpoint: micropub,
 			mediaEndpoint: media,
 		};

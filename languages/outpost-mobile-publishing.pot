@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.30\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.31\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-17T04:45:57+00:00\n"
+"POT-Creation-Date: 2026-11-27T20:44:49+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -42,7 +42,8 @@ msgstr ""
 #: includes/abilities/class-outpost-abilities.php:106
 #: includes/class-admin-page.php:75
 #: includes/class-admin-page.php:76
-#: includes/class-admin-page.php:208
+#: includes/class-admin-page.php:105
+#: includes/class-admin-page.php:244
 #: build/index.js:3
 msgid "Outpost"
 msgstr ""
@@ -233,7 +234,7 @@ msgstr ""
 #: includes/admin/class-appearance-settings-page.php:62
 #: includes/admin/class-ios-shortcut-settings-page.php:122
 #: includes/admin/class-outpost-oauth-settings-page.php:52
-#: includes/class-admin-page.php:201
+#: includes/class-admin-page.php:237
 msgid "You do not have permission to access this page."
 msgstr ""
 
@@ -640,111 +641,111 @@ msgstr ""
 msgid "Application passwords are not available on this site."
 msgstr ""
 
-#: includes/class-admin-page.php:178
+#: includes/class-admin-page.php:214
 msgid "Copied!"
 msgstr ""
 
 #. translators: %s: composer URL
-#: includes/class-admin-page.php:213
+#: includes/class-admin-page.php:249
 #, php-format
 msgid "Composer lives at %s. Sign in there with IndieAuth, then start posting."
 msgstr ""
 
-#: includes/class-admin-page.php:219
+#: includes/class-admin-page.php:255
 msgid "On your phone (recommended)"
 msgstr ""
 
-#: includes/class-admin-page.php:222
+#: includes/class-admin-page.php:258
 msgid "On mobile the share sheet beats bookmarklets. Install Outpost once, then any app with a Share button can send pages straight to the composer."
 msgstr ""
 
 #. translators: %s: composer URL link
-#: includes/class-admin-page.php:233
+#: includes/class-admin-page.php:269
 #, php-format
 msgid "Open %s in Safari (iPhone) or Chrome (Android)."
 msgstr ""
 
-#: includes/class-admin-page.php:239
+#: includes/class-admin-page.php:275
 msgid "iPhone:"
 msgstr ""
 
-#: includes/class-admin-page.php:241
+#: includes/class-admin-page.php:277
 msgid "tap the Share button, scroll, tap \"Add to Home Screen.\" Outpost appears as an app icon."
 msgstr ""
 
-#: includes/class-admin-page.php:248
+#: includes/class-admin-page.php:284
 msgid "Android:"
 msgstr ""
 
-#: includes/class-admin-page.php:250
+#: includes/class-admin-page.php:286
 msgid "tap the menu (⋮), then \"Install app\" or \"Add to Home screen.\""
 msgstr ""
 
-#: includes/class-admin-page.php:258
+#: includes/class-admin-page.php:294
 msgid "On any web page, tap Share → Outpost. The composer opens with the page URL and title pre-filled."
 msgstr ""
 
-#: includes/class-admin-page.php:266
+#: includes/class-admin-page.php:302
 msgid "Bookmarklets"
 msgstr ""
 
-#: includes/class-admin-page.php:269
+#: includes/class-admin-page.php:305
 msgid "Pick a Reply variant. On desktop, drag the button to your bookmarks bar. On mobile, long-press the button and choose \"Add Bookmark.\" Tap the saved bookmark from any page to compose a reply against that page."
 msgstr ""
 
 #. translators: %s: variant label, e.g. "Reply"
-#: includes/class-admin-page.php:291
+#: includes/class-admin-page.php:327
 #, php-format
 msgid "Outpost: %s"
 msgstr ""
 
 #. translators: %s: variant label, e.g. "Reply"
-#: includes/class-admin-page.php:305
+#: includes/class-admin-page.php:341
 #, php-format
 msgid "Drag or long-press: %s"
 msgstr ""
 
-#: includes/class-admin-page.php:313
+#: includes/class-admin-page.php:349
 msgid "Copy source"
 msgstr ""
 
-#: includes/class-admin-page.php:316
+#: includes/class-admin-page.php:352
 msgid "Show source"
 msgstr ""
 
-#: includes/class-admin-page.php:330
+#: includes/class-admin-page.php:366
 msgid "How it works"
 msgstr ""
 
-#: includes/class-admin-page.php:333
+#: includes/class-admin-page.php:369
 msgid "Desktop:"
 msgstr ""
 
-#: includes/class-admin-page.php:334
+#: includes/class-admin-page.php:370
 msgid "drag the colored button to your bookmarks bar. Click it from any page."
 msgstr ""
 
-#: includes/class-admin-page.php:337
+#: includes/class-admin-page.php:373
 msgid "iPhone Safari:"
 msgstr ""
 
-#: includes/class-admin-page.php:338
+#: includes/class-admin-page.php:374
 msgid "long-press the button, choose \"Add Bookmark.\" Later, tap the bookmarks icon, find the saved bookmark, tap to run on the current page."
 msgstr ""
 
-#: includes/class-admin-page.php:341
+#: includes/class-admin-page.php:377
 msgid "Android Chrome:"
 msgstr ""
 
-#: includes/class-admin-page.php:342
+#: includes/class-admin-page.php:378
 msgid "long-press the button, choose \"Copy link,\" then save it as a bookmark from the menu."
 msgstr ""
 
-#: includes/class-admin-page.php:345
+#: includes/class-admin-page.php:381
 msgid "Either way, the page URL, title, and any text you had selected get sent to Outpost with the right variant pre-selected."
 msgstr ""
 
-#: includes/class-admin-page.php:352
+#: includes/class-admin-page.php:388
 #: includes/settings/class-outpost-settings-page.php:56
 msgid "Settings"
 msgstr ""
@@ -1071,7 +1072,7 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:411
-#: outpost.php:640
+#: outpost.php:649
 #, php-format
 msgid "Install %s"
 msgstr ""
@@ -1084,14 +1085,14 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:426
-#: outpost.php:625
+#: outpost.php:634
 #, php-format
 msgid "Activate %s"
 msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:431
-#: outpost.php:630
+#: outpost.php:639
 #, php-format
 msgid "Outpost needs the %s plugin to be activated before the composer can run."
 msgstr ""
@@ -1123,13 +1124,26 @@ msgstr ""
 
 #. translators: 1: minimum WP version, 2: minimum PHP version.
 #: includes/class-pwa-shell.php:489
-#: outpost.php:688
+#: outpost.php:697
 #, php-format
 msgid "Outpost requires WordPress %1$s or newer and PHP %2$s or newer."
 msgstr ""
 
 #: includes/class-pwa-shell.php:510
 msgid "Server requirements"
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:84
+#: includes/class-recent-drafts-endpoint.php:107
+msgid "You cannot edit this draft in Outpost."
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:90
+msgid "The draft has changed. Reopen it before saving."
+msgstr ""
+
+#: includes/class-recent-drafts-endpoint.php:103
+msgid "WordPress did not save the draft. Try again."
 msgstr ""
 
 #: includes/class-settings.php:129
@@ -2091,13 +2105,13 @@ msgid "YouTube"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: outpost.php:645
+#: outpost.php:654
 #, php-format
 msgid "Outpost requires the %s plugin. Install it from WordPress.org to continue."
 msgstr ""
 
 #. translators: %s: installed Micropub plugin version.
-#: outpost.php:808
+#: outpost.php:817
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
 msgstr ""
