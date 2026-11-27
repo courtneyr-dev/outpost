@@ -79,6 +79,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-invali
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-config.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-audit-log.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-image-block-uses.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-intent-payload-builder.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-pending-capture-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-syndication-writeback.php';

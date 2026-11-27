@@ -552,6 +552,17 @@ if ( ! class_exists( 'WP_Term' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_REST_Attachments_Controller' ) ) {
+	/**
+	 * Minimal stand-in so a finalize handler can be identified by class.
+	 */
+	class WP_REST_Attachments_Controller {
+		public function finalize_item(): void {}
+
+		public function create_item(): void {}
+	}
+}
+
 // Minimal WP_REST_Response stub. The real class extends WP_HTTP_Response with
 // status code, headers, and data accessors; tests only need round-trip of data
 // + status.

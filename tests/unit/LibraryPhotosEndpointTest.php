@@ -156,11 +156,23 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		return $request;
 	}
 
-	private function allow_image( bool $can_edit = true, bool $can_read_parent = true, string $pending = '' ): void {
+	/** Metadata Core writes for a finished image that needed no sub-sizes. */
+	private const SMALL_IMAGE_METADATA = array(
+		'width'  => 120,
+		'height' => 80,
+		'file'   => '2026/11/small.jpg',
+		'sizes'  => array(),
+	);
+
+	/**
+	 * @param mixed $metadata What wp_get_attachment_metadata() returns.
+	 */
+	private function allow_image( bool $can_edit = true, bool $can_read_parent = true, string $pending = '', $metadata = self::SMALL_IMAGE_METADATA ): void {
 		WP_Mock::userFunction( 'get_post' )->with( 5 )->andReturn( $this->image( array( 'post_excerpt' => 'Original fixture caption' ) ) );
 		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 5 )->andReturn( $can_edit );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'read_post', 9 )->andReturn( $can_read_parent );
+		WP_Mock::userFunction( 'wp_get_attachment_metadata' )->with( 5 )->andReturn( $metadata );
 		WP_Mock::userFunction( 'get_post_meta' )->with( 5, Outpost_Library_Photos_Endpoint::PENDING_META, true )->andReturn( $pending );
 	}
 
@@ -200,22 +212,51 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertArrayNotHasKey( 'post_parent', $inserted );
 	}
 
+	public function test_decorative_draft_records_the_choice_for_activitypub(): void {
+		$this->allow_image();
+		WP_Mock::userFunction( 'wp_get_attachment_image_url' )->with( 5, 'full' )->andReturn( 'https://example.test/fixture.jpg' );
+		WP_Mock::userFunction( 'get_post_meta' )->with( 5, '_wp_attachment_image_alt', true )->andReturn( 'Shared alt from another post' );
+		WP_Mock::userFunction( 'wp_slash' )->andReturnUsing( static fn( $v ) => $v );
+		$registry = \Mockery::mock( 'alias:WP_Block_Type_Registry' );
+		$registry->shouldReceive( 'get_instance->get_registered' )->andReturn( (object) array( 'attributes' => array() ) );
+		WP_Mock::userFunction( 'wp_insert_post' )->once()->andReturn( 78 );
+		WP_Mock::userFunction( 'get_edit_post_link' )->andReturn( 'https://example.test/wp-admin/post.php?post=78&action=edit' );
+		WP_Mock::userFunction( 'add_post_meta' )->once()->with( 78, Outpost_Library_Photos_Endpoint::DECORATIVE_META, 5 );
+
+		$response = Outpost_Library_Photos_Endpoint::handle(
+			$this->draft_request(
+				array(
+					'attachmentId' => 5,
+					'alt'          => '',
+					'decorative'   => true,
+				)
+			)
+		);
+		$this->assertSame( 201, $response->get_status() );
+	}
+
 	/**
-	 * @return array<string, array{0: bool, 1: bool, 2: string}>
+	 * @return array<string, array{0: bool, 1: bool, 2: string, 3: mixed}>
 	 */
 	public static function unusable_images(): array {
 		return array(
-			'another user\'s image'            => array( false, true, '' ),
-			'image on a post the user can\'t read' => array( true, false, '' ),
-			'client upload awaiting finalize'  => array( true, true, '1' ),
+			'another user\'s image'                        => array( false, true, '', self::SMALL_IMAGE_METADATA ),
+			'image on a post the user can\'t read'          => array( true, false, '', self::SMALL_IMAGE_METADATA ),
+			'client upload awaiting finalize'              => array( true, true, '1', self::SMALL_IMAGE_METADATA ),
+			// Core inserts the attachment, fires rest_after_insert_attachment (where
+			// the pending mark lands), and only then writes metadata.
+			'inserted, metadata not written yet (no mark)' => array( true, true, '', false ),
+			'inserted, metadata empty (no mark)'           => array( true, true, '', array() ),
 		);
 	}
 
 	/**
 	 * @dataProvider unusable_images
+	 *
+	 * @param mixed $metadata What wp_get_attachment_metadata() returns.
 	 */
-	public function test_unusable_image_is_refused_without_side_effects( bool $can_edit, bool $can_read_parent, string $pending ): void {
-		$this->allow_image( $can_edit, $can_read_parent, $pending );
+	public function test_unusable_image_is_refused_without_side_effects( bool $can_edit, bool $can_read_parent, string $pending, $metadata ): void {
+		$this->allow_image( $can_edit, $can_read_parent, $pending, $metadata );
 		$this->forbid_attachment_writes();
 		WP_Mock::userFunction( 'wp_insert_post', array( 'times' => 0 ) );
 
@@ -227,6 +268,21 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 
 	// --- finalize tracking ------------------------------------------------------
 
+	/**
+	 * @return array{callback: array{0: \WP_REST_Attachments_Controller, 1: string}}
+	 */
+	private function core_finalize_handler(): array {
+		return array( 'callback' => array( new \WP_REST_Attachments_Controller(), 'finalize_item' ) );
+	}
+
+	private function finalize_request( int $route_id, int $resolved_id ): WP_REST_Request {
+		$request = new WP_REST_Request( 'POST', '/wp/v2/media/' . $route_id . '/finalize' );
+		// Core reads `id` from the body or query before the URL, so the ID it
+		// finalizes can differ from the one in the route.
+		$request->set_param( 'id', $resolved_id );
+		return $request;
+	}
+
 	public function test_client_processed_upload_is_pending_until_finalize(): void {
 		$upload = new WP_REST_Request( 'POST', '/wp/v2/media' );
 		$upload->set_param( 'generate_sub_sizes', false );
@@ -236,16 +292,33 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		Outpost_Library_Photos_Endpoint::track_client_upload( $this->image(), $upload, true );
 
 		WP_Mock::userFunction( 'delete_post_meta' )->once()->with( 5, Outpost_Library_Photos_Endpoint::PENDING_META );
-		$finalize = new WP_REST_Request( 'POST', '/wp/v2/media/5/finalize' );
-		$ok       = new WP_REST_Response( array(), 200 );
-		$this->assertSame( $ok, Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, array(), $finalize ) );
+		$ok = new WP_REST_Response( array(), 200 );
+		$this->assertSame( $ok, Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, $this->core_finalize_handler(), $this->finalize_request( 5, 5 ) ) );
+	}
+
+	public function test_finalize_of_another_attachment_does_not_clear_the_route_id(): void {
+		// `/media/5/finalize` with `id=9` in the body: Core authorizes and
+		// finalizes 9, so 5 still has no derivatives and must stay pending.
+		WP_Mock::userFunction( 'delete_post_meta', array( 'times' => 0 ) );
+		$ok = new WP_REST_Response( array(), 200 );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, $this->core_finalize_handler(), $this->finalize_request( 5, 9 ) );
+		$this->assertTrue( true );
+	}
+
+	public function test_a_non_core_handler_on_the_finalize_route_does_not_clear(): void {
+		WP_Mock::userFunction( 'delete_post_meta', array( 'times' => 0 ) );
+		$ok = new WP_REST_Response( array(), 200 );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, array( 'callback' => '__return_true' ), $this->finalize_request( 5, 5 ) );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, array( 'callback' => array( new \WP_REST_Attachments_Controller(), 'create_item' ) ), $this->finalize_request( 5, 5 ) );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( $ok, array(), $this->finalize_request( 5, 5 ) );
+		$this->assertTrue( true );
 	}
 
 	public function test_failed_finalize_keeps_the_image_pending(): void {
 		WP_Mock::userFunction( 'delete_post_meta', array( 'times' => 0 ) );
-		$finalize = new WP_REST_Request( 'POST', '/wp/v2/media/5/finalize' );
-		Outpost_Library_Photos_Endpoint::complete_client_upload( new \WP_Error( 'x', 'y' ), array(), $finalize );
-		Outpost_Library_Photos_Endpoint::complete_client_upload( new WP_REST_Response( array(), 400 ), array(), $finalize );
+		$finalize = $this->finalize_request( 5, 5 );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( new \WP_Error( 'x', 'y' ), $this->core_finalize_handler(), $finalize );
+		Outpost_Library_Photos_Endpoint::complete_client_upload( new WP_REST_Response( array(), 400 ), $this->core_finalize_handler(), $finalize );
 		$this->assertTrue( true );
 	}
 
@@ -254,5 +327,211 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		WP_Mock::userFunction( 'update_post_meta', array( 'times' => 0 ) );
 		Outpost_Library_Photos_Endpoint::track_client_upload( $this->image(), $upload, true );
 		$this->assertTrue( true );
+	}
+
+	// --- list pagination --------------------------------------------------------
+
+	/**
+	 * Attachment rows newest first: rows 1000..941 are client uploads awaiting
+	 * finalize, then 35 ready images 940..906.
+	 *
+	 * @param array<int, array<string, mixed>> $queries Captured get_posts() args.
+	 */
+	private function mock_library( array &$queries ): void {
+		$rows    = range( 1000, 906 );
+		$pending = range( 1000, 941 );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_others_posts' )->andReturn( true );
+		WP_Mock::userFunction( 'get_posts' )->andReturnUsing(
+			static function ( array $args ) use ( $rows, &$queries ): array {
+				$queries[] = $args;
+				return array_slice( $rows, $args['offset'], $args['posts_per_page'] );
+			}
+		);
+		WP_Mock::userFunction( 'get_post' )->andReturnUsing(
+			fn( int $id ) => $this->image(
+				array(
+					'ID'          => $id,
+					'post_parent' => 0,
+					'post_title'  => 'Fixture ' . $id,
+				)
+			)
+		);
+		WP_Mock::userFunction( 'wp_attachment_is_image', array( 'return' => true ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', \Mockery::type( 'int' ) )->andReturn( true );
+		WP_Mock::userFunction( 'wp_get_attachment_metadata' )->andReturn( self::SMALL_IMAGE_METADATA );
+		WP_Mock::userFunction( 'get_post_meta' )->andReturnUsing(
+			static fn( int $id, string $key ) => Outpost_Library_Photos_Endpoint::PENDING_META === $key && in_array( $id, $pending, true ) ? '1' : ''
+		);
+		WP_Mock::userFunction( 'wp_get_attachment_image_url' )->andReturn( null );
+		WP_Mock::userFunction( 'get_edit_post_link' )->andReturn( null );
+		WP_Mock::userFunction( 'wp_strip_all_tags' )->andReturnUsing( static fn( $v ) => (string) $v );
+	}
+
+	private function list_request( int $offset ): WP_REST_Request {
+		$request = new WP_REST_Request( 'POST', '/outpost/v1/library-photos' );
+		$request->set_param( 'search', '' );
+		$request->set_param( 'offset', $offset );
+		return $request;
+	}
+
+	public function test_list_skips_unready_rows_before_deciding_the_page_is_full(): void {
+		$queries = array();
+		$this->mock_library( $queries );
+
+		$first = Outpost_Library_Photos_Endpoint::handle( $this->list_request( 0 ) )->get_data();
+
+		$this->assertCount( 30, $first['items'] );
+		$this->assertSame( 940, $first['items'][0]['id'] );
+		$this->assertSame( 911, $first['items'][29]['id'] );
+		// 60 pending rows plus 30 listed: the next page starts at row 90 (id 910).
+		$this->assertSame( 90, $first['nextOffset'] );
+
+		$second = Outpost_Library_Photos_Endpoint::handle( $this->list_request( 90 ) )->get_data();
+		$this->assertSame( array( 910, 909, 908, 907, 906 ), array_column( $second['items'], 'id' ) );
+		$this->assertNull( $second['nextOffset'] );
+	}
+
+	public function test_list_orders_newest_first_with_an_id_tie_breaker(): void {
+		$queries = array();
+		$this->mock_library( $queries );
+		Outpost_Library_Photos_Endpoint::handle( $this->list_request( 0 ) );
+
+		$this->assertSame(
+			array(
+				'date' => 'DESC',
+				'ID'   => 'DESC',
+			),
+			$queries[0]['orderby']
+		);
+		$this->assertSame( 'ids', $queries[0]['fields'] );
+	}
+
+	// --- Authorization header -----------------------------------------------------
+
+	public function test_missing_authorization_header_gets_an_actionable_401(): void {
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 0 );
+
+		$result = Outpost_Library_Photos_Endpoint::permission_check( new WP_REST_Request( 'POST', '/outpost/v1/library-photos' ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'outpost_authorization_header_missing', $result->get_error_code() );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
+	}
+
+	public function test_token_forwarded_as_redirect_http_authorization_is_accepted(): void {
+		// Apache with mod_rewrite hands the header to PHP under this name only.
+		unset( $_SERVER['HTTP_AUTHORIZATION'] );
+		$_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = 'Bearer valid'; // outpost-lint:fixture-credential
+		$GLOBALS['wp_rest_auth_cookie']         = null;
+		WP_Mock::userFunction( 'get_current_user_id' )->andReturn( 3 );
+		WP_Mock::onFilter( 'indieauth_scopes' )->with( null )->reply( array( 'create' ) );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'upload_files' )->andReturn( true );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_posts' )->andReturn( true );
+
+		try {
+			$this->assertTrue( Outpost_Library_Photos_Endpoint::permission_check( new WP_REST_Request( 'POST', '/outpost/v1/library-photos' ) ) );
+		} finally {
+			unset( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] );
+		}
+	}
+
+	// --- ActivityPub --------------------------------------------------------------
+
+	/**
+	 * ActivityPub 9.4.4 isn't loaded in unit tests. These attachments have the
+	 * shape its Post transformer passes to `activitypub_attachments`
+	 * (Base::transform_attachment()): an image whose block alt is empty
+	 * already carries the attachment's shared alt as `name`.
+	 *
+	 * @return array<int, array<string, string>>
+	 */
+	private function activitypub_attachments(): array {
+		return array(
+			array(
+				'type'      => 'Image',
+				'url'       => 'https://example.test/uploads/embedded-1024x768.jpg',
+				'mediaType' => 'image/jpeg',
+				'name'      => self::FRENCH_ALT,
+			),
+			array(
+				'type'      => 'Image',
+				'url'       => 'https://example.test/uploads/explicit-1024x768.jpg',
+				'mediaType' => 'image/jpeg',
+				'name'      => 'Explicit alt text',
+			),
+			array(
+				'type'      => 'Image',
+				'url'       => 'https://example.test/uploads/decorative-1024x768.jpg',
+				'mediaType' => 'image/jpeg',
+				'name'      => 'Shared alt from another post',
+			),
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $decorative_attrs Attributes of the third block.
+	 * @param int[]                $recorded         DECORATIVE_META values on the post.
+	 */
+	private function mock_activitypub_post( array $decorative_attrs, array $recorded ): WP_Post {
+		$blocks = array(
+			array(
+				'blockName'   => 'core/image',
+				'attrs'       => array( 'id' => 11 ),
+				'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="' . htmlspecialchars( self::FRENCH_ALT, ENT_QUOTES, 'UTF-8' ) . '" class="wp-image-11"/></figure>',
+				'innerBlocks' => array(),
+			),
+			array(
+				'blockName'   => 'core/image',
+				'attrs'       => array( 'id' => 12 ),
+				'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="Explicit alt text" class="wp-image-12"/></figure>',
+				'innerBlocks' => array(),
+			),
+			array(
+				'blockName'   => 'core/image',
+				'attrs'       => array( 'id' => 13 ) + $decorative_attrs,
+				'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="" class="wp-image-13"/></figure>',
+				'innerBlocks' => array(),
+			),
+		);
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn( $blocks );
+		WP_Mock::userFunction( 'get_post_meta' )->with( 40, Outpost_Library_Photos_Endpoint::DECORATIVE_META, false )->andReturn( $recorded );
+		WP_Mock::userFunction( 'wp_get_attachment_image_src' )->andReturnUsing(
+			static fn( int $id ) => array( 'https://example.test/uploads/' . array( 11 => 'embedded', 12 => 'explicit', 13 => 'decorative' )[ $id ] . '-1024x768.jpg', 1024, 768, true )
+		);
+		WP_Mock::userFunction( 'esc_url_raw' )->andReturnUsing( static fn( $v ) => (string) $v );
+		return new WP_Post(
+			array(
+				'ID'           => 40,
+				'post_content' => '<!-- wp:image {"id":11} -->...',
+			)
+		);
+	}
+
+	public function test_activitypub_keeps_isdecorative_image_description_empty(): void {
+		$post = $this->mock_activitypub_post( array( 'isDecorative' => true ), array() );
+
+		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->activitypub_attachments(), $post );
+
+		$this->assertSame( self::FRENCH_ALT, $out[0]['name'], 'embedded alt the author applied' );
+		$this->assertSame( 'Explicit alt text', $out[1]['name'], 'explicit text' );
+		$this->assertSame( '', $out[2]['name'], 'decorative: no fallback to the shared alt' );
+	}
+
+	public function test_activitypub_keeps_recorded_decorative_choice_empty_without_isdecorative(): void {
+		$post = $this->mock_activitypub_post( array(), array( 13 ) );
+
+		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->activitypub_attachments(), $post );
+
+		$this->assertSame( '', $out[2]['name'] );
+		$this->assertSame( 'Explicit alt text', $out[1]['name'] );
+	}
+
+	public function test_activitypub_fallback_stays_for_an_empty_alt_nobody_marked_decorative(): void {
+		$post = $this->mock_activitypub_post( array(), array() );
+
+		$out = Outpost_Library_Photos_Endpoint::keep_decorative_alt_empty( $this->activitypub_attachments(), $post );
+
+		$this->assertSame( $this->activitypub_attachments(), $out );
 	}
 }

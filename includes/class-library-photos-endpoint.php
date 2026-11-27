@@ -6,8 +6,9 @@
  * Library. `POST /wp-json/outpost/v1/library-photos` does two things:
  *
  *   - Without `attachmentId`, it lists ready images the user may edit,
- *     optionally filtered by `search`. POST keeps the search text out of
- *     URLs and server logs.
+ *     newest first, optionally filtered by `search`, one page at a time:
+ *     `offset` continues from the `nextOffset` the previous page returned.
+ *     POST keeps the search text out of URLs and server logs.
  *   - With `attachmentId`, it saves a draft whose body is one core/image
  *     block that stores that attachment ID. The attachment itself is never
  *     written: its parent, caption, alt text and generated sizes stay as they
@@ -20,7 +21,13 @@
  * exists before its sub-sizes do: the browser sideloads them and then calls
  * `/wp/v2/media/<id>/finalize`. Such an image is marked pending on creation
  * and only listed or usable once finalize succeeds, so a draft never points
- * at an image with no derivatives.
+ * at an image with no derivatives. An image whose metadata WordPress has not
+ * written yet is refused too, which covers the moment between Core inserting
+ * the attachment and the pending mark landing.
+ *
+ * ActivityPub (when active) describes an image block with an empty alt using
+ * the attachment's shared alt. For an image the author marked decorative,
+ * the federated object keeps the empty description instead.
  *
  * @package Outpost
  */
@@ -40,8 +47,17 @@ final class Outpost_Library_Photos_Endpoint {
 	/** Post meta marking a client-processed upload that is not finalized yet. */
 	public const PENDING_META = '_outpost_media_awaiting_finalize';
 
+	/** Post meta on a draft: attachment IDs the author marked decorative. */
+	public const DECORATIVE_META = '_outpost_decorative_images';
+
 	/** Images returned per list request. */
 	private const LIST_LIMIT = 30;
+
+	/** Attachment rows read per query while filling a page. */
+	private const SCAN_BATCH = 60;
+
+	/** Attachment rows one list request reads at most before handing back a cursor. */
+	private const SCAN_CAP = 600;
 
 	/**
 	 * Hook the route and the client-upload tracking.
@@ -50,6 +66,7 @@ final class Outpost_Library_Photos_Endpoint {
 		add_action( 'rest_api_init', array( self::class, 'register_route' ) );
 		add_action( 'rest_after_insert_attachment', array( self::class, 'track_client_upload' ), 10, 3 );
 		add_filter( 'rest_request_after_callbacks', array( self::class, 'complete_client_upload' ), 20, 3 );
+		add_filter( 'activitypub_attachments', array( self::class, 'keep_decorative_alt_empty' ), 20, 2 );
 	}
 
 	/**
@@ -79,6 +96,11 @@ final class Outpost_Library_Photos_Endpoint {
 						'maxLength' => 80,
 						'default'   => '',
 					),
+					'offset'       => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+						'default' => 0,
+					),
 				),
 			)
 		);
@@ -89,10 +111,22 @@ final class Outpost_Library_Photos_Endpoint {
 	 * capabilities to use media and write posts. Access to a specific
 	 * attachment is checked per image in {@see self::usable_image()}.
 	 *
+	 * A request that reaches PHP with no user and no Authorization header at
+	 * all gets its own 401: the PWA always sends the header, so its absence
+	 * means the web server dropped it, and the composer can say how to fix
+	 * that instead of reporting a generic failure.
+	 *
 	 * @param WP_REST_Request $request Request.
-	 * @return bool
+	 * @return bool|WP_Error
 	 */
-	public static function permission_check( WP_REST_Request $request ): bool {
+	public static function permission_check( WP_REST_Request $request ) {
+		if ( 0 === get_current_user_id() && '' === Outpost_Request_Headers::authorization() ) {
+			return new WP_Error(
+				'outpost_authorization_header_missing',
+				__( 'WordPress did not receive the Authorization header. Ask your host to forward it to PHP (on Apache, add "CGIPassAuth On" to .htaccess).', 'outpost-mobile-publishing' ),
+				array( 'status' => 401 )
+			);
+		}
 		// Credential first: a cookie session without a valid REST nonce, or a
 		// token without the `create` scope, is refused before any capability.
 		if ( ! self::bearer_has_scope( $request, array( 'create' ) ) ) {
@@ -172,6 +206,11 @@ final class Outpost_Library_Photos_Endpoint {
 		if ( is_wp_error( $id ) ) {
 			return $id;
 		}
+		if ( $choice['decorative'] ) {
+			// Lets the ActivityPub filter tell this decorative choice from an
+			// alt someone left empty, on cores without `isDecorative`.
+			add_post_meta( $id, self::DECORATIVE_META, $attachment->ID );
+		}
 		return new WP_REST_Response(
 			array(
 				'id'      => $id,
@@ -182,41 +221,89 @@ final class Outpost_Library_Photos_Endpoint {
 	}
 
 	/**
-	 * List ready images the user may edit.
+	 * List one page of ready images the user may edit, newest first.
+	 *
+	 * Rows are filtered for readiness and access before they count toward the
+	 * page, so a run of pending or foreign images never ends the list early.
+	 * `nextOffset` is the number of rows read through the page's last image,
+	 * or null once no usable image remains. One request reads at most
+	 * SCAN_CAP rows; past that it returns what it has with a cursor.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
 	private static function list_images( WP_REST_Request $request ): WP_REST_Response {
-		$query = new WP_Query(
+		$offset = max( 0, (int) $request->get_param( 'offset' ) );
+		$search = sanitize_text_field( (string) $request->get_param( 'search' ) );
+		$author = current_user_can( 'edit_others_posts' ) ? 0 : get_current_user_id();
+		$items  = array();
+		$next   = null;
+		$read   = 0;
+
+		while ( null === $next && $read < self::SCAN_CAP ) {
+			$ids = get_posts(
+				array(
+					'post_type'        => 'attachment',
+					'post_status'      => 'inherit',
+					'post_mime_type'   => 'image',
+					'author'           => $author,
+					'fields'           => 'ids',
+					'orderby'          => array(
+						'date' => 'DESC',
+						'ID'   => 'DESC',
+					),
+					'posts_per_page'   => self::SCAN_BATCH,
+					'offset'           => $offset + $read,
+					'no_found_rows'    => true,
+					'suppress_filters' => false,
+					's'                => $search,
+				)
+			);
+			foreach ( $ids as $id ) {
+				++$read;
+				$image = self::usable_image( (int) $id );
+				if ( null === $image ) {
+					continue;
+				}
+				if ( count( $items ) === self::LIST_LIMIT ) {
+					// One more usable image exists: the next page starts at it.
+					$next = $offset + $read - 1;
+					break;
+				}
+				$items[] = self::list_item( $image );
+			}
+			if ( count( $ids ) < self::SCAN_BATCH ) {
+				break;
+			}
+		}
+		if ( null === $next && $read >= self::SCAN_CAP ) {
+			$next = $offset + $read;
+		}
+		return new WP_REST_Response(
 			array(
-				'post_type'      => 'attachment',
-				'post_status'    => 'inherit',
-				'post_mime_type' => 'image',
-				'author'         => current_user_can( 'edit_others_posts' ) ? 0 : get_current_user_id(),
-				'posts_per_page' => self::LIST_LIMIT,
-				'no_found_rows'  => true,
-				's'              => sanitize_text_field( (string) $request->get_param( 'search' ) ),
+				'items'      => $items,
+				'nextOffset' => $next,
 			)
 		);
-		$items = array();
-		foreach ( $query->posts as $post ) {
-			$image = self::usable_image( $post instanceof WP_Post ? $post->ID : (int) $post );
-			if ( null === $image ) {
-				continue;
-			}
-			$thumbnail = wp_get_attachment_image_url( $image->ID, 'thumbnail' );
-			$items[]   = array(
-				'id'          => $image->ID,
-				'title'       => $image->post_title,
-				'caption'     => wp_strip_all_tags( $image->post_excerpt ),
-				'alt'         => (string) get_post_meta( $image->ID, '_wp_attachment_image_alt', true ),
-				'embeddedAlt' => self::embedded_alt( $image->ID ),
-				'thumbnail'   => is_string( $thumbnail ) ? $thumbnail : null,
-				'editUrl'     => get_edit_post_link( $image->ID, 'raw' ),
-			);
-		}
-		return new WP_REST_Response( array( 'items' => $items ) );
+	}
+
+	/**
+	 * One image as the composer lists it.
+	 *
+	 * @param WP_Post $image Usable attachment.
+	 * @return array<string, mixed>
+	 */
+	private static function list_item( WP_Post $image ): array {
+		$thumbnail = wp_get_attachment_image_url( $image->ID, 'thumbnail' );
+		return array(
+			'id'          => $image->ID,
+			'title'       => $image->post_title,
+			'caption'     => wp_strip_all_tags( $image->post_excerpt ),
+			'alt'         => (string) get_post_meta( $image->ID, '_wp_attachment_image_alt', true ),
+			'embeddedAlt' => self::embedded_alt( $image->ID ),
+			'thumbnail'   => is_string( $thumbnail ) ? $thumbnail : null,
+			'editUrl'     => get_edit_post_link( $image->ID, 'raw' ),
+		);
 	}
 
 	/**
@@ -280,7 +367,10 @@ final class Outpost_Library_Photos_Endpoint {
 	 *
 	 * It must be a finished image the user can edit. An image attached to a
 	 * post the user cannot read (a private post) is refused even when the
-	 * user can edit the image.
+	 * user can edit the image. Finished means WordPress has written its
+	 * metadata (Core does that after `rest_after_insert_attachment`, where the
+	 * pending mark is set) and no finalize is outstanding. A small image that
+	 * needed no sub-sizes has metadata with an empty `sizes` and stays usable.
 	 *
 	 * @param int $id Attachment ID.
 	 * @return WP_Post|null
@@ -297,6 +387,10 @@ final class Outpost_Library_Photos_Endpoint {
 			return null;
 		}
 		if ( $attachment->post_parent > 0 && ! current_user_can( 'read_post', $attachment->post_parent ) ) {
+			return null;
+		}
+		$metadata = wp_get_attachment_metadata( $id );
+		if ( ! is_array( $metadata ) || empty( $metadata['file'] ) || (int) ( $metadata['width'] ?? 0 ) <= 0 ) {
 			return null;
 		}
 		if ( '' !== (string) get_post_meta( $id, self::PENDING_META, true ) ) {
@@ -365,7 +459,13 @@ final class Outpost_Library_Photos_Endpoint {
 	}
 
 	/**
-	 * Clear the pending mark once `/wp/v2/media/<id>/finalize` succeeds.
+	 * Clear the pending mark once Core's finalize succeeds.
+	 *
+	 * Core authorizes and finalizes `$request['id']` (the same value as
+	 * `get_param( 'id' )`), which WordPress reads from the body or query
+	 * string before the URL, so the ID in the route
+	 * may not be the attachment Core finalized. The mark is cleared only when
+	 * the handler is Core's finalize and both IDs agree.
 	 *
 	 * @param mixed                $response REST callback result.
 	 * @param array<string, mixed> $handler  REST route handler.
@@ -373,12 +473,69 @@ final class Outpost_Library_Photos_Endpoint {
 	 * @return mixed
 	 */
 	public static function complete_client_upload( $response, array $handler, WP_REST_Request $request ) {
-		if ( 'POST' === $request->get_method()
-			&& $response instanceof WP_REST_Response
-			&& 200 === $response->get_status()
-			&& preg_match( '#^/wp/v2/media/([1-9][0-9]*)/finalize$#D', $request->get_route(), $matches ) ) {
-			delete_post_meta( (int) $matches[1], self::PENDING_META );
+		if ( 'POST' !== $request->get_method()
+			|| ! $response instanceof WP_REST_Response
+			|| 200 !== $response->get_status()
+			|| ! preg_match( '#^/wp/v2/media/([1-9][0-9]*)/finalize$#D', $request->get_route(), $matches ) ) {
+			return $response;
+		}
+		$callback = $handler['callback'] ?? null;
+		if ( ! is_array( $callback )
+			|| ! ( $callback[0] ?? null ) instanceof WP_REST_Attachments_Controller
+			|| 'finalize_item' !== ( $callback[1] ?? null ) ) {
+			return $response;
+		}
+		$finalized = (int) $request->get_param( 'id' );
+		if ( $finalized === (int) $matches[1] ) {
+			delete_post_meta( $finalized, self::PENDING_META );
 		}
 		return $response;
+	}
+
+	/**
+	 * Keep a decorative image's description empty in ActivityPub output.
+	 *
+	 * ActivityPub 9.4 falls back to the attachment's shared alt when a block's
+	 * alt is empty, so a decorative choice would federate whatever
+	 * description the image carries elsewhere. For each image the post marks
+	 * decorative (core's `isDecorative`, or the choice Outpost recorded on
+	 * the draft for a block with `alt=""`), the matching attachment's `name`
+	 * is set to ''. The attachment itself is not changed.
+	 *
+	 * ActivityPub builds each image URL from `wp_get_attachment_image_src()`
+	 * at `large`, passed through `activitypub_get_image`; matching uses the
+	 * same URL.
+	 *
+	 * @param mixed $attachments ActivityPub attachment objects.
+	 * @param mixed $post        Post being transformed.
+	 * @return mixed
+	 */
+	public static function keep_decorative_alt_empty( $attachments, $post ) {
+		if ( ! is_array( $attachments ) || ! $post instanceof WP_Post ) {
+			return $attachments;
+		}
+		$recorded = array_map( 'intval', (array) get_post_meta( $post->ID, self::DECORATIVE_META, false ) );
+		$urls     = array();
+		foreach ( Outpost_Image_Block_Uses::in_content( (string) $post->post_content ) as $use ) {
+			$decorative = $use['decorative'] || ( '' === $use['alt'] && in_array( $use['id'], $recorded, true ) );
+			if ( ! $decorative ) {
+				continue;
+			}
+			$image = apply_filters( 'activitypub_get_image', wp_get_attachment_image_src( $use['id'], 'large' ), $use['id'], 'large' );
+			if ( is_array( $image ) && isset( $image[0] ) && is_string( $image[0] ) ) {
+				$urls[] = esc_url_raw( $image[0] );
+			}
+		}
+		if ( array() === $urls ) {
+			return $attachments;
+		}
+		foreach ( $attachments as $key => $attachment ) {
+			if ( is_array( $attachment )
+				&& 'Image' === ( $attachment['type'] ?? '' )
+				&& in_array( $attachment['url'] ?? null, $urls, true ) ) {
+				$attachments[ $key ]['name'] = '';
+			}
+		}
+		return $attachments;
 	}
 }
