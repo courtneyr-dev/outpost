@@ -101,6 +101,33 @@ describe('LibraryPhotos chooser', () => {
 		expect(last_body().get('decorative')).toBe('false');
 		const open = Array.from(root.querySelectorAll('a')).find((a) => a.textContent === 'Open photo draft in WordPress');
 		expect(open?.getAttribute('href')).toBe(origin + '/wp-admin/post.php?post=77&action=edit');
+		expect(document.activeElement).toBe(open);
+	});
+
+	it('treats a stored alt that WordPress copied from the file as a suggestion', async () => {
+		fetch_stub.mockImplementation(async () =>
+			new Response(JSON.stringify({ items: [{ ...fixture, alt: fixture.embeddedAlt }] }), { status: 200 }),
+		);
+		render(null, root);
+		render(<LibraryPhotos token="t" libraryUrl="" env={{ fetch: fetch_stub as unknown as typeof fetch }} />, root);
+		await flush();
+		choose_fixture();
+		await flush();
+		expect(root.querySelector<HTMLTextAreaElement>('#outpost-library-alt')!.value).toBe('');
+		expect(button('Use embedded alt text')).toBeTruthy();
+	});
+
+	it('pre-fills an alt someone wrote', async () => {
+		fetch_stub.mockImplementation(async () =>
+			new Response(JSON.stringify({ items: [{ ...fixture, alt: 'Written in the Media Library' }] }), { status: 200 }),
+		);
+		render(null, root);
+		render(<LibraryPhotos token="t" libraryUrl="" env={{ fetch: fetch_stub as unknown as typeof fetch }} />, root);
+		await flush();
+		choose_fixture();
+		await flush();
+		expect(root.querySelector<HTMLTextAreaElement>('#outpost-library-alt')!.value).toBe('Written in the Media Library');
+		expect(button('Use embedded alt text')).toBeTruthy();
 	});
 
 	it('saves explicit text as typed', async () => {

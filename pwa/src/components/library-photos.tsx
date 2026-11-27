@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { is_safe_http_url } from '../lib/url-validation';
 import { ExternalLink } from './external-link';
 import {
@@ -17,9 +17,9 @@ import {
  * so pressing Enter in any field here can never publish the photo post. The
  * search field has its own form; the other fields have no form at all.
  *
- * Alt text is the author's call. The image's stored alt pre-fills the field,
- * and alt text embedded in the file is offered beside it as a suggestion the
- * author applies with a button, never automatically.
+ * Alt text is the author's call. A stored alt someone wrote pre-fills the
+ * field. Alt text embedded in the file is offered beside it as a suggestion
+ * the author applies with a button, never automatically.
  */
 
 export interface LibraryPhotosProps {
@@ -43,6 +43,13 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState('');
 	const [loaded, setLoaded] = useState(false);
+	const draft_link_ref = useRef<HTMLAnchorElement>(null);
+
+	// Saving disables the focused Save button, which would drop focus to the
+	// page. Move it to the link that opens the new draft instead.
+	useEffect(() => {
+		if (saved) draft_link_ref.current?.focus();
+	}, [saved]);
 
 	const load = useCallback(
 		async (query: string): Promise<void> => {
@@ -69,7 +76,10 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 	const choose = (id: number): void => {
 		const choice = images.find((image) => image.id === id) ?? null;
 		setSelected(choice);
-		setAlt(choice?.alt ?? '');
+		// WordPress copies embedded alt into the attachment's alt on upload. An
+		// alt equal to the embedded one was never written by a person, so it
+		// starts as a suggestion to review rather than a pre-filled answer.
+		setAlt(choice && choice.alt !== choice.embeddedAlt ? choice.alt : '');
 		setDecorative(false);
 		setSaved(null);
 		setError('');
@@ -222,7 +232,11 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 				{saved && (
 					<>
 						Photo draft saved.{' '}
-						{local_url(saved.editUrl) && <a href={saved.editUrl}>Open photo draft in WordPress</a>}
+						{local_url(saved.editUrl) && (
+							<a ref={draft_link_ref} href={saved.editUrl}>
+								Open photo draft in WordPress
+							</a>
+						)}
 					</>
 				)}
 			</p>
