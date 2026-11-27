@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { list_library_photos, save_library_photo_draft, LibraryPhotosError } from './library-photos';
+import {
+	AUTHORIZATION_HEADER_MISSING,
+	list_library_photos,
+	save_library_photo_draft,
+	LibraryPhotosError,
+} from './library-photos';
 
 function env_returning(status: number, body: unknown) {
 	const fetch = vi.fn(async () => new Response(JSON.stringify(body), { status }));
@@ -14,7 +19,7 @@ function sent(fetch: ReturnType<typeof vi.fn>): { url: string; init: RequestInit
 describe('library photos client', () => {
 	it('sends the token only in the Authorization header', async () => {
 		const { env, fetch } = env_returning(200, { items: [] });
-		await list_library_photos('secret-token', 'cercle', env);
+		await list_library_photos('secret-token', 'cercle', 0, env);
 
 		const { url, init, body } = sent(fetch);
 		expect(url).toBe('/wp-json/outpost/v1/library-photos');
@@ -34,7 +39,7 @@ describe('library photos client', () => {
 				{ id: 'x' },
 			],
 		});
-		expect(await list_library_photos('t', '', env)).toEqual([
+		expect((await list_library_photos('t', '', 0, env)).images).toEqual([
 			{ id: 5, title: 'Fixture', caption: 'Original fixture caption', alt: '', embeddedAlt: 'Un cercle jaune sur fond bleu', thumbnail: null, editUrl: '/wp-admin/post.php?post=5&action=edit' },
 		]);
 	});
@@ -62,5 +67,28 @@ describe('library photos client', () => {
 	it('reports a refused attachment', async () => {
 		const { env } = env_returning(403, { code: 'outpost_library_image_unavailable' });
 		await expect(save_library_photo_draft('t', 5, { kind: 'decorative' }, env)).rejects.toBeInstanceOf(LibraryPhotosError);
+	});
+
+	it('asks for the next page from the cursor WordPress returned', async () => {
+		const { env, fetch } = env_returning(200, { items: [], nextOffset: 90 });
+		const page = await list_library_photos('t', 'cercle', 30, env);
+
+		expect(sent(fetch).body.get('offset')).toBe('30');
+		expect(page.nextOffset).toBe(90);
+	});
+
+	it('treats a missing or non-advancing cursor as the last page', async () => {
+		for (const nextOffset of [null, undefined, 30, 12, '90', 1.5]) {
+			const { env } = env_returning(200, { items: [], nextOffset });
+			expect((await list_library_photos('t', '', 30, env)).nextOffset).toBeNull();
+		}
+	});
+
+	it('names a stripped Authorization header apart from other refusals', async () => {
+		const { env } = env_returning(401, { code: AUTHORIZATION_HEADER_MISSING, message: 'x' });
+		const error = await list_library_photos('t', '', 0, env).catch((caught: unknown) => caught);
+		expect(error).toBeInstanceOf(LibraryPhotosError);
+		expect((error as LibraryPhotosError).status).toBe(401);
+		expect((error as LibraryPhotosError).code).toBe(AUTHORIZATION_HEADER_MISSING);
 	});
 });

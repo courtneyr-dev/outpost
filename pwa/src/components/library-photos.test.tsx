@@ -89,11 +89,14 @@ describe('LibraryPhotos chooser', () => {
 	it('offers embedded alt as a suggestion the author applies', async () => {
 		const alt = root.querySelector<HTMLTextAreaElement>('#outpost-library-alt')!;
 		expect(alt.value).toBe('');
-		expect(button('Save photo as WordPress draft').disabled).toBe(true);
+		expect(button('Save photo as WordPress draft').getAttribute('aria-disabled')).toBe('true');
 
+		button('Use embedded alt text').focus();
 		button('Use embedded alt text').click();
 		await flush();
 		expect(alt.value).toBe('Un cercle jaune sur fond bleu');
+		// The button is gone; focus lands on the field it filled, not the page.
+		expect(document.activeElement).toBe(alt);
 
 		button('Save photo as WordPress draft').click();
 		await flush();
@@ -148,6 +151,105 @@ describe('LibraryPhotos chooser', () => {
 		await flush();
 		expect(last_body().get('alt')).toBe('');
 		expect(last_body().get('decorative')).toBe('true');
+	});
+
+	it('keeps focus on Save while WordPress answers and after a failed save', async () => {
+		type_alt('A yellow circle');
+		await flush();
+		let reject_save: (reason: Error) => void = () => undefined;
+		fetch_stub.mockImplementation(
+			() =>
+				new Promise<Response>((_resolve, reject) => {
+					reject_save = reject;
+				}),
+		);
+		const save = button('Save photo as WordPress draft');
+		save.focus();
+		save.click();
+		await flush();
+
+		// Disabling a focused button sends focus to the page behind the drawer.
+		expect(root.querySelector('.outpost-library-photos')!.getAttribute('aria-busy')).toBe('true');
+		expect(save.disabled).toBe(false);
+		expect(save.getAttribute('aria-disabled')).toBe('true');
+		expect(document.activeElement).toBe(save);
+
+		reject_save(new Error('offline'));
+		await flush();
+		expect(document.activeElement).toBe(save);
+		expect(root.querySelector('[role=alert]')!.textContent).toContain('did not save the photo draft');
+	});
+
+	it('keeps focus in the search field and button through a failed search', async () => {
+		const field = root.querySelector<HTMLInputElement>('#outpost-library-search')!;
+		let reject_search: (reason: Error) => void = () => undefined;
+		fetch_stub.mockImplementation(
+			() =>
+				new Promise<Response>((_resolve, reject) => {
+					reject_search = reject;
+				}),
+		);
+		field.focus();
+		field.form!.requestSubmit();
+		await flush();
+		expect(field.disabled).toBe(false);
+		expect(field.readOnly).toBe(true);
+		expect(document.activeElement).toBe(field);
+		reject_search(new Error('offline'));
+		await flush();
+		expect(document.activeElement).toBe(field);
+
+		const search = button('Search Media Library');
+		search.focus();
+		search.click();
+		await flush();
+		expect(search.disabled).toBe(false);
+		expect(document.activeElement).toBe(search);
+		reject_search(new Error('offline'));
+		await flush();
+		expect(document.activeElement).toBe(search);
+	});
+});
+
+describe('LibraryPhotos pages and errors', () => {
+	const page = (ids: number[], nextOffset: number | null): Response =>
+		new Response(
+			JSON.stringify({ items: ids.map((id) => ({ ...fixture, id, title: 'Image ' + String(id) })), nextOffset }),
+			{ status: 200 },
+		);
+
+	it('loads the next page and keeps focus in the drawer when the last page arrives', async () => {
+		fetch_stub.mockImplementation(async (_url: string, init: RequestInit) => {
+			const offset = new URLSearchParams(String(init.body)).get('offset');
+			return offset === '0' ? page([9, 8], 90) : page([7], null);
+		});
+		render(<LibraryPhotos token="t" libraryUrl="" env={{ fetch: fetch_stub as unknown as typeof fetch }} />, root);
+		await flush();
+
+		const more = button('Load more images');
+		more.focus();
+		more.click();
+		await flush();
+
+		expect(last_body().get('offset')).toBe('90');
+		const options = Array.from(root.querySelectorAll<HTMLOptionElement>('#outpost-library-image option')).map((o) => o.value);
+		expect(options).toEqual(['', '9', '8', '7']);
+		// The button is gone on the last page; focus moves to the image list.
+		expect(root.querySelector('button.outpost-button--secondary:not([type=submit])')?.textContent).not.toBe('Load more images');
+		expect(document.activeElement).toBe(root.querySelector('#outpost-library-image'));
+	});
+
+	it('names the header-forwarding fix when the host strips Authorization', async () => {
+		fetch_stub.mockImplementation(
+			async () =>
+				new Response(JSON.stringify({ code: 'outpost_authorization_header_missing', message: 'x' }), { status: 401 }),
+		);
+		render(<LibraryPhotos token="t" libraryUrl="" env={{ fetch: fetch_stub as unknown as typeof fetch }} />, root);
+		await flush();
+
+		const alert = root.querySelector('[role=alert]')!.textContent ?? '';
+		expect(alert).toContain('Authorization header');
+		expect(alert).toContain('CGIPassAuth On');
 	});
 });
 

@@ -8,6 +8,10 @@
  * The token travels only in the Authorization header, never in the body or
  * the URL. `credentials: 'omit'` keeps a logged-in wp-admin cookie from
  * turning the request into a cookie request that demands a nonce (OUT-001).
+ * A host that drops the header (WordPress reads `HTTP_AUTHORIZATION`, then
+ * `REDIRECT_HTTP_AUTHORIZATION`) gets the server's
+ * `outpost_authorization_header_missing` 401, surfaced as its own error so
+ * the composer can name the fix.
  */
 
 export interface LibraryPhotosEnvironment {
@@ -40,13 +44,33 @@ export interface SavedLibraryDraft {
 	editUrl: string | null;
 }
 
+export interface LibraryPage {
+	images: LibraryImage[];
+	/** Pass back as `offset` for the next page; null when no more images are ready. */
+	nextOffset: number | null;
+}
+
+/** The web server stripped the Authorization header before PHP saw it. */
+export const AUTHORIZATION_HEADER_MISSING = 'outpost_authorization_header_missing';
+
 export class LibraryPhotosError extends Error {
 	constructor(
 		message: string,
 		public readonly status: number,
+		/** WordPress's error code, or '' when the response carried none. */
+		public readonly code: string = '',
 	) {
 		super(message);
 		this.name = 'LibraryPhotosError';
+	}
+}
+
+async function error_code(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { code?: unknown };
+		return typeof body.code === 'string' ? body.code : '';
+	} catch {
+		return '';
 	}
 }
 
@@ -67,7 +91,11 @@ async function post<T>(
 		body: new URLSearchParams(fields).toString(),
 	});
 	if (!response.ok) {
-		throw new LibraryPhotosError('WordPress returned ' + String(response.status) + '.', response.status);
+		throw new LibraryPhotosError(
+			'WordPress returned ' + String(response.status) + '.',
+			response.status,
+			await error_code(response),
+		);
 	}
 	return (await response.json()) as T;
 }
@@ -93,11 +121,20 @@ function to_image(row: unknown): LibraryImage | null {
 export async function list_library_photos(
 	token: string,
 	search: string,
+	offset = 0,
 	env: LibraryPhotosEnvironment = default_env(),
-): Promise<LibraryImage[]> {
-	const json = await post<{ items?: unknown }>(token, { search }, env);
+): Promise<LibraryPage> {
+	const json = await post<{ items?: unknown; nextOffset?: unknown }>(
+		token,
+		{ search, offset: String(offset) },
+		env,
+	);
 	const rows = Array.isArray(json.items) ? json.items : [];
-	return rows.map(to_image).filter((image): image is LibraryImage => image !== null);
+	const next = json.nextOffset;
+	return {
+		images: rows.map(to_image).filter((image): image is LibraryImage => image !== null),
+		nextOffset: typeof next === 'number' && Number.isInteger(next) && next > offset ? next : null,
+	};
 }
 
 export async function save_library_photo_draft(

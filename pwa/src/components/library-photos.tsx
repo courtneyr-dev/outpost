@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { is_safe_http_url } from '../lib/url-validation';
 import { ExternalLink } from './external-link';
 import {
+	AUTHORIZATION_HEADER_MISSING,
+	LibraryPhotosError,
 	list_library_photos,
 	save_library_photo_draft,
 	type AltChoice,
@@ -20,6 +22,13 @@ import {
  * Alt text is the author's call. A stored alt someone wrote pre-fills the
  * field. Alt text embedded in the file is offered beside it as a suggestion
  * the author applies with a button, never automatically.
+ *
+ * Focus stays inside the drawer while WordPress answers (WCAG 2.2 SC 2.4.3,
+ * WAI-ARIA modal dialog pattern): buttons that start a request are marked
+ * `aria-disabled` rather than `disabled`, and the search field goes
+ * read-only, because disabling the focused control drops focus to the page
+ * behind the scrim. If the focused control goes away anyway, focus moves to
+ * the error, the image list or the chooser itself.
  */
 
 export interface LibraryPhotosProps {
@@ -43,7 +52,13 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState('');
 	const [loaded, setLoaded] = useState(false);
+	const [next_offset, setNextOffset] = useState<number | null>(null);
+	const [query, setQuery] = useState('');
+	const root_ref = useRef<HTMLDivElement>(null);
 	const draft_link_ref = useRef<HTMLAnchorElement>(null);
+	const alt_ref = useRef<HTMLTextAreaElement>(null);
+	const error_ref = useRef<HTMLParagraphElement>(null);
+	const select_ref = useRef<HTMLSelectElement>(null);
 
 	// Saving disables the focused Save button, which would drop focus to the
 	// page. Move it to the link that opens the new draft instead.
@@ -51,17 +66,39 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 		if (saved) draft_link_ref.current?.focus();
 	}, [saved]);
 
+	// After a request settles, keep focus in the drawer if the control that
+	// had it went away (a "Load more" button on the last page, for one).
+	const was_busy_ref = useRef(false);
+	useEffect(() => {
+		const settled = was_busy_ref.current && !busy;
+		was_busy_ref.current = busy;
+		if (!settled) return;
+		const root = root_ref.current;
+		if (!root || root.contains(document.activeElement)) return;
+		const target = (error ? error_ref.current : null) ?? select_ref.current ?? root;
+		target.focus();
+	}, [busy, error]);
+
 	const load = useCallback(
-		async (query: string): Promise<void> => {
+		async (search_text: string, offset: number): Promise<void> => {
 			setBusy(true);
 			setError('');
-			setSelected(null);
-			setSaved(null);
+			if (offset === 0) {
+				setSelected(null);
+				setSaved(null);
+			}
 			try {
-				setImages(await list_library_photos(token, query, env));
+				const page = await list_library_photos(token, search_text, offset, env);
+				setImages((current) => {
+					if (offset === 0) return page.images;
+					const known = new Set(current.map((image) => image.id));
+					return current.concat(page.images.filter((image) => !known.has(image.id)));
+				});
+				setNextOffset(page.nextOffset);
+				setQuery(search_text);
 				setLoaded(true);
-			} catch {
-				setError('WordPress did not return the Media Library images.');
+			} catch (caught) {
+				setError(failure_message(caught, 'WordPress did not return the Media Library images.'));
 			} finally {
 				setBusy(false);
 			}
@@ -70,7 +107,7 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 	);
 
 	useEffect(() => {
-		void load('');
+		void load('', 0);
 	}, [load]);
 
 	const choose = (id: number): void => {
@@ -92,22 +129,36 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 			: null;
 
 	const save = async (): Promise<void> => {
-		if (!selected || !alt_choice) return;
+		if (busy || saved || !selected || !alt_choice) return;
 		setBusy(true);
 		setError('');
 		try {
 			setSaved(await save_library_photo_draft(token, selected.id, alt_choice, env));
-		} catch {
-			setError('WordPress did not save the photo draft. The image may be unavailable or still processing.');
+		} catch (caught) {
+			setError(
+				failure_message(
+					caught,
+					'WordPress did not save the photo draft. The image may be unavailable or still processing.',
+				),
+			);
 		} finally {
 			setBusy(false);
 		}
 	};
 
+	const apply_suggestion = (text: string): void => {
+		setAlt(text);
+		// The suggestion button disappears once applied; move focus to the
+		// field it filled so the author can review or edit the text.
+		alt_ref.current?.focus();
+	};
+
+	const save_disabled = busy || saved !== null || alt_choice === null;
+
 	const suggestion = selected?.embeddedAlt ?? '';
 
 	return (
-		<div class="outpost-form-row outpost-library-photos" aria-busy={busy}>
+		<div class="outpost-form-row outpost-library-photos" aria-busy={busy} ref={root_ref} tabIndex={-1}>
 			{local_url(libraryUrl) && (
 				<p>
 					<ExternalLink href={libraryUrl}>Upload or process images in WordPress</ExternalLink>
@@ -118,7 +169,7 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 				class="outpost-form-row"
 				onSubmit={(event): void => {
 					event.preventDefault();
-					void load(search.trim());
+					if (!busy) void load(search.trim(), 0);
 				}}
 			>
 				<label class="outpost-label" for="outpost-library-search">
@@ -130,9 +181,9 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 					type="search"
 					value={search}
 					onInput={(event): void => setSearch(event.currentTarget.value)}
-					disabled={busy}
+					readOnly={busy}
 				/>
-				<button class="outpost-button outpost-button--secondary" type="submit" disabled={busy}>
+				<button class="outpost-button outpost-button--secondary" type="submit" aria-disabled={busy}>
 					Search Media Library
 				</button>
 			</form>
@@ -145,6 +196,7 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 					<select
 						class="outpost-input"
 						id="outpost-library-image"
+						ref={select_ref}
 						value={selected ? String(selected.id) : ''}
 						disabled={busy}
 						onChange={(event): void => choose(Number(event.currentTarget.value))}
@@ -156,6 +208,18 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 							</option>
 						))}
 					</select>
+					{next_offset !== null && (
+						<button
+							class="outpost-button outpost-button--secondary"
+							type="button"
+							aria-disabled={busy}
+							onClick={(): void => {
+								if (!busy) void load(query, next_offset);
+							}}
+						>
+							Load more images
+						</button>
+					)}
 				</>
 			)}
 			{loaded && images.length === 0 && <p>No matching images are ready to use.</p>}
@@ -178,9 +242,11 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 					<textarea
 						class="outpost-textarea"
 						id="outpost-library-alt"
+						ref={alt_ref}
 						rows={2}
 						value={alt}
-						disabled={busy || decorative}
+						readOnly={busy}
+						disabled={decorative}
 						onInput={(event): void => setAlt(event.currentTarget.value)}
 					/>
 					{suggestion && suggestion !== alt && !decorative && (
@@ -192,8 +258,10 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 								class="outpost-button outpost-button--secondary"
 								type="button"
 								aria-describedby="outpost-library-embedded-alt"
-								disabled={busy}
-								onClick={(): void => setAlt(suggestion)}
+								aria-disabled={busy}
+								onClick={(): void => {
+									if (!busy) apply_suggestion(suggestion);
+								}}
 							>
 								Use embedded alt text
 							</button>
@@ -217,14 +285,14 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 						class="outpost-button"
 						type="button"
 						onClick={(): void => void save()}
-						disabled={busy || saved !== null || alt_choice === null}
+						aria-disabled={save_disabled}
 					>
 						Save photo as WordPress draft
 					</button>
 				</>
 			)}
 
-			<p role="alert" class={'outpost-error' + (error ? '' : ' outpost-error--empty')}>
+			<p role="alert" ref={error_ref} tabIndex={-1} class={'outpost-error' + (error ? '' : ' outpost-error--empty')}>
 				{error}
 			</p>
 			<p role="status" class="outpost-status">
@@ -242,4 +310,12 @@ export function LibraryPhotos({ token, libraryUrl, env }: LibraryPhotosProps): p
 			</p>
 		</div>
 	);
+}
+
+/** The message for a failed request, naming the fix when the host dropped the token. */
+function failure_message(caught: unknown, fallback: string): string {
+	if (caught instanceof LibraryPhotosError && caught.code === AUTHORIZATION_HEADER_MISSING) {
+		return 'WordPress did not receive your sign-in: the web server removed the Authorization header. Ask your host to forward it to PHP (on Apache, add "CGIPassAuth On" to .htaccess).';
+	}
+	return fallback;
 }
