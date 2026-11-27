@@ -301,9 +301,11 @@ final class Outpost_Micropub_Bridges {
 	 *
 	 * An explicit empty alt is persisted (not skipped): it is the client's
 	 * decorative choice, and the AP spec is fine with an empty
-	 * `attachment[].name`. An absent alt writes nothing, so the alt WordPress
-	 * imported from the file's embedded IPTC metadata on upload (7.0+) is
-	 * kept instead of being wiped.
+	 * `attachment[].name`. An absent alt writes nothing, so an alt the
+	 * attachment already stores is kept instead of being wiped: for example
+	 * one WordPress imported from the file's IPTC metadata when the image was
+	 * uploaded to the Media Library (7.0+). A photo the Micropub plugin
+	 * uploads fresh gets no imported alt, and this bridge adds none.
 	 *
 	 * @param int                  $post_id    Post ID.
 	 * @param array<string, mixed> $properties Flat properties map from `extract_properties()`.

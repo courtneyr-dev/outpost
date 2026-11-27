@@ -976,9 +976,10 @@ final class MicropubBridgesTest extends \WP_Mock\Tools\TestCase {
 		$this->assertTrue( true );
 	}
 
-	public function test_apply_photo_alt_keeps_imported_alt_when_client_sends_none(): void {
-		// No alt at all is not a decorative choice. WordPress 7.0+ imports the
-		// file's embedded IPTC alt on upload; writing '' here would wipe it.
+	public function test_apply_photo_alt_keeps_existing_stored_alt_when_client_sends_none(): void {
+		// No alt at all is not a decorative choice. The attachment may already
+		// store an alt (for example one imported when it was uploaded to the
+		// Media Library); writing '' here would wipe it.
 		WP_Mock::userFunction( 'attachment_url_to_postid' )->andReturn( 101 );
 		WP_Mock::userFunction( 'wp_get_post_parent_id' )->andReturn( 42 );
 		WP_Mock::userFunction( 'current_user_can' )->with( 'edit_post', 101 )->andReturn( true );
