@@ -266,9 +266,9 @@ final class Outpost_Library_Photos_Endpoint {
 
 	/**
 	 * Whether this WordPress's core/image block has the `isDecorative`
-	 * attribute (added in 7.2). Earlier versions express decorative only as
-	 * `alt=""`; sending the attribute and `role="none"` there would make the
-	 * editor flag the block invalid.
+	 * attribute (7.1.5 and 7.2 do). Versions without it express decorative
+	 * only as `alt=""`; sending the attribute and `role="none"` there would
+	 * make the editor flag the block invalid.
 	 */
 	private static function core_supports_decorative(): bool {
 		$block_type = WP_Block_Type_Registry::get_instance()->get_registered( 'core/image' );

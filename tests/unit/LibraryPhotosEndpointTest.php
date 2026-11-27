@@ -117,7 +117,7 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertStringContainsString( 'alt="Tom &amp; Jerry say &quot;hi&quot; &lt;b&gt;"', $block );
 	}
 
-	public function test_decorative_block_round_trips_into_core_image_on_72(): void {
+	public function test_decorative_block_round_trips_into_core_image_when_supported(): void {
 		$block = Outpost_Library_Photos_Endpoint::image_block(
 			$this->image(),
 			'https://example.test/a.jpg',
@@ -131,7 +131,7 @@ final class LibraryPhotosEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertStringContainsString( 'alt="" class="wp-image-5" role="none"/>', $block );
 	}
 
-	public function test_decorative_block_is_plain_empty_alt_before_72(): void {
+	public function test_decorative_block_is_plain_empty_alt_without_core_support(): void {
 		$block = Outpost_Library_Photos_Endpoint::image_block(
 			$this->image(),
 			'https://example.test/a.jpg',
