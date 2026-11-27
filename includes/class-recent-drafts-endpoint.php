@@ -49,8 +49,21 @@ final class Outpost_Recent_Drafts_Endpoint {
 		);
 	}
 
+	/**
+	 * Credential first, then capability, each refusing where it runs.
+	 *
+	 * The picker edits existing drafts, so a token needs the `update` scope.
+	 * A cookie session needs a valid REST nonce. Per-draft ownership is
+	 * checked in the callback, where the draft ID is known.
+	 *
+	 * @param WP_REST_Request $request Current request.
+	 * @return bool Whether the request may list or edit its own drafts.
+	 */
 	public static function permission_check( WP_REST_Request $request ): bool {
-		return current_user_can( 'edit_posts' ) && self::bearer_has_scope( $request, array( 'update' ) );
+		if ( ! self::bearer_has_scope( $request, array( 'update' ) ) ) {
+			return false;
+		}
+		return current_user_can( 'edit_posts' );
 	}
 
 	/** @return WP_REST_Response|WP_Error */
@@ -121,7 +134,9 @@ final class Outpost_Recent_Drafts_Endpoint {
 
 	/** @return array{items: list<array{id: int, title: string}>, hasNext: bool}|WP_Error */
 	private static function query_drafts( int $user_id, int $page ) {
-		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'core/content-query' ) : null;
+		// Core 7.2 ships core/content-query. Older Core keeps the WP_Query path,
+		// and wp_get_ability() on an unregistered name raises _doing_it_wrong().
+		$ability = function_exists( 'wp_has_ability' ) && wp_has_ability( 'core/content-query' ) ? wp_get_ability( 'core/content-query' ) : null;
 		if ( $ability ) {
 			$result = $ability->execute(
 				array(
@@ -137,6 +152,13 @@ final class Outpost_Recent_Drafts_Endpoint {
 					),
 				)
 			);
+			// A page past the last one is an empty page, as on the WP_Query path.
+			if ( is_wp_error( $result ) && 'content_invalid_page_number' === $result->get_error_code() ) {
+				return array(
+					'items'   => array(),
+					'hasNext' => false,
+				);
+			}
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
