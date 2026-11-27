@@ -50,6 +50,7 @@ export interface PostKindsCapabilities {
 export interface ComposerConfig {
 	companions: Record<CompanionId, CompanionStatus>;
 	draftEndpoint?: string | null;
+	recentDrafts?: boolean;
 	/** Absent on servers (and cached configs) older than outpost#243. */
 	postKinds?: PostKindsCapabilities;
 	postFormats: string[] | null;

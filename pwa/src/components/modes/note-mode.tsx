@@ -16,6 +16,7 @@ import { GeocodePicker } from '../geocode-picker';
 import { geo_uri, type GeocodeResult } from '../../lib/geocode';
 import { CharCounter } from '../char-counter';
 import { Drawer } from '../drawer';
+import { RecentDrafts } from '../recent-drafts';
 import { draft_text, read_draft, useDraft } from '../../lib/drafts';
 import { DraftStatus } from '../draft-status';
 import { is_safe_http_url } from '../../lib/url-validation';
@@ -261,6 +262,7 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 	});
 
 	const [more_open, setMoreOpen] = useMoreOpen();
+	const [drafts_open, setDraftsOpen] = useState(false);
 	const config = VARIANTS[variant];
 	const a11y_active = composerConfig?.companions['accessibility-checker'] === 'active';
 
@@ -512,8 +514,26 @@ export function NoteMode({ token, micropubEnv, composerConfig, onSignInExpired }
 						>
 							More options
 						</button>
+						{composerConfig.recentDrafts === true && token.scope.split(/\s+/).includes('update') && (
+							<button
+								class="outpost-button outpost-button--secondary"
+								type="button"
+								onClick={() => setDraftsOpen(true)}
+							>
+								Recent WordPress drafts
+							</button>
+						)}
 					</div>
 				)}
+
+				<Drawer
+					open={drafts_open}
+					onClose={() => setDraftsOpen(false)}
+					title="Recent WordPress drafts"
+					idPrefix="outpost-recent-drafts"
+				>
+					{drafts_open && <RecentDrafts token={token.accessToken} />}
+				</Drawer>
 
 				{/* Persistent live regions stay mounted for iOS VoiceOver. */}
 				<div
