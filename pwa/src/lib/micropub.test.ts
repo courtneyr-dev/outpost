@@ -120,6 +120,54 @@ describe('save a WordPress draft', () => {
 		expect(result).toEqual({ draftEditUrl: edit_url });
 	});
 
+	it('sends the token only in the Authorization header', async () => {
+		let url = '';
+		let init: RequestInit | undefined;
+		await post_h_entry(draft, {
+			fetch: async (input, request) => {
+				url = String(input);
+				init = request;
+				return make_response({ status: 201 });
+			},
+		});
+		expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer abc123');
+		expect(new URLSearchParams(String(init?.body)).has('access_token')).toBe(false);
+		expect(String(init?.body)).not.toContain('abc123');
+		expect(url).not.toContain('abc123');
+	});
+
+	it('returns the editor URL when Micropub saved an ordinary post as a draft', async () => {
+		const edit_url = 'https://example.test/wp-admin/post.php?post=73&action=edit';
+		const result = await post_h_entry(
+			{ properties: { content: 'Contributor post' }, accessToken: 'abc123', micropubEndpoint: draft.micropubEndpoint },
+			{
+				fetch: async () =>
+					make_response({
+						status: 201,
+						headers: { Location: 'https://example.test/?p=73', 'X-Outpost-Draft-Edit': edit_url },
+					}),
+			},
+		);
+		expect(result).toEqual({ location: 'https://example.test/?p=73', draftEditUrl: edit_url });
+	});
+
+	it('ignores an editor URL on another origin for an ordinary post', async () => {
+		const result = await post_h_entry(
+			{ properties: { content: 'Contributor post' }, accessToken: 'abc123', micropubEndpoint: draft.micropubEndpoint },
+			{
+				fetch: async () =>
+					make_response({
+						status: 201,
+						headers: {
+							Location: 'https://example.test/?p=73',
+							'X-Outpost-Draft-Edit': 'https://wrong.example/wp-admin/post.php?post=73&action=edit',
+						},
+					}),
+			},
+		);
+		expect(result).toEqual({ location: 'https://example.test/?p=73' });
+	});
+
 	it.each([undefined, 'javascript:alert(1)', 'https://wrong.example/wp-admin/post.php?post=72'])(
 		'does not treat the preview URL as an editor link when the edit header is %s',
 		async (edit_url) => {

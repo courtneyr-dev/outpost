@@ -89,13 +89,6 @@ describe('RecentDrafts', () => {
 			'outpost-recent-drafts-page'
 		);
 
-		// What the list showed at the moment focus moved to the page label.
-		const list_at_focus: Array<string | null> = [];
-		root.addEventListener('focusin', () =>
-			list_at_focus.push(
-				root.querySelector('ul button')?.textContent ?? null
-			)
-		);
 		(await button('Next drafts')).click();
 		await settle();
 		expect(await button('Older draft')).toBeTruthy();
@@ -110,7 +103,6 @@ describe('RecentDrafts', () => {
 			)
 		);
 		expect(document.activeElement?.textContent).toBe('Your drafts, page 2');
-		expect(list_at_focus).toEqual(['Older draft']);
 
 		(await button('Previous drafts')).click();
 		await vi.waitFor(() =>
@@ -120,6 +112,41 @@ describe('RecentDrafts', () => {
 				'1',
 			])
 		);
+	});
+
+	it('moves focus to the page label before the pressed button goes away', async () => {
+		const { env } = site();
+		let release_page_two: (() => void) | null = null;
+		const held: RecentDraftsEnvironment = {
+			fetch: ((input: RequestInfo | URL, init?: RequestInit) => {
+				const fields = new URLSearchParams(String(init?.body));
+				if (fields.get('page') !== '2') return env.fetch(input, init);
+				return new Promise<Response>((resolve) => {
+					release_page_two = () => resolve(Response.json(PAGES['2']));
+				});
+			}) as typeof fetch,
+		};
+		render(<RecentDrafts token="tk" env={held} />, root);
+		await settle();
+
+		const next = await button('Next drafts');
+		next.focus();
+		next.click();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		// The Next button is gone before WordPress is even asked.
+		expect(next.isConnected).toBe(false);
+		expect(document.activeElement?.id).toBe('outpost-recent-drafts-page');
+
+		// WordPress has the request and has not answered.
+		await vi.waitFor(() => expect(release_page_two).not.toBeNull());
+		expect(root.querySelector('[aria-busy="true"]')).not.toBeNull();
+		expect(document.activeElement?.id).toBe('outpost-recent-drafts-page');
+
+		release_page_two!();
+		await settle();
+		expect(document.activeElement?.id).toBe('outpost-recent-drafts-page');
+		expect(document.activeElement?.textContent).toBe('Your drafts, page 2');
 	});
 
 	it('sends the token only in the Authorization header, without cookies', async () => {

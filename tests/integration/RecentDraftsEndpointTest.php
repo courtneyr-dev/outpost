@@ -45,6 +45,9 @@ final class RecentDraftsEndpointTest extends TestCase {
 	/** @var int[] */
 	private array $extra_posts = array();
 
+	/** @var int[] */
+	private array $extra_users = array();
+
 	protected function setUp(): void {
 		parent::setUp();
 		if ( ! function_exists( 'wp_insert_user' ) ) {
@@ -76,7 +79,7 @@ final class RecentDraftsEndpointTest extends TestCase {
 			}
 		}
 		require_once ABSPATH . 'wp-admin/includes/user.php';
-		foreach ( array( $this->author_id, $this->other_id ) as $user_id ) {
+		foreach ( array_merge( array( $this->author_id, $this->other_id ), $this->extra_users ) as $user_id ) {
 			if ( $user_id > 0 ) {
 				wp_delete_user( $user_id );
 			}
@@ -84,16 +87,28 @@ final class RecentDraftsEndpointTest extends TestCase {
 		parent::tearDown();
 	}
 
-	private function make_author( string $prefix ): int {
+	private function make_author( string $prefix, string $role = 'author' ): int {
 		$login = $prefix . wp_generate_password( 8, false );
 		return (int) wp_insert_user(
 			array(
 				'user_login' => $login,
 				'user_pass'  => wp_generate_password( 24, true ),
 				'user_email' => $login . '@example.test',
-				'role'       => 'author',
+				'role'       => $role,
 			)
 		);
+	}
+
+	/**
+	 * Store fields exactly as given, as if another user had saved them,
+	 * without running the current user's save filters.
+	 *
+	 * @param array<string, string> $fields Post fields.
+	 */
+	private function store_raw( int $post_id, array $fields ): void {
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, $fields, array( 'ID' => $post_id ) );
+		clean_post_cache( $post_id );
 	}
 
 	private function make_post( string $title, string $status, int $author, int $age_minutes, string $type = 'post' ): int {
@@ -329,6 +344,165 @@ final class RecentDraftsEndpointTest extends TestCase {
 		$this->assertSame( 'Saved from Outpost', $post->post_title, 'Titles are sanitized as text.' );
 		$this->assertSame( 'Edited text & more.', $saved->get_data()['content'] );
 		$this->assertNotSame( $opened['version'], $saved->get_data()['version'] );
+	}
+
+	/**
+	 * @test
+	 */
+	public function an_authors_title_edit_keeps_an_editors_embed(): void {
+		$editor_id           = $this->make_author( 'drafts_e_', 'editor' );
+		$this->extra_users[] = $editor_id;
+		$draft_id            = $this->own_drafts[2];
+		$embed               = '<!-- wp:html --><iframe src="https://player.example/embed/1" title="Clip"></iframe><!-- /wp:html -->';
+
+		wp_set_current_user( $editor_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ), 'Precondition: the editor may save an iframe.' );
+		wp_update_post( wp_slash( array( 'ID' => $draft_id, 'post_content' => $embed ) ) );
+		wp_set_current_user( 0 );
+		$this->assertSame( $embed, get_post( $draft_id )->post_content );
+		$this->assertFalse( user_can( $this->author_id, 'unfiltered_html' ), 'Precondition: the author may not.' );
+
+		$opened = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+		$this->assertNull( $opened['content'], 'Formatted content stays in the native editor.' );
+
+		$saved = $this->call(
+			$this->author_id,
+			array(
+				'id'      => (string) $draft_id,
+				'title'   => 'Retitled by the author',
+				'version' => $opened['version'],
+			)
+		);
+
+		$this->assertSame( 200, $saved->get_status() );
+		$post = get_post( $draft_id );
+		$this->assertSame( 'Retitled by the author', $post->post_title );
+		$this->assertSame( $embed, $post->post_content, 'A title edit leaves the editor\'s embed as it was.' );
+	}
+
+	/**
+	 * @test
+	 */
+	public function plain_text_edits_keep_literal_text_and_untouched_fields(): void {
+		$draft_id = $this->own_drafts[3];
+		$text     = 'Read https://example.com/a%20b?q=%2F now';
+		$this->store_raw(
+			$draft_id,
+			array(
+				'post_title'   => 'Trip notes',
+				'post_content' => $text,
+			)
+		);
+		$opened = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+		$this->assertSame( $text, $opened['content'] );
+
+		// A title edit: the picker sends the unchanged content back.
+		$titled = $this->call(
+			$this->author_id,
+			array(
+				'id'      => (string) $draft_id,
+				'title'   => 'Trip %20 plan',
+				'content' => $opened['content'],
+				'version' => $opened['version'],
+			)
+		);
+		$this->assertSame( 200, $titled->get_status() );
+		$this->assertSame( 'Trip %20 plan', get_post( $draft_id )->post_title, 'Percent sequences in a title are text.' );
+		$this->assertSame( $text, get_post( $draft_id )->post_content, 'Unchanged content is not rewritten.' );
+
+		// A content edit: the picker sends the unchanged title back. An editor
+		// gave the title markup the author's own save filters would strip.
+		$this->store_raw( $draft_id, array( 'post_title' => 'Trip <em>%20</em> plan' ) );
+		$reopened = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+		$edited   = $text . ' and https://example.com/c%2Fd & <more>';
+		$saved    = $this->call(
+			$this->author_id,
+			array(
+				'id'      => (string) $draft_id,
+				'title'   => $reopened['title'],
+				'content' => $edited,
+				'version' => $reopened['version'],
+			)
+		);
+		$this->assertSame( 200, $saved->get_status() );
+		$this->assertSame( $edited, $saved->get_data()['content'], 'Edited plain text reopens exactly as typed.' );
+		$this->assertSame( 'Trip <em>%20</em> plan', get_post( $draft_id )->post_title, 'An unchanged title is not rewritten.' );
+	}
+
+	/**
+	 * @test
+	 * @dataProvider query_paths
+	 */
+	public function drafts_saved_in_the_same_second_page_by_id( bool $use_ability ): void {
+		$registered = $use_ability && $this->register_core_content_query();
+		if ( ! $use_ability && function_exists( 'wp_has_ability' ) && wp_has_ability( 'core/content-query' ) ) {
+			$this->markTestSkipped( 'core/content-query is registered, so the WP_Query path cannot run here.' );
+		}
+		$tied_author         = $this->make_author( 'drafts_t_' );
+		$this->extra_users[] = $tied_author;
+		$date                = gmdate( 'Y-m-d H:i:s', time() - 3600 );
+		$tied                = array();
+		for ( $i = 1; $i <= 11; ++$i ) {
+			$post_id = wp_insert_post(
+				array(
+					'post_title'    => 'Tied draft ' . $i,
+					'post_status'   => 'draft',
+					'post_author'   => $tied_author,
+					'post_date'     => $date,
+					'post_date_gmt' => $date,
+				),
+				true
+			);
+			$this->assertIsInt( $post_id );
+			$tied[]              = $post_id;
+			$this->extra_posts[] = $post_id;
+		}
+		try {
+			$first  = $this->call( $tied_author, array( 'page' => '1' ) );
+			$second = $this->call( $tied_author, array( 'page' => '2' ) );
+		} finally {
+			if ( $registered ) {
+				wp_unregister_ability( 'core/content-query' );
+				wp_unregister_ability_category( 'content' );
+			}
+		}
+
+		rsort( $tied );
+		$this->assertSame( array_slice( $tied, 0, 10 ), $this->ids( $first ), 'Equal dates fall back to the newest ID first.' );
+		$this->assertSame( array_slice( $tied, 10 ), $this->ids( $second ), 'The page boundary neither repeats nor skips a draft.' );
+	}
+
+	/**
+	 * @test
+	 */
+	public function a_failed_save_returns_a_generic_error(): void {
+		global $wpdb;
+		$draft_id = $this->own_drafts[4];
+		$opened   = $this->call( $this->author_id, array( 'id' => (string) $draft_id ) )->get_data();
+
+		$break    = static function ( string $query ) use ( $wpdb ): string {
+			return 0 === strpos( $query, "UPDATE `{$wpdb->posts}`" ) ? "UPDATE `{$wpdb->posts}` SET outpost_no_such_column = 1 WHERE ID = 0" : $query;
+		};
+		$suppress = $wpdb->suppress_errors( true );
+		add_filter( 'query', $break );
+		try {
+			$saved = $this->call(
+				$this->author_id,
+				array(
+					'id'      => (string) $draft_id,
+					'title'   => 'Never stored',
+					'version' => $opened['version'],
+				)
+			);
+		} finally {
+			remove_filter( 'query', $break );
+			$wpdb->suppress_errors( $suppress );
+		}
+
+		$this->assertSame( 500, $saved->get_status() );
+		$this->assertSame( 'outpost_draft_save_failed', $saved->get_data()['code'] );
+		$this->assertStringNotContainsString( 'outpost_no_such_column', (string) wp_json_encode( $saved->get_data() ), 'The database error stays on the server.' );
+		$this->assertSame( 'Own draft 5', get_post( $draft_id )->post_title );
 	}
 
 	/**
