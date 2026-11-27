@@ -2,14 +2,14 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Outpost Mobile Publishing 1.0.31\n"
+"Project-Id-Version: Outpost Mobile Publishing 1.0.32\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/outpost-mobile-publishing\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-27T20:44:49+00:00\n"
+"POT-Creation-Date: 2026-11-27T22:02:04+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: outpost-mobile-publishing\n"
@@ -850,6 +850,22 @@ msgstr ""
 msgid "No URL detected in payload."
 msgstr ""
 
+#: includes/class-library-photos-endpoint.php:136
+msgid "WordPress did not receive the Authorization header. Ask your host to forward it to PHP (on Apache, add \"CGIPassAuth On\" to .htaccess)."
+msgstr ""
+
+#: includes/class-library-photos-endpoint.php:180
+msgid "This image is not ready or you cannot use it."
+msgstr ""
+
+#: includes/class-library-photos-endpoint.php:188
+msgid "The original image is unavailable."
+msgstr ""
+
+#: includes/class-library-photos-endpoint.php:200
+msgid "Add alt text or mark the image as decorative."
+msgstr ""
+
 #: includes/class-manual-share-controller.php:173
 msgid "Outpost manual-share intent firing requires an authenticated user."
 msgstr ""
@@ -950,23 +966,23 @@ msgstr ""
 msgid "Too many lookups. Try again in a minute."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:194
+#: includes/class-outpost-uninstaller.php:195
 msgid "Deactivation stopped: Outpost could not delete the iOS Shortcut application password, so Outpost stays active and that password stays limited to the Shortcut. Try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:195
+#: includes/class-outpost-uninstaller.php:196
 msgid "Outpost is still active"
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:210
+#: includes/class-outpost-uninstaller.php:211
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password, so it turned itself back on to keep that password limited to the Shortcut. Try again, or revoke the password under Users → Profile → Application Passwords."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:211
+#: includes/class-outpost-uninstaller.php:212
 msgid "Uninstall stopped: Outpost could not delete the iOS Shortcut application password and could not turn itself back on, so that password is not limited to the Shortcut. Revoke it under Users → Profile → Application Passwords, then try again."
 msgstr ""
 
-#: includes/class-outpost-uninstaller.php:214
+#: includes/class-outpost-uninstaller.php:215
 msgid "Outpost uninstall stopped"
 msgstr ""
 
@@ -1072,7 +1088,7 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:411
-#: outpost.php:649
+#: outpost.php:653
 #, php-format
 msgid "Install %s"
 msgstr ""
@@ -1085,14 +1101,14 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:426
-#: outpost.php:634
+#: outpost.php:638
 #, php-format
 msgid "Activate %s"
 msgstr ""
 
 #. translators: %s: plugin name.
 #: includes/class-pwa-shell.php:431
-#: outpost.php:639
+#: outpost.php:643
 #, php-format
 msgid "Outpost needs the %s plugin to be activated before the composer can run."
 msgstr ""
@@ -1124,7 +1140,7 @@ msgstr ""
 
 #. translators: 1: minimum WP version, 2: minimum PHP version.
 #: includes/class-pwa-shell.php:489
-#: outpost.php:697
+#: outpost.php:701
 #, php-format
 msgid "Outpost requires WordPress %1$s or newer and PHP %2$s or newer."
 msgstr ""
@@ -2105,13 +2121,13 @@ msgid "YouTube"
 msgstr ""
 
 #. translators: %s: plugin name.
-#: outpost.php:654
+#: outpost.php:658
 #, php-format
 msgid "Outpost requires the %s plugin. Install it from WordPress.org to continue."
 msgstr ""
 
 #. translators: %s: installed Micropub plugin version.
-#: outpost.php:817
+#: outpost.php:821
 #, php-format
 msgid "Outpost: the installed Micropub plugin (version %s) can report success for posts that failed to save. Update Micropub to 2.5.1 or newer so failed posts show a real error instead."
 msgstr ""

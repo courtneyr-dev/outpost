@@ -3,7 +3,7 @@
  * Plugin Name:       Outpost Mobile Publishing
  * Plugin URI:        https://github.com/courtneyr-dev/outpost
  * Description:       Mobile-first Progressive Web App composer for IndieWeb POSSE workflows. Post notes, replies, likes, photos, and life-tracking entries from your phone, with one-tap syndication. Requires the Micropub plugin.
- * Version:           1.0.31
+ * Version:           1.0.32
  * Requires at least: 6.5
  * Requires PHP:      8.2
  * Requires Plugins:  indieauth, micropub
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin metadata constants.
-define( 'OUTPOST_VERSION', '1.0.31' );
+define( 'OUTPOST_VERSION', '1.0.32' );
 define( 'OUTPOST_PLUGIN_FILE', __FILE__ );
 define( 'OUTPOST_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OUTPOST_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -79,6 +79,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-invali
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-config.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-platform-registry.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-audit-log.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-image-block-uses.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-intent-payload-builder.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-pending-capture-detector.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/companions/manual-share/class-syndication-writeback.php';
@@ -236,6 +237,7 @@ require_once OUTPOST_PLUGIN_DIR . 'includes/class-manual-share-status-controller
 require_once OUTPOST_PLUGIN_DIR . 'includes/abilities/class-outpost-abilities.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-micropub-bridges.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-recent-drafts-endpoint.php';
+require_once OUTPOST_PLUGIN_DIR . 'includes/class-library-photos-endpoint.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-outpost-image-caption-renderer.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-admin-page.php';
 require_once OUTPOST_PLUGIN_DIR . 'includes/class-settings.php';
@@ -286,6 +288,8 @@ add_action(
 		Outpost_Composer_Config_Endpoint::register();
 
 		Outpost_Recent_Drafts_Endpoint::register();
+		// Register the /wp-json/outpost/v1/library-photos REST route (Media Library reuse).
+		Outpost_Library_Photos_Endpoint::register();
 		// Register the /wp-json/outpost/v1/geocode REST route (Checkin coordinates).
 		Outpost_Geocode_Endpoint::register();
 		// Register the /wp-json/outpost/v1/lookup REST route (Post Kinds metadata proxy).

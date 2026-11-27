@@ -268,7 +268,21 @@ final class ComposerConfigEndpointTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( array( 'comics' => false ), $payload['postKinds'] );
 	}
 
-	private function mock_config_dependencies( bool $post_kinds_active = false ): void {
+	// --- Media Library reuse -------------------------------------------------
+
+	public function test_media_library_url_is_offered_only_to_users_who_can_upload(): void {
+		$this->mock_config_dependencies( false, true );
+		$this->assertSame( 'https://example.test/wp-admin/upload.php?mode=grid', Outpost_Composer_Config_Endpoint::build_payload()['mediaLibraryUrl'] );
+	}
+
+	public function test_media_library_url_is_null_without_upload_files(): void {
+		$this->mock_config_dependencies();
+		$this->assertNull( Outpost_Composer_Config_Endpoint::build_payload()['mediaLibraryUrl'] );
+	}
+
+	private function mock_config_dependencies( bool $post_kinds_active = false, bool $can_upload = false ): void {
+		WP_Mock::userFunction( 'current_user_can' )->with( 'upload_files' )->andReturn( $can_upload );
+		WP_Mock::userFunction( 'admin_url' )->andReturnUsing( static fn ( string $path = '' ): string => 'https://example.test/wp-admin/' . $path );
 		WP_Mock::userFunction( 'is_plugin_active' )->andReturnUsing(
 			static fn ( string $file ): bool => $post_kinds_active && OUTPOST_POST_KINDS_PLUGIN_FILE === $file
 		);

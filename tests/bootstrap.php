@@ -505,6 +505,49 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	}
 }
 
+// Stand-in for core's WP_HTML_Tag_Processor covering next_tag() by tag name
+// and get_attribute(). libxml's HTML parser backs it, so a missing attribute
+// (null) and an empty one ('') stay distinct and entities decode, as in core.
+// The integration suite runs core's own class against the same markup.
+if ( ! class_exists( 'WP_HTML_Tag_Processor' ) ) {
+	class WP_HTML_Tag_Processor {
+		/** @var list<DOMElement> */
+		private array $tags = array();
+
+		private int $index = -1;
+
+		public function __construct( string $html ) {
+			$doc      = new DOMDocument();
+			$previous = libxml_use_internal_errors( true );
+			$doc->loadHTML( '<?xml encoding="UTF-8"><body>' . $html . '</body>' );
+			libxml_clear_errors();
+			libxml_use_internal_errors( $previous );
+			foreach ( $doc->getElementsByTagName( 'body' )->item( 0 )?->getElementsByTagName( '*' ) ?? array() as $element ) {
+				$this->tags[] = $element;
+			}
+		}
+
+		/**
+		 * @param array{tag_name?: string}|string|null $query
+		 */
+		public function next_tag( $query = null ): bool {
+			$name = strtolower( is_array( $query ) ? (string) ( $query['tag_name'] ?? '' ) : (string) $query );
+			while ( isset( $this->tags[ ++$this->index ] ) ) {
+				if ( '' === $name || strtolower( $this->tags[ $this->index ]->nodeName ) === $name ) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		/** @return string|null */
+		public function get_attribute( string $name ) {
+			$element = $this->tags[ $this->index ] ?? null;
+			return null !== $element && $element->hasAttribute( $name ) ? $element->getAttribute( $name ) : null;
+		}
+	}
+}
+
 // Minimal WP_Post stub for unit tests. Real WP supplies the full class; F10
 // IntentPayloadBuilder + future post-meta tests need a constructable object
 // whose properties round-trip through `instanceof WP_Post` checks.
@@ -514,6 +557,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public int $post_author       = 0;
 		public string $post_title     = '';
 		public string $post_content   = '';
+		public string $post_excerpt   = '';
 		public string $post_status    = '';
 		public string $post_type      = '';
 		public int $post_parent       = 0;
@@ -548,6 +592,17 @@ if ( ! class_exists( 'WP_Term' ) ) {
 				}
 			}
 		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Attachments_Controller' ) ) {
+	/**
+	 * Minimal stand-in so a finalize handler can be identified by class.
+	 */
+	class WP_REST_Attachments_Controller {
+		public function finalize_item(): void {}
+
+		public function create_item(): void {}
 	}
 }
 

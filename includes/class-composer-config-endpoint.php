@@ -351,6 +351,7 @@ final class Outpost_Composer_Config_Endpoint {
 	 *     companions: array<string, string>,
 	 *     draftEndpoint: string|null,
 	 *     recentDrafts: bool,
+	 *     mediaLibraryUrl: string|null,
 	 *     postKinds: array{comics: bool},
 	 *     postFormats: array<int, string>|null,
 	 *     xfnRels: array<int, string>,
@@ -397,6 +398,7 @@ final class Outpost_Composer_Config_Endpoint {
 			'companions'         => $companions,
 			'recentDrafts'       => true,
 			'draftEndpoint'      => defined( 'MICROPUB_PLUGIN_VERSION' ) ? Outpost_Micropub_Bridges::draft_endpoint() : null,
+			'mediaLibraryUrl'    => current_user_can( 'upload_files' ) ? admin_url( 'upload.php?mode=grid' ) : null,
 			'postKinds'          => array(
 				'comics' => 'active' === $companions['post-kinds'] && Outpost_Post_Kinds_Adapter::supports_comics(),
 			),

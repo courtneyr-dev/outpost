@@ -318,6 +318,117 @@ final class IntentPayloadBuilderTest extends \WP_Mock\Tools\TestCase {
 		$this->assertSame( array(), $payload['files'] );
 	}
 
+	public function test_reused_library_images_are_shared_with_their_per_use_alt(): void {
+		// A photo draft made from the Media Library keeps the image's original
+		// parent, so get_attached_media() for this post doesn't return it.
+		$this->attached_image_ids = array( 101 );
+		$this->post_title         = '';
+		$this->post_content       = '<!-- wp:image {"id":300} -->...<!-- /wp:image --><!-- wp:image {"id":301,"isDecorative":true} -->...<!-- /wp:image -->';
+		$this->meta_store[300]['_wp_attachment_image_alt'] = 'Shared alt written for another post';
+		$this->meta_store[301]['_wp_attachment_image_alt'] = 'Shared alt that must not replace the decorative choice';
+		$this->meta_store[101]['_wp_attachment_image_alt'] = 'Attached image alt';
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn(
+			array(
+				array(
+					'blockName'   => 'core/image',
+					'attrs'       => array( 'id' => 300 ),
+					'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="Alt for this post &amp; no other" class="wp-image-300"/></figure>',
+					'innerBlocks' => array(),
+				),
+				array(
+					'blockName'   => 'core/image',
+					'attrs'       => array(
+						'id'           => 301,
+						'isDecorative' => true,
+					),
+					'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="" class="wp-image-301" role="none"/></figure>',
+					'innerBlocks' => array(),
+				),
+			)
+		);
+		WP_Mock::userFunction( 'get_post_type' )->andReturn( 'attachment' );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'read_post', \Mockery::type( 'int' ) )->andReturn( true );
+
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_android(
+			$this->platform_config_for( 'instagram-feed' ),
+			42
+		);
+
+		$this->assertSame(
+			array(
+				array( 'https://example.com/img-300.jpg', 'Alt for this post & no other' ),
+				array( 'https://example.com/img-301.jpg', '' ),
+				array( 'https://example.com/img-101.jpg', 'Attached image alt' ),
+			),
+			array_map( static fn( array $f ): array => array( $f['url'], $f['alt'] ), $payload['files'] )
+		);
+	}
+
+	public function test_block_image_without_an_alt_attribute_shares_the_attachment_alt(): void {
+		// An attached image a block shows with no `alt` attribute keeps the
+		// shared alt it carried before the block was read; alt="" stays empty.
+		$this->attached_image_ids = array( 302 );
+		$this->post_title         = '';
+		$this->post_content       = '<!-- wp:image {"id":302} -->...<!-- /wp:image --><!-- wp:image {"id":303} -->...<!-- /wp:image -->';
+		$this->meta_store[302]['_wp_attachment_image_alt'] = 'Shared alt';
+		$this->meta_store[303]['_wp_attachment_image_alt'] = 'Shared alt that alt="" overrides';
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn(
+			array(
+				array(
+					'blockName'   => 'core/image',
+					'attrs'       => array( 'id' => 302 ),
+					'innerHTML'   => '<figure class="wp-block-image"><img src="x" class="wp-image-302"/></figure>',
+					'innerBlocks' => array(),
+				),
+				array(
+					'blockName'   => 'core/image',
+					'attrs'       => array( 'id' => 303 ),
+					'innerHTML'   => '<figure class="wp-block-image"><img src="x" alt="" class="wp-image-303"/></figure>',
+					'innerBlocks' => array(),
+				),
+			)
+		);
+		WP_Mock::userFunction( 'get_post_type' )->andReturn( 'attachment' );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'read_post', \Mockery::type( 'int' ) )->andReturn( true );
+
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_android(
+			$this->platform_config_for( 'instagram-feed' ),
+			42
+		);
+
+		$this->assertSame(
+			array(
+				array( 'https://example.com/img-302.jpg', 'Shared alt' ),
+				array( 'https://example.com/img-303.jpg', '' ),
+			),
+			array_map( static fn( array $f ): array => array( $f['url'], $f['alt'] ), $payload['files'] )
+		);
+	}
+
+	public function test_block_image_the_user_cannot_read_is_left_out(): void {
+		$this->attached_image_ids = array();
+		$this->post_content       = '<!-- wp:image {"id":300} -->...<!-- /wp:image -->';
+		WP_Mock::userFunction( 'parse_blocks' )->andReturn(
+			array(
+				array(
+					'blockName'   => 'core/image',
+					'attrs'       => array( 'id' => 300 ),
+					'innerHTML'   => '<img src="x" alt="Private" class="wp-image-300"/>',
+					'innerBlocks' => array(),
+				),
+			)
+		);
+		WP_Mock::userFunction( 'get_post_type' )->andReturn( 'attachment' );
+		WP_Mock::userFunction( 'current_user_can' )->with( 'read_post', 300 )->andReturn( false );
+
+		$payload = Outpost_Manual_Share_Intent_Payload_Builder::build_for_android(
+			$this->platform_config_for( 'instagram-feed' ),
+			42
+		);
+
+		$this->assertSame( array(), $payload['files'] );
+	}
+
 	// =====================================================================
 	// F11: iOS payload (build_for_ios)
 	// =====================================================================
